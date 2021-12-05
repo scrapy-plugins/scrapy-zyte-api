@@ -1,6 +1,5 @@
 import os
 
-from aiohttp import ClientSession, BasicAuth
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
@@ -9,47 +8,33 @@ from scrapy.responsetypes import responsetypes
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
 from twisted.internet.defer import Deferred, inlineCallbacks
-
-
-# class APIContextManager:
-#     async def __aenter__(self):
-#         self._session = aiohttp.ClientSession()
-#         return self
-#
-#     async def __aexit__(self, *err):
-#         await self._session.close()
-#         self._session = None
-#
-#     async def fetch(self, url):
-#         async with self._session.get(url) as resp:
-#             resp.raise_for_status()
-#             return await resp.read()
+from zyte_api.aio.client import AsyncClient
 
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def __init__(self, settings: Settings, crawler: Crawler):
         super().__init__(settings=settings, crawler=crawler)
-        self._session: ClientSession = ClientSession()
+        self._client: AsyncClient = AsyncClient()
+        # TODO Think about concurrent requests implementation
+        # TODO Think about sessions reusing
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         return deferred_from_coro(self._download_request(request, spider))
 
     async def _download_request(self, request: Request, spider: Spider):
-        api_url = "https://api.zyte.com/v1/extract"
-        data = {"url": request.url, "browserHtml": True}
-        headers = {'Content-Type': 'application/json'}
-        aio_response = await self._session.post(api_url,
-                                                auth=BasicAuth(os.environ["ZYTE_API_KEY"]),
-                                                json=data,
-                                                headers=headers)
-        body_json = await aio_response.json()
-        html = body_json["browserHtml"].encode("utf-8")
-        response_class = responsetypes.from_args(headers={}, url=request.url, body=html)
+        api_response = await self._client.request_raw({
+            'url': request.url,
+            'browserHtml': True
+        })
+        body = api_response["browserHtml"].encode("utf-8")
+        # TODO Get headers somewhere? Or return just HTML (base Response) every time?
+        response_class = responsetypes.from_args(headers=request.headers, url=request.url, body=body)
         return response_class(
             url=request.url,
-            status=aio_response.status,
+            # TODO Get headers and status somewhere?
+            status=200,
             headers={},
-            body=html,
+            body=body,
             request=request
         )
 
@@ -59,4 +44,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         yield deferred_from_coro(self._close())
 
     async def _close(self) -> None:  # NOQA
-        await self._session.close()
+        # TODO Close ssession here if it could be reused
+        # await self._session.close()
+        pass
