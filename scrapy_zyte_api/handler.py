@@ -1,4 +1,6 @@
-from aiohttp import ClientSession
+import os
+
+from aiohttp import ClientSession, BasicAuth
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
@@ -26,8 +28,6 @@ from twisted.internet.defer import Deferred, inlineCallbacks
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def __init__(self, settings: Settings, crawler: Crawler):
-        print('*'*500)
-        print(type(settings))
         super().__init__(settings=settings, crawler=crawler)
         self._session: ClientSession = ClientSession()
 
@@ -35,15 +35,21 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         return deferred_from_coro(self._download_request(request, spider))
 
     async def _download_request(self, request: Request, spider: Spider):
-        url = "https://books.toscrape.com/catalogue/sapiens-a-brief-history-of-humankind_996/index.html"
-        aio_response = await self._session.get(url)
-        body = await aio_response.read()
-        response_class = responsetypes.from_args(headers={}, url=request.url, body=body)
+        api_url = "https://api.zyte.com/v1/extract"
+        data = {"url": request.url, "browserHtml": True}
+        headers = {'Content-Type': 'application/json'}
+        aio_response = await self._session.post(api_url,
+                                                auth=BasicAuth(os.environ["ZYTE_API_KEY"]),
+                                                json=data,
+                                                headers=headers)
+        body_json = await aio_response.json()
+        html = body_json["browserHtml"].encode("utf-8")
+        response_class = responsetypes.from_args(headers={}, url=request.url, body=html)
         return response_class(
             url=request.url,
             status=aio_response.status,
             headers={},
-            body=body,
+            body=html,
             request=request
         )
 
@@ -53,5 +59,4 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         yield deferred_from_coro(self._close())
 
     async def _close(self) -> None:  # NOQA
-        print('*' * 50)
-        print("Closing downloader handler")
+        await self._session.close()
