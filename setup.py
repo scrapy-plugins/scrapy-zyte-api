@@ -13,6 +13,6 @@ setuptools.setup(
     packages=["scrapy_zyte_api"],
     install_requires=[
         "scrapy>=2.0,!=2.4.0",
-        "scrapy_zyte_api>=3.8.1",
+        "aiohttp>=3.8.1",
     ],
 )
