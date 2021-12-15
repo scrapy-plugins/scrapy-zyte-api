@@ -1,3 +1,5 @@
+import logging
+
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
@@ -6,20 +8,24 @@ from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
-from zyte_api.aio.client import AsyncClient
+from zyte_api.aio.client import AsyncClient, create_session
+
+# from zyte_api.aio.errors import RequestError
+
+logger = logging.getLogger("scrapy-zyte-api")
 
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def __init__(self, settings: Settings, crawler: Crawler):
         super().__init__(settings=settings, crawler=crawler)
         self._client: AsyncClient = AsyncClient()
-        # TODO Think about concurrent requests implementation
-        # TODO Think about sessions reusing
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
+        # TODO Think about concurrent requests implementation
         # TODO Add custom stats to increase/monitor
-        self.stats = crawler.stats
+        self._stats = crawler.stats
+        self._session = create_session()
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         if request.meta.get("zyte_api"):
@@ -39,8 +45,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if echo_data:
             api_data["echoData"] = echo_data
         # TODO Check where to pick jobId
-        api_response = await self._client.request_raw(api_data)
+        # TODO Handle request errors
+        api_response = await self._client.request_raw(api_data, session=self._session)
         body = api_response["browserHtml"].encode("utf-8")
+        # TODO Add retrying support
         return Response(
             url=request.url,
             status=api_response["statusCode"],
@@ -55,6 +63,4 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         yield deferred_from_coro(self._close())
 
     async def _close(self) -> None:  # NOQA
-        # TODO Close ssession here if it could be reused
-        # await self._session.close()
-        pass
+        await self._session.close()
