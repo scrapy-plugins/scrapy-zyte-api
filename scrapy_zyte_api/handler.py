@@ -47,7 +47,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         # TODO Check where to pick jobId
         # TODO Handle request errors
         api_response = await self._client.request_raw(api_data, session=self._session)
+        self._stats.inc_value("scrapy-zyte-api/request_count")
         body = api_response["browserHtml"].encode("utf-8")
+
         # TODO Add retrying support
         return Response(
             url=request.url,
