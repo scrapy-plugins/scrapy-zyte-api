@@ -1,8 +1,7 @@
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
-from scrapy.http import Request
-from scrapy.responsetypes import responsetypes
+from scrapy.http import Request, Response
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.reactor import verify_installed_reactor
@@ -29,8 +28,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             return super().download_request(request, spider)
 
     async def _download_request(self, request: Request, spider: Spider):
-        # TODO Add input validation through openapi schema or similar
-        # https://github.com/zytedata/zde-api-server/blob/master/server/src/main/resources/openapi/openapi.yaml
         api_data = {"url": request.url, "browserHtml": True}
         api_params = request.meta["zyte_api"]
         if api_params.get("javascript"):
@@ -44,19 +41,12 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         # TODO Check where to pick jobId
         api_response = await self._client.request_raw(api_data)
         body = api_response["browserHtml"].encode("utf-8")
-        # TODO Could the response be different from default Response (just HTML)?
-        response_class = responsetypes.from_args(
-            headers=request.headers, url=request.url, body=body
-        )
-        if echo_data:
-            response_class.meta = api_response["echoData"]
-        return response_class(
+        return Response(
             url=request.url,
-            # TODO Get headers and status somewhere or stick with default ones?
-            status=200,
-            headers={},
+            status=api_response["statusCode"],
             body=body,
-            request=request,
+            request=request
+            # API provides no page-request-related headers
         )
 
     @inlineCallbacks
