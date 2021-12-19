@@ -21,7 +21,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     ):
         super().__init__(settings=settings, crawler=crawler)
         self._client: AsyncClient = client if client else AsyncClient()
-        # TODO Check do I need to verify reactor
+        # TODO Check if I need to verify reactor
         # verify_installed_reactor(
         #     "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         # )

@@ -21,10 +21,22 @@ class MockServer:
 
 
 class _RequestHandler(BaseHTTPRequestHandler):
-    def do_POST(self):  # NOQA
-        # content_length = int(self.headers['Content-Length'])  # <--- Gets the size of data
-        # post_data = self.rfile.read(content_length)  # <--- Gets the data itself
-        self.send_response(200)
-        self.send_header("Content-type", "application/json")
+    def _send_response(self, status: int, content: str, content_type: str):
+        self.send_response(status)
+        self.send_header("Content-type", content_type)
         self.end_headers()
-        self.wfile.write(json.dumps({"browserHtml": "<html></html>"}).encode("utf-8"))
+        self.wfile.write(content.encode("utf-8"))
+
+    def do_POST(self):  # NOQA
+        content_length = int(self.headers["Content-Length"])
+        try:
+            post_data = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            url = post_data["url"]
+        except (AttributeError, TypeError, ValueError, KeyError) as er:
+            self._send_response(400, str(er), "text/html")
+        else:
+            self._send_response(
+                200,
+                json.dumps({"url": url, "browserHtml": "<html></html>"}),
+                "application/json",
+            )
