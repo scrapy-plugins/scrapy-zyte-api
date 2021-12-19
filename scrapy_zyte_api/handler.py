@@ -6,7 +6,8 @@ from scrapy.crawler import Crawler
 from scrapy.http import Request, Response
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
-from scrapy.utils.reactor import verify_installed_reactor
+
+# from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
 
@@ -16,12 +17,12 @@ logger = logging.getLogger("scrapy-zyte-api")
 
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
-    def __init__(self, settings: Settings, crawler: Crawler):
+    def __init__(self, settings: Settings, crawler: Crawler, client: AsyncClient):
         super().__init__(settings=settings, crawler=crawler)
-        self._client: AsyncClient = AsyncClient()
-        verify_installed_reactor(
-            "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
-        )
+        self._client: AsyncClient = client if client else AsyncClient()
+        # verify_installed_reactor(
+        #     "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+        # )
         # TODO Think about concurrent requests implementation
         # TODO Add custom stats to increase/monitor
         self._stats = crawler.stats
@@ -55,8 +56,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             url=request.url,
             status=api_response["statusCode"],
             body=body,
-            request=request
+            request=request,
             # API provides no page-request-related headers
+            flags=["zyte-api"],
         )
 
     @inlineCallbacks
