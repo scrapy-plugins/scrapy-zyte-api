@@ -32,5 +32,3 @@ yield scrapy.Request("http://books.toscrape.com/",
                    }
                }),
 ```
-
-
