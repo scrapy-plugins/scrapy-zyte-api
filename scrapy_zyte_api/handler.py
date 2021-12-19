@@ -69,9 +69,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             logger.error(
                 f"Got Zyte API error ({er.status}) while processing URL ({request.url}): {error_message}"
             )
-            # Skipping requests if API error
             raise IgnoreRequest()
-        # TODO Handle other errors
+        except Exception as er:
+            logger.error(f"Got an error when processing Zyte API request: {er}")
+            raise IgnoreRequest()
         self._stats.inc_value("scrapy-zyte-api/request_count")
         body = api_response["browserHtml"].encode("utf-8")
         # TODO Add retrying support?
@@ -95,9 +96,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
 
     @staticmethod
     def get_request_error_message(error: RequestError) -> str:
-        base_message = ""
         if hasattr(error, "message"):
             base_message = error.message
+        else:
+            base_message = str(error)
         if not hasattr(error, "response_content"):
             return base_message
         try:
