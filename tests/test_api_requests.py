@@ -1,15 +1,19 @@
 import pytest
 from scrapy import Request, Spider
+from twisted.internet.asyncioreactor import install as install_asyncio_reactor
 
 from tests import make_handler
 from tests.mockserver import MockServer
+
+install_asyncio_reactor()
 
 
 class TestAPI:
     @pytest.mark.asyncio
     async def test_post_request(self):
+        custom_settings = {}
         with MockServer() as server:
-            async with make_handler({}, server.urljoin("/")) as handler:
+            async with make_handler(custom_settings, server.urljoin("/")) as handler:
                 req = Request(
                     "http://example.com",
                     method="POST",

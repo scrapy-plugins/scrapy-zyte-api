@@ -8,6 +8,7 @@ from scrapy.exceptions import IgnoreRequest
 from scrapy.http import Request, Response
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
+from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
 from zyte_api.aio.errors import RequestError
@@ -21,10 +22,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     ):
         super().__init__(settings=settings, crawler=crawler)
         self._client: AsyncClient = client if client else AsyncClient()
-        # TODO Check if I need to verify reactor
-        # verify_installed_reactor(
-        #     "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
-        # )
+        verify_installed_reactor(
+            "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+        )
         self._stats = crawler.stats
         self._session = create_session()
 
