@@ -35,7 +35,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         else:
             return super().download_request(request, spider)
 
-    async def _download_request(self, request: Request, spider: Spider):
+    async def _download_request(self, request: Request, spider: Spider) -> Response:
         api_data = {"url": request.url, "browserHtml": True}
         allowed_keys = {"javascript", "geolocation", "echoData"}
         api_params = request.meta["zyte_api"]
@@ -67,7 +67,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 api_data, session=self._session
             )
         except RequestError as er:
-            error_message = self.get_request_error_message(er)
+            error_message = self._get_request_error_message(er)
             logger.error(
                 f"Got Zyte API error ({er.status}) while processing URL ({request.url}): {error_message}"
             )
@@ -96,7 +96,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         await self._session.close()
 
     @staticmethod
-    def get_request_error_message(error: RequestError) -> str:
+    def _get_request_error_message(error: RequestError) -> str:
         if hasattr(error, "message"):
             base_message = error.message
         else:
