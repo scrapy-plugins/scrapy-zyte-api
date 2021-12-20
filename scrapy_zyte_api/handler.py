@@ -26,6 +26,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
         self._stats = crawler.stats
+        self._job_id = crawler.settings.attributes.get("JOB")
         self._session = create_session()
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
@@ -57,9 +58,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                     f"({api_data[key]}) and can't be overwritten, skipping."
                 )
                 continue
-            # TODO Decide how to validate echoData or do I need to validate it at all?
+            # TODO Do I need to validate echoData?
             api_data[key] = value
-        # TODO Check where to pick jobId
+        if self._job_id is not None:
+            api_data["jobId"] = self._job_id
         try:
             api_response = await self._client.request_raw(
                 api_data, session=self._session
@@ -75,10 +77,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             raise IgnoreRequest()
         self._stats.inc_value("scrapy-zyte-api/request_count")
         body = api_response["browserHtml"].encode("utf-8")
-        # TODO Add retrying support?
         return Response(
             url=request.url,
-            # TODO Add status code data to the API
+            # TODO Add status code data to the API?
             status=200,
             body=body,
             request=request,
