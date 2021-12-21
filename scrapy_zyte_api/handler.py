@@ -43,20 +43,20 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if not isinstance(api_params, dict):
             logger.error(
                 "zyte_api parameters in the request meta should be "
-                f"provided as dictionary (got {type(api_params)} instead)."
+                f"provided as dictionary, got {type(api_params)} instead ({request.url})."
             )
             raise IgnoreRequest()
         for key, value in api_params.items():
             if key not in allowed_keys:
                 logger.warning(
-                    f"Key `{key}` isn't allowed in Zyte API parameters, skipping."
+                    f"Key `{key}` isn't allowed in Zyte API parameters, skipping ({request.url})."
                 )
                 continue
             # Protect default settings (request url and browserHtml)
             if key in api_data:
                 logger.warning(
-                    "Key `{key}` is already in Zyte API parameters "
-                    f"({api_data[key]}) and can't be overwritten, skipping."
+                    f"Key `{key}` is already in Zyte API parameters "
+                    f"({api_data[key]}) and can't be overwritten, skipping ({request.url})."
                 )
                 continue
             # TODO Do I need to validate echoData?
@@ -74,7 +74,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             )
             raise IgnoreRequest()
         except Exception as er:
-            logger.error(f"Got an error when processing Zyte API request: {er}")
+            logger.error(f"Got an error when processing Zyte API request ({request.url}): {er}")
             raise IgnoreRequest()
         self._stats.inc_value("scrapy-zyte-api/request_count")
         body = api_response["browserHtml"].encode("utf-8")
