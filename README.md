@@ -1,7 +1,6 @@
 ## How to configure
 
-Replace the default `http` and `https` Download Handlers through
-[`DOWNLOAD_HANDLERS`](https://docs.scrapy.org/en/latest/topics/settings.html):
+Replace the default `http` and `https` Download Handlers through [`DOWNLOAD_HANDLERS`](https://docs.scrapy.org/en/latest/topics/settings.html):
 
 ```python
 DOWNLOAD_HANDLERS = {
@@ -18,8 +17,7 @@ TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 ## How to use
 
-Set the `zyte_api` [Request.meta](https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta)
-key to download a request using Zyte API. Currently, it supports `javascript`, `geolocation`, and `echoData` settings.
+Set the `zyte_api` [Request.meta](https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta) key to download a request using Zyte API. Full list of parameters is provided in the [Zyte API Specification](https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec).
 
 ```python
 yield scrapy.Request("http://books.toscrape.com/",
