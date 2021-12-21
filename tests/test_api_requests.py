@@ -1,17 +1,26 @@
+import os
+
 import pytest
 from scrapy import Request, Spider
 from twisted.internet.asyncioreactor import install as install_asyncio_reactor
+from twisted.internet.error import ReactorAlreadyInstalledError
 
 from tests import make_handler
 from tests.mockserver import MockServer
 
-install_asyncio_reactor()
+try:
+    install_asyncio_reactor()
+except ReactorAlreadyInstalledError:
+    pass
 
 
 class TestAPI:
     @pytest.mark.asyncio
     async def test_post_request(self):
-        custom_settings = {}
+        custom_settings = {
+            "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+        }
+        os.environ["ZYTE_API_KEY"] = "test"
         with MockServer() as server:
             async with make_handler(custom_settings, server.urljoin("/")) as handler:
                 req = Request(
