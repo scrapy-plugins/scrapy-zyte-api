@@ -19,7 +19,7 @@ logger = logging.getLogger("scrapy-zyte-api")
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+            self, settings: Settings, crawler: Crawler, client: AsyncClient = None
     ):
         super().__init__(settings=settings, crawler=crawler)
         self._client: AsyncClient = client if client else AsyncClient()
@@ -89,7 +89,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         )
 
     @inlineCallbacks
-    def close(self) -> Deferred:
+    def close(self) -> Generator:
         yield super().close()
         yield deferred_from_coro(self._close())
 
