@@ -1,1 +1,1 @@
-__version__ = "0.0.0"
+from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler  # NOQA
