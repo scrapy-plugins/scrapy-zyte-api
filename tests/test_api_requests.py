@@ -1,11 +1,13 @@
 import os
+from asyncio import iscoroutine
 from typing import Any, Dict
 
 import pytest
-from _pytest.logging import LogCaptureFixture
+from _pytest.logging import LogCaptureFixture  # NOQA
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest
 from twisted.internet.asyncioreactor import install as install_asyncio_reactor
+from twisted.internet.defer import Deferred
 from twisted.internet.error import ReactorAlreadyInstalledError
 
 from tests import make_handler
@@ -35,15 +37,50 @@ class TestAPI:
                 req = Request(
                     "http://example.com",
                     method="POST",
-                    meta={"zyte_api": {"geolocation": "US"}},
+                    meta=meta,
                 )
-                resp = await handler._download_request(req, Spider("test"))  # NOQA
+                coro = handler._download_request(req, Spider("test"))
+                assert iscoroutine(coro)
+                assert not isinstance(coro, Deferred)
+                resp = await coro  # NOQA
 
             assert resp.request is req
             assert resp.url == req.url
             assert resp.status == 200
             assert "zyte-api" in resp.flags
             assert resp.body == b"<html></html>"
+
+    @pytest.mark.parametrize(
+        "meta, api_relevant",
+        [
+            ({"zyte_api": {"waka": True}}, True),
+            ({"zyte_api": True}, True),
+            ({"zyte_api": {"browserHtml": True}}, True),
+            ({"zyte_api": {}}, False),
+            ({"randomParameter": True}, False),
+            ({}, False),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_coro_handling(
+        self, meta: Dict[str, Dict[str, Any]], api_relevant: bool
+    ):
+        with MockServer() as server:
+            async with make_handler({}, server.urljoin("/")) as handler:
+                req = Request(
+                    "http://example.com",
+                    method="POST",
+                    meta=meta,
+                )
+                if api_relevant:
+                    coro = handler.download_request(req, Spider("test"))
+                    assert not iscoroutine(coro)
+                    assert isinstance(coro, Deferred)
+                else:
+                    # Non-API requests won't get into handle, but run HTTPDownloadHandler.download_request instead
+                    # But because they're Deffered - they won't run because event loop is closed
+                    with pytest.raises(RuntimeError, match="Event loop is closed"):
+                        handler.download_request(req, Spider("test"))
 
     @pytest.mark.parametrize(
         "meta, server_path, exception_type, exception_text",
