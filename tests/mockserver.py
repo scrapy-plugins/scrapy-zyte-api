@@ -34,6 +34,9 @@ class _RequestHandler(BaseHTTPRequestHandler):
             url = post_data["url"]
         except (AttributeError, TypeError, ValueError, KeyError) as er:
             self._send_response(400, str(er), "text/html")
+            return
+        if self.path == "/exception/extract":
+            self._send_response(400, "", "text/html")
         else:
             self._send_response(
                 200,
