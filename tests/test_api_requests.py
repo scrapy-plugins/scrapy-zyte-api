@@ -123,3 +123,24 @@ class TestAPI:
                 with pytest.raises(exception_type):  # NOQA
                     await handler._download_request(req, Spider("test"))  # NOQA
                 assert exception_text in caplog.text
+
+    @pytest.mark.parametrize(
+        "job_id",
+        ["547773/99/6"],
+    )
+    @pytest.mark.asyncio
+    async def test_job_id(self, job_id):
+        with MockServer() as server:
+            async with make_handler({"JOB": job_id}, server.urljoin("/")) as handler:
+                req = Request(
+                    "http://example.com",
+                    method="POST",
+                    meta={"zyte_api": {"browserHtml": True}},
+                )
+                resp = await handler._download_request(req, Spider("test"))  # NOQA
+
+            assert resp.request is req
+            assert resp.url == req.url
+            assert resp.status == 200
+            assert "zyte-api" in resp.flags
+            assert resp.body == f"<html>{job_id}</html>".encode("utf8")

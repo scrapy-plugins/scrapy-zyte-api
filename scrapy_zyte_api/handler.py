@@ -47,7 +47,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         # Define url by default
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
-            api_data["jobId"] = self._job_id
+            api_data["jobId"] = self._job_id.value
         try:
             api_response = await self._client.request_raw(
                 api_data, session=self._session

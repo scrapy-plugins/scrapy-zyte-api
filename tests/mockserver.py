@@ -38,8 +38,12 @@ class _RequestHandler(BaseHTTPRequestHandler):
         if self.path == "/exception/extract":
             self._send_response(400, "", "text/html")
         else:
+            if post_data.get("jobId") is None:
+                browser_html = "<html></html>"
+            else:
+                browser_html = f"<html>{post_data['jobId']}</html>"
             self._send_response(
                 200,
-                json.dumps({"url": url, "browserHtml": "<html></html>"}),
+                json.dumps({"url": url, "browserHtml": browser_html}),
                 "application/json",
             )
