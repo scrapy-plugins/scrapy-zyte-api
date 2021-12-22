@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Generator
+from typing import Any, Dict, Generator
 
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
@@ -39,7 +39,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     async def _download_request(self, request: Request, spider: Spider) -> Response:
         api_data = {"url": request.url, "browserHtml": True}
         allowed_keys = {"javascript", "geolocation", "echoData"}
-        api_params: Dict = request.meta["zyte_api"]
+        api_params: Dict[str, Any] = request.meta["zyte_api"]
         if not isinstance(api_params, dict):
             logger.error(
                 "zyte_api parameters in the request meta should be "
