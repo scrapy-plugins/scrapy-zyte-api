@@ -1,4 +1,5 @@
 import os
+from typing import Any, Dict
 
 import pytest
 from _pytest.logging import LogCaptureFixture
@@ -28,7 +29,7 @@ class TestAPI:
         ],
     )
     @pytest.mark.asyncio
-    async def test_base_request(self, meta: dict):
+    async def test_base_request(self, meta: Dict[str, Dict[str, Any]]):
         with MockServer() as server:
             async with make_handler({}, server.urljoin("/")) as handler:
                 req = Request(
@@ -74,14 +75,14 @@ class TestAPI:
     async def test_exceptions(
         self,
         caplog: LogCaptureFixture,
-        meta,
-        server_path,
-        exception_type,
-        exception_text,
+        meta: Dict[str, Dict[str, Any]],
+        server_path: str,
+        exception_type: Exception,
+        exception_text: str,
     ):
         with MockServer() as server:
             async with make_handler({}, server.urljoin(server_path)) as handler:
                 req = Request("http://example.com", method="POST", meta=meta)
-                with pytest.raises(exception_type):
+                with pytest.raises(exception_type):  # NOQA
                     await handler._download_request(req, Spider("test"))  # NOQA
                 assert exception_text in caplog.text
