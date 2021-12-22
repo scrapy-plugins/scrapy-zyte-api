@@ -19,7 +19,7 @@ logger = logging.getLogger("scrapy-zyte-api")
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def __init__(
-            self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
     ):
         super().__init__(settings=settings, crawler=crawler)
         self._client: AsyncClient = client if client else AsyncClient()
@@ -74,12 +74,14 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             )
             raise IgnoreRequest()
         except Exception as er:
-            logger.error(f"Got an error when processing Zyte API request ({request.url}): {er}")
+            logger.error(
+                f"Got an error when processing Zyte API request ({request.url}): {er}"
+            )
             raise IgnoreRequest()
         self._stats.inc_value("scrapy-zyte-api/request_count")
         body = api_response["browserHtml"].encode("utf-8")
         return Response(
-            url=request.url,
+            url=api_response["url"],
             # TODO Add status code data to the API?
             status=200,
             body=body,
