@@ -13,5 +13,7 @@ async def make_handler(settings_dict: dict, api_url: str):
     handler = ScrapyZyteAPIDownloadHandler(
         Settings(settings_dict), crawler=crawler, client=AsyncClient(api_url=api_url)
     )
-    # TODO Close handler if needed
-    yield handler
+    try:
+        yield handler
+    finally:
+        await handler._close()  # NOQA
