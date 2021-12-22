@@ -37,8 +37,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             return super().download_request(request, spider)
 
     async def _download_request(self, request: Request, spider: Spider) -> Response:
-        api_data = {"url": request.url, "browserHtml": True}
-        allowed_keys = {"javascript", "geolocation", "echoData"}
+        # Define url by default
         api_params: Dict[str, Any] = request.meta["zyte_api"]
         if not isinstance(api_params, dict):
             logger.error(
@@ -46,21 +45,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"provided as dictionary, got {type(api_params)} instead ({request.url})."
             )
             raise IgnoreRequest()
-        for key, value in api_params.items():
-            if key not in allowed_keys:
-                logger.warning(
-                    f"Key `{key}` isn't allowed in Zyte API parameters, skipping ({request.url})."
-                )
-                continue
-            # Protect default settings (request url and browserHtml)
-            if key in api_data:
-                logger.warning(
-                    f"Key `{key}` is already in Zyte API parameters "
-                    f"({api_data[key]}) and can't be overwritten, skipping ({request.url})."
-                )
-                continue
-            # TODO Do I need to validate echoData?
-            api_data[key] = value
+        api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
             api_data["jobId"] = self._job_id
         try:
@@ -82,7 +67,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         body = api_response["browserHtml"].encode("utf-8")
         return Response(
             url=api_response["url"],
-            # TODO Add status code data to the API?
             status=200,
             body=body,
             request=request,
