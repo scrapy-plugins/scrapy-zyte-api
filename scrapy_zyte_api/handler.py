@@ -37,7 +37,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             return super().download_request(request, spider)
 
     async def _download_request(self, request: Request, spider: Spider) -> Response:
-        # Define url by default
         api_params: Dict[str, Any] = request.meta["zyte_api"]
         if not isinstance(api_params, dict):
             logger.error(
@@ -45,6 +44,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"provided as dictionary, got {type(api_params)} instead ({request.url})."
             )
             raise IgnoreRequest()
+        # Define url by default
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
             api_data["jobId"] = self._job_id
