@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from _pytest.logging import LogCaptureFixture
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest
 from twisted.internet.asyncioreactor import install as install_asyncio_reactor
@@ -27,7 +28,7 @@ class TestAPI:
         ],
     )
     @pytest.mark.asyncio
-    async def test_base_request(self, meta):
+    async def test_base_request(self, meta: dict):
         with MockServer() as server:
             async with make_handler({}, server.urljoin("/")) as handler:
                 req = Request(
@@ -71,7 +72,12 @@ class TestAPI:
     )
     @pytest.mark.asyncio
     async def test_exceptions(
-        self, caplog, meta, server_path, exception_type, exception_text
+        self,
+        caplog: LogCaptureFixture,
+        meta,
+        server_path,
+        exception_type,
+        exception_text,
     ):
         with MockServer() as server:
             async with make_handler({}, server.urljoin(server_path)) as handler:
