@@ -1,8 +1,5 @@
 import setuptools
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
-
 setuptools.setup(
     name="scrapy-zyte-api",
     version="0.0.0",
