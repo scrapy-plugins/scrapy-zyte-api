@@ -14,7 +14,7 @@ from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
 from zyte_api.aio.errors import RequestError
 
-logger = logging.getLogger("scrapy-zyte-api")
+logger = logging.getLogger(__name__)
 
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
