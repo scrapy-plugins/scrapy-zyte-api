@@ -6,6 +6,7 @@ import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest
+from scrapy.http import Response, TextResponse
 from twisted.internet.asyncioreactor import install as install_asyncio_reactor
 from twisted.internet.defer import Deferred
 from twisted.internet.error import ReactorAlreadyInstalledError
@@ -25,13 +26,13 @@ class TestAPI:
         "meta",
         [
             {"zyte_api": {"browserHtml": True}},
-            {"zyte_api": {"geolocation": "US"}},
-            {"zyte_api": {"geolocation": "US", "echoData": 123}},
-            {"zyte_api": {"randomParameter": None}},
+            {"zyte_api": {"browserHtml": True, "geolocation": "US"}},
+            {"zyte_api": {"browserHtml": True, "geolocation": "US", "echoData": 123}},
+            {"zyte_api": {"browserHtml": True, "randomParameter": None}},
         ],
     )
     @pytest.mark.asyncio
-    async def test_base_request(self, meta: Dict[str, Dict[str, Any]]):
+    async def test_browser_html_request(self, meta: Dict[str, Dict[str, Any]]):
         with MockServer() as server:
             async with make_handler({}, server.urljoin("/")) as handler:
                 req = Request(
@@ -44,6 +45,44 @@ class TestAPI:
                 assert not isinstance(coro, Deferred)
                 resp = await coro  # NOQA
 
+            assert isinstance(resp, TextResponse)
+            assert resp.request is req
+            assert resp.url == req.url
+            assert resp.status == 200
+            assert "zyte-api" in resp.flags
+            assert resp.body == b"<html></html>"
+            assert resp.text == "<html></html>"
+
+    @pytest.mark.parametrize(
+        "meta",
+        [
+            {"zyte_api": {"httpResponseBody": True}},
+            {"zyte_api": {"httpResponseBody": True, "geolocation": "US"}},
+            {
+                "zyte_api": {
+                    "httpResponseBody": True,
+                    "geolocation": "US",
+                    "echoData": 123,
+                }
+            },
+            {"zyte_api": {"httpResponseBody": True, "randomParameter": None}},
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_http_response_body_request(self, meta: Dict[str, Dict[str, Any]]):
+        with MockServer() as server:
+            async with make_handler({}, server.urljoin("/")) as handler:
+                req = Request(
+                    "http://example.com",
+                    method="POST",
+                    meta=meta,
+                )
+                coro = handler._download_request(req, Spider("test"))
+                assert iscoroutine(coro)
+                assert not isinstance(coro, Deferred)
+                resp = await coro  # NOQA
+
+            assert isinstance(resp, Response)
             assert resp.request is req
             assert resp.url == req.url
             assert resp.status == 200

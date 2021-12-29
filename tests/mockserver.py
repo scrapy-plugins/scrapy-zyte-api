@@ -1,4 +1,5 @@
 import json
+from base64 import b64encode
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from urllib.parse import urljoin
@@ -42,8 +43,22 @@ class _RequestHandler(BaseHTTPRequestHandler):
                 browser_html = "<html></html>"
             else:
                 browser_html = f"<html>{post_data['jobId']}</html>"
-            self._send_response(
-                200,
-                json.dumps({"url": url, "browserHtml": browser_html}),
-                "application/json",
-            )
+            if post_data.get("browserHtml"):
+                self._send_response(
+                    200,
+                    json.dumps({"url": url, "browserHtml": browser_html}),
+                    "application/json",
+                )
+            else:
+                self._send_response(
+                    200,
+                    json.dumps(
+                        {
+                            "url": url,
+                            "httpResponseBody": b64encode(
+                                browser_html.encode("utf-8")
+                            ).decode("utf-8"),
+                        }
+                    ),
+                    "application/json",
+                )
