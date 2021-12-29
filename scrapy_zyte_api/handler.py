@@ -27,7 +27,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
         self._stats = crawler.stats
-        self._job_id = crawler.settings.attributes.get("JOB")
+        self._job_id = crawler.settings.get("JOB")
         self._session = create_session()
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
@@ -47,7 +47,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         # Define url by default
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
-            api_data["jobId"] = self._job_id.value
+            api_data["jobId"] = self._job_id
         try:
             api_response = await self._client.request_raw(
                 api_data, session=self._session
