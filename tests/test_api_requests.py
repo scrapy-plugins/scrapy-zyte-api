@@ -90,6 +90,34 @@ class TestAPI:
             assert resp.body == b"<html></html>"
 
     @pytest.mark.parametrize(
+        "meta",
+        [
+            {"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": True}},
+            {"zyte_api": {"browserHtml": True, "httpResponseHeaders": True}},
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_http_response_headers_request(self, meta: Dict[str, Dict[str, Any]]):
+        with MockServer() as server:
+            async with make_handler({}, server.urljoin("/")) as handler:
+                req = Request(
+                    "http://example.com",
+                    method="POST",
+                    meta=meta,
+                )
+                coro = handler._download_request(req, Spider("test"))
+                assert iscoroutine(coro)
+                assert not isinstance(coro, Deferred)
+                resp = await coro  # NOQA
+
+            assert resp.request is req
+            assert resp.url == req.url
+            assert resp.status == 200
+            assert "zyte-api" in resp.flags
+            assert resp.body == b"<html></html>"
+            assert resp.headers == {b"Test_Header": [b"test_value"]}
+
+    @pytest.mark.parametrize(
         "meta, api_relevant",
         [
             ({"zyte_api": {"waka": True}}, True),

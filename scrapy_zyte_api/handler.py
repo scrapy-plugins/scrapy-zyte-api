@@ -1,7 +1,7 @@
 import json
 import logging
 from base64 import b64decode
-from typing import Any, Dict, Generator
+from typing import Any, Dict, Generator, List, Optional
 
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
@@ -66,7 +66,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             )
             raise IgnoreRequest()
         self._stats.inc_value("scrapy-zyte-api/request_count")
-        headers = api_response.get("httpResponseHeaders")
+        headers = self._prepare_headers(api_response.get("httpResponseHeaders"))
         # browserHtml and httpResponseBody are not allowed at the same time,
         # but at least one of them should be present
         if api_response.get("browserHtml"):
@@ -114,3 +114,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if error_data.get("detail"):
             return error_data["detail"]
         return base_message
+
+    @staticmethod
+    def _prepare_headers(init_headers: Optional[List[Dict[str, str]]]):
+        if not init_headers:
+            return None
+        return {h["name"]: h["value"] for h in init_headers}
