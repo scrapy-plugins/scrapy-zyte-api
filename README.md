@@ -24,6 +24,7 @@ yield scrapy.Request("http://books.toscrape.com/",
                callback=self.parse,
                meta={
                    "zyte_api": {
+                       "browserHtml": True,
                        "geolocation": "US",
                        "javascript": True,
                        "echoData": {"something": True}
