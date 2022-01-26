@@ -1,4 +1,5 @@
 import json
+from base64 import b64encode
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from urllib.parse import urljoin
@@ -38,12 +39,20 @@ class _RequestHandler(BaseHTTPRequestHandler):
         if self.path == "/exception/extract":
             self._send_response(400, "", "text/html")
         else:
+            base_response = {"url": url}
+            if post_data.get("httpResponseHeaders"):
+                base_response["httpResponseHeaders"] = [
+                    {"name": "test_header", "value": "test_value"}
+                ]
             if post_data.get("jobId") is None:
                 browser_html = "<html></html>"
             else:
                 browser_html = f"<html>{post_data['jobId']}</html>"
-            self._send_response(
-                200,
-                json.dumps({"url": url, "browserHtml": browser_html}),
-                "application/json",
-            )
+            if post_data.get("browserHtml"):
+                base_response["browserHtml"] = browser_html
+                self._send_response(200, json.dumps(base_response), "application/json")
+            else:
+                base_response["httpResponseBody"] = b64encode(
+                    browser_html.encode("utf-8")
+                ).decode("utf-8")
+                self._send_response(200, json.dumps(base_response), "application/json")

@@ -1,12 +1,13 @@
 import json
 import logging
-from typing import Any, Dict, Generator
+from base64 import b64decode
+from typing import Any, Dict, Generator, List, Optional
 
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
 from scrapy.exceptions import IgnoreRequest
-from scrapy.http import Request, Response
+from scrapy.http import Request, Response, TextResponse
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.reactor import verify_installed_reactor
@@ -14,7 +15,7 @@ from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
 from zyte_api.aio.errors import RequestError
 
-logger = logging.getLogger("scrapy-zyte-api")
+logger = logging.getLogger(__name__)
 
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
@@ -27,8 +28,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
         self._stats = crawler.stats
-        self._job_id = crawler.settings.attributes.get("JOB")
+        self._job_id = crawler.settings.get("JOB")
         self._session = create_session()
+        self._encoding = "utf-8"
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         if request.meta.get("zyte_api"):
@@ -47,7 +49,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         # Define url by default
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
-            api_data["jobId"] = self._job_id.value
+            api_data["jobId"] = self._job_id
         try:
             api_response = await self._client.request_raw(
                 api_data, session=self._session
@@ -64,15 +66,30 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             )
             raise IgnoreRequest()
         self._stats.inc_value("scrapy-zyte-api/request_count")
-        body = api_response["browserHtml"].encode("utf-8")
-        return Response(
-            url=api_response["url"],
-            status=200,
-            body=body,
-            request=request,
-            flags=["zyte-api"],
-            # API provides no page-request-related headers, so returning no headers
-        )
+        headers = self._prepare_headers(api_response.get("httpResponseHeaders"))
+        # browserHtml and httpResponseBody are not allowed at the same time,
+        # but at least one of them should be present
+        if api_response.get("browserHtml"):
+            # Using TextResponse because browserHtml always returns a browser-rendered page
+            # even when requesting files (like images)
+            return TextResponse(
+                url=api_response["url"],
+                status=200,
+                body=api_response["browserHtml"].encode(self._encoding),
+                encoding=self._encoding,
+                request=request,
+                flags=["zyte-api"],
+                headers=headers,
+            )
+        else:
+            return Response(
+                url=api_response["url"],
+                status=200,
+                body=b64decode(api_response["httpResponseBody"]),
+                request=request,
+                flags=["zyte-api"],
+                headers=headers,
+            )
 
     @inlineCallbacks
     def close(self) -> Generator:
@@ -97,3 +114,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if error_data.get("detail"):
             return error_data["detail"]
         return base_message
+
+    @staticmethod
+    def _prepare_headers(init_headers: Optional[List[Dict[str, str]]]):
+        if not init_headers:
+            return None
+        return {h["name"]: h["value"] for h in init_headers}
