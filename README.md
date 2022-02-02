@@ -1,3 +1,25 @@
+## Requirements
+
+* scrapy>=2.5.1
+* zyte-api>=0.1.2
+* twisted>=21.7.0
+
+If you are deploying on Scrapy Cloud, then add the below packages to your requirements.txt file.
+
+* zyte-api>=0.1.2
+* twisted>=21.7.0
+* git+https://github.com/scrapy-plugins/scrapy-zyte-api.git
+
+## Installation
+
+It is not yet available on PyPI. However, it can be installed directly from GitHub:
+
+`pip install git+ssh://git@github.com/scrapy-plugins/scrapy-zyte-api.git`
+
+or
+
+`pip install git+https://github.com/scrapy-plugins/scrapy-zyte-api.git`
+
 ## How to configure
 
 Replace the default `http` and `https` Download Handlers through [`DOWNLOAD_HANDLERS`](https://docs.scrapy.org/en/latest/topics/settings.html):
@@ -30,4 +52,37 @@ yield scrapy.Request("http://books.toscrape.com/",
                        "echoData": {"something": True}
                    }
                }),
+```
+
+## Example Code:
+
+```python
+import scrapy
+import os
+
+
+class TestSpider(scrapy.Spider):
+    name = 'test'
+    os.environ["ZYTE_API_KEY"] = "<You ZYTE_API_KEY>"
+    start_urls = ['http://books.toscrape.com/']
+
+    def start_requests(self):
+
+            yield scrapy.Request(url="http://books.toscrape.com/", callback=self.parse,
+                                 meta={
+                                     "zyte_api": {
+                                         "browserHtml": True,
+                                         # You can set any GEOLocation region you want.
+                                         "geolocation": "US",
+                                         "javascript": True,
+                                         "echoData": {"something": True}
+                                     }
+                                 })
+
+    def parse(self, response, **kwargs):
+        yield{
+            'URL': response.url,
+            'status': response.status,
+            'HTML': response.body
+        }
 ```
