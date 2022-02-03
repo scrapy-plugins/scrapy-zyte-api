@@ -72,26 +72,25 @@ key to download a request using Zyte API. Full list of parameters is provided in
 
    import scrapy
 
+
    class TestSpider(scrapy.Spider):
-       name = 'test'
-       start_urls = ['http://books.toscrape.com/']
+       name = "test"
 
        def start_requests(self):
 
-               yield scrapy.Request(url="http://books.toscrape.com/", callback=self.parse,
-                                    meta={
-                                        "zyte_api": {
-                                            "browserHtml": True,
-                                            # You can set any GEOLocation region you want.
-                                            "geolocation": "US",
-                                            "javascript": True,
-                                            "echoData": {"something": True}
-                                        }
-                                    })
+           yield scrapy.Request(
+               url="http://books.toscrape.com/",
+               callback=self.parse,
+               meta={
+                   "zyte_api": {
+                       "browserHtml": True,
+                       # You can set any GEOLocation region you want.
+                       "geolocation": "US",
+                       "javascript": True,
+                       "echoData": {"something": True},
+                   }
+               },
+           )
 
-       def parse(self, response, **kwargs):
-           yield{
-               'URL': response.url,
-               'status': response.status,
-               'HTML': response.body
-           }
+       def parse(self, response):
+           yield {"URL": response.url, "status": response.status, "HTML": response.body}
