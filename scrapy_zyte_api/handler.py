@@ -38,8 +38,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         zyte_api_key = crawler.settings.get("ZYTE_API_KEY") or os.getenv("ZYTE_API_KEY")
         if not zyte_api_key:
             logger.warning(
-                f"'ZYTE_API_KEY' must be set in the spider settings or env var "
-                f"in order for ScrapyZyteAPIDownloadHandler to work."
+                "'ZYTE_API_KEY' must be set in the spider settings or env var "
+                "in order for ScrapyZyteAPIDownloadHandler to work."
             )
             raise NotConfigured
 
