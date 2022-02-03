@@ -19,7 +19,7 @@ scrapy-zyte-api
    :alt: Coverage report
 
 Requirements
-============
+------------
 
 * Python 3.7+
 * Scrapy
