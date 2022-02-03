@@ -1,12 +1,13 @@
 import json
 import logging
+import os
 from base64 import b64decode
 from typing import Any, Dict, Generator, List, Optional
 
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
-from scrapy.exceptions import IgnoreRequest
+from scrapy.exceptions import IgnoreRequest, NotConfigured
 from scrapy.http import Request, Response, TextResponse
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
@@ -31,6 +32,20 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._job_id = crawler.settings.get("JOB")
         self._session = create_session()
         self._encoding = "utf-8"
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        zyte_api_key = crawler.settings.get("ZYTE_API_KEY") or os.getenv("ZYTE_API_KEY")
+        if not zyte_api_key:
+            logger.warning(
+                "'ZYTE_API_KEY' must be set in the spider settings or env var "
+                "in order for ScrapyZyteAPIDownloadHandler to work."
+            )
+            raise NotConfigured
+
+        logger.info(f"Using Zyte API Key: {zyte_api_key[:7]}")
+        client = AsyncClient(api_key=zyte_api_key)
+        return cls(crawler.settings, crawler, client)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         if request.meta.get("zyte_api"):

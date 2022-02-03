@@ -5,8 +5,9 @@ from typing import Any, Dict
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from scrapy import Request, Spider
-from scrapy.exceptions import IgnoreRequest
+from scrapy.exceptions import IgnoreRequest, NotConfigured
 from scrapy.http import Response, TextResponse
+from scrapy.utils.test import get_crawler
 from twisted.internet.asyncioreactor import install as install_asyncio_reactor
 from twisted.internet.defer import Deferred
 from twisted.internet.error import ReactorAlreadyInstalledError
@@ -211,3 +212,27 @@ class TestAPI:
             assert resp.status == 200
             assert "zyte-api" in resp.flags
             assert resp.body == f"<html>{job_id}</html>".encode("utf8")
+
+
+def test_api_key_presence():
+    from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
+
+    API_KEY = "TEST_API_KEY"
+
+    # Setting the API KEY via env vars should work
+    os.environ["ZYTE_API_KEY"] = API_KEY
+    crawler = get_crawler(settings_dict={})
+    handler = ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
+    assert handler._client.api_key == API_KEY
+
+    # Having the API KEY missing in both env vars and Scrapy Settings should
+    # error out.
+    os.environ["ZYTE_API_KEY"] = ""
+    crawler = get_crawler(settings_dict={})
+    with pytest.raises(NotConfigured):
+        ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
+
+    # Setting the API KEY via Scrapy settings should work
+    crawler = get_crawler(settings_dict={"ZYTE_API_KEY": API_KEY})
+    handler = ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
+    assert handler._client.api_key == API_KEY
