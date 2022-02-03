@@ -44,8 +44,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             raise NotConfigured
 
         logger.info(f"Using Zyte API Key: {zyte_api_key[:7]}")
-        os.environ["ZYTE_API_KEY"] = zyte_api_key
-        return cls(crawler.settings, crawler)
+        client = AsyncClient(api_key=zyte_api_key)
+        return cls(crawler.settings, crawler, client)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         if request.meta.get("zyte_api"):

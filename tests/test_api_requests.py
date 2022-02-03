@@ -217,10 +217,13 @@ class TestAPI:
 def test_api_key_presence():
     from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 
+    API_KEY = "TEST_API_KEY"
+
     # Setting the API KEY via env vars should work
-    os.environ["ZYTE_API_KEY"] = "TEST_API_KEY"
+    os.environ["ZYTE_API_KEY"] = API_KEY
     crawler = get_crawler(settings_dict={})
-    ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
+    handler = ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
+    assert handler._client.api_key == API_KEY
 
     # Having the API KEY missing in both env vars and Scrapy Settings should
     # error out.
@@ -230,5 +233,6 @@ def test_api_key_presence():
         ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
 
     # Setting the API KEY via Scrapy settings should work
-    crawler = get_crawler(settings_dict={"ZYTE_API_KEY": "TEST_API_KEY"})
-    ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
+    crawler = get_crawler(settings_dict={"ZYTE_API_KEY": API_KEY})
+    handler = ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
+    assert handler._client.api_key == API_KEY
