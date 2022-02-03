@@ -18,6 +18,12 @@ scrapy-zyte-api
    :target: https://codecov.io/gh/scrapy-plugins/scrapy-zyte-api
    :alt: Coverage report
 
+Requirements
+------------
+
+* Python 3.7+
+* Scrapy
+
 Installation
 ------------
 
@@ -64,15 +70,27 @@ key to download a request using Zyte API. Full list of parameters is provided in
 
 .. code-block:: python
 
-    yield scrapy.Request(
-        "http://books.toscrape.com/",
-        callback=self.parse,
-        meta={
-            "zyte_api": {
-                "browserHtml": True,
-                "geolocation": "US",
-                "javascript": True,
-                "echoData": {"something": True}
-            }
-        }
-    )
+   import scrapy
+
+
+   class TestSpider(scrapy.Spider):
+       name = "test"
+
+       def start_requests(self):
+
+           yield scrapy.Request(
+               url="http://books.toscrape.com/",
+               callback=self.parse,
+               meta={
+                   "zyte_api": {
+                       "browserHtml": True,
+                       # You can set any GEOLocation region you want.
+                       "geolocation": "US",
+                       "javascript": True,
+                       "echoData": {"something": True},
+                   }
+               },
+           )
+
+       def parse(self, response):
+           yield {"URL": response.url, "status": response.status, "HTML": response.body}
