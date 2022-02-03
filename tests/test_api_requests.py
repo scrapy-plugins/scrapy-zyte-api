@@ -14,7 +14,6 @@ from twisted.internet.error import ReactorAlreadyInstalledError
 
 from tests import make_handler
 from tests.mockserver import MockServer
-# from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 
 try:
     install_asyncio_reactor()
