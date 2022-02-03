@@ -31,7 +31,10 @@ How to configure
 ----------------
 
 Replace the default ``http`` and ``https`` in Scrapy's
-`DOWNLOAD_HANDLERS <https://docs.scrapy.org/en/latest/topics/settings.html>`_.
+`DOWNLOAD_HANDLERS <https://docs.scrapy.org/en/latest/topics/settings.html>`_
+in the ``settings.py`` of your Scrapy project.
+
+You also need to set the ``ZYTE_API_KEY``.
 
 .. code-block:: python
 
@@ -40,8 +43,12 @@ Replace the default ``http`` and ``https`` in Scrapy's
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler"
     }
 
+    # Having the following in the env var would also work.
+    ZYTE_API_KEY = "<your API key>"
+
 Also, make sure to `install the asyncio-based Twisted reactor
-<https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor)>`_ :
+<https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor)>`_
+in the ``settings.py`` file as well:
 
 .. code-block:: python
 
