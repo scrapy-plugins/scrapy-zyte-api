@@ -14,7 +14,7 @@ scrapy-zyte-api
    :target: https://github.com/scrapy-plugins/scrapy-zyte-api/actions/workflows/test.yml
    :alt: Automated tests
 
-.. image:: https://codecov.io/gh/scrapy-plugins/scrapy-zyte-api/branch/master/graph/badge.svg?token=iNYIk4nfyd
+.. image:: https://codecov.io/gh/scrapy-plugins/scrapy-zyte-api/branch/main/graph/badge.svg?token=iNYIk4nfyd
    :target: https://codecov.io/gh/scrapy-plugins/scrapy-zyte-api
    :alt: Coverage report
 
