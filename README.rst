@@ -33,8 +33,8 @@ Installation
 
 This package requires Python 3.7+.
 
-How to configure
-----------------
+Configuration
+-------------
 
 Replace the default ``http`` and ``https`` in Scrapy's
 `DOWNLOAD_HANDLERS <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-DOWNLOAD_HANDLERS>`_
@@ -60,8 +60,8 @@ Here's example of the things needed inside a Scrapy project's ``settings.py`` fi
 
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
-How to use
-----------
+Usage
+-----
 
 Set the ``zyte_api`` `Request.meta
 <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
@@ -70,27 +70,52 @@ key to download a request using Zyte API. Full list of parameters is provided in
 
 .. code-block:: python
 
-   import scrapy
+    import scrapy
 
 
-   class TestSpider(scrapy.Spider):
-       name = "test"
+    class SampleQuotesSpider(scrapy.Spider):
+        name = "sample_quotes"
 
-       def start_requests(self):
+        def start_requests(self):
 
-           yield scrapy.Request(
-               url="http://books.toscrape.com/",
-               callback=self.parse,
-               meta={
-                   "zyte_api": {
-                       "browserHtml": True,
-                       # You can set any GEOLocation region you want.
-                       "geolocation": "US",
-                       "javascript": True,
-                       "echoData": {"something": True},
-                   }
-               },
-           )
+            yield scrapy.Request(
+                url="http://books.toscrape.com/",
+                callback=self.parse,
+                meta={
+                    "zyte_api": {
+                        "browserHtml": True,
+                        "geolocation": "US",  # You can set any Geolocation region you want.
+                        "javascript": True,
+                        "echoData": {"some_value_I_could_track": 123},
+                    }
+                },
+            )
 
-       def parse(self, response):
-           yield {"URL": response.url, "status": response.status, "HTML": response.body}
+        def parse(self, response):
+            yield {"URL": response.url, "status": response.status, "HTML": response.body}
+
+            print(response.zyte_api_response)
+            # {
+            #     'url': 'https://quotes.toscrape.com/',
+            #     'browserHtml': '<html> ... </html>',
+            #     'echoData': {'some_value_I_could_track': 123},
+            #     'actions': []
+            # }
+
+            print(response.request.meta)
+            # {
+            #     'zyte_api': {
+            #         'browserHtml': True,
+            #         'geolocation': 'US',
+            #         'javascript': True,
+            #         'echoData': {'some_value_I_could_track': 123}
+            #     },
+            #     'download_timeout': 180.0,
+            #     'download_slot': 'quotes.toscrape.com'
+            # }
+
+The raw Zyte API Response can be accessed via the ``zyte_api_response`` attribute
+of the response object. Note that such responses are of ``ZyteAPIResponse`` and
+``ZyteAPITextResponse`` which are respectively subclasses of ``scrapy.http.Response``
+and ``scrapy.http.TextResponse``. Such classes are needed to hold the raw Zyte API
+responses.
