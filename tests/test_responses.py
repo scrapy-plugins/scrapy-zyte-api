@@ -99,3 +99,24 @@ def test_response_replace(api_response, cls):
     new_response = orig_response.replace(status=404)
     assert new_response.status == 404
     assert new_response.zyte_api_response == orig_response.zyte_api_response
+
+
+def test_non_utf8_response():
+    content = "<html><body>Some non-ASCII ✨ chars</body></html>"
+    sample_zyte_api_response = {
+        "url": URL,
+        "browserHtml": content,
+        "httpResponseHeaders": [
+            {"name": "Content-Type", "value": "text/html; charset=iso-8859-1"},
+            {"name": "Content-Length", "value": len(content)},
+        ],
+    }
+
+    # Encoding inference should not kick in under the hood for
+    # ``scrapy.http.TextResponse`` since ``ZyteAPITextResponse`` using "utf-8"
+    # for it. This is the default encoding for the "browserHtml" contents from
+    # Zyte API. Thus, even if the Response Headers or <meta> tags indicate a
+    # different encoding, it should still be treated as "utf-8".
+    response = ZyteAPITextResponse.from_api_response(sample_zyte_api_response)
+    assert response.text == content
+    assert response.encoding == "utf-8"

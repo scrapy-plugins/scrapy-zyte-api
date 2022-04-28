@@ -4,6 +4,8 @@ from typing import Dict, List, Optional
 from scrapy import Request
 from scrapy.http import Response, TextResponse
 
+_ENCODING = "utf-8"
+
 
 class ZyteAPIMixin:
     def __init__(self, *args, zyte_api_response: Dict = None, **kwargs):
@@ -45,7 +47,8 @@ class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
         return cls(
             url=api_response["url"],
             status=200,
-            body=api_response["browserHtml"].encode("utf-8"),
+            body=api_response["browserHtml"].encode(_ENCODING),
+            encoding=_ENCODING,
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
