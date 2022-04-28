@@ -11,7 +11,12 @@ class ZyteAPIMixin:
         self._zyte_api_response = zyte_api_response
 
     @property
-    def zyte_api_response(self):
+    def zyte_api_response(self) -> Dict:
+        """Contains the raw API response from Zyte API.
+
+        To see the full list of parameters and their description, kindly refer to the
+        `Zyte API Specification <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
+        """
         return self._zyte_api_response
 
     @staticmethod
@@ -24,6 +29,9 @@ class ZyteAPIMixin:
 class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
+        """Alternative constructor to instantiate the response from the raw
+        Zyte API response.
+        """
         return cls(
             url=api_response["url"],
             status=200,
@@ -38,6 +46,9 @@ class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
 class ZyteAPIResponse(ZyteAPIMixin, Response):
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
+        """Alternative constructor to instantiate the response from the raw
+        Zyte API response.
+        """
         return cls(
             url=api_response["url"],
             status=200,

@@ -99,7 +99,6 @@ key to download a request using Zyte API. Full list of parameters is provided in
             #     'url': 'https://quotes.toscrape.com/',
             #     'browserHtml': '<html> ... </html>',
             #     'echoData': {'some_value_I_could_track': 123},
-            #     'actions': []
             # }
 
             print(response.request.meta)
