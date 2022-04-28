@@ -44,7 +44,7 @@ class TestAPI:
                 coro = handler._download_request(req, Spider("test"))
                 assert iscoroutine(coro)
                 assert not isinstance(coro, Deferred)
-                resp = await coro  # NOQA
+                resp = await coro  # type: ignore
 
             assert isinstance(resp, TextResponse)
             assert resp.request is req
@@ -81,7 +81,7 @@ class TestAPI:
                 coro = handler._download_request(req, Spider("test"))
                 assert iscoroutine(coro)
                 assert not isinstance(coro, Deferred)
-                resp = await coro  # NOQA
+                resp = await coro  # type: ignore
 
             assert isinstance(resp, Response)
             assert resp.request is req
@@ -109,7 +109,7 @@ class TestAPI:
                 coro = handler._download_request(req, Spider("test"))
                 assert iscoroutine(coro)
                 assert not isinstance(coro, Deferred)
-                resp = await coro  # NOQA
+                resp = await coro  # type: ignore
 
             assert resp.request is req
             assert resp.url == req.url

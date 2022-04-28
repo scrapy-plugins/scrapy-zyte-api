@@ -21,7 +21,7 @@ class ZyteAPIMixin:
         return instance
 
     @property
-    def zyte_api_response(self) -> Dict:
+    def zyte_api_response(self) -> Optional[Dict]:
         """Contains the raw API response from Zyte API.
 
         To see the full list of parameters and their description, kindly refer to the
