@@ -6,9 +6,19 @@ from scrapy.http import Response, TextResponse
 
 
 class ZyteAPIMixin:
-    def __init__(self, *args, zyte_api_response=None, **kwargs):
+    def __init__(self, *args, zyte_api_response: Dict = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._zyte_api_response = zyte_api_response
+
+    def replace(self, *args, **kwargs):
+        """Create a new response with the same attributes except for those given
+        new values.
+
+        NOTE: This doesn't support replacing the ``zyte_api_response`` attribute.
+        """
+        instance = super().replace(*args, **kwargs)
+        instance._zyte_api_response = self.zyte_api_response
+        return instance
 
     @property
     def zyte_api_response(self) -> Dict:

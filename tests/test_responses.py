@@ -79,3 +79,23 @@ def test_text_from_api_response(api_response, cls):
     assert response.certificate is None
     assert response.ip_address is None
     assert response.protocol is None
+
+
+@pytest.mark.parametrize(
+    "api_response,cls",
+    [
+        (api_response_browser, ZyteAPITextResponse),
+        (api_response_body, ZyteAPIResponse),
+    ],
+)
+def test_response_replace(api_response, cls):
+    orig_response = cls.from_api_response(api_response())
+
+    # The ``zyte_api_response`` should not be replaced.
+    new_response = orig_response.replace(zyte_api_response={"overridden": "value"})
+    assert new_response.zyte_api_response == orig_response.zyte_api_response
+
+    # It should still work the same way
+    new_response = orig_response.replace(status=404)
+    assert new_response.status == 404
+    assert new_response.zyte_api_response == orig_response.zyte_api_response
