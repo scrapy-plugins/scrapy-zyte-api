@@ -23,14 +23,11 @@ class ZyteAPIMixin:
 
 class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
     @classmethod
-    def from_api_response(
-        cls, api_response: Dict, *, request: Request = None, encoding: str = "utf-8"
-    ):
+    def from_api_response(cls, api_response: Dict, *, request: Request = None):
         return cls(
             url=api_response["url"],
             status=200,
-            body=api_response["browserHtml"].encode(encoding),
-            encoding=encoding,
+            body=api_response["browserHtml"].encode("utf-8"),
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),

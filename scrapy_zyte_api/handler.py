@@ -32,7 +32,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._stats = crawler.stats
         self._job_id = crawler.settings.get("JOB")
         self._session = create_session()
-        self._encoding = "utf-8"
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -89,9 +88,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if api_response.get("browserHtml"):
             # Using TextResponse because browserHtml always returns a browser-rendered page
             # even when requesting files (like images)
-            return ZyteAPITextResponse.from_api_response(
-                api_response, request=request, encoding=self._encoding
-            )
+            return ZyteAPITextResponse.from_api_response(api_response, request=request)
         else:
             return ZyteAPIResponse.from_api_response(api_response, request=request)
 
