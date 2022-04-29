@@ -60,13 +60,40 @@ Here's example of the things needed inside a Scrapy project's ``settings.py`` fi
 
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
+To enable every request to be sent through Zyte API, you can set the following
+in the ``settings.py`` file:
+
+.. code-block:: python
+
+    ZYTE_API_ENABLED = True
+
+Moreover, it can also be set inside the spider as an attribute:
+
+.. code-block:: python
+
+    class MySpider:
+        zyte_api_enabled = True
+
+The default parameters sent for every request could be declared in the ``settings.py``
+file or `any other settings <https://docs.scrapy.org/en/latest/topics/settings.html#populating-the-settings>`_
+as:
+
+.. code-block:: python
+
+    ZYTE_API_DEFAULT_PARAMS = {
+        "browserHtml": True,
+        "geolocation": "US",
+    }
+
+You can see the full list of parameters in the `Zyte API Specification
+<https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
+
 Usage
 -----
 
-Set the ``zyte_api`` `Request.meta
-<https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
-key to download a request using Zyte API. Full list of parameters is provided in the
-`Zyte API Specification <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
+Setting ``ZYTE_API_ENABLED=True`` would enable Zyte API for every request. On the
+other hand, you could also control it on a per request basis by setting the
+``zyte_api`` key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_.
 
 .. code-block:: python
 
