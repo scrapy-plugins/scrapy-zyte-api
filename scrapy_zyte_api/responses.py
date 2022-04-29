@@ -15,12 +15,8 @@ class ZyteAPIMixin:
     def replace(self, *args, **kwargs):
         """Create a new response with the same attributes except for those given
         new values.
-
-        NOTE: This doesn't support replacing the ``zyte_api_response`` attribute.
         """
-        instance = super().replace(*args, **kwargs)
-        instance._zyte_api_response = self.zyte_api_response
-        return instance
+        return super().replace(*args, **kwargs)
 
     @property
     def zyte_api_response(self) -> Optional[Dict]:
