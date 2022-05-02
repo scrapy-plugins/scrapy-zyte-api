@@ -74,20 +74,6 @@ in the ``settings.py`` file or `any other settings within Scrapy
         "geolocation": "US",
     }
 
-Moreover, it can also be set inside the spider as an attribute:
-
-.. code-block:: python
-
-    class MySpider:
-        zyte_api_default_params = {
-            "browserHtml": True,
-            "geolocation": "US",
-        }
-
-If the default parameters are both set in the ``settings.py`` and the **spider**,
-the values within ``settings.py`` will take effect first. The values within the
-**spider** will be next, essentially overwriting similar parameters.
-
 You can see the full list of parameters in the `Zyte API Specification
 <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
 
