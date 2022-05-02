@@ -23,17 +23,9 @@ os.environ["ZYTE_API_KEY"] = "test"
 
 
 class TestAPI:
-    @pytest.mark.parametrize(
-        "meta",
-        [
-            {"zyte_api": {"browserHtml": True}},
-            {"zyte_api": {"browserHtml": True, "geolocation": "US"}},
-            {"zyte_api": {"browserHtml": True, "geolocation": "US", "echoData": 123}},
-            {"zyte_api": {"browserHtml": True, "randomParameter": None}},
-        ],
-    )
-    @pytest.mark.asyncio
-    async def test_browser_html_request(self, meta: Dict[str, Dict[str, Any]]):
+
+    @staticmethod
+    async def produce_request_response(meta):
         with MockServer() as server:
             async with make_handler({}, server.urljoin("/")) as handler:
                 req = Request(
@@ -45,14 +37,27 @@ class TestAPI:
                 assert iscoroutine(coro)
                 assert not isinstance(coro, Deferred)
                 resp = await coro  # type: ignore
+                return req, resp
 
-            assert isinstance(resp, TextResponse)
-            assert resp.request is req
-            assert resp.url == req.url
-            assert resp.status == 200
-            assert "zyte-api" in resp.flags
-            assert resp.body == b"<html></html>"
-            assert resp.text == "<html></html>"
+    @pytest.mark.parametrize(
+        "meta",
+        [
+            {"zyte_api": {"browserHtml": True}},
+            {"zyte_api": {"browserHtml": True, "geolocation": "US"}},
+            {"zyte_api": {"browserHtml": True, "geolocation": "US", "echoData": 123}},
+            {"zyte_api": {"browserHtml": True, "randomParameter": None}},
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_browser_html_request(self, meta: Dict[str, Dict[str, Any]]):
+        req, resp = await self.produce_request_response(meta)
+        assert isinstance(resp, TextResponse)
+        assert resp.request is req
+        assert resp.url == req.url
+        assert resp.status == 200
+        assert "zyte-api" in resp.flags
+        assert resp.body == b"<html></html>"
+        assert resp.text == "<html></html>"
 
     @pytest.mark.parametrize(
         "meta",
@@ -71,24 +76,13 @@ class TestAPI:
     )
     @pytest.mark.asyncio
     async def test_http_response_body_request(self, meta: Dict[str, Dict[str, Any]]):
-        with MockServer() as server:
-            async with make_handler({}, server.urljoin("/")) as handler:
-                req = Request(
-                    "http://example.com",
-                    method="POST",
-                    meta=meta,
-                )
-                coro = handler._download_request(req, Spider("test"))
-                assert iscoroutine(coro)
-                assert not isinstance(coro, Deferred)
-                resp = await coro  # type: ignore
-
-            assert isinstance(resp, Response)
-            assert resp.request is req
-            assert resp.url == req.url
-            assert resp.status == 200
-            assert "zyte-api" in resp.flags
-            assert resp.body == b"<html></html>"
+        req, resp = await self.produce_request_response(meta)
+        assert isinstance(resp, Response)
+        assert resp.request is req
+        assert resp.url == req.url
+        assert resp.status == 200
+        assert "zyte-api" in resp.flags
+        assert resp.body == b"<html></html>"
 
     @pytest.mark.parametrize(
         "meta",
@@ -99,24 +93,13 @@ class TestAPI:
     )
     @pytest.mark.asyncio
     async def test_http_response_headers_request(self, meta: Dict[str, Dict[str, Any]]):
-        with MockServer() as server:
-            async with make_handler({}, server.urljoin("/")) as handler:
-                req = Request(
-                    "http://example.com",
-                    method="POST",
-                    meta=meta,
-                )
-                coro = handler._download_request(req, Spider("test"))
-                assert iscoroutine(coro)
-                assert not isinstance(coro, Deferred)
-                resp = await coro  # type: ignore
-
-            assert resp.request is req
-            assert resp.url == req.url
-            assert resp.status == 200
-            assert "zyte-api" in resp.flags
-            assert resp.body == b"<html></html>"
-            assert resp.headers == {b"Test_Header": [b"test_value"]}
+        req, resp = await self.produce_request_response(meta)
+        assert resp.request is req
+        assert resp.url == req.url
+        assert resp.status == 200
+        assert "zyte-api" in resp.flags
+        assert resp.body == b"<html></html>"
+        assert resp.headers == {b"Test_Header": [b"test_value"]}
 
     @pytest.mark.parametrize(
         "meta, api_relevant",
