@@ -1,6 +1,7 @@
 import os
 from asyncio import iscoroutine
 from typing import Any, Dict
+from unittest import mock
 
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
@@ -23,17 +24,16 @@ os.environ["ZYTE_API_KEY"] = "test"
 
 
 class TestAPI:
-
     @staticmethod
-    async def produce_request_response(meta):
+    async def produce_request_response(meta, custom_settings=None):
         with MockServer() as server:
-            async with make_handler({}, server.urljoin("/")) as handler:
+            async with make_handler(custom_settings, server.urljoin("/")) as handler:
                 req = Request(
                     "http://example.com",
                     method="POST",
                     meta=meta,
                 )
-                coro = handler._download_request(req, Spider("test"))
+                coro = handler._download_request(req, None)
                 assert iscoroutine(coro)
                 assert not isinstance(coro, Deferred)
                 resp = await coro  # type: ignore
@@ -100,6 +100,53 @@ class TestAPI:
         assert "zyte-api" in resp.flags
         assert resp.body == b"<html></html>"
         assert resp.headers == {b"Test_Header": [b"test_value"]}
+
+    @pytest.mark.parametrize(
+        "meta,custom_settings,expected",
+        [
+            ({}, {}, {}),
+            ({"zyte_api": {}}, {}, {}),
+            (
+                {},
+                {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
+                {"browserHtml": True, "geolocation": "CA"},
+            ),
+            (
+                {"zyte_api": {}},
+                {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
+                {"browserHtml": True, "geolocation": "CA"},
+            ),
+            (
+                {"zyte_api": {"javascript": True, "geolocation": "US"}},
+                {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
+                {"browserHtml": True, "geolocation": "US", "javascript": True},
+            ),
+        ],
+    )
+    @mock.patch("tests.AsyncClient")
+    @pytest.mark.asyncio
+    async def test_empty_zyte_api_request_meta(
+        self,
+        mock_client,
+        meta: Dict[str, Dict[str, Any]],
+        custom_settings: Dict[str, str],
+        expected: Dict[str, str],
+    ):
+        try:
+            # This would always error out since the mocked client doesn't
+            # return the expected API response.
+            await self.produce_request_response(meta, custom_settings=custom_settings)
+        except:
+            pass
+
+        request_call = [c for c in mock_client.mock_calls if "request_raw(" in str(c)]
+        if not request_call:
+            pytest.fail("The client's request_raw() method was not called.")
+
+        args_used = request_call[0].args[0]
+        args_used.pop("url")
+
+        assert args_used == expected
 
     @pytest.mark.parametrize(
         "meta, api_relevant",
