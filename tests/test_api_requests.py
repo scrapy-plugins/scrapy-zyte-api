@@ -1,4 +1,5 @@
 import os
+import sys
 from asyncio import iscoroutine
 from typing import Any, Dict
 from unittest import mock
@@ -101,6 +102,9 @@ class TestAPI:
         assert resp.body == b"<html></html>"
         assert resp.headers == {b"Test_Header": [b"test_value"]}
 
+    @pytest.mark.skipif(
+        sys.version_info < (3, 8), reason="Python3.7 has poor support for AsyncMocks"
+    )
     @pytest.mark.parametrize(
         "meta,custom_settings,expected",
         [
@@ -136,9 +140,10 @@ class TestAPI:
             # This would always error out since the mocked client doesn't
             # return the expected API response.
             await self.produce_request_response(meta, custom_settings=custom_settings)
-        except:
+        except Exception:
             pass
 
+        # What we're interested in is the Request call in the API
         request_call = [c for c in mock_client.mock_calls if "request_raw(" in str(c)]
         if not request_call:
             pytest.fail("The client's request_raw() method was not called.")

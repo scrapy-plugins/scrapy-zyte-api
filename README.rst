@@ -79,8 +79,8 @@ You can see the full list of parameters in the `Zyte API Specification
 
 On the other hand, you could also control it on a per request basis by setting the
 ``zyte_api`` key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_.
-When doing so, it will override any parameters that was set via the setting
-named ``ZYTE_API_DEFAULT_PARAMS``.
+When doing so, it will override any parameters that was set in the 
+``ZYTE_API_DEFAULT_PARAMS`` setting.
 
 .. code-block:: python
 
