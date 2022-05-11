@@ -135,3 +135,32 @@ def test_non_utf8_response():
     response = ZyteAPITextResponse.from_api_response(sample_zyte_api_response)
     assert response.text == content
     assert response.encoding == "utf-8"
+
+
+@pytest.mark.parametrize(
+    "api_response,cls",
+    [
+        (api_response_browser, ZyteAPITextResponse),
+        (api_response_body, ZyteAPIResponse),
+    ],
+)
+def test_response_headers_removal(api_response, cls):
+    """Headers like 'Content-Encoding' should be removed later in the response
+    instance returned to Scrapy.
+
+    However, it should still be present inside 'zyte_api_response.headers'.
+    """
+    additional_headers = [
+        {"name": "Content-Encoding", "value": "gzip"},
+        {"name": "X-Some-Other-Value", "value": "123"},
+    ]
+    raw_response = api_response()
+    raw_response["httpResponseHeaders"] = additional_headers
+
+    response = cls.from_api_response(raw_response)
+
+    assert response.headers == {b"X-Some-Other-Value": [b"123"]}
+    assert (
+        response.zyte_api_response["httpResponseHeaders"]
+        == raw_response["httpResponseHeaders"]
+    )

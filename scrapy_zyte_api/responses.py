@@ -8,6 +8,14 @@ _ENCODING = "utf-8"
 
 
 class ZyteAPIMixin:
+
+    REMOVE_HEADERS = {
+        # Zyte API already decompresses the HTTP Response Body. Scrapy's
+        # HttpCompressionMiddleware will error out when it attempts to
+        # decompress an already decompressed body based on this header.
+        "content-encoding"
+    }
+
     def __init__(self, *args, zyte_api_response: Dict = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._zyte_api_response = zyte_api_response
@@ -27,11 +35,15 @@ class ZyteAPIMixin:
         """
         return self._zyte_api_response
 
-    @staticmethod
-    def _prepare_headers(init_headers: Optional[List[Dict[str, str]]]):
+    @classmethod
+    def _prepare_headers(cls, init_headers: Optional[List[Dict[str, str]]]):
         if not init_headers:
             return None
-        return {h["name"]: h["value"] for h in init_headers}
+        return {
+            h["name"]: h["value"]
+            for h in init_headers
+            if h["name"].lower() not in cls.REMOVE_HEADERS
+        }
 
 
 class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
