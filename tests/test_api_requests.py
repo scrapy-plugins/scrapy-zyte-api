@@ -233,8 +233,6 @@ class TestAPI:
         ],
     )
     async def test_method(self, method):
-        """Makes sure that request_raw() gets the expected input for a given
-        request object."""
         client_mock = AsyncClient()
         client_mock.request_raw = AsyncMock(
             return_value={
