@@ -62,7 +62,11 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             )
             raise IgnoreRequest()
         # Define url by default
-        api_data = {**{"url": request.url}, **api_params}
+        api_data = {
+            "url": request.url,
+            "httpRequestMethod": request.method,
+            **api_params,
+        }
         if self._job_id is not None:
             api_data["jobId"] = self._job_id
         try:

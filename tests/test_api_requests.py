@@ -1,6 +1,7 @@
 import os
 from asyncio import iscoroutine
 from typing import Any, Dict
+from unittest.mock import AsyncMock
 
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
@@ -11,6 +12,7 @@ from scrapy.utils.test import get_crawler
 from twisted.internet.asyncioreactor import install as install_asyncio_reactor
 from twisted.internet.defer import Deferred
 from twisted.internet.error import ReactorAlreadyInstalledError
+from zyte_api.aio.client import AsyncClient
 
 from tests import make_handler
 from tests.mockserver import MockServer
@@ -212,6 +214,49 @@ class TestAPI:
             assert resp.status == 200
             assert "zyte-api" in resp.flags
             assert resp.body == f"<html>{job_id}</html>".encode("utf8")
+
+    @pytest.mark.parametrize(
+        "method",
+        [
+            "DELETE",
+            "GET",
+            "OPTIONS",
+            "PATCH",
+            "POST",
+            "PUT",
+            "TRACE",
+            # Not supported by Zyte Data API at the moment, but processed
+            # nonetheless for forward-compatibility, in case Zyte Data API
+            # starts supporting any of them in the future:
+            "CONNECT",
+            "HEAD",
+        ],
+    )
+    async def test_method(self, method):
+        """Makes sure that request_raw() gets the expected input for a given
+        request object."""
+        client_mock = AsyncClient()
+        client_mock.request_raw = AsyncMock(
+            return_value={
+                "url": "https://example.com",
+                "httpResponseBody": "",
+            },
+        )
+        request = Request(
+            "http://example.com",
+            method=method,
+            meta={"zyte_api": {"browserHtml": True}},
+        )
+        async with make_handler(client=client_mock) as handler:
+            await handler._download_request(request, Spider("test"))
+            client_mock.request_raw.assert_awaited_once_with(
+                {
+                    "url": "http://example.com",
+                    "browserHtml": True,
+                    "httpRequestMethod": method,
+                },
+                session=handler._session,
+            )
 
 
 def test_api_key_presence():
