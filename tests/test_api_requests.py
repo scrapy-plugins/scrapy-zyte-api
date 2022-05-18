@@ -225,14 +225,9 @@ class TestAPI:
             "POST",
             "PUT",
             "TRACE",
-            # Not supported by Zyte Data API at the moment, but processed
-            # nonetheless for forward-compatibility, in case Zyte Data API
-            # starts supporting any of them in the future:
-            "CONNECT",
-            "HEAD",
         ],
     )
-    async def test_method(self, method):
+    async def test_supported_method(self, method):
         client_mock = AsyncClient()
         client_mock.request_raw = AsyncMock(
             return_value={
@@ -255,6 +250,31 @@ class TestAPI:
                 },
                 session=handler._session,
             )
+
+    @pytest.mark.parametrize(
+        "method",
+        [
+            "CONNECT",
+            "FOO",
+            "HEAD",
+        ],
+    )
+    async def test_unsupported_method(self, method):
+        client_mock = AsyncClient()
+        client_mock.request_raw = AsyncMock(
+            return_value={
+                "url": "https://example.com",
+                "httpResponseBody": "",
+            },
+        )
+        request = Request(
+            "http://example.com",
+            method=method,
+            meta={"zyte_api": {"browserHtml": True}},
+        )
+        async with make_handler(client=client_mock) as handler:
+            with pytest.raises(IgnoreRequest):
+                await handler._download_request(request, Spider("test"))
 
 
 def test_api_key_presence():

@@ -18,6 +18,16 @@ from zyte_api.aio.errors import RequestError
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_HTTP_METHODS = {
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+    "TRACE",
+}
+
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def __init__(
@@ -61,7 +71,17 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"provided as dictionary, got {type(api_params)} instead ({request.url})."
             )
             raise IgnoreRequest()
-        # Define url by default
+        if request.method not in SUPPORTED_HTTP_METHODS:
+            logger.error(
+                (
+                    "Request %r uses unsupported HTTP method %s. Zyte Data "
+                    "API only supports the following HTTP methods: %s"
+                ),
+                request,
+                request.method,
+                ", ".join(sorted(SUPPORTED_HTTP_METHODS)),
+            )
+            raise IgnoreRequest()
         api_data = {
             "url": request.url,
             "httpRequestMethod": request.method,
