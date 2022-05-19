@@ -46,7 +46,7 @@ Lastly, make sure to `install the asyncio-based Twisted reactor
 <https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor)>`_
 in the ``settings.py`` file as well:
 
-Here's example of the things needed inside a Scrapy project's ``settings.py`` file:
+Here's an example of the things needed inside a Scrapy project's ``settings.py`` file:
 
 .. code-block:: python
 
@@ -63,10 +63,24 @@ Here's example of the things needed inside a Scrapy project's ``settings.py`` fi
 Usage
 -----
 
-Set the ``zyte_api`` `Request.meta
-<https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
-key to download a request using Zyte API. Full list of parameters is provided in the
-`Zyte API Specification <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
+To enable every request to be sent through Zyte API, you can set the following
+in the ``settings.py`` file or `any other settings within Scrapy
+<https://docs.scrapy.org/en/latest/topics/settings.html#populating-the-settings>`_:
+
+.. code-block:: python
+
+    ZYTE_API_DEFAULT_PARAMS = {
+        "browserHtml": True,
+        "geolocation": "US",
+    }
+
+You can see the full list of parameters in the `Zyte API Specification
+<https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
+
+On the other hand, you could also control it on a per request basis by setting the
+``zyte_api`` key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_.
+When doing so, it will override any parameters that was set in the 
+``ZYTE_API_DEFAULT_PARAMS`` setting.
 
 .. code-block:: python
 

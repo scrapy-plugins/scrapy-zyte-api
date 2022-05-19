@@ -31,6 +31,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         )
         self._stats = crawler.stats
         self._job_id = crawler.settings.get("JOB")
+        self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
         self._session = create_session()
 
     @classmethod
@@ -56,11 +57,14 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     async def _download_request(
         self, request: Request, spider: Spider
     ) -> Union[ZyteAPITextResponse, ZyteAPIResponse]:
-        api_params: Dict[str, Any] = request.meta["zyte_api"]
-        if not isinstance(api_params, dict):
+        api_params: Dict[str, Any] = self._zyte_api_default_params or {}
+        try:
+            api_params.update(request.meta.get("zyte_api") or {})
+        except TypeError:
             logger.error(
-                "zyte_api parameters in the request meta should be "
-                f"provided as dictionary, got {type(api_params)} instead ({request.url})."
+                f"zyte_api parameters in the request meta should be "
+                f"provided as dictionary, got {type(request.meta.get('zyte_api'))} "
+                f"instead ({request.url})."
             )
             raise IgnoreRequest()
         # Define url by default
