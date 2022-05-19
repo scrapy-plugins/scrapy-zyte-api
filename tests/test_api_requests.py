@@ -24,9 +24,11 @@ except ReactorAlreadyInstalledError:
 os.environ["ZYTE_API_KEY"] = "test"
 
 
-class AsyncMock(MagicMock):
-    """Custom unittest.mock.AsyncMock implementation, required for Python 3.7
-    where AsyncMock is not defined."""
+class AsyncEnabledMagicMock(MagicMock):
+    """Workaround for the lack of unittest.mock.AsyncMock in Python 3.7.
+
+    .. note:: It has the API of MagicMock, not that of AsyncMock.
+    """
 
     async def __call__(self, *args, **kwargs):
         return super().__call__(*args, **kwargs)
@@ -237,7 +239,7 @@ class TestAPI:
     )
     async def test_supported_method(self, method):
         client_mock = AsyncClient()
-        client_mock.request_raw = AsyncMock(
+        client_mock.request_raw = AsyncEnabledMagicMock(
             return_value={
                 "url": "https://example.com",
                 "httpResponseBody": "",
@@ -250,7 +252,7 @@ class TestAPI:
         )
         async with make_handler(client=client_mock) as handler:
             await handler._download_request(request, Spider("test"))
-            client_mock.request_raw.assert_awaited_once_with(
+            client_mock.request_raw.assert_called_once_with(
                 {
                     "url": "http://example.com",
                     "browserHtml": True,
@@ -269,7 +271,7 @@ class TestAPI:
     )
     async def test_unsupported_method(self, method):
         client_mock = AsyncClient()
-        client_mock.request_raw = AsyncMock(
+        client_mock.request_raw = AsyncEnabledMagicMock(
             return_value={
                 "url": "https://example.com",
                 "httpResponseBody": "",
