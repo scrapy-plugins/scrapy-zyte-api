@@ -45,8 +45,8 @@ EXPECTED_BODY = PAGE_CONTENT.encode("utf-8")
     ],
 )
 def test_init(api_response, cls):
-    response = cls(URL, zyte_api_response=api_response())
-    assert response.zyte_api_response == api_response()
+    response = cls(URL, zyte_api=api_response())
+    assert response.zyte_api == api_response()
 
     assert response.url == URL
     assert response.status == 200
@@ -68,7 +68,7 @@ def test_init(api_response, cls):
 )
 def test_text_from_api_response(api_response, cls):
     response = cls.from_api_response(api_response())
-    assert response.zyte_api_response == api_response()
+    assert response.zyte_api == api_response()
 
     assert response.url == URL
     assert response.status == 200
@@ -107,18 +107,18 @@ def test_response_replace(api_response, cls):
         (api_response_body, ZyteAPIResponse),
     ],
 )
-def test_response_replace_zyte_api_response(api_response, cls):
+def test_response_replace_zyte_api(api_response, cls):
     orig_response = cls.from_api_response(api_response())
 
-    # The ``zyte_api_response`` should not be replaced.
-    new_zyte_api_response = {"overridden": "value"}
-    new_response = orig_response.replace(zyte_api_response=new_zyte_api_response)
-    assert new_response.zyte_api_response == api_response()
+    # The ``zyte_api`` should not be replaced.
+    new_zyte_api = {"overridden": "value"}
+    new_response = orig_response.replace(zyte_api=new_zyte_api)
+    assert new_response.zyte_api == api_response()
 
 
 def test_non_utf8_response():
     content = "<html><body>Some non-ASCII ✨ chars</body></html>"
-    sample_zyte_api_response = {
+    sample_zyte_api = {
         "url": URL,
         "browserHtml": content,
         "httpResponseHeaders": [
@@ -132,7 +132,7 @@ def test_non_utf8_response():
     # for it. This is the default encoding for the "browserHtml" contents from
     # Zyte API. Thus, even if the Response Headers or <meta> tags indicate a
     # different encoding, it should still be treated as "utf-8".
-    response = ZyteAPITextResponse.from_api_response(sample_zyte_api_response)
+    response = ZyteAPITextResponse.from_api_response(sample_zyte_api)
     assert response.text == content
     assert response.encoding == "utf-8"
 
@@ -148,7 +148,7 @@ def test_response_headers_removal(api_response, cls):
     """Headers like 'Content-Encoding' should be removed later in the response
     instance returned to Scrapy.
 
-    However, it should still be present inside 'zyte_api_response.headers'.
+    However, it should still be present inside 'zyte_api.headers'.
     """
     additional_headers = [
         {"name": "Content-Encoding", "value": "gzip"},
@@ -161,6 +161,5 @@ def test_response_headers_removal(api_response, cls):
 
     assert response.headers == {b"X-Some-Other-Value": [b"123"]}
     assert (
-        response.zyte_api_response["httpResponseHeaders"]
-        == raw_response["httpResponseHeaders"]
+        response.zyte_api["httpResponseHeaders"] == raw_response["httpResponseHeaders"]
     )

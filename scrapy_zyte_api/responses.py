@@ -16,9 +16,9 @@ class ZyteAPIMixin:
         "content-encoding"
     }
 
-    def __init__(self, *args, zyte_api_response: Dict = None, **kwargs):
+    def __init__(self, *args, zyte_api: Dict = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._zyte_api_response = zyte_api_response
+        self._zyte_api = zyte_api
 
     def replace(self, *args, **kwargs):
         """Create a new response with the same attributes except for those given
@@ -27,13 +27,13 @@ class ZyteAPIMixin:
         return super().replace(*args, **kwargs)
 
     @property
-    def zyte_api_response(self) -> Optional[Dict]:
+    def zyte_api(self) -> Optional[Dict]:
         """Contains the raw API response from Zyte API.
 
         To see the full list of parameters and their description, kindly refer to the
         `Zyte API Specification <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
         """
-        return self._zyte_api_response
+        return self._zyte_api
 
     @classmethod
     def _prepare_headers(cls, init_headers: Optional[List[Dict[str, str]]]):
@@ -60,7 +60,7 @@ class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
-            zyte_api_response=api_response,
+            zyte_api=api_response,
         )
 
 
@@ -77,5 +77,5 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
-            zyte_api_response=api_response,
+            zyte_api=api_response,
         )

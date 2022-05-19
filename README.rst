@@ -94,7 +94,7 @@ key to download a request using Zyte API. Full list of parameters is provided in
         def parse(self, response):
             yield {"URL": response.url, "status": response.status, "HTML": response.body}
 
-            print(response.zyte_api_response)
+            print(response.zyte_api)
             # {
             #     'url': 'https://quotes.toscrape.com/',
             #     'browserHtml': '<html> ... </html>',
@@ -113,7 +113,7 @@ key to download a request using Zyte API. Full list of parameters is provided in
             #     'download_slot': 'quotes.toscrape.com'
             # }
 
-The raw Zyte API Response can be accessed via the ``zyte_api_response`` attribute
+The raw Zyte API Response can be accessed via the ``zyte_api`` attribute
 of the response object. Note that such responses are of ``ZyteAPIResponse`` and
 ``ZyteAPITextResponse`` which are respectively subclasses of ``scrapy.http.Response``
 and ``scrapy.http.TextResponse``. Such classes are needed to hold the raw Zyte API
