@@ -1,7 +1,7 @@
 import os
 from asyncio import iscoroutine
 from typing import Any, Dict
-from unittext.mock import MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
