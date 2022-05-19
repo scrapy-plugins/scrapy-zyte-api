@@ -1,7 +1,7 @@
 import os
 from asyncio import iscoroutine
 from typing import Any, Dict
-from unittest.mock import AsyncMock
+from unittext.mock import MagicMock
 
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
@@ -22,6 +22,14 @@ try:
 except ReactorAlreadyInstalledError:
     pass
 os.environ["ZYTE_API_KEY"] = "test"
+
+
+class AsyncMock(MagicMock):
+    """Custom unittest.mock.AsyncMock implementation, required for Python 3.7
+    where AsyncMock is not defined."""
+
+    async def __call__(self, *args, **kwargs):
+        return super().__call__(*args, **kwargs)
 
 
 class TestAPI:
