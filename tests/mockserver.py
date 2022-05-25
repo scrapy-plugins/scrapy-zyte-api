@@ -45,7 +45,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
                     {"name": "test_header", "value": "test_value"}
                 ]
             if post_data.get("jobId") is None:
-                browser_html = "<html></html>"
+                browser_html = "<html><body>Hello<h1>World!</h1></body></html>"
             else:
                 browser_html = f"<html>{post_data['jobId']}</html>"
             if post_data.get("browserHtml"):

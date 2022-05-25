@@ -7,7 +7,7 @@ from unittest import mock
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from scrapy import Request, Spider
-from scrapy.exceptions import IgnoreRequest, NotConfigured
+from scrapy.exceptions import IgnoreRequest, NotConfigured, NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.utils.test import get_crawler
 from twisted.internet.asyncioreactor import install as install_asyncio_reactor
@@ -57,8 +57,10 @@ class TestAPI:
         assert resp.url == req.url
         assert resp.status == 200
         assert "zyte-api" in resp.flags
-        assert resp.body == b"<html></html>"
-        assert resp.text == "<html></html>"
+        assert resp.body == b"<html><body>Hello<h1>World!</h1></body></html>"
+        assert resp.text == "<html><body>Hello<h1>World!</h1></body></html>"
+        assert resp.css("h1 ::text").get() == "World!"
+        assert resp.xpath("//body/text()").getall() == ["Hello"]
 
     @pytest.mark.parametrize(
         "meta",
@@ -83,7 +85,12 @@ class TestAPI:
         assert resp.url == req.url
         assert resp.status == 200
         assert "zyte-api" in resp.flags
-        assert resp.body == b"<html></html>"
+        assert resp.body == b"<html><body>Hello<h1>World!</h1></body></html>"
+
+        with pytest.raises(NotSupported):
+            assert resp.css("h1 ::text").get() == "World!"
+        with pytest.raises(NotSupported):
+            assert resp.xpath("//body/text()").getall() == ["Hello"]
 
     @pytest.mark.parametrize(
         "meta",
@@ -99,7 +106,7 @@ class TestAPI:
         assert resp.url == req.url
         assert resp.status == 200
         assert "zyte-api" in resp.flags
-        assert resp.body == b"<html></html>"
+        assert resp.body == b"<html><body>Hello<h1>World!</h1></body></html>"
         assert resp.headers == {b"Test_Header": [b"test_value"]}
 
     @pytest.mark.skipif(
