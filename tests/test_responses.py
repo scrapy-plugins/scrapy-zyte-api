@@ -180,13 +180,15 @@ def test_response_headers_removal(api_response, cls):
 
 
 def test_process_response_no_body():
-    """The process_response() function cannot produce the appropriate Zyte API
-    Response for Scrapy if it doesn't have a 'browserHtml' or 'httpResponseBody'.
+    """The process_response() function should handle missing 'browserHtml' or
+    'httpResponseBody'.
     """
     api_response = {"url": "https://example.com", "product": {"name": "shoes"}}
 
-    with pytest.raises(ValueError):
-        process_response(api_response, Request(api_response["url"]))
+    resp = process_response(api_response, Request(api_response["url"]))
+
+    assert isinstance(resp, Response)
+    assert resp.body == b""
 
 
 def test_process_response_body_only():

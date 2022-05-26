@@ -83,7 +83,7 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
         return cls(
             url=api_response["url"],
             status=200,
-            body=b64decode(api_response["httpResponseBody"]),
+            body=b64decode(api_response.get("httpResponseBody") or ""),
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
@@ -109,12 +109,6 @@ def process_response(
         # Using TextResponse because browserHtml always returns a browser-rendered page
         # even when requesting files (like images)
         return ZyteAPITextResponse.from_api_response(api_response, request=request)
-
-    if api_response.get("httpResponseBody") is None:
-        raise ValueError(
-            "Can't instantiate ZyteAPITextResponse/ZyteAPIResopnse without "
-            "'browserHtml' or 'httpResponseBody'."
-        )
 
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
         response_cls = responsetypes.from_args(
