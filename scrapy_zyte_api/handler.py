@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, Generator, Union
+from typing import Any, Dict, Generator, Optional, Union
 
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
@@ -15,7 +15,7 @@ from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
 from zyte_api.aio.errors import RequestError
 
-from .responses import ZyteAPIResponse, ZyteAPITextResponse
+from .responses import ZyteAPIResponse, ZyteAPITextResponse, process_response
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
 
     async def _download_request(
         self, request: Request, spider: Spider
-    ) -> Union[ZyteAPITextResponse, ZyteAPIResponse]:
+    ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
         api_params: Dict[str, Any] = self._zyte_api_default_params or {}
         try:
             api_params.update(request.meta.get("zyte_api") or {})
@@ -86,15 +86,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
             )
             raise IgnoreRequest()
+
         self._stats.inc_value("scrapy-zyte-api/request_count")
-        # browserHtml and httpResponseBody are not allowed at the same time,
-        # but at least one of them should be present
-        if api_response.get("browserHtml"):
-            # Using TextResponse because browserHtml always returns a browser-rendered page
-            # even when requesting files (like images)
-            return ZyteAPITextResponse.from_api_response(api_response, request=request)
-        else:
-            return ZyteAPIResponse.from_api_response(api_response, request=request)
+        return process_response(api_response, request)
 
     @inlineCallbacks
     def close(self) -> Generator:

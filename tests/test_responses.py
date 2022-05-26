@@ -1,8 +1,15 @@
 from base64 import b64encode
 
 import pytest
+from scrapy import Request
+from scrapy.exceptions import NotSupported
+from scrapy.http import Response, TextResponse
 
-from scrapy_zyte_api.responses import ZyteAPIResponse, ZyteAPITextResponse
+from scrapy_zyte_api.responses import (
+    ZyteAPIResponse,
+    ZyteAPITextResponse,
+    process_response,
+)
 
 PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
 URL = "https://example.com"
@@ -137,6 +144,13 @@ def test_non_utf8_response():
     assert response.encoding == "utf-8"
 
 
+BODY = "<html><body>Hello<h1>World!✨</h1></body></html>"
+
+
+def format_to_httpResponseBody(body, encoding="utf-8"):
+    return b64encode(body.encode(encoding)).decode("utf-8")
+
+
 @pytest.mark.parametrize(
     "api_response,cls",
     [
@@ -163,3 +177,211 @@ def test_response_headers_removal(api_response, cls):
     assert (
         response.zyte_api["httpResponseHeaders"] == raw_response["httpResponseHeaders"]
     )
+
+
+def test_process_response_no_body():
+    """The process_response() function cannot produce the appropriate Zyte API
+    Response for Scrapy if it doesn't have a 'browserHtml' or 'httpResponseBody'.
+    """
+    api_response = {"url": "https://example.com", "product": {"name": "shoes"}}
+
+    with pytest.raises(ValueError):
+        process_response(api_response, Request(api_response["url"]))
+
+
+def test_process_response_body_only():
+    """Having the Body but with no Headers won't allow us to decode the contents
+    with the proper encoding.
+
+    Thus, we won't have access to css/xpath selectors.
+    """
+    encoding = "utf-8"
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": format_to_httpResponseBody(BODY, encoding=encoding),
+    }
+
+    resp = process_response(api_response, Request(api_response["url"]))
+
+    assert isinstance(resp, Response)
+    with pytest.raises(NotSupported):
+        assert resp.css("h1 ::text")
+    with pytest.raises(NotSupported):
+        assert resp.xpath("//body/text()")
+
+
+@pytest.mark.xfail(reason="encoding inference is not supported for now")
+def test_process_response_body_only_infer_encoding():
+    """The ``scrapy.TextResponse`` class has the ability to check the encoding
+    by inferring it in the HTML body.
+
+    However, this is a bit tricky since we need to somehow ensure that the body
+    we're receiving is "text/html". We can't fully determine that without the
+    headers.
+    """
+    encoding = "gb18030"
+    body = (
+        "<html>"
+        '<head><meta http-equiv="Content-Type" content="text/html; charset="gb2312"></head>'
+        "<body>Some ✨ contents</body>"
+        "</html>"
+    )
+
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": format_to_httpResponseBody(body, encoding=encoding),
+    }
+
+    resp = process_response(api_response, Request(api_response["url"]))
+
+    assert isinstance(resp, TextResponse)
+    assert resp.css("body ::text").get() == "Some ✨ contents"
+    assert resp.xpath("//body/text()").getall() == ["Some ✨ contents"]
+
+
+@pytest.mark.parametrize(
+    "encoding,content_type",
+    [
+        ("utf-8", "text/html; charset=UTF-8"),
+        ("gb18030", "text/html; charset=gb2312"),
+    ],
+)
+def test_process_response_body_and_headers(encoding, content_type):
+    """Having access to the Headers allow us to properly decode the contents
+    and will have access to the css/xpath selectors.
+    """
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": format_to_httpResponseBody(BODY, encoding=encoding),
+        "httpResponseHeaders": [{"name": "Content-Type", "value": content_type}],
+    }
+
+    resp = process_response(api_response, Request(api_response["url"]))
+
+    assert isinstance(resp, TextResponse)
+    assert resp.css("h1 ::text").get() == "World!✨"
+    assert resp.xpath("//body/text()").getall() == ["Hello"]
+    assert resp.encoding == encoding
+
+
+@pytest.mark.parametrize(
+    "body,expected,actual_encoding,inferred_encoding",
+    [
+        ("<html><body>plain</body></html>", "plain", "cp1252", "cp1252"),
+        (
+            "<html><body>✨</body></html>",
+            "✨",
+            "utf-8",
+            "utf-8",
+        ),
+        (
+            "<html><body>✨</body></html>",
+            "✨",
+            "utf-16",
+            "utf-16-le",
+        ),
+        (
+            """<html><head><meta http-equiv="Content-Type" content="text/html; charset="gb2312">
+            </head><body>✨</body></html>""",
+            "✨",
+            "gb18030",
+            None,
+        ),
+    ],
+)
+def test_process_response_body_and_headers_but_no_encoding(
+    body, expected, actual_encoding, inferred_encoding
+):
+    """Should both the body and headers are present but no 'Content-Type' encoding
+    can be derived, it should infer from the body contents.
+    """
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": format_to_httpResponseBody(body, encoding=actual_encoding),
+        "httpResponseHeaders": [{"name": "X-Value", "value": "some_value"}],
+    }
+
+    resp = process_response(api_response, Request(api_response["url"]))
+
+    assert isinstance(resp, TextResponse)
+
+    if inferred_encoding:
+        assert resp.css("body ::text").get() == expected
+        assert resp.xpath("//body/text()").get() == expected
+        assert resp.encoding == inferred_encoding
+
+    # Scrapy's ``TextResponse`` built-in inference only works on "utf-8" and
+    # "Latin-1" based encodings.
+    else:
+        assert resp.css("body ::text").get() != expected
+        assert resp.xpath("//body/text()").get() != expected
+        assert resp.encoding == "ascii"
+
+
+def test_process_response_body_and_headers_mismatch():
+    """If the actual contents have a mismatch in terms of its encoding, we won't
+    properly decode the ✨ emoji.
+    """
+    encoding = "utf-8"
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": format_to_httpResponseBody(BODY, encoding=encoding),
+        "httpResponseHeaders": [
+            {"name": "Content-Type", "value": "text/html; charset=gb2312"}
+        ],
+    }
+
+    resp = process_response(api_response, Request(api_response["url"]))
+
+    assert isinstance(resp, TextResponse)
+    assert resp.css("h1 ::text").get() != "World!✨"  # mismatch
+    assert resp.xpath("//body/text()").getall() == ["Hello"]
+    assert resp.encoding == "gb18030"
+
+
+def test_process_response_non_text():
+    """Non-textual responses like images, files, etc. won't have access to the
+    css/xpath selectors.
+    """
+    api_response = {
+        "url": "https://example.com/sprite.gif",
+        "httpResponseBody": b"",
+        "httpResponseHeaders": [
+            {
+                "name": "Content-Type",
+                "value": "image/gif",
+            }
+        ],
+    }
+    resp = process_response(api_response, Request(api_response["url"]))
+
+    assert isinstance(resp, Response)
+    with pytest.raises(NotSupported):
+        assert resp.css("h1 ::text")
+    with pytest.raises(NotSupported):
+        assert resp.xpath("//body/text()")
+
+
+@pytest.mark.parametrize(
+    "api_response",
+    [
+        {"url": "https://example.com", "browserHtml": BODY},
+        {
+            "url": "https://example.com",
+            "browserHtml": BODY,
+            "httpResponseHeaders": [
+                {
+                    "name": "Content-Type",
+                    "value": "text/html; charset=UTF-8",
+                }
+            ],
+        },
+    ],
+)
+def test_process_response_browserhtml(api_response):
+    resp = process_response(api_response, Request(api_response["url"]))
+
+    assert isinstance(resp, TextResponse)
+    assert resp.css("h1 ::text").get() == "World!✨"
+    assert resp.xpath("//body/text()").getall() == ["Hello"]
+    assert resp.encoding == "utf-8"  # Zyte API is consistent with this on browserHtml

@@ -1,10 +1,11 @@
 from base64 import b64decode
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from scrapy import Request
 from scrapy.http import Response, TextResponse
+from scrapy.responsetypes import responsetypes
 
-_ENCODING = "utf-8"
+_DEFAULT_ENCODING = "utf-8"
 
 
 class ZyteAPIMixin:
@@ -52,11 +53,20 @@ class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
+        body = None
+        encoding = None
+
+        if api_response.get("browserHtml"):
+            encoding = _DEFAULT_ENCODING  # Zyte API has "utf-8" by default
+            body = api_response["browserHtml"].encode(encoding)
+        elif api_response.get("httpResponseBody"):
+            body = b64decode(api_response["httpResponseBody"])
+
         return cls(
             url=api_response["url"],
             status=200,
-            body=api_response["browserHtml"].encode(_ENCODING),
-            encoding=_ENCODING,
+            body=body,
+            encoding=encoding,
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
@@ -79,3 +89,41 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
             headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
             zyte_api=api_response,
         )
+
+
+def process_response(
+    api_response: Dict[str, Union[List[Dict], str]], request: Request
+) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
+    """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
+    this returns either a ``ZyteAPITextResponse`` or ``ZyteAPIResponse`` depending
+    on which if it can properly decode the HTTP Body or have access to browserHtml.
+    """
+
+    # NOTES: Currently, Zyte API does NOT only allow both 'browserHtml' and
+    # 'httpResponseBody' to be present at the same time. The support for both
+    # will be addressed in the future. Reference:
+    # - https://github.com/scrapy-plugins/scrapy-zyte-api/pull/10#issuecomment-1131406460
+    # For now, at least one of them should be present.
+
+    if api_response.get("browserHtml"):
+        # Using TextResponse because browserHtml always returns a browser-rendered page
+        # even when requesting files (like images)
+        return ZyteAPITextResponse.from_api_response(api_response, request=request)
+
+    if api_response.get("httpResponseBody") is None:
+        raise ValueError(
+            "Can't instantiate ZyteAPITextResponse/ZyteAPIResopnse without "
+            "'browserHtml' or 'httpResponseBody'."
+        )
+
+    if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
+        response_cls = responsetypes.from_args(
+            headers=api_response["httpResponseHeaders"],
+            url=api_response["url"],
+            # FIXME: update this when python-zyte-api supports base64 decoding
+            body=b64decode(api_response["httpResponseBody"]),  # type: ignore
+        )
+        if issubclass(response_cls, TextResponse):
+            return ZyteAPITextResponse.from_api_response(api_response, request=request)
+
+    return ZyteAPIResponse.from_api_response(api_response, request=request)
