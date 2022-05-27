@@ -77,9 +77,9 @@ in the ``settings.py`` file or `any other settings within Scrapy
 You can see the full list of parameters in the `Zyte API Specification
 <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
 
-On the other hand, you could also control it on a per request basis by setting the
+On the other hand, you could also control it on a per-request basis by setting the
 ``zyte_api`` key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_.
-When doing so, it will override any parameters that was set in the 
+When doing so, it will override any parameters set in the 
 ``ZYTE_API_DEFAULT_PARAMS`` setting.
 
 .. code-block:: python
@@ -127,8 +127,8 @@ When doing so, it will override any parameters that was set in the
             #     'download_slot': 'quotes.toscrape.com'
             # }
 
-The raw Zyte API Response can be accessed via the ``zyte_api`` attribute
+The raw Zyte Data API response can be accessed via the ``zyte_api`` attribute
 of the response object. Note that such responses are of ``ZyteAPIResponse`` and
-``ZyteAPITextResponse`` which are respectively subclasses of ``scrapy.http.Response``
-and ``scrapy.http.TextResponse``. Such classes are needed to hold the raw Zyte API
+``ZyteAPITextResponse`` types, which are respectively subclasses of ``scrapy.http.Response``
+and ``scrapy.http.TextResponse``. Such classes are needed to hold the raw Zyte Data API
 responses.
