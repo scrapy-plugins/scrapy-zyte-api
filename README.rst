@@ -116,7 +116,7 @@ is set. When doing so, it will override any parameters set in the
         def parse(self, response):
             yield {"URL": response.url, "status": response.status, "HTML": response.body}
 
-            print(response.zyte_api)
+            print(response.raw_api_response)
             # {
             #     'url': 'https://quotes.toscrape.com/',
             #     'browserHtml': '<html> ... </html>',
@@ -135,7 +135,7 @@ is set. When doing so, it will override any parameters set in the
             #     'download_slot': 'quotes.toscrape.com'
             # }
 
-The raw Zyte Data API response can be accessed via the ``zyte_api`` attribute
+The raw Zyte Data API response can be accessed via the ``raw_api_response`` attribute
 of the response object. Note that such responses are of ``ZyteAPIResponse`` and
 ``ZyteAPITextResponse`` types, which are respectively subclasses of ``scrapy.http.Response``
 and ``scrapy.http.TextResponse``. Such classes are needed to hold the raw Zyte Data API

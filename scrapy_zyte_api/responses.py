@@ -1,5 +1,5 @@
 from base64 import b64decode
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from scrapy import Request
 from scrapy.http import Response, TextResponse
@@ -17,23 +17,23 @@ class ZyteAPIMixin:
         "content-encoding"
     }
 
-    def __init__(self, *args, zyte_api: Dict = None, **kwargs):
+    def __init__(self, *args, raw_api_response: Dict = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._zyte_api = zyte_api
+        self._raw_api_response = raw_api_response
 
     def replace(self, *args, **kwargs):
-        if kwargs.get("zyte_api"):
-            raise ValueError("Replacing the value of 'zyte_api' isn't allowed.")
+        if kwargs.get("raw_api_response"):
+            raise ValueError("Replacing the value of 'raw_api_response' isn't allowed.")
         return super().replace(*args, **kwargs)
 
     @property
-    def zyte_api(self) -> Optional[Dict]:
+    def raw_api_response(self) -> Optional[Dict]:
         """Contains the raw API response from Zyte API.
 
         To see the full list of parameters and their description, kindly refer to the
         `Zyte API Specification <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
         """
-        return self._zyte_api
+        return self._raw_api_response
 
     @classmethod
     def _prepare_headers(cls, init_headers: Optional[List[Dict[str, str]]]):
@@ -48,7 +48,7 @@ class ZyteAPIMixin:
 
 class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
 
-    attributes: Tuple[str, ...] = TextResponse.attributes + ("zyte_api",)
+    attributes: Tuple[str, ...] = TextResponse.attributes + ("raw_api_response",)
 
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
@@ -72,13 +72,13 @@ class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
-            zyte_api=api_response,
+            raw_api_response=api_response,
         )
 
 
 class ZyteAPIResponse(ZyteAPIMixin, Response):
 
-    attributes: Tuple[str, ...] = Response.attributes + ("zyte_api",)
+    attributes: Tuple[str, ...] = Response.attributes + ("raw_api_response",)
 
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
@@ -92,7 +92,7 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
-            zyte_api=api_response,
+            raw_api_response=api_response,
         )
 
 

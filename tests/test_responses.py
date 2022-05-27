@@ -15,7 +15,7 @@ PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
 URL = "https://example.com"
 
 
-def api_response_browser():
+def raw_api_response_browser():
     return {
         "url": URL,
         "browserHtml": PAGE_CONTENT,
@@ -28,7 +28,7 @@ def api_response_browser():
     }
 
 
-def api_response_body():
+def raw_api_response_body():
     return {
         "url": "https://example.com",
         "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
@@ -47,13 +47,13 @@ EXPECTED_BODY = PAGE_CONTENT.encode("utf-8")
 @pytest.mark.parametrize(
     "api_response,cls",
     [
-        (api_response_browser, ZyteAPITextResponse),
-        (api_response_body, ZyteAPIResponse),
+        (raw_api_response_browser, ZyteAPITextResponse),
+        (raw_api_response_body, ZyteAPIResponse),
     ],
 )
 def test_init(api_response, cls):
-    response = cls(URL, zyte_api=api_response())
-    assert response.zyte_api == api_response()
+    response = cls(URL, raw_api_response=api_response())
+    assert response.raw_api_response == api_response()
 
     assert response.url == URL
     assert response.status == 200
@@ -69,13 +69,13 @@ def test_init(api_response, cls):
 @pytest.mark.parametrize(
     "api_response,cls",
     [
-        (api_response_browser, ZyteAPITextResponse),
-        (api_response_body, ZyteAPIResponse),
+        (raw_api_response_browser, ZyteAPITextResponse),
+        (raw_api_response_body, ZyteAPIResponse),
     ],
 )
 def test_text_from_api_response(api_response, cls):
     response = cls.from_api_response(api_response())
-    assert response.zyte_api == api_response()
+    assert response.raw_api_response == api_response()
 
     assert response.url == URL
     assert response.status == 200
@@ -91,8 +91,8 @@ def test_text_from_api_response(api_response, cls):
 @pytest.mark.parametrize(
     "api_response,cls",
     [
-        (api_response_browser, ZyteAPITextResponse),
-        (api_response_body, ZyteAPIResponse),
+        (raw_api_response_browser, ZyteAPITextResponse),
+        (raw_api_response_body, ZyteAPIResponse),
     ],
 )
 def test_response_replace(api_response, cls):
@@ -106,21 +106,21 @@ def test_response_replace(api_response, cls):
     assert new_response.url == "https://new-example.com"
 
     # Ensure that the Zyte API response is intact
-    assert new_response.zyte_api == api_response()
+    assert new_response.raw_api_response == api_response()
 
-    new_zyte_api = {
+    new_raw_api_response = {
         "url": "https://another-website.com",
-        "httpResponseHeaders": {"name": "Content-Type", "value": "application/json"}
+        "httpResponseHeaders": {"name": "Content-Type", "value": "application/json"},
     }
 
-    # Attempting to replace the zyte_api value would raise an error
+    # Attempting to replace the raw_api_response value would raise an error
     with pytest.raises(ValueError):
-        orig_response.replace(zyte_api=new_zyte_api)
+        orig_response.replace(raw_api_response=new_raw_api_response)
 
 
 def test_non_utf8_response():
     content = "<html><body>Some non-ASCII ✨ chars</body></html>"
-    sample_zyte_api = {
+    sample_raw_api_response = {
         "url": URL,
         "browserHtml": content,
         "httpResponseHeaders": [
@@ -134,7 +134,7 @@ def test_non_utf8_response():
     # for it. This is the default encoding for the "browserHtml" contents from
     # Zyte API. Thus, even if the Response Headers or <meta> tags indicate a
     # different encoding, it should still be treated as "utf-8".
-    response = ZyteAPITextResponse.from_api_response(sample_zyte_api)
+    response = ZyteAPITextResponse.from_api_response(sample_raw_api_response)
     assert response.text == content
     assert response.encoding == "utf-8"
 
@@ -149,15 +149,15 @@ def format_to_httpResponseBody(body, encoding="utf-8"):
 @pytest.mark.parametrize(
     "api_response,cls",
     [
-        (api_response_browser, ZyteAPITextResponse),
-        (api_response_body, ZyteAPIResponse),
+        (raw_api_response_browser, ZyteAPITextResponse),
+        (raw_api_response_body, ZyteAPIResponse),
     ],
 )
 def test_response_headers_removal(api_response, cls):
     """Headers like 'Content-Encoding' should be removed later in the response
     instance returned to Scrapy.
 
-    However, it should still be present inside 'zyte_api.headers'.
+    However, it should still be present inside 'raw_api_response.headers'.
     """
     additional_headers = [
         {"name": "Content-Encoding", "value": "gzip"},
@@ -170,7 +170,8 @@ def test_response_headers_removal(api_response, cls):
 
     assert response.headers == {b"X-Some-Other-Value": [b"123"]}
     assert (
-        response.zyte_api["httpResponseHeaders"] == raw_response["httpResponseHeaders"]
+        response.raw_api_response["httpResponseHeaders"]
+        == raw_response["httpResponseHeaders"]
     )
 
 
