@@ -108,23 +108,14 @@ def test_response_replace(api_response, cls):
     # Ensure that the Zyte API response is intact
     assert new_response.zyte_api == api_response()
 
-    # The Zyte API response must also be fully replaceable
     new_zyte_api = {
         "url": "https://another-website.com",
         "httpResponseHeaders": {"name": "Content-Type", "value": "application/json"}
     }
-    if cls == ZyteAPITextResponse:
-        new_zyte_api["browserHtml"] = "Hello World!"
-    elif cls == ZyteAPIResponse:
-        new_zyte_api["httpResponseBody"] = "Hello World!"
 
-    new_response = orig_response.replace(zyte_api=new_zyte_api)
-    assert new_response.zyte_api == new_zyte_api
-
-    # But it doesn't change the contextually similar attributes of the response
-    new_response.url == orig_response.url
-    new_response.body == orig_response.body
-    new_response.headers == orig_response.headers
+    # Attempting to replace the zyte_api value would raise an error
+    with pytest.raises(ValueError):
+        orig_response.replace(zyte_api=new_zyte_api)
 
 
 def test_non_utf8_response():

@@ -21,6 +21,11 @@ class ZyteAPIMixin:
         super().__init__(*args, **kwargs)
         self._zyte_api = zyte_api
 
+    def replace(self, *args, **kwargs):
+        if kwargs.get("zyte_api"):
+            raise ValueError("Replacing the value of 'zyte_api' isn't allowed.")
+        return super().replace(*args, **kwargs)
+
     @property
     def zyte_api(self) -> Optional[Dict]:
         """Contains the raw API response from Zyte API.
