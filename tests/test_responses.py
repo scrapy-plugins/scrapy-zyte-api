@@ -8,7 +8,7 @@ from scrapy.http import Response, TextResponse
 from scrapy_zyte_api.responses import (
     ZyteAPIResponse,
     ZyteAPITextResponse,
-    process_response,
+    _process_response,
 )
 
 PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
@@ -170,19 +170,19 @@ def test_response_headers_removal(api_response, cls):
     )
 
 
-def test_process_response_no_body():
-    """The process_response() function should handle missing 'browserHtml' or
+def test__process_response_no_body():
+    """The _process_response() function should handle missing 'browserHtml' or
     'httpResponseBody'.
     """
     api_response = {"url": "https://example.com", "product": {"name": "shoes"}}
 
-    resp = process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(api_response["url"]))
 
     assert isinstance(resp, Response)
     assert resp.body == b""
 
 
-def test_process_response_body_only():
+def test__process_response_body_only():
     """Having the Body but with no Headers won't allow us to decode the contents
     with the proper encoding.
 
@@ -194,7 +194,7 @@ def test_process_response_body_only():
         "httpResponseBody": format_to_httpResponseBody(BODY, encoding=encoding),
     }
 
-    resp = process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(api_response["url"]))
 
     assert isinstance(resp, Response)
     with pytest.raises(NotSupported):
@@ -204,7 +204,7 @@ def test_process_response_body_only():
 
 
 @pytest.mark.xfail(reason="encoding inference is not supported for now")
-def test_process_response_body_only_infer_encoding():
+def test__process_response_body_only_infer_encoding():
     """The ``scrapy.TextResponse`` class has the ability to check the encoding
     by inferring it in the HTML body.
 
@@ -225,7 +225,7 @@ def test_process_response_body_only_infer_encoding():
         "httpResponseBody": format_to_httpResponseBody(body, encoding=encoding),
     }
 
-    resp = process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(api_response["url"]))
 
     assert isinstance(resp, TextResponse)
     assert resp.css("body ::text").get() == "Some ✨ contents"
@@ -239,7 +239,7 @@ def test_process_response_body_only_infer_encoding():
         ("gb18030", "text/html; charset=gb2312"),
     ],
 )
-def test_process_response_body_and_headers(encoding, content_type):
+def test__process_response_body_and_headers(encoding, content_type):
     """Having access to the Headers allow us to properly decode the contents
     and will have access to the css/xpath selectors.
     """
@@ -249,7 +249,7 @@ def test_process_response_body_and_headers(encoding, content_type):
         "httpResponseHeaders": [{"name": "Content-Type", "value": content_type}],
     }
 
-    resp = process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(api_response["url"]))
 
     assert isinstance(resp, TextResponse)
     assert resp.css("h1 ::text").get() == "World!✨"
@@ -282,7 +282,7 @@ def test_process_response_body_and_headers(encoding, content_type):
         ),
     ],
 )
-def test_process_response_body_and_headers_but_no_encoding(
+def test__process_response_body_and_headers_but_no_encoding(
     body, expected, actual_encoding, inferred_encoding
 ):
     """Should both the body and headers are present but no 'Content-Type' encoding
@@ -294,7 +294,7 @@ def test_process_response_body_and_headers_but_no_encoding(
         "httpResponseHeaders": [{"name": "X-Value", "value": "some_value"}],
     }
 
-    resp = process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(api_response["url"]))
 
     assert isinstance(resp, TextResponse)
 
@@ -311,7 +311,7 @@ def test_process_response_body_and_headers_but_no_encoding(
         assert resp.encoding == "ascii"
 
 
-def test_process_response_body_and_headers_mismatch():
+def test__process_response_body_and_headers_mismatch():
     """If the actual contents have a mismatch in terms of its encoding, we won't
     properly decode the ✨ emoji.
     """
@@ -324,7 +324,7 @@ def test_process_response_body_and_headers_mismatch():
         ],
     }
 
-    resp = process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(api_response["url"]))
 
     assert isinstance(resp, TextResponse)
     assert resp.css("h1 ::text").get() != "World!✨"  # mismatch
@@ -332,7 +332,7 @@ def test_process_response_body_and_headers_mismatch():
     assert resp.encoding == "gb18030"
 
 
-def test_process_response_non_text():
+def test__process_response_non_text():
     """Non-textual responses like images, files, etc. won't have access to the
     css/xpath selectors.
     """
@@ -346,7 +346,7 @@ def test_process_response_non_text():
             }
         ],
     }
-    resp = process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(api_response["url"]))
 
     assert isinstance(resp, Response)
     with pytest.raises(NotSupported):
@@ -371,8 +371,8 @@ def test_process_response_non_text():
         },
     ],
 )
-def test_process_response_browserhtml(api_response):
-    resp = process_response(api_response, Request(api_response["url"]))
+def test__process_response_browserhtml(api_response):
+    resp = _process_response(api_response, Request(api_response["url"]))
 
     assert isinstance(resp, TextResponse)
     assert resp.css("h1 ::text").get() == "World!✨"

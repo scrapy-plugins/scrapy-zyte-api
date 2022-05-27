@@ -91,7 +91,7 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
         )
 
 
-def process_response(
+def _process_response(
     api_response: Dict[str, Union[List[Dict], str]], request: Request
 ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
     """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
