@@ -63,8 +63,12 @@ Here's an example of the things needed inside a Scrapy project's ``settings.py``
 Usage
 -----
 
-To enable every request to be sent through Zyte API, you can set the following
-in the ``settings.py`` file or `any other settings within Scrapy
+To enable a ``scrapy.Request`` to go through Zyte Data API, the ``zyte_api`` key in
+`Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
+must be present and has dict-like contents.
+
+To set the default parameters for Zyte API enabled requests, you can set the
+following in the ``settings.py`` file or `any other settings within Scrapy
 <https://docs.scrapy.org/en/latest/topics/settings.html#populating-the-settings>`_:
 
 .. code-block:: python
@@ -74,12 +78,12 @@ in the ``settings.py`` file or `any other settings within Scrapy
         "geolocation": "US",
     }
 
-You can see the full list of parameters in the `Zyte API Specification
+You can see the full list of parameters in the `Zyte Data API Specification
 <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
 
-On the other hand, you could also control it on a per-request basis by setting the
-``zyte_api`` key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_.
-When doing so, it will override any parameters set in the 
+Note that the ``ZYTE_API_DEFAULT_PARAMS`` would only work if the ``zyte_api``
+key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
+is set. When doing so, it will override any parameters set in the 
 ``ZYTE_API_DEFAULT_PARAMS`` setting.
 
 .. code-block:: python
@@ -90,15 +94,19 @@ When doing so, it will override any parameters set in the
     class SampleQuotesSpider(scrapy.Spider):
         name = "sample_quotes"
 
-        def start_requests(self):
+        custom_settings = {
+            "ZYTE_API_DEFAULT_PARAMS": {
+                "geolocation": "US",  # You can set any Geolocation region you want.
+            }
+        }
 
+        def start_requests(self):
             yield scrapy.Request(
                 url="http://books.toscrape.com/",
                 callback=self.parse,
                 meta={
                     "zyte_api": {
                         "browserHtml": True,
-                        "geolocation": "US",  # You can set any Geolocation region you want.
                         "javascript": True,
                         "echoData": {"some_value_I_could_track": 123},
                     }
