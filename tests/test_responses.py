@@ -105,6 +105,10 @@ def test_response_replace(api_response, cls):
     new_response = orig_response.replace(url="https://new-example.com")
     assert new_response.url == "https://new-example.com"
 
+    # Ensure that the Zyte API response is intact
+    assert new_response.zyte_api == api_response()
+
+    # The Zyte API response must also be fully replaceable
     new_zyte_api = {"overridden": "value"}
     new_response = orig_response.replace(zyte_api=new_zyte_api)
     assert new_response.zyte_api == new_zyte_api
