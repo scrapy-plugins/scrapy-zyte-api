@@ -1,5 +1,5 @@
 from base64 import b64decode
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
 
 from scrapy import Request
 from scrapy.http import Response, TextResponse
@@ -20,12 +20,6 @@ class ZyteAPIMixin:
     def __init__(self, *args, zyte_api: Dict = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._zyte_api = zyte_api
-
-    def replace(self, *args, **kwargs):
-        """Create a new response with the same attributes except for those given
-        new values.
-        """
-        return super().replace(*args, **kwargs)
 
     @property
     def zyte_api(self) -> Optional[Dict]:
@@ -48,6 +42,9 @@ class ZyteAPIMixin:
 
 
 class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
+
+    attributes: Tuple[str, ...] = TextResponse.attributes + ("zyte_api",)
+
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
         """Alternative constructor to instantiate the response from the raw
@@ -75,6 +72,9 @@ class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
 
 
 class ZyteAPIResponse(ZyteAPIMixin, Response):
+
+    attributes: Tuple[str, ...] = Response.attributes + ("zyte_api",)
+
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
         """Alternative constructor to instantiate the response from the raw

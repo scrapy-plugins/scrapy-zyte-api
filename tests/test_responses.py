@@ -105,22 +105,9 @@ def test_response_replace(api_response, cls):
     new_response = orig_response.replace(url="https://new-example.com")
     assert new_response.url == "https://new-example.com"
 
-
-@pytest.mark.xfail
-@pytest.mark.parametrize(
-    "api_response,cls",
-    [
-        (api_response_browser, ZyteAPITextResponse),
-        (api_response_body, ZyteAPIResponse),
-    ],
-)
-def test_response_replace_zyte_api(api_response, cls):
-    orig_response = cls.from_api_response(api_response())
-
-    # The ``zyte_api`` should not be replaced.
     new_zyte_api = {"overridden": "value"}
     new_response = orig_response.replace(zyte_api=new_zyte_api)
-    assert new_response.zyte_api == api_response()
+    assert new_response.zyte_api == new_zyte_api
 
 
 def test_non_utf8_response():
