@@ -94,3 +94,6 @@ key to download a request using Zyte API. Full list of parameters is provided in
 
        def parse(self, response):
            yield {"URL": response.url, "status": response.status, "HTML": response.body}
+
+If multiple requests target the same URL with different Zyte Data API 
+parameters, pass ``dont_filter=True`` to ``Request``.
