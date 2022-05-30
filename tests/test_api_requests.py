@@ -9,6 +9,7 @@ from _pytest.logging import LogCaptureFixture  # NOQA
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest, NotConfigured, NotSupported
 from scrapy.http import Response, TextResponse
+from scrapy.utils.defer import deferred_to_future
 from scrapy.utils.test import get_crawler
 from twisted.internet.asyncioreactor import install as install_asyncio_reactor
 from twisted.internet.defer import Deferred
@@ -34,10 +35,12 @@ class TestAPI:
                     method="POST",
                     meta=meta,
                 )
-                coro = handler._download_request(req, None)
-                assert iscoroutine(coro)
-                assert not isinstance(coro, Deferred)
-                resp = await coro  # type: ignore
+                coro_or_deferred = handler.download_request(req, None)
+                if iscoroutine(coro_or_deferred):
+                    resp = await coro_or_deferred  # type: ignore
+                else:
+                    resp = await deferred_to_future(coro_or_deferred)
+
                 return req, resp
 
     @pytest.mark.parametrize(
@@ -113,35 +116,59 @@ class TestAPI:
         sys.version_info < (3, 8), reason="Python3.7 has poor support for AsyncMocks"
     )
     @pytest.mark.parametrize(
-        "meta,custom_settings,expected",
+        "meta,custom_settings,expected,use_zyte_api",
         [
-            ({}, {}, {}),
-            ({"zyte_api": {}}, {}, {}),
+            ({}, {}, {}, False),
+            ({"zyte_api": {}}, {}, {}, False),
+            ({"zyte_api": True}, {}, {}, False),
+            ({"zyte_api": False}, {}, {}, False),
             (
                 {},
                 {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
                 {"browserHtml": True, "geolocation": "CA"},
+                False,
+            ),
+            (
+                {"zyte_api": False},
+                {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
+                {},
+                False,
+            ),
+            (
+                {"zyte_api": None},
+                {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
+                {},
+                False,
             ),
             (
                 {"zyte_api": {}},
                 {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
                 {"browserHtml": True, "geolocation": "CA"},
+                True,
+            ),
+            (
+                {"zyte_api": True},
+                {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
+                {"browserHtml": True, "geolocation": "CA"},
+                True,
             ),
             (
                 {"zyte_api": {"javascript": True, "geolocation": "US"}},
                 {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
                 {"browserHtml": True, "geolocation": "US", "javascript": True},
+                True,
             ),
         ],
     )
     @mock.patch("tests.AsyncClient")
     @pytest.mark.asyncio
-    async def test_empty_zyte_api_request_meta(
+    async def test_zyte_api_request_meta(
         self,
         mock_client,
         meta: Dict[str, Dict[str, Any]],
         custom_settings: Dict[str, str],
         expected: Dict[str, str],
+        use_zyte_api: bool,
     ):
         try:
             # This would always error out since the mocked client doesn't
@@ -152,7 +179,12 @@ class TestAPI:
 
         # What we're interested in is the Request call in the API
         request_call = [c for c in mock_client.mock_calls if "request_raw(" in str(c)]
-        if not request_call:
+
+        if not use_zyte_api:
+            assert request_call == []
+            return
+
+        elif not request_call:
             pytest.fail("The client's request_raw() method was not called.")
 
         args_used = request_call[0].args[0]
@@ -166,15 +198,18 @@ class TestAPI:
             ({"zyte_api": {"waka": True}}, True),
             ({"zyte_api": True}, True),
             ({"zyte_api": {"browserHtml": True}}, True),
-            ({"zyte_api": {}}, False),
+            ({"zyte_api": {}}, True),
+            ({"zyte_api": None}, False),
             ({"randomParameter": True}, False),
             ({}, False),
+            (None, False),
         ],
     )
     @pytest.mark.asyncio
     async def test_coro_handling(
         self, meta: Dict[str, Dict[str, Any]], api_relevant: bool
     ):
+        custom_settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
         with MockServer() as server:
             async with make_handler({}, server.urljoin("/")) as handler:
                 req = Request(
@@ -182,13 +217,14 @@ class TestAPI:
                     method="POST",
                     meta=meta,
                 )
+                handler._zyte_api_default_params = custom_settings
                 if api_relevant:
                     coro = handler.download_request(req, Spider("test"))
                     assert not iscoroutine(coro)
                     assert isinstance(coro, Deferred)
                 else:
                     # Non-API requests won't get into handle, but run HTTPDownloadHandler.download_request instead
-                    # But because they're Deffered - they won't run because event loop is closed
+                    # But because they're Deferred - they won't run because event loop is closed
                     with pytest.raises(RuntimeError, match="Event loop is closed"):
                         handler.download_request(req, Spider("test"))
 
@@ -201,13 +237,6 @@ class TestAPI:
                 IgnoreRequest,
                 "Got an error when processing Zyte API request (http://example.com): "
                 "Object of type Request is not JSON serializable",
-            ),
-            (
-                {"zyte_api": True},
-                "/",
-                IgnoreRequest,
-                "zyte_api parameters in the request meta should be provided as "
-                "dictionary, got <class 'bool'> instead (http://example.com)",
             ),
             (
                 {"zyte_api": {"browserHtml": True}},
@@ -230,8 +259,12 @@ class TestAPI:
         with MockServer() as server:
             async with make_handler({}, server.urljoin(server_path)) as handler:
                 req = Request("http://example.com", method="POST", meta=meta)
+                api_params = handler._prepare_api_params(req)
+
                 with pytest.raises(exception_type):  # NOQA
-                    await handler._download_request(req, Spider("test"))  # NOQA
+                    await handler._download_request(
+                        api_params, req, Spider("test")
+                    )  # NOQA
                 assert exception_text in caplog.text
 
     @pytest.mark.parametrize(
@@ -247,7 +280,10 @@ class TestAPI:
                     method="POST",
                     meta={"zyte_api": {"browserHtml": True}},
                 )
-                resp = await handler._download_request(req, Spider("test"))  # NOQA
+                api_params = handler._prepare_api_params(req)
+                resp = await handler._download_request(
+                    api_params, req, Spider("test")
+                )  # NOQA
 
             assert resp.request is req
             assert resp.url == req.url

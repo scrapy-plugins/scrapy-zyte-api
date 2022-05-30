@@ -49,17 +49,24 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         return cls(crawler.settings, crawler, client)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
-        if request.meta.get("zyte_api"):
-            return deferred_from_coro(self._download_request(request, spider))
-        else:
-            return super().download_request(request, spider)
+        api_params = self._prepare_api_params(request)
+        if api_params:
+            return deferred_from_coro(
+                self._download_request(api_params, request, spider)
+            )
+        return super().download_request(request, spider)
 
-    async def _download_request(
-        self, request: Request, spider: Spider
-    ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
+    def _prepare_api_params(self, request: Request) -> Optional[dict]:
+        meta_params = request.meta.get("zyte_api")
+        if not meta_params and meta_params != {}:
+            return None
+
+        if meta_params is True:
+            meta_params = {}
+
         api_params: Dict[str, Any] = self._zyte_api_default_params or {}
         try:
-            api_params.update(request.meta.get("zyte_api") or {})
+            api_params.update(meta_params)
         except TypeError:
             logger.error(
                 f"zyte_api parameters in the request meta should be "
@@ -67,6 +74,11 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"instead ({request.url})."
             )
             raise IgnoreRequest()
+        return api_params
+
+    async def _download_request(
+        self, api_params: dict, request: Request, spider: Spider
+    ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
         # Define url by default
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
