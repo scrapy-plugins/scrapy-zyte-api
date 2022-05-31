@@ -44,7 +44,7 @@ You also need to set the ``ZYTE_API_KEY``.
 
 Lastly, make sure to `install the asyncio-based Twisted reactor
 <https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor)>`_
-in the ``settings.py`` file as well:
+in the ``settings.py`` file as well.
 
 Here's an example of the things needed inside a Scrapy project's ``settings.py`` file:
 
@@ -65,7 +65,60 @@ Usage
 
 To enable a ``scrapy.Request`` to go through Zyte Data API, the ``zyte_api`` key in
 `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
-must be present and has dict-like contents.
+must be present and contain a dict with Zyte API parameters:
+
+.. code-block:: python
+
+    import scrapy
+
+
+    class SampleQuotesSpider(scrapy.Spider):
+        name = "sample_quotes"
+
+        def start_requests(self):
+            yield scrapy.Request(
+                url="http://quotes.toscrape.com/",
+                callback=self.parse,
+                meta={
+                    "zyte_api": {
+                        "browserHtml": True,
+                    }
+                },
+            )
+
+        def parse(self, response):
+            yield {"URL": response.url, "HTML": response.body}
+
+            print(response.raw_api_response)
+            # {
+            #     'url': 'https://quotes.toscrape.com/',
+            #     'browserHtml': '<html> ... </html>',
+            # }
+
+You can see the full list of parameters in the `Zyte Data API Specification
+<https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
+"url" parameter is filled automatically from ``request.url``, other parameters
+should be set explicitly.
+
+The raw Zyte Data API response can be accessed via the ``raw_api_response``
+attribute of the response object.
+
+When ``browserHtml``, ``httpResponseBody`` or ``httpResponseHeaders`` Zyte API
+arguments are used, the response body and headers are set accordingly.
+
+Note that for Zyte API requests the spider is getting responses of
+``ZyteAPIResponse`` and ``ZyteAPITextResponse`` types,
+which are respectively subclasses of ``scrapy.http.Response``
+and ``scrapy.http.TextResponse``.
+
+If multiple requests target the same URL with different Zyte Data API
+parameters, pass ``dont_filter=True`` to ``Request``.
+
+Setting default parameters
+--------------------------
+Often the same configuration needs to be used for all Zyte API requests.
+For example, all requests may need to set the same geolocation, or
+the spider only uses browserHtml requests.
 
 To set the default parameters for Zyte API enabled requests, you can set the
 following in the ``settings.py`` file or `any other settings within Scrapy
@@ -78,13 +131,13 @@ following in the ``settings.py`` file or `any other settings within Scrapy
         "geolocation": "US",
     }
 
-You can see the full list of parameters in the `Zyte Data API Specification
-<https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
 
-Note that the ``ZYTE_API_DEFAULT_PARAMS`` would only work if the ``zyte_api``
+``ZYTE_API_DEFAULT_PARAMS`` works if the ``zyte_api``
 key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
-is set. When doing so, it will override any parameters set in the 
-``ZYTE_API_DEFAULT_PARAMS`` setting.
+is set, i.e. having ``ZYTE_API_DEFAULT_PARAMS`` doesn't make all requests
+to go through Zyte API. Parameters in ``ZYTE_API_DEFAULT_PARAMS`` are merged
+with parameters set via ``zyte_api`` meta key, with the values in meta
+taking priority.
 
 .. code-block:: python
 
@@ -102,7 +155,7 @@ is set. When doing so, it will override any parameters set in the
 
         def start_requests(self):
             yield scrapy.Request(
-                url="http://books.toscrape.com/",
+                url="http://quotes.toscrape.com/",
                 callback=self.parse,
                 meta={
                     "zyte_api": {
@@ -114,7 +167,7 @@ is set. When doing so, it will override any parameters set in the
             )
 
         def parse(self, response):
-            yield {"URL": response.url, "status": response.status, "HTML": response.body}
+            yield {"URL": response.url, "HTML": response.body}
 
             print(response.raw_api_response)
             # {
@@ -135,11 +188,46 @@ is set. When doing so, it will override any parameters set in the
             #     'download_slot': 'quotes.toscrape.com'
             # }
 
-The raw Zyte Data API response can be accessed via the ``raw_api_response`` attribute
-of the response object. Note that such responses are of ``ZyteAPIResponse`` and
-``ZyteAPITextResponse`` types, which are respectively subclasses of ``scrapy.http.Response``
-and ``scrapy.http.TextResponse``. Such classes are needed to hold the raw Zyte Data API
-responses.
+There is a shortcut, in case a request uses the same parameters as
+defined in ``ZYTE_API_DEFAULT_PARAMS`` setting, without any further
+customization - ``zyte_api`` meta key can be set to True:
 
-If multiple requests target the same URL with different Zyte Data API 
-parameters, pass ``dont_filter=True`` to ``Request``.
+.. code-block:: python
+
+    import scrapy
+
+
+    class SampleQuotesSpider(scrapy.Spider):
+        name = "sample_quotes"
+
+        custom_settings = {
+            "ZYTE_API_DEFAULT_PARAMS": {
+                "browserHtml": True,
+            }
+        }
+
+        def start_requests(self):
+            yield scrapy.Request(
+                url="http://quotes.toscrape.com/",
+                callback=self.parse,
+                meta={"zyte_api": True},
+            )
+
+        def parse(self, response):
+            yield {"URL": response.url, "HTML": response.body}
+
+            print(response.raw_api_response)
+            # {
+            #     'url': 'https://quotes.toscrape.com/',
+            #     'browserHtml': '<html> ... </html>',
+            # }
+
+            print(response.request.meta)
+            # {
+            #     'zyte_api': {
+            #         'browserHtml': True,
+            #     },
+            #     'download_timeout': 180.0,
+            #     'download_slot': 'quotes.toscrape.com'
+            # }
+
