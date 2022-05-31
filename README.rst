@@ -140,3 +140,6 @@ of the response object. Note that such responses are of ``ZyteAPIResponse`` and
 ``ZyteAPITextResponse`` types, which are respectively subclasses of ``scrapy.http.Response``
 and ``scrapy.http.TextResponse``. Such classes are needed to hold the raw Zyte Data API
 responses.
+
+If multiple requests target the same URL with different Zyte Data API 
+parameters, pass ``dont_filter=True`` to ``Request``.
