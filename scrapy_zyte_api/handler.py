@@ -1,20 +1,21 @@
 import json
 import logging
 import os
-from base64 import b64decode
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, Optional, Union
 
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
 from scrapy.exceptions import IgnoreRequest, NotConfigured
-from scrapy.http import Request, Response, TextResponse
+from scrapy.http import Request
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
 from zyte_api.aio.errors import RequestError
+
+from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +31,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         )
         self._stats = crawler.stats
         self._job_id = crawler.settings.get("JOB")
+        self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
         self._session = create_session()
-        self._encoding = "utf-8"
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -48,19 +49,36 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         return cls(crawler.settings, crawler, client)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
-        if request.meta.get("zyte_api"):
-            return deferred_from_coro(self._download_request(request, spider))
-        else:
-            return super().download_request(request, spider)
+        api_params = self._prepare_api_params(request)
+        if api_params:
+            return deferred_from_coro(
+                self._download_request(api_params, request, spider)
+            )
+        return super().download_request(request, spider)
 
-    async def _download_request(self, request: Request, spider: Spider) -> Response:
-        api_params: Dict[str, Any] = request.meta["zyte_api"]
-        if not isinstance(api_params, dict):
+    def _prepare_api_params(self, request: Request) -> Optional[dict]:
+        meta_params = request.meta.get("zyte_api")
+        if not meta_params and meta_params != {}:
+            return None
+
+        if meta_params is True:
+            meta_params = {}
+
+        api_params: Dict[str, Any] = self._zyte_api_default_params or {}
+        try:
+            api_params.update(meta_params)
+        except TypeError:
             logger.error(
-                "zyte_api parameters in the request meta should be "
-                f"provided as dictionary, got {type(api_params)} instead ({request.url})."
+                f"zyte_api parameters in the request meta should be "
+                f"provided as dictionary, got {type(request.meta.get('zyte_api'))} "
+                f"instead ({request.url})."
             )
             raise IgnoreRequest()
+        return api_params
+
+    async def _download_request(
+        self, api_params: dict, request: Request, spider: Spider
+    ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
         # Define url by default
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
@@ -80,31 +98,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
             )
             raise IgnoreRequest()
+
         self._stats.inc_value("scrapy-zyte-api/request_count")
-        headers = self._prepare_headers(api_response.get("httpResponseHeaders"))
-        # browserHtml and httpResponseBody are not allowed at the same time,
-        # but at least one of them should be present
-        if api_response.get("browserHtml"):
-            # Using TextResponse because browserHtml always returns a browser-rendered page
-            # even when requesting files (like images)
-            return TextResponse(
-                url=api_response["url"],
-                status=200,
-                body=api_response["browserHtml"].encode(self._encoding),
-                encoding=self._encoding,
-                request=request,
-                flags=["zyte-api"],
-                headers=headers,
-            )
-        else:
-            return Response(
-                url=api_response["url"],
-                status=200,
-                body=b64decode(api_response["httpResponseBody"]),
-                request=request,
-                flags=["zyte-api"],
-                headers=headers,
-            )
+        return _process_response(api_response, request)
 
     @inlineCallbacks
     def close(self) -> Generator:
@@ -129,9 +125,3 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if error_data.get("detail"):
             return error_data["detail"]
         return base_message
-
-    @staticmethod
-    def _prepare_headers(init_headers: Optional[List[Dict[str, str]]]):
-        if not init_headers:
-            return None
-        return {h["name"]: h["value"] for h in init_headers}

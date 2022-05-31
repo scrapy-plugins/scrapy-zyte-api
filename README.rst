@@ -33,8 +33,8 @@ Installation
 
 This package requires Python 3.7+.
 
-How to configure
-----------------
+Configuration
+-------------
 
 Replace the default ``http`` and ``https`` in Scrapy's
 `DOWNLOAD_HANDLERS <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-DOWNLOAD_HANDLERS>`_
@@ -46,7 +46,7 @@ Lastly, make sure to `install the asyncio-based Twisted reactor
 <https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor)>`_
 in the ``settings.py`` file as well:
 
-Here's example of the things needed inside a Scrapy project's ``settings.py`` file:
+Here's an example of the things needed inside a Scrapy project's ``settings.py`` file:
 
 .. code-block:: python
 
@@ -60,40 +60,86 @@ Here's example of the things needed inside a Scrapy project's ``settings.py`` fi
 
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
-How to use
-----------
+Usage
+-----
 
-Set the ``zyte_api`` `Request.meta
-<https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
-key to download a request using Zyte API. Full list of parameters is provided in the
-`Zyte API Specification <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
+To enable a ``scrapy.Request`` to go through Zyte Data API, the ``zyte_api`` key in
+`Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
+must be present and has dict-like contents.
+
+To set the default parameters for Zyte API enabled requests, you can set the
+following in the ``settings.py`` file or `any other settings within Scrapy
+<https://docs.scrapy.org/en/latest/topics/settings.html#populating-the-settings>`_:
 
 .. code-block:: python
 
-   import scrapy
+    ZYTE_API_DEFAULT_PARAMS = {
+        "browserHtml": True,
+        "geolocation": "US",
+    }
+
+You can see the full list of parameters in the `Zyte Data API Specification
+<https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
+
+Note that the ``ZYTE_API_DEFAULT_PARAMS`` would only work if the ``zyte_api``
+key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
+is set. When doing so, it will override any parameters set in the 
+``ZYTE_API_DEFAULT_PARAMS`` setting.
+
+.. code-block:: python
+
+    import scrapy
 
 
-   class TestSpider(scrapy.Spider):
-       name = "test"
+    class SampleQuotesSpider(scrapy.Spider):
+        name = "sample_quotes"
 
-       def start_requests(self):
+        custom_settings = {
+            "ZYTE_API_DEFAULT_PARAMS": {
+                "geolocation": "US",  # You can set any Geolocation region you want.
+            }
+        }
 
-           yield scrapy.Request(
-               url="http://books.toscrape.com/",
-               callback=self.parse,
-               meta={
-                   "zyte_api": {
-                       "browserHtml": True,
-                       # You can set any GEOLocation region you want.
-                       "geolocation": "US",
-                       "javascript": True,
-                       "echoData": {"something": True},
-                   }
-               },
-           )
+        def start_requests(self):
+            yield scrapy.Request(
+                url="http://books.toscrape.com/",
+                callback=self.parse,
+                meta={
+                    "zyte_api": {
+                        "browserHtml": True,
+                        "javascript": True,
+                        "echoData": {"some_value_I_could_track": 123},
+                    }
+                },
+            )
 
-       def parse(self, response):
-           yield {"URL": response.url, "status": response.status, "HTML": response.body}
+        def parse(self, response):
+            yield {"URL": response.url, "status": response.status, "HTML": response.body}
+
+            print(response.raw_api_response)
+            # {
+            #     'url': 'https://quotes.toscrape.com/',
+            #     'browserHtml': '<html> ... </html>',
+            #     'echoData': {'some_value_I_could_track': 123},
+            # }
+
+            print(response.request.meta)
+            # {
+            #     'zyte_api': {
+            #         'browserHtml': True,
+            #         'geolocation': 'US',
+            #         'javascript': True,
+            #         'echoData': {'some_value_I_could_track': 123}
+            #     },
+            #     'download_timeout': 180.0,
+            #     'download_slot': 'quotes.toscrape.com'
+            # }
+
+The raw Zyte Data API response can be accessed via the ``raw_api_response`` attribute
+of the response object. Note that such responses are of ``ZyteAPIResponse`` and
+``ZyteAPITextResponse`` types, which are respectively subclasses of ``scrapy.http.Response``
+and ``scrapy.http.TextResponse``. Such classes are needed to hold the raw Zyte Data API
+responses.
 
 If multiple requests target the same URL with different Zyte Data API 
 parameters, pass ``dont_filter=True`` to ``Request``.
