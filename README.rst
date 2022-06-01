@@ -97,16 +97,17 @@ must be present and contain a dict with Zyte API parameters:
 
 You can see the full list of parameters in the `Zyte Data API Specification
 <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
-"url" parameter is filled automatically from ``request.url``, other parameters
-should be set explicitly.
+The ``url`` parameter is filled automatically from ``request.url``, other 
+parameters should be set explicitly.
 
 The raw Zyte Data API response can be accessed via the ``raw_api_response``
 attribute of the response object.
 
-When ``browserHtml``, ``httpResponseBody`` or ``httpResponseHeaders`` Zyte API
-arguments are used, the response body and headers are set accordingly.
+When you use the Zyte Data API parameters ``browserHtml``, 
+``httpResponseBody``, or ``httpResponseHeaders``, the response body and headers 
+are set accordingly.
 
-Note that for Zyte API requests the spider is getting responses of
+Note that, for Zyte Data API requests, the spider gets responses of
 ``ZyteAPIResponse`` and ``ZyteAPITextResponse`` types,
 which are respectively subclasses of ``scrapy.http.Response``
 and ``scrapy.http.TextResponse``.
@@ -118,7 +119,7 @@ Setting default parameters
 --------------------------
 Often the same configuration needs to be used for all Zyte API requests.
 For example, all requests may need to set the same geolocation, or
-the spider only uses browserHtml requests.
+the spider only uses ``browserHtml`` requests.
 
 To set the default parameters for Zyte API enabled requests, you can set the
 following in the ``settings.py`` file or `any other settings within Scrapy
@@ -135,9 +136,9 @@ following in the ``settings.py`` file or `any other settings within Scrapy
 ``ZYTE_API_DEFAULT_PARAMS`` works if the ``zyte_api``
 key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
 is set, i.e. having ``ZYTE_API_DEFAULT_PARAMS`` doesn't make all requests
-to go through Zyte API. Parameters in ``ZYTE_API_DEFAULT_PARAMS`` are merged
-with parameters set via ``zyte_api`` meta key, with the values in meta
-taking priority.
+to go through Zyte Data API. Parameters in ``ZYTE_API_DEFAULT_PARAMS`` are 
+merged with parameters set via the ``zyte_api`` meta key, with the values in 
+meta taking priority.
 
 .. code-block:: python
 
@@ -189,8 +190,8 @@ taking priority.
             # }
 
 There is a shortcut, in case a request uses the same parameters as
-defined in ``ZYTE_API_DEFAULT_PARAMS`` setting, without any further
-customization - ``zyte_api`` meta key can be set to True:
+defined in the ``ZYTE_API_DEFAULT_PARAMS`` setting, without any further
+customization - the ``zyte_api`` meta key can be set to ``True`` or ``{}``:
 
 .. code-block:: python
 
