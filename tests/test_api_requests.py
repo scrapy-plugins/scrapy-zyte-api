@@ -52,7 +52,6 @@ class TestAPI:
             {"zyte_api": {"browserHtml": True, "randomParameter": None}},
         ],
     )
-    @pytest.mark.asyncio
     async def test_browser_html_request(self, meta: Dict[str, Dict[str, Any]]):
         req, resp = await self.produce_request_response(meta)
         assert isinstance(resp, TextResponse)
@@ -80,7 +79,6 @@ class TestAPI:
             {"zyte_api": {"httpResponseBody": True, "randomParameter": None}},
         ],
     )
-    @pytest.mark.asyncio
     async def test_http_response_body_request(self, meta: Dict[str, Dict[str, Any]]):
         req, resp = await self.produce_request_response(meta)
         assert isinstance(resp, Response)
@@ -102,7 +100,6 @@ class TestAPI:
             {"zyte_api": {"browserHtml": True, "httpResponseHeaders": True}},
         ],
     )
-    @pytest.mark.asyncio
     async def test_http_response_headers_request(self, meta: Dict[str, Dict[str, Any]]):
         req, resp = await self.produce_request_response(meta)
         assert resp.request is req
@@ -161,7 +158,6 @@ class TestAPI:
         ],
     )
     @mock.patch("tests.AsyncClient")
-    @pytest.mark.asyncio
     async def test_zyte_api_request_meta(
         self,
         mock_client,
@@ -205,7 +201,6 @@ class TestAPI:
             (None, False),
         ],
     )
-    @pytest.mark.asyncio
     async def test_coro_handling(
         self, meta: Dict[str, Dict[str, Any]], api_relevant: bool
     ):
@@ -247,7 +242,6 @@ class TestAPI:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_exceptions(
         self,
         caplog: LogCaptureFixture,
@@ -271,7 +265,6 @@ class TestAPI:
         "job_id",
         ["547773/99/6"],
     )
-    @pytest.mark.asyncio
     async def test_job_id(self, job_id):
         with MockServer() as server:
             async with make_handler({"JOB": job_id}, server.urljoin("/")) as handler:
