@@ -10,6 +10,7 @@ from pytest_twisted import ensureDeferred, inlineCallbacks
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest, NotConfigured, NotSupported
 from scrapy.http import Response, TextResponse
+from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.test import get_crawler
 from twisted.internet.asyncioreactor import install as install_asyncio_reactor
 from twisted.internet.defer import Deferred
@@ -251,8 +252,10 @@ async def test_exceptions(
             api_params = handler._prepare_api_params(req)
 
             with pytest.raises(exception_type):  # NOQA
-                await handler._download_request(
-                    api_params, req, Spider("test")
+                await deferred_from_coro(
+                    handler._download_request(
+                        api_params, req, Spider("test")
+                    )  # NOQA
                 )  # NOQA
             assert exception_text in caplog.text
 
@@ -271,9 +274,11 @@ async def test_job_id(job_id):
                 meta={"zyte_api": {"browserHtml": True}},
             )
             api_params = handler._prepare_api_params(req)
-            resp = await handler._download_request(
-                api_params, req, Spider("test")
-            )  # NOQA
+            resp = await deferred_from_coro(
+                handler._download_request(
+                    api_params, req, Spider("test")
+                )  # NOQA
+            )
 
         assert resp.request is req
         assert resp.url == req.url
