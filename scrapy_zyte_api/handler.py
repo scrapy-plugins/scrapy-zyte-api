@@ -25,10 +25,12 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self, settings: Settings, crawler: Crawler, client: AsyncClient = None
     ):
         super().__init__(settings=settings, crawler=crawler)
-        max_concurrent_requests = settings.getint('CONCURRENT_REQUESTS')
         self._client: AsyncClient = (
             client
-            or AsyncClient(n_conn=max_concurrent_requests)
+            or AsyncClient(
+                api_key=settings.get('ZYTE_API_KEY'),
+                n_conn=settings.getint('CONCURRENT_REQUESTS'),
+            )
         )
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
@@ -36,7 +38,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._stats = crawler.stats
         self._job_id = crawler.settings.get("JOB")
         self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
-        self._session = create_session(max_concurrent_requests)
+        self._session = create_session(self._client.n_conn)
 
     @classmethod
     def from_crawler(cls, crawler):
