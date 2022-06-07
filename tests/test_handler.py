@@ -1,5 +1,4 @@
 import pytest
-from scrapy.utils.reactor import install_reactor
 from scrapy.utils.test import get_crawler
 from twisted.internet.asyncioreactor import AsyncioSelectorReactor
 from zyte_api.aio.client import AsyncClient

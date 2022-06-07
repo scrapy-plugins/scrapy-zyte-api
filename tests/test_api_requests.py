@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
-from pytest_twisted import ensureDeferred, inlineCallbacks
+from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest, NotConfigured, NotSupported
 from scrapy.http import Response, TextResponse
