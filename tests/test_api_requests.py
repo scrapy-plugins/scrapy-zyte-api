@@ -1,4 +1,3 @@
-import os
 import sys
 from asyncio import iscoroutine
 from typing import Any, Dict
@@ -8,35 +7,17 @@ import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
-from scrapy.exceptions import IgnoreRequest, NotConfigured, NotSupported
+from scrapy.exceptions import IgnoreRequest, NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.test import get_crawler
-from twisted.internet.asyncioreactor import install as install_asyncio_reactor
 from twisted.internet.defer import Deferred
-from twisted.internet.error import ReactorAlreadyInstalledError
 
-from tests import make_handler
-from tests.mockserver import MockServer
-
-try:
-    install_asyncio_reactor()
-except ReactorAlreadyInstalledError:
-    pass
-os.environ["ZYTE_API_KEY"] = "test"
-
-
-@ensureDeferred
-async def produce_request_response(meta, custom_settings=None):
-    with MockServer() as server:
-        async with make_handler(custom_settings, server.urljoin("/")) as handler:
-            req = Request(
-                "http://example.com",
-                method="POST",
-                meta=meta,
-            )
-            resp = await handler.download_request(req, None)
-            return req, resp
+from . import (
+    DEFAULT_CLIENT_CONCURRENCY,
+    SETTINGS,
+)
+from .mockserver import DelayedResource, MockServer, produce_request_response
 
 
 @ensureDeferred
@@ -113,10 +94,10 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]]):
 
 @ensureDeferred
 @pytest.mark.skipif(
-    sys.version_info < (3, 8), reason="Python3.7 has poor support for AsyncMocks"
+    sys.version_info < (3, 8), reason="unittest.mock.AsyncMock"
 )
 @pytest.mark.parametrize(
-    "meta,custom_settings,expected,use_zyte_api",
+    "meta,settings,expected,use_zyte_api",
     [
         ({}, {}, {}, False),
         ({"zyte_api": {}}, {}, {}, False),
@@ -160,35 +141,39 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]]):
         ),
     ],
 )
-@mock.patch("tests.AsyncClient")
 async def test_zyte_api_request_meta(
-    mock_client,
     meta: Dict[str, Dict[str, Any]],
-    custom_settings: Dict[str, str],
+    settings: Dict[str, str],
     expected: Dict[str, str],
     use_zyte_api: bool,
 ):
-    try:
-        # This would always error out since the mocked client doesn't
-        # return the expected API response.
-        await produce_request_response(meta, custom_settings=custom_settings)
-    except Exception:
-        pass
+    with MockServer() as server:
+        async with server.make_handler(settings) as handler:
+            req = Request(server.urljoin("/"), meta=meta)
+            unmocked_client = handler._client
+            handler._client = mock.AsyncMock(unmocked_client)
+            handler._client.request_raw.side_effect = (
+                unmocked_client.request_raw
+            )
+            await handler.download_request(req, None)
 
-    # What we're interested in is the Request call in the API
-    request_call = [c for c in mock_client.mock_calls if "request_raw(" in str(c)]
+            # What we're interested in is the Request call in the API
+            request_call = [
+                c for c in handler._client.mock_calls
+                if "request_raw(" in str(c)
+            ]
 
-    if not use_zyte_api:
-        assert request_call == []
-        return
+            if not use_zyte_api:
+                assert request_call == []
+                return
 
-    elif not request_call:
-        pytest.fail("The client's request_raw() method was not called.")
+            elif not request_call:
+                pytest.fail("The client's request_raw() method was not called.")
 
-    args_used = request_call[0].args[0]
-    args_used.pop("url")
+            args_used = request_call[0].args[0]
+            args_used.pop("url")
 
-    assert args_used == expected
+            assert args_used == expected
 
 
 @pytest.mark.parametrize(
@@ -206,14 +191,13 @@ async def test_zyte_api_request_meta(
 )
 @ensureDeferred
 async def test_coro_handling(meta: Dict[str, Dict[str, Any]]):
-    custom_settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
+    settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
     with MockServer() as server:
-        async with make_handler({}, server.urljoin("/")) as handler:
+        async with server.make_handler(settings) as handler:
             req = Request(
                 "https://toscrape.com",
                 meta=meta,
             )
-            handler._zyte_api_default_params = custom_settings
             coro = handler.download_request(req, Spider("test"))
             assert not iscoroutine(coro)
             assert isinstance(coro, Deferred)
@@ -221,18 +205,16 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]]):
 
 @ensureDeferred
 @pytest.mark.parametrize(
-    "meta, server_path, exception_type, exception_text",
+    "meta, exception_type, exception_text",
     [
         (
             {"zyte_api": {"echoData": Request("http://test.com")}},
-            "/",
             IgnoreRequest,
             "Got an error when processing Zyte API request (http://example.com): "
             "Object of type Request is not JSON serializable",
         ),
         (
-            {"zyte_api": {"browserHtml": True}},
-            "/exception/",
+            {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
             IgnoreRequest,
             "Got Zyte API error (400) while processing URL (http://example.com): "
             "Bad Request",
@@ -242,12 +224,11 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]]):
 async def test_exceptions(
     caplog: LogCaptureFixture,
     meta: Dict[str, Dict[str, Any]],
-    server_path: str,
     exception_type: Exception,
     exception_text: str,
 ):
     with MockServer() as server:
-        async with make_handler({}, server.urljoin(server_path)) as handler:
+        async with server.make_handler() as handler:
             req = Request("http://example.com", method="POST", meta=meta)
             api_params = handler._prepare_api_params(req)
 
@@ -267,7 +248,8 @@ async def test_exceptions(
 @ensureDeferred
 async def test_job_id(job_id):
     with MockServer() as server:
-        async with make_handler({"JOB": job_id}, server.urljoin("/")) as handler:
+        settings = {"JOB": job_id}
+        async with server.make_handler(settings) as handler:
             req = Request(
                 "http://example.com",
                 method="POST",
@@ -287,25 +269,56 @@ async def test_job_id(job_id):
         assert resp.body == f"<html>{job_id}</html>".encode("utf8")
 
 
-def test_api_key_presence():
-    from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
+@ensureDeferred
+async def test_higher_concurrency():
+    """Send DEFAULT_CLIENT_CONCURRENCY + 1 requests, the first and last taking
+    less time than the rest, and ensure that the first 2 responses are the
+    first and the last, verifying that a concurrency ≥
+    DEFAULT_CLIENT_CONCURRENCY + 1 has been reached."""
+    concurrency = DEFAULT_CLIENT_CONCURRENCY + 1
+    response_indexes = []
+    expected_first_indexes = {0, concurrency - 1}
+    fast_seconds = 0.001
+    slow_seconds = 0.02
 
-    API_KEY = "TEST_API_KEY"
+    with MockServer(DelayedResource) as server:
 
-    # Setting the API KEY via env vars should work
-    os.environ["ZYTE_API_KEY"] = API_KEY
-    crawler = get_crawler(settings_dict={})
-    handler = ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
-    assert handler._client.api_key == API_KEY
+        class TestSpider(Spider):
+            name = 'test_spider'
 
-    # Having the API KEY missing in both env vars and Scrapy Settings should
-    # error out.
-    os.environ["ZYTE_API_KEY"] = ""
-    crawler = get_crawler(settings_dict={})
-    with pytest.raises(NotConfigured):
-        ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
+            def start_requests(self):
+                for index in range(concurrency):
+                    yield Request(
+                        'https://example.com',
+                        meta={
+                            'index': index,
+                            'zyte_api': {
+                                'browserHtml': True,
+                                'delay': (
+                                    fast_seconds
+                                    if index in expected_first_indexes
+                                    else slow_seconds
+                                ),
+                            },
+                        },
+                        dont_filter=True,
+                    )
 
-    # Setting the API KEY via Scrapy settings should work
-    crawler = get_crawler(settings_dict={"ZYTE_API_KEY": API_KEY})
-    handler = ScrapyZyteAPIDownloadHandler.from_crawler(crawler)
-    assert handler._client.api_key == API_KEY
+            async def parse(self, response):
+                response_indexes.append(response.meta['index'])
+
+        crawler = get_crawler(
+            TestSpider,
+            {
+                **SETTINGS,
+                'CONCURRENT_REQUESTS': concurrency,
+                'CONCURRENT_REQUESTS_PER_DOMAIN': concurrency,
+                'ZYTE_API_URL': server.urljoin('/'),
+            },
+        )
+        await crawler.crawl()
+
+    assert (
+        set(response_indexes[:len(expected_first_indexes)])
+        == expected_first_indexes
+    )
