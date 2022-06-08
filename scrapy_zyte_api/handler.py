@@ -47,7 +47,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._stats = crawler.stats
         self._job_id = crawler.settings.get("JOB")
         self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
-        self._session = create_session(self._client.n_conn)
+        self._session = create_session(
+            connection_pool_size=self._client.n_conn
+        )
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._prepare_api_params(request)
