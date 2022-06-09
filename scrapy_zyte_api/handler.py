@@ -40,7 +40,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 )
                 raise NotConfigured
         self._client: AsyncClient = client
-        logger.info(f"Using Zyte API Key: {self._client.api_key[:7]}")
+        logger.info(
+            "Using a Zyte Data API key ending in %r",
+            self._client.api_key[:7]
+        )
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
