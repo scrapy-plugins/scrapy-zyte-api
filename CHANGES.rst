@@ -1,6 +1,11 @@
 Changes
 =======
 
+TBD
+---
+
+* Update minimum requirement: ``scrapy>=2.6.0``.
+
 
 0.2.0 (2022-05-31)
 ------------------

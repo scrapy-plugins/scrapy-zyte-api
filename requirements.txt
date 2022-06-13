@@ -1,3 +1,3 @@
-scrapy>=2.5.1
+scrapy>=2.6.1
 zyte-api>=0.1.2
 twisted>=21.7.0
