@@ -69,7 +69,7 @@ def test_concurrency_configuration(concurrency):
         (
             UNSET,
             "",
-            "",
+            NotConfigured,
         ),
         (
             "",
@@ -79,7 +79,7 @@ def test_concurrency_configuration(concurrency):
         (
             "a",
             "",
-            "",
+            "a",
         ),
         (
             UNSET,

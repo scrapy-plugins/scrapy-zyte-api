@@ -29,7 +29,13 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if not client:
             try:
                 client = AsyncClient(
-                    api_key=settings.get('ZYTE_API_KEY'),
+                    # To allow users to have a key defined in Scrapy settings
+                    # and in a environment variable, and be able to cause the
+                    # environment variable to be used instead of the setting by
+                    # overriding the setting on the command-line to be an empty
+                    # string, we do not support setting empty string keys
+                    # through settings.
+                    api_key=settings.get('ZYTE_API_KEY') or None,
                     api_url=settings.get('ZYTE_API_URL') or API_URL,
                     n_conn=settings.getint('CONCURRENT_REQUESTS'),
                 )
