@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from typing import Any, Dict, Generator, Optional, Union
 
 from scrapy import Spider
@@ -14,6 +13,8 @@ from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
 from zyte_api.aio.errors import RequestError
+from zyte_api.apikey import NoApiKey
+from zyte_api.constants import API_URL
 
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 
@@ -25,28 +26,39 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self, settings: Settings, crawler: Crawler, client: AsyncClient = None
     ):
         super().__init__(settings=settings, crawler=crawler)
-        self._client: AsyncClient = client if client else AsyncClient()
+        if not client:
+            try:
+                client = AsyncClient(
+                    # To allow users to have a key defined in Scrapy settings
+                    # and in a environment variable, and be able to cause the
+                    # environment variable to be used instead of the setting by
+                    # overriding the setting on the command-line to be an empty
+                    # string, we do not support setting empty string keys
+                    # through settings.
+                    api_key=settings.get('ZYTE_API_KEY') or None,
+                    api_url=settings.get('ZYTE_API_URL') or API_URL,
+                    n_conn=settings.getint('CONCURRENT_REQUESTS'),
+                )
+            except NoApiKey:
+                logger.warning(
+                    "'ZYTE_API_KEY' must be set in the spider settings or env var "
+                    "in order for ScrapyZyteAPIDownloadHandler to work."
+                )
+                raise NotConfigured
+        self._client: AsyncClient = client
+        logger.info(
+            "Using a Zyte Data API key starting with %r",
+            self._client.api_key[:7]
+        )
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
         self._stats = crawler.stats
         self._job_id = crawler.settings.get("JOB")
         self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
-        self._session = create_session()
-
-    @classmethod
-    def from_crawler(cls, crawler):
-        zyte_api_key = crawler.settings.get("ZYTE_API_KEY") or os.getenv("ZYTE_API_KEY")
-        if not zyte_api_key:
-            logger.warning(
-                "'ZYTE_API_KEY' must be set in the spider settings or env var "
-                "in order for ScrapyZyteAPIDownloadHandler to work."
-            )
-            raise NotConfigured
-
-        logger.info(f"Using Zyte API Key: {zyte_api_key[:7]}")
-        client = AsyncClient(api_key=zyte_api_key)
-        return cls(crawler.settings, crawler, client)
+        self._session = create_session(
+            connection_pool_size=self._client.n_conn
+        )
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._prepare_api_params(request)

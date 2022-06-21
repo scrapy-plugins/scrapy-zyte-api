@@ -1,58 +1,165 @@
+import argparse
 import json
+import socket
+import sys
+import time
 from base64 import b64encode
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from threading import Thread
-from urllib.parse import urljoin
+from contextlib import asynccontextmanager
+from subprocess import Popen, PIPE
+from importlib import import_module
+
+from pytest_twisted import ensureDeferred
+from scrapy import Request
+from twisted.internet import reactor
+from twisted.internet.task import deferLater
+from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET, Site
+
+from . import make_handler
 
 
-class MockServer:
+def get_ephemeral_port():
+    s = socket.socket()
+    s.bind(("", 0))
+    return s.getsockname()[1]
+
+
+@ensureDeferred
+async def produce_request_response(meta, settings=None):
+    with MockServer() as server:
+        async with server.make_handler(settings) as handler:
+            req = Request(server.urljoin("/"), meta=meta)
+            resp = await handler.download_request(req, None)
+            return req, resp
+
+
+class LeafResource(Resource):
+    isLeaf = True
+
+    def deferRequest(self, request, delay, f, *a, **kw):
+        def _cancelrequest(_):
+            # silence CancelledError
+            d.addErrback(lambda _: None)
+            d.cancel()
+
+        d = deferLater(reactor, delay, f, *a, **kw)
+        request.notifyFinish().addErrback(_cancelrequest)
+        return d
+
+
+class DefaultResource(LeafResource):
+    def render_POST(self, request):
+        request_data = json.loads(request.content.read())
+        request.responseHeaders.setRawHeaders(
+            b"Content-Type",
+            [b"application/json"],
+        )
+
+        response_data = {}
+        if "url" not in request_data:
+            request.setResponseCode(400)
+            return json.dumps(response_data).encode()
+        response_data["url"] = request_data["url"]
+
+        if request_data.get("jobId") is not None:
+            html = f"<html>{request_data['jobId']}</html>"
+        else:
+            html = "<html><body>Hello<h1>World!</h1></body></html>"
+
+        if "browserHtml" in request_data:
+            if "httpResponseBody" in request_data:
+                request.setResponseCode(400)
+                return json.dumps(response_data).encode()
+            response_data["browserHtml"] = html
+        elif "httpResponseBody" in request_data:
+            base64_html = b64encode(html.encode()).decode()
+            response_data["httpResponseBody"] = base64_html
+
+        if "httpResponseHeaders" in request_data:
+            response_data["httpResponseHeaders"] = [
+                {"name": "test_header", "value": "test_value"}
+            ]
+
+        return json.dumps(response_data).encode()
+
+
+class DelayedResource(LeafResource):
+    def render_POST(self, request):
+        data = json.loads(request.content.read())
+        seconds = data.get("delay", 0)
+        self.deferRequest(
+            request,
+            seconds,
+            self._delayedRender,
+            request,
+            seconds,
+        )
+        return NOT_DONE_YET
+
+    def _delayedRender(self, request, seconds):
+        request.responseHeaders.setRawHeaders(
+            b"Content-Type",
+            [b"application/json"],
+        )
+        request.write(
+            b'{"url": "https://example.com", "browserHtml": "<html></html>"}'
+        )
+        request.finish()
+
+
+class MockServer():
+    def __init__(self, resource=None, port=None):
+        resource = resource or DefaultResource
+        self.resource = '{}.{}'.format(resource.__module__, resource.__name__)
+        self.proc = None
+        host = socket.gethostbyname(socket.gethostname())
+        self.port = port or get_ephemeral_port()
+        self.root_url = 'http://%s:%d' % (host, self.port)
+
     def __enter__(self):
-        self.httpd = HTTPServer(("127.0.0.1", 0), _RequestHandler)
-        self.address, self.port = self.httpd.server_address
-        self.thread = Thread(target=self.httpd.serve_forever)
-        self.thread.start()
+        self.proc = Popen(
+            [sys.executable, '-u', '-m', 'tests.mockserver',
+             self.resource, '--port', str(self.port)],
+            stdout=PIPE)
+        self.proc.stdout.readline()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.httpd.shutdown()
-        self.thread.join()
+        self.proc.kill()
+        self.proc.wait()
+        time.sleep(0.2)
 
-    def urljoin(self, url: str) -> str:
-        return urljoin("http://{}:{}".format(self.address, self.port), url)
+    def urljoin(self, path):
+        return self.root_url + path
+
+    @asynccontextmanager
+    async def make_handler(self, settings: dict = None):
+        settings = settings or {}
+        async with make_handler(settings, self.urljoin("/")) as handler:
+            try:
+                yield handler
+            finally:
+                await handler._close()  # NOQA
 
 
-class _RequestHandler(BaseHTTPRequestHandler):
-    def _send_response(self, status: int, content: str, content_type: str):
-        self.send_response(status)
-        self.send_header("Content-type", content_type)
-        self.end_headers()
-        self.wfile.write(content.encode("utf-8"))
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('resource')
+    parser.add_argument('--port', type=int)
+    args = parser.parse_args()
+    module_name, name = args.resource.rsplit('.', 1)
+    sys.path.append('.')
+    resource = getattr(import_module(module_name), name)()
+    http_port = reactor.listenTCP(args.port, Site(resource))
 
-    def do_POST(self):  # NOQA
-        content_length = int(self.headers["Content-Length"])
-        try:
-            post_data = json.loads(self.rfile.read(content_length).decode("utf-8"))
-            url = post_data["url"]
-        except (AttributeError, TypeError, ValueError, KeyError) as er:
-            self._send_response(400, str(er), "text/html")
-            return
-        if self.path == "/exception/extract":
-            self._send_response(400, "", "text/html")
-        else:
-            base_response = {"url": url}
-            if post_data.get("httpResponseHeaders"):
-                base_response["httpResponseHeaders"] = [
-                    {"name": "test_header", "value": "test_value"}
-                ]
-            if post_data.get("jobId") is None:
-                browser_html = "<html><body>Hello<h1>World!</h1></body></html>"
-            else:
-                browser_html = f"<html>{post_data['jobId']}</html>"
-            if post_data.get("browserHtml"):
-                base_response["browserHtml"] = browser_html
-                self._send_response(200, json.dumps(base_response), "application/json")
-            else:
-                base_response["httpResponseBody"] = b64encode(
-                    browser_html.encode("utf-8")
-                ).decode("utf-8")
-                self._send_response(200, json.dumps(base_response), "application/json")
+    def print_listening():
+        host = http_port.getHost()
+        print('Mock server {} running at http://{}:{}'.format(
+            resource, host.host, host.port))
+
+    reactor.callWhenRunning(print_listening)
+    reactor.run()
+
+
+if __name__ == "__main__":
+    main()
