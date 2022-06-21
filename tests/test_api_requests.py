@@ -279,7 +279,7 @@ async def test_higher_concurrency():
     response_indexes = []
     expected_first_indexes = {0, concurrency - 1}
     fast_seconds = 0.001
-    slow_seconds = 0.02
+    slow_seconds = 0.1
 
     with MockServer(DelayedResource) as server:
 
