@@ -13,10 +13,7 @@ from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
 
-from . import (
-    DEFAULT_CLIENT_CONCURRENCY,
-    SETTINGS,
-)
+from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS
 from .mockserver import DelayedResource, MockServer, produce_request_response
 
 
@@ -93,9 +90,7 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]]):
 
 
 @ensureDeferred
-@pytest.mark.skipif(
-    sys.version_info < (3, 8), reason="unittest.mock.AsyncMock"
-)
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
 @pytest.mark.parametrize(
     "meta,settings,expected,use_zyte_api",
     [
@@ -152,15 +147,12 @@ async def test_zyte_api_request_meta(
             req = Request(server.urljoin("/"), meta=meta)
             unmocked_client = handler._client
             handler._client = mock.AsyncMock(unmocked_client)
-            handler._client.request_raw.side_effect = (
-                unmocked_client.request_raw
-            )
+            handler._client.request_raw.side_effect = unmocked_client.request_raw
             await handler.download_request(req, None)
 
             # What we're interested in is the Request call in the API
             request_call = [
-                c for c in handler._client.mock_calls
-                if "request_raw(" in str(c)
+                c for c in handler._client.mock_calls if "request_raw(" in str(c)
             ]
 
             if not use_zyte_api:
@@ -234,9 +226,7 @@ async def test_exceptions(
 
             with pytest.raises(exception_type):  # NOQA
                 await deferred_from_coro(
-                    handler._download_request(
-                        api_params, req, Spider("test")
-                    )  # NOQA
+                    handler._download_request(api_params, req, Spider("test"))  # NOQA
                 )  # NOQA
             assert exception_text in caplog.text
 
@@ -257,9 +247,7 @@ async def test_job_id(job_id):
             )
             api_params = handler._prepare_api_params(req)
             resp = await deferred_from_coro(
-                handler._download_request(
-                    api_params, req, Spider("test")
-                )  # NOQA
+                handler._download_request(api_params, req, Spider("test"))  # NOQA
             )
 
         assert resp.request is req
@@ -284,17 +272,17 @@ async def test_higher_concurrency():
     with MockServer(DelayedResource) as server:
 
         class TestSpider(Spider):
-            name = 'test_spider'
+            name = "test_spider"
 
             def start_requests(self):
                 for index in range(concurrency):
                     yield Request(
-                        'https://example.com',
+                        "https://example.com",
                         meta={
-                            'index': index,
-                            'zyte_api': {
-                                'browserHtml': True,
-                                'delay': (
+                            "index": index,
+                            "zyte_api": {
+                                "browserHtml": True,
+                                "delay": (
                                     fast_seconds
                                     if index in expected_first_indexes
                                     else slow_seconds
@@ -305,20 +293,19 @@ async def test_higher_concurrency():
                     )
 
             async def parse(self, response):
-                response_indexes.append(response.meta['index'])
+                response_indexes.append(response.meta["index"])
 
         crawler = get_crawler(
             TestSpider,
             {
                 **SETTINGS,
-                'CONCURRENT_REQUESTS': concurrency,
-                'CONCURRENT_REQUESTS_PER_DOMAIN': concurrency,
-                'ZYTE_API_URL': server.urljoin('/'),
+                "CONCURRENT_REQUESTS": concurrency,
+                "CONCURRENT_REQUESTS_PER_DOMAIN": concurrency,
+                "ZYTE_API_URL": server.urljoin("/"),
             },
         )
         await crawler.crawl()
 
     assert (
-        set(response_indexes[:len(expected_first_indexes)])
-        == expected_first_indexes
+        set(response_indexes[: len(expected_first_indexes)]) == expected_first_indexes
     )

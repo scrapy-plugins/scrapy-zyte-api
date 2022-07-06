@@ -35,9 +35,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                     # overriding the setting on the command-line to be an empty
                     # string, we do not support setting empty string keys
                     # through settings.
-                    api_key=settings.get('ZYTE_API_KEY') or None,
-                    api_url=settings.get('ZYTE_API_URL') or API_URL,
-                    n_conn=settings.getint('CONCURRENT_REQUESTS'),
+                    api_key=settings.get("ZYTE_API_KEY") or None,
+                    api_url=settings.get("ZYTE_API_URL") or API_URL,
+                    n_conn=settings.getint("CONCURRENT_REQUESTS"),
                 )
             except NoApiKey:
                 logger.warning(
@@ -47,8 +47,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 raise NotConfigured
         self._client: AsyncClient = client
         logger.info(
-            "Using a Zyte Data API key starting with %r",
-            self._client.api_key[:7]
+            "Using a Zyte Data API key starting with %r", self._client.api_key[:7]
         )
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
@@ -56,9 +55,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._stats = crawler.stats
         self._job_id = crawler.settings.get("JOB")
         self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
-        self._session = create_session(
-            connection_pool_size=self._client.n_conn
-        )
+        self._session = create_session(connection_pool_size=self._client.n_conn)
+        self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._prepare_api_params(request)
@@ -95,9 +93,12 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
             api_data["jobId"] = self._job_id
+        retrying = request.meta.get("zyte_api_retry_policy") or self._retry_policy
         try:
             api_response = await self._client.request_raw(
-                api_data, session=self._session
+                api_data,
+                session=self._session,
+                retrying=retrying,
             )
         except RequestError as er:
             error_message = self._get_request_error_message(er)
