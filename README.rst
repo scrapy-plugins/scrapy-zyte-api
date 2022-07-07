@@ -247,7 +247,8 @@ custom retry policy.
 
 A custom retry policy must be an instance of `tenacity.AsyncRetrying`_.
 
-For example, to also retry HTTP 521 errors the same as HTTP 520 errors::
+For example, to also retry HTTP 521 errors the same as HTTP 520 errors, you can
+subclass RetryFactory_ as follows::
 
     # settings.py
     from tenacity import retry_if_exception
@@ -276,4 +277,5 @@ For example, to also retry HTTP 521 errors the same as HTTP 520 errors::
     ZYTE_API_RETRY_POLICY = CustomRetryFactory().build()
 
 .. _python-zyte-api: https://github.com/zytedata/python-zyte-api
+.. _RetryFactory: https://github.com/zytedata/python-zyte-api/blob/5b38f47c50552a5c0fcdc7cd4084a1b6bf2428d6/zyte_api/aio/retry.py#L61-L131
 .. _tenacity.AsyncRetrying: https://tenacity.readthedocs.io/en/latest/api.html#tenacity.AsyncRetrying
