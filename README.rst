@@ -277,5 +277,5 @@ subclass RetryFactory_ as follows::
     ZYTE_API_RETRY_POLICY = CustomRetryFactory().build()
 
 .. _python-zyte-api: https://github.com/zytedata/python-zyte-api
-.. _RetryFactory: https://github.com/zytedata/python-zyte-api/blob/5b38f47c50552a5c0fcdc7cd4084a1b6bf2428d6/zyte_api/aio/retry.py#L61-L131
+.. _RetryFactory: https://github.com/zytedata/python-zyte-api/blob/main/zyte_api/aio/retry.py
 .. _tenacity.AsyncRetrying: https://tenacity.readthedocs.io/en/latest/api.html#tenacity.AsyncRetrying
