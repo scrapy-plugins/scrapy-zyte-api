@@ -232,3 +232,50 @@ customization - the ``zyte_api`` meta key can be set to ``True`` or ``{}``:
             #     'download_slot': 'quotes.toscrape.com'
             # }
 
+Customizing the retry policy
+----------------------------
+
+API requests are retried automatically using the default retry policy of
+`python-zyte-api`_.
+
+API requests that exceed retries are dropped. You cannot manage API request
+retries through Scrapy downloader middlewares.
+
+Use the ``ZYTE_API_RETRY_POLICY`` setting or the ``zyte_api_retry_policy``
+request meta key to override the default `python-zyte-api`_ retry policy with a
+custom retry policy.
+
+A custom retry policy must be an instance of `tenacity.AsyncRetrying`_.
+
+For example, to also retry HTTP 521 errors the same as HTTP 520 errors, you can
+subclass RetryFactory_ as follows::
+
+    # settings.py
+    from tenacity import retry_if_exception
+    from zyte_api.aio.retry import RetryFactory
+
+    def is_http_521(exc: BaseException) -> bool:
+        return isinstance(exc, RequestError) and exc.status == 521
+
+    class CustomRetryFactory(RetryFactory):
+
+        retry_condition = (
+            RetryFactory.retry_condition
+            | retry_if_exception(is_http_521)
+        )
+
+        def wait(self, retry_state: RetryCallState) -> float:
+            if is_http_521(retry_state.outcome.exception()):
+                return self.temporary_download_error_wait(retry_state=retry_state)
+            return super().wait(retry_state)
+
+        def stop(self, retry_state: RetryCallState) -> bool:
+            if is_http_521(retry_state.outcome.exception()):
+                return self.temporary_download_error_stop(retry_state)
+            return super().stop(retry_state)
+
+    ZYTE_API_RETRY_POLICY = CustomRetryFactory().build()
+
+.. _python-zyte-api: https://github.com/zytedata/python-zyte-api
+.. _RetryFactory: https://github.com/zytedata/python-zyte-api/blob/main/zyte_api/aio/retry.py
+.. _tenacity.AsyncRetrying: https://tenacity.readthedocs.io/en/latest/api.html#tenacity.AsyncRetrying
