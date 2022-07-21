@@ -403,6 +403,8 @@ def test__process_response_browserhtml(api_response):
     ],
 )
 def test_status_code(base_kwargs_func, kwargs, expected_status_code):
-    api_response = {**base_kwargs_func(), **kwargs}
+    base_api_response = base_kwargs_func()
+    del base_api_response["statusCode"]
+    api_response = {**base_api_response, **kwargs}
     response = _process_response(api_response, Request(api_response["url"]))
     assert response.status == expected_status_code
