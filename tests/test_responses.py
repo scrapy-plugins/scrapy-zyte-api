@@ -25,6 +25,7 @@ def raw_api_response_browser():
             {"name": "Content-Type", "value": "text/html"},
             {"name": "Content-Length", "value": len(PAGE_CONTENT)},
         ],
+        "statusCode": 200,
     }
 
 
@@ -37,6 +38,7 @@ def raw_api_response_body():
             {"name": "Content-Type", "value": "text/html"},
             {"name": "Content-Length", "value": len(PAGE_CONTENT)},
         ],
+        "statusCode": 200,
     }
 
 
@@ -383,3 +385,24 @@ def test__process_response_browserhtml(api_response):
     assert resp.css("h1 ::text").get() == "World!✨"
     assert resp.xpath("//body/text()").getall() == ["Hello"]
     assert resp.encoding == "utf-8"  # Zyte API is consistent with this on browserHtml
+
+
+@pytest.mark.parametrize(
+    "base_kwargs_func",
+    [
+        raw_api_response_browser,
+        raw_api_response_body,
+    ],
+)
+@pytest.mark.parametrize(
+    "kwargs,expected_status_code",
+    [
+        ({}, 200),
+        ({"statusCode": 200}, 200),
+        ({"statusCode": 404}, 404),
+    ],
+)
+def test_status_code(base_kwargs_func, kwargs, expected_status_code):
+    api_response = {**base_kwargs_func(), **kwargs}
+    response = _process_response(api_response, Request(api_response["url"]))
+    assert response.status == expected_status_code
