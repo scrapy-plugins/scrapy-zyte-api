@@ -66,7 +66,7 @@ class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
 
         return cls(
             url=api_response["url"],
-            status=200,
+            status=api_response.get("statusCode") or 200,
             body=body,
             encoding=encoding,
             request=request,
@@ -87,7 +87,7 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
         """
         return cls(
             url=api_response["url"],
-            status=200,
+            status=api_response.get("statusCode") or 200,
             body=b64decode(api_response.get("httpResponseBody") or ""),
             request=request,
             flags=["zyte-api"],
