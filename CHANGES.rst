@@ -1,11 +1,20 @@
 Changes
 =======
 
-TBD
----
+0.3.0 (2022-07-22)
+------------------
 
-* Update minimum requirement: ``scrapy>=2.6.0``.
-
+* ``CONCURRENT_REQUESTS`` Scrapy setting is properly supported; in previous
+  releases max concurrency of Zyte API requests was limited to 15.
+* The retry policy for Zyte API requests can be overridden, using
+  either ``ZYTE_API_RETRY_POLICY`` setting or ``zyte_api_retry_policy``
+  request.meta key.
+* Proper response.status is set when Zyte API returns ``statusCode``
+  field.
+* URL of the Zyte API server can be set using ``ZYTE_API_URL``
+  Scrapy setting. This feature is currently used in tests.
+* The minimum required Scrapy version (2.6.0) is now enforced in setup.py.
+* Test and documentation improvements.
 
 0.2.0 (2022-05-31)
 ------------------
