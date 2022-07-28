@@ -86,6 +86,41 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             raise IgnoreRequest()
         return api_params
 
+    def _update_stats(self):
+        prefix = "scrapy-zyte-api"
+        for stat in (
+            '429',
+            'attempts',
+            'errors',
+            'extracted_queries',
+            'fatal_errors',
+            'input_queries',
+            'results',
+        ):
+            self._stats.set_value(
+                f"{prefix}/{stat}",
+                getattr(self._client.agg_stats, f"n_{stat}"),
+            )
+        for source, target in (
+            ('connect', 'connection'),
+            ('total', 'response'),
+        ):
+            self._stats.set_value(
+                f"{prefix}/mean_{target}_seconds",
+                getattr(self._client.agg_stats, f"time_{source}_stats").mean(),
+            )
+        for counter in (
+            'api_error_types',
+            'exception_types',
+            'status_codes',
+        ):
+            for key, value in getattr(self._client.agg_stats, counter).items():
+                self._stats.set_value(
+                    f"{prefix}/{counter}/{key}",
+                    value,
+                )
+
+
     async def _download_request(
         self, api_params: dict, request: Request, spider: Spider
     ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
@@ -112,7 +147,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             )
             raise IgnoreRequest()
 
-        self._stats.inc_value("scrapy-zyte-api/request_count")
+        self._update_stats()
+
         return _process_response(api_response, request)
 
     @inlineCallbacks
