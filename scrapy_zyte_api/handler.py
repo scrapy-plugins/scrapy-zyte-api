@@ -146,8 +146,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
             )
             raise IgnoreRequest()
-
-        self._update_stats()
+        finally:
+            self._update_stats()
 
         return _process_response(api_response, request)
 
