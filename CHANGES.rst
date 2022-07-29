@@ -4,11 +4,13 @@ Changes
 To be released
 --------------
 
-* Stats from python-zyte-api_ are now copied into Scrapy stats. The
-  ``scrapy-zyte-api/request_count`` stat has been renamed to
-  ``scrapy-zyte-api/input_queries`` accordingly.
+* Requires zyte-api_ ≥ 0.3.0.
 
-.. _python-zyte-api: https://github.com/zytedata/python-zyte-api
+* Stats from zyte-api are now copied into Scrapy stats. The
+  ``scrapy-zyte-api/request_count`` stat has been renamed to
+  ``scrapy-zyte-api/processed`` accordingly.
+
+.. _zyte-api: https://github.com/zytedata/python-zyte-api
 
 
 0.3.0 (2022-07-22)

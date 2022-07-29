@@ -92,14 +92,22 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             '429',
             'attempts',
             'errors',
-            'extracted_queries',
             'fatal_errors',
-            'input_queries',
-            'results',
+            'processed',
+            'success',
         ):
             self._stats.set_value(
                 f"{prefix}/{stat}",
                 getattr(self._client.agg_stats, f"n_{stat}"),
+            )
+        for stat in (
+            'error_ratio',
+            'success_ratio',
+            'throttle_ratio',
+        ):
+            self._stats.set_value(
+                f"{prefix}/{stat}",
+                getattr(self._client.agg_stats, stat)(),
             )
         for source, target in (
             ('connect', 'connection'),
