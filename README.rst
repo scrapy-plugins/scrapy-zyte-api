@@ -279,3 +279,10 @@ subclass RetryFactory_ as follows::
 .. _python-zyte-api: https://github.com/zytedata/python-zyte-api
 .. _RetryFactory: https://github.com/zytedata/python-zyte-api/blob/main/zyte_api/aio/retry.py
 .. _tenacity.AsyncRetrying: https://tenacity.readthedocs.io/en/latest/api.html#tenacity.AsyncRetrying
+
+
+Stats
+-----
+
+Stats from python-zyte-api_ are exposed as Scrapy stats with the
+``scrapy-zyte-api`` prefix.

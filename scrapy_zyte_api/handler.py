@@ -86,6 +86,48 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             raise IgnoreRequest()
         return api_params
 
+    def _update_stats(self):
+        prefix = "scrapy-zyte-api"
+        for stat in (
+            '429',
+            'attempts',
+            'errors',
+            'fatal_errors',
+            'processed',
+            'success',
+        ):
+            self._stats.set_value(
+                f"{prefix}/{stat}",
+                getattr(self._client.agg_stats, f"n_{stat}"),
+            )
+        for stat in (
+            'error_ratio',
+            'success_ratio',
+            'throttle_ratio',
+        ):
+            self._stats.set_value(
+                f"{prefix}/{stat}",
+                getattr(self._client.agg_stats, stat)(),
+            )
+        for source, target in (
+            ('connect', 'connection'),
+            ('total', 'response'),
+        ):
+            self._stats.set_value(
+                f"{prefix}/mean_{target}_seconds",
+                getattr(self._client.agg_stats, f"time_{source}_stats").mean(),
+            )
+        for counter in (
+            'api_error_types',
+            'exception_types',
+            'status_codes',
+        ):
+            for key, value in getattr(self._client.agg_stats, counter).items():
+                self._stats.set_value(
+                    f"{prefix}/{counter}/{key}",
+                    value,
+                )
+
     async def _download_request(
         self, api_params: dict, request: Request, spider: Spider
     ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
@@ -111,8 +153,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
             )
             raise IgnoreRequest()
+        finally:
+            self._update_stats()
 
-        self._stats.inc_value("scrapy-zyte-api/request_count")
         return _process_response(api_response, request)
 
     @inlineCallbacks
