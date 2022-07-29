@@ -15,6 +15,7 @@ from zyte_api.constants import API_URL
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET, make_handler, set_env
+from .mockserver import MockServer
 
 
 @pytest.mark.parametrize(
@@ -212,3 +213,35 @@ async def test_retry_policy(
 
         actual = request_call[0].kwargs["retrying"]
         assert actual == expected
+
+
+@ensureDeferred
+async def test_stats():
+    with MockServer() as server:
+        async with make_handler({}, server.urljoin("/")) as handler:
+            scrapy_stats = handler._crawler.stats
+            assert scrapy_stats.get_stats() == {}
+
+            client_stats = handler._client.agg_stats
+            client_stats.n_attempts += 1
+
+            meta = {"zyte_api": {"foo": "bar"}}
+            request = Request("https://example.com", meta=meta)
+            await handler.download_request(request, None)
+
+            for suffix, value in (
+                ('429', 0),
+                ('errors', 0),
+                ('extracted_queries', 1),
+                ('fatal_errors', 0),
+                ('input_queries', 1),
+                ('results', 1),
+                ('status_codes/200', 1),
+            ):
+                stat = f"scrapy-zyte-api/{suffix}"
+                assert scrapy_stats.get_value(stat) == value
+            for name in ('connection', 'response'):
+                stat = f"scrapy-zyte-api/mean_{name}_seconds"
+                value = scrapy_stats.get_value(stat)
+                assert isinstance(value, float)
+                assert value > 0.0
