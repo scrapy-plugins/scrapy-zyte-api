@@ -120,7 +120,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                     value,
                 )
 
-
     async def _download_request(
         self, api_params: dict, request: Request, spider: Spider
     ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
