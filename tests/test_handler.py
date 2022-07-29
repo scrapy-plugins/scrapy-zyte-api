@@ -222,15 +222,13 @@ async def test_stats():
             scrapy_stats = handler._crawler.stats
             assert scrapy_stats.get_stats() == {}
 
-            client_stats = handler._client.agg_stats
-            client_stats.n_attempts += 1
-
             meta = {"zyte_api": {"foo": "bar"}}
             request = Request("https://example.com", meta=meta)
             await handler.download_request(request, None)
 
             for suffix, value in (
                 ('429', 0),
+                ('attempts', 1),
                 ('errors', 0),
                 ('extracted_queries', 1),
                 ('fatal_errors', 0),
