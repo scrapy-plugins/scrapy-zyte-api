@@ -1,10 +1,10 @@
 Changes
 =======
 
-To be released
---------------
+0.4.0 (2022-08-02)
+------------------
 
-* Requires zyte-api_ ≥ 0.3.0.
+* Requires a more recent Python client library zyte-api_ ≥ 0.3.0.
 
 * Stats from zyte-api are now copied into Scrapy stats. The
   ``scrapy-zyte-api/request_count`` stat has been renamed to
