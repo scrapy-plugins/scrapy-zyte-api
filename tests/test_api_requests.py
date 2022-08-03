@@ -208,8 +208,8 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]]):
         (
             {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
             IgnoreRequest,
-            "Got Zyte API error (400) while processing URL (http://example.com): "
-            "Bad Request",
+            "Got Zyte API error (status=422, type='/request/unprocessable') while processing URL (http://example.com): "
+            "Incompatible parameters were found in the request.",
         ),
     ],
 )
