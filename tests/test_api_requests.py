@@ -27,8 +27,8 @@ from .mockserver import DelayedResource, MockServer, produce_request_response
         {"zyte_api": {"browserHtml": True, "randomParameter": None}},
     ],
 )
-async def test_browser_html_request(meta: Dict[str, Dict[str, Any]]):
-    req, resp = await produce_request_response(meta)
+async def test_browser_html_request(meta: Dict[str, Dict[str, Any]], mockserver):
+    req, resp = await produce_request_response(mockserver, meta)
     assert isinstance(resp, TextResponse)
     assert resp.request is req
     assert resp.url == req.url
@@ -56,8 +56,8 @@ async def test_browser_html_request(meta: Dict[str, Dict[str, Any]]):
     ],
 )
 @ensureDeferred
-async def test_http_response_body_request(meta: Dict[str, Dict[str, Any]]):
-    req, resp = await produce_request_response(meta)
+async def test_http_response_body_request(meta: Dict[str, Dict[str, Any]], mockserver):
+    req, resp = await produce_request_response(mockserver, meta)
     assert isinstance(resp, Response)
     assert resp.request is req
     assert resp.url == req.url
@@ -79,8 +79,8 @@ async def test_http_response_body_request(meta: Dict[str, Dict[str, Any]]):
     ],
 )
 @ensureDeferred
-async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]]):
-    req, resp = await produce_request_response(meta)
+async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mockserver):
+    req, resp = await produce_request_response(mockserver, meta)
     assert resp.request is req
     assert resp.url == req.url
     assert resp.status == 200
@@ -141,31 +141,31 @@ async def test_zyte_api_request_meta(
     settings: Dict[str, str],
     expected: Dict[str, str],
     use_zyte_api: bool,
+    mockserver,
 ):
-    with MockServer() as server:
-        async with server.make_handler(settings) as handler:
-            req = Request(server.urljoin("/"), meta=meta)
-            unmocked_client = handler._client
-            handler._client = mock.AsyncMock(unmocked_client)
-            handler._client.request_raw.side_effect = unmocked_client.request_raw
-            await handler.download_request(req, None)
+    async with mockserver.make_handler(settings) as handler:
+        req = Request(mockserver.urljoin("/"), meta=meta)
+        unmocked_client = handler._client
+        handler._client = mock.AsyncMock(unmocked_client)
+        handler._client.request_raw.side_effect = unmocked_client.request_raw
+        await handler.download_request(req, None)
 
-            # What we're interested in is the Request call in the API
-            request_call = [
-                c for c in handler._client.mock_calls if "request_raw(" in str(c)
-            ]
+        # What we're interested in is the Request call in the API
+        request_call = [
+            c for c in handler._client.mock_calls if "request_raw(" in str(c)
+        ]
 
-            if not use_zyte_api:
-                assert request_call == []
-                return
+        if not use_zyte_api:
+            assert request_call == []
+            return
 
-            elif not request_call:
-                pytest.fail("The client's request_raw() method was not called.")
+        elif not request_call:
+            pytest.fail("The client's request_raw() method was not called.")
 
-            args_used = request_call[0].args[0]
-            args_used.pop("url")
+        args_used = request_call[0].args[0]
+        args_used.pop("url")
 
-            assert args_used == expected
+        assert args_used == expected
 
 
 @pytest.mark.parametrize(
@@ -182,17 +182,16 @@ async def test_zyte_api_request_meta(
     ],
 )
 @ensureDeferred
-async def test_coro_handling(meta: Dict[str, Dict[str, Any]]):
+async def test_coro_handling(meta: Dict[str, Dict[str, Any]], mockserver):
     settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
-    with MockServer() as server:
-        async with server.make_handler(settings) as handler:
-            req = Request(
-                "https://toscrape.com",
-                meta=meta,
-            )
-            coro = handler.download_request(req, Spider("test"))
-            assert not iscoroutine(coro)
-            assert isinstance(coro, Deferred)
+    async with mockserver.make_handler(settings) as handler:
+        req = Request(
+            "https://toscrape.com",
+            meta=meta,
+        )
+        coro = handler.download_request(req, Spider("test"))
+        assert not iscoroutine(coro)
+        assert isinstance(coro, Deferred)
 
 
 @ensureDeferred
@@ -218,17 +217,17 @@ async def test_exceptions(
     meta: Dict[str, Dict[str, Any]],
     exception_type: Exception,
     exception_text: str,
+    mockserver,
 ):
-    with MockServer() as server:
-        async with server.make_handler() as handler:
-            req = Request("http://example.com", method="POST", meta=meta)
-            api_params = handler._prepare_api_params(req)
+    async with mockserver.make_handler() as handler:
+        req = Request("http://example.com", method="POST", meta=meta)
+        api_params = handler._prepare_api_params(req)
 
-            with pytest.raises(exception_type):  # NOQA
-                await deferred_from_coro(
-                    handler._download_request(api_params, req, Spider("test"))  # NOQA
-                )  # NOQA
-            assert exception_text in caplog.text
+        with pytest.raises(exception_type):  # NOQA
+            await deferred_from_coro(
+                handler._download_request(api_params, req, Spider("test"))  # NOQA
+            )  # NOQA
+        assert exception_text in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -236,25 +235,24 @@ async def test_exceptions(
     ["547773/99/6"],
 )
 @ensureDeferred
-async def test_job_id(job_id):
-    with MockServer() as server:
-        settings = {"JOB": job_id}
-        async with server.make_handler(settings) as handler:
-            req = Request(
-                "http://example.com",
-                method="POST",
-                meta={"zyte_api": {"browserHtml": True}},
-            )
-            api_params = handler._prepare_api_params(req)
-            resp = await deferred_from_coro(
-                handler._download_request(api_params, req, Spider("test"))  # NOQA
-            )
+async def test_job_id(job_id, mockserver):
+    settings = {"JOB": job_id}
+    async with mockserver.make_handler(settings) as handler:
+        req = Request(
+            "http://example.com",
+            method="POST",
+            meta={"zyte_api": {"browserHtml": True}},
+        )
+        api_params = handler._prepare_api_params(req)
+        resp = await deferred_from_coro(
+            handler._download_request(api_params, req, Spider("test"))  # NOQA
+        )
 
-        assert resp.request is req
-        assert resp.url == req.url
-        assert resp.status == 200
-        assert "zyte-api" in resp.flags
-        assert resp.body == f"<html>{job_id}</html>".encode("utf8")
+    assert resp.request is req
+    assert resp.url == req.url
+    assert resp.status == 200
+    assert "zyte-api" in resp.flags
+    assert resp.body == f"<html>{job_id}</html>".encode("utf8")
 
 
 @ensureDeferred

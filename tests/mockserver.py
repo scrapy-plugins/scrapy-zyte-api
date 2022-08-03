@@ -25,12 +25,11 @@ def get_ephemeral_port():
 
 
 @ensureDeferred
-async def produce_request_response(meta, settings=None):
-    with MockServer() as server:
-        async with server.make_handler(settings) as handler:
-            req = Request(server.urljoin("/"), meta=meta)
-            resp = await handler.download_request(req, None)
-            return req, resp
+async def produce_request_response(mockserver, meta, settings=None):
+    async with mockserver.make_handler(settings) as handler:
+        req = Request(mockserver.urljoin("/"), meta=meta)
+        resp = await handler.download_request(req, None)
+        return req, resp
 
 
 class LeafResource(Resource):
