@@ -186,12 +186,15 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]], mockserver):
     settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
     async with mockserver.make_handler(settings) as handler:
         req = Request(
-            "https://toscrape.com",
+            # this should really be a URL to a website, not to the API server,
+            # but API server URL works ok
+            mockserver.urljoin("/"),
             meta=meta,
         )
-        coro = handler.download_request(req, Spider("test"))
-        assert not iscoroutine(coro)
-        assert isinstance(coro, Deferred)
+        dfd = handler.download_request(req, Spider("test"))
+        assert not iscoroutine(dfd)
+        assert isinstance(dfd, Deferred)
+        await dfd
 
 
 @ensureDeferred
