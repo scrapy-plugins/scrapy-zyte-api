@@ -68,8 +68,13 @@ class DefaultResource(LeafResource):
 
         if "browserHtml" in request_data:
             if "httpResponseBody" in request_data:
-                request.setResponseCode(400)
-                return json.dumps(response_data).encode()
+                request.setResponseCode(422)
+                return json.dumps({
+                    "type": "/request/unprocessable",
+                    "title": "Unprocessable Request",
+                    "status": 422,
+                    "detail": "Incompatible parameters were found in the request."
+                }).encode()
             response_data["browserHtml"] = html
         elif "httpResponseBody" in request_data:
             base64_html = b64encode(html.encode()).decode()
