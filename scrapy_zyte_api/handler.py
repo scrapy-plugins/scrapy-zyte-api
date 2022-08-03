@@ -141,9 +141,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 retrying=retrying,
             )
         except RequestError as er:
-            error_message = self._get_request_error_message(er)
+            error_detail = (er.parsed.data or {}).get("detail", er.message)
             logger.error(
-                f"Got Zyte API error ({er.status}) while processing URL ({request.url}): {error_message}"
+                f"Got Zyte API error (status={er.status}, type={er.parsed.type!r}) "
+                f"while processing URL ({request.url}): {error_detail}"
             )
             raise IgnoreRequest()
         except Exception as er:
@@ -163,19 +164,3 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
 
     async def _close(self) -> None:  # NOQA
         await self._session.close()
-
-    @staticmethod
-    def _get_request_error_message(error: RequestError) -> str:
-        if hasattr(error, "message"):
-            base_message = error.message
-        else:
-            base_message = str(error)
-        if not hasattr(error, "response_content"):
-            return base_message
-        try:
-            error_data = json.loads(error.response_content.decode("utf-8"))
-        except (AttributeError, TypeError, ValueError):
-            return base_message
-        if error_data.get("detail"):
-            return error_data["detail"]
-        return base_message
