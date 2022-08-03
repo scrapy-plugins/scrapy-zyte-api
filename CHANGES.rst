@@ -1,6 +1,15 @@
 Changes
 =======
 
+0.4.2 (to be released)
+----------------------
+
+* Cleaned up Scrapy stats names: fixed an issue with ``//``, renamed
+  ``scrapy-zyte-api/api_error_types/..`` to ``scrapy-zyte-api/error_types/..``,
+  added ``scrapy-zyte-api/error_types/<empty>`` for cases error type is unknown;
+* Added error type to the error log messages
+* Testing improvements
+
 0.4.1 (2022-08-02)
 ------------------
 
