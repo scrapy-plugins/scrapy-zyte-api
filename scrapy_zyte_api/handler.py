@@ -117,16 +117,14 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"{prefix}/mean_{target}_seconds",
                 getattr(self._client.agg_stats, f"time_{source}_stats").mean(),
             )
-        for counter in (
-            'api_error_types',
-            'exception_types',
-            'status_codes',
-        ):
+
+        for error_type, count in self._client.agg_stats.api_error_types.items():
+            error_type = error_type or "/<empty>"
+            self._stats.set_value(f"{prefix}/error_types{error_type}", count)
+
+        for counter in ('exception_types', 'status_codes',):
             for key, value in getattr(self._client.agg_stats, counter).items():
-                self._stats.set_value(
-                    f"{prefix}/{counter}/{key}",
-                    value,
-                )
+                self._stats.set_value(f"{prefix}/{counter}/{key}", value)
 
     async def _download_request(
         self, api_params: dict, request: Request, spider: Spider
