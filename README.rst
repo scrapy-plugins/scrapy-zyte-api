@@ -92,6 +92,7 @@ must be present and contain a dict with Zyte API parameters:
             print(response.raw_api_response)
             # {
             #     'url': 'https://quotes.toscrape.com/',
+            #     'statusCode': 200,
             #     'browserHtml': '<html> ... </html>',
             # }
 
@@ -173,6 +174,7 @@ meta taking priority.
             print(response.raw_api_response)
             # {
             #     'url': 'https://quotes.toscrape.com/',
+            #     'statusCode': 200,
             #     'browserHtml': '<html> ... </html>',
             #     'echoData': {'some_value_I_could_track': 123},
             # }
@@ -220,6 +222,7 @@ customization - the ``zyte_api`` meta key can be set to ``True`` or ``{}``:
             print(response.raw_api_response)
             # {
             #     'url': 'https://quotes.toscrape.com/',
+            #     'statusCode': 200,
             #     'browserHtml': '<html> ... </html>',
             # }
 
