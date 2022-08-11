@@ -119,6 +119,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
 
         for error_type, count in self._client.agg_stats.api_error_types.items():
             error_type = error_type or "/<empty>"
+            if not error_type.startswith("/"):
+                error_type = f"/{error_type}"
             self._stats.set_value(f"{prefix}/error_types{error_type}", count)
 
         for counter in ('exception_types', 'status_codes',):
