@@ -1,4 +1,5 @@
 import logging
+from base64 import b64decode, b64encode
 from typing import Any, Dict, Generator, Optional, Union
 from warnings import warn
 
@@ -8,6 +9,10 @@ from scrapy.crawler import Crawler
 from scrapy.exceptions import IgnoreRequest, NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
+from scrapy.settings.default_settings import (
+    DEFAULT_REQUEST_HEADERS,
+    USER_AGENT as DEFAULT_USER_AGENT
+)
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
@@ -60,6 +65,21 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._session = create_session(connection_pool_size=self._client.n_conn)
         self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
         self._on_all_requests = settings.getbool("ZYTE_API_ON_ALL_REQUESTS")
+        self._automap = settings.getbool("ZYTE_API_AUTOMAP", True)
+        self._unsupported_headers = {
+            header.strip().lower().encode() for header in settings.getlist(
+                "ZYTE_API_UNSUPPORTED_HEADERS",
+                ["Cookie", "User-Agent"],
+            )
+        }
+        browser_headers = settings.getdict(
+            "ZYTE_API_BROWSER_HEADERS",
+            {"Referer": "referer"},
+        )
+        self._browser_headers = {
+            k.strip().lower().encode(): v
+            for k, v in browser_headers.items()
+        }
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._prepare_api_params(request)
@@ -93,6 +113,145 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"instead ({request.url})."
             )
             raise IgnoreRequest()
+
+        if not self._automap:
+            return api_params
+
+        if not any(
+            api_params.get(k)
+            for k in ("httpResponseBody", "browserHtml", "screenshot")
+        ):
+            api_params.setdefault("httpResponseBody", True)
+        response_body = api_params.get("httpResponseBody")
+
+        if any(api_params.get(k) for k in ("httpResponseBody", "browserHtml")):
+            if api_params.get("httpResponseHeaders") is True:
+                logger.warning(
+                    "You do not need to set httpResponseHeaders to True if "
+                    "you httpResponseBody or browserHtml to True. Note that "
+                    "httpResponseBody is set to True automatically if neither "
+                    "browserHtml nor screenshot are set to True."
+                )
+            api_params.setdefault("httpResponseHeaders", True)
+
+        method = api_params.get("httpRequestMethod")
+        if method:
+            logger.warning(
+                f"Request {request} uses the Zyte Data API httpRequestMethod "
+                f"parameter. Use Request.method instead."
+            )
+            if method != request.method:
+                logger.warning(
+                    f"The HTTP method of request {request} ({request.method}) "
+                    f"does not match the Zyte Data API httpRequestMethod "
+                    f"parameter ({method})."
+                )
+        elif request.method != "GET":
+            if response_body:
+                api_params["httpRequestMethod"] = request.method
+            else:
+                logger.warning(
+                    f"The HTTP method of request {request} ({request.method}) "
+                    f"is being ignored. The httpRequestMethod parameter of "
+                    f"Zyte Data API can only be set when the httpResponseBody "
+                    f"parameter is True."
+                )
+
+        if response_body:
+            headers = api_params.get("customHttpRequestHeaders")
+            if headers is not None:
+                logger.warning(
+                    f"Request {request} defines the Zyte Data API "
+                    f"customHttpRequestHeaders parameter. Use Request.headers "
+                    f"instead."
+                )
+            elif request.headers:
+                headers = []
+                for k, v in request.headers.items():
+                    if not v:
+                        continue
+                    v = b','.join(v).decode()
+                    lowercase_k = k.strip().lower()
+                    if lowercase_k in self._unsupported_headers:
+                        if (
+                            lowercase_k != b'user-agent'
+                            or v != DEFAULT_USER_AGENT
+                        ):
+                            logger.warning(
+                                f"Request {request} defines header {k}, which "
+                                f"cannot be mapped into the Zyte Data API "
+                                f"customHttpRequestHeaders parameter."
+                            )
+                        continue
+                    k = k.decode()
+                    headers.append({"name": k, "value": v})
+                if headers:
+                    api_params["customHttpRequestHeaders"] = headers
+        if (
+            not response_body
+            or any(api_params.get(k) for k in ("browserHtml", "screenshot"))
+        ):
+            headers = api_params.get("requestHeaders")
+            if headers is not None:
+                logger.warning(
+                    f"Request {request} defines the Zyte Data API "
+                    f"requestHeaders parameter. Use Request.headers instead."
+                )
+            elif request.headers:
+                request_headers = {}
+                for k, v in request.headers.items():
+                    if not v:
+                        continue
+                    v = b','.join(v).decode()
+                    lowercase_k = k.strip().lower()
+                    key = self._browser_headers.get(lowercase_k)
+                    if key is not None:
+                        request_headers[key] = v
+                    elif not (
+                        (
+                            lowercase_k == b'accept'
+                            and v == DEFAULT_REQUEST_HEADERS['Accept']
+                        ) or (
+                            lowercase_k == b'accept-language'
+                            and v == DEFAULT_REQUEST_HEADERS['Accept-Language']
+                        ) or (
+                            lowercase_k == b'user-agent'
+                            and v == DEFAULT_USER_AGENT
+                        )
+                    ):
+                        logger.warning(
+                            f"Request {request} defines header {k}, which "
+                            f"cannot be mapped into the Zyte Data API "
+                            f"requestHeaders parameter."
+                        )
+                if request_headers:
+                    api_params["requestHeaders"] = request_headers
+
+        body = api_params.get("httpRequestBody")
+        if body:
+            logger.warning(
+                f"Request {request} uses the Zyte Data API httpRequestBody "
+                f"parameter. Use Request.body instead."
+            )
+            decoded_body = b64decode(body)
+            if decoded_body != request.body:
+                logger.warning(
+                    f"The body of request {request} ({request.body!r}) "
+                    f"does not match the Zyte Data API httpRequestBody "
+                    f"parameter ({body!r}; decoded: {decoded_body!r})."
+                )
+        elif request.body != b"":
+            if response_body:
+                base64_body = b64encode(request.body).decode()
+                api_params["httpRequestBody"] = base64_body
+            else:
+                logger.warning(
+                    f"The body of request {request} ({request.body!r}) "
+                    f"is being ignored. The httpRequestBody parameter of "
+                    f"Zyte Data API can only be set when the httpResponseBody "
+                    f"parameter is True."
+                )
+
         return api_params
 
     def _update_stats(self):
