@@ -9,10 +9,8 @@ from scrapy.crawler import Crawler
 from scrapy.exceptions import IgnoreRequest, NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
-from scrapy.settings.default_settings import (
-    DEFAULT_REQUEST_HEADERS,
-    USER_AGENT as DEFAULT_USER_AGENT
-)
+from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
+from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
@@ -67,7 +65,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._on_all_requests = settings.getbool("ZYTE_API_ON_ALL_REQUESTS")
         self._automap = settings.getbool("ZYTE_API_AUTOMAP", True)
         self._unsupported_headers = {
-            header.strip().lower().encode() for header in settings.getlist(
+            header.strip().lower().encode()
+            for header in settings.getlist(
                 "ZYTE_API_UNSUPPORTED_HEADERS",
                 ["Cookie", "User-Agent"],
             )
@@ -77,8 +76,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             {"Referer": "referer"},
         )
         self._browser_headers = {
-            k.strip().lower().encode(): v
-            for k, v in browser_headers.items()
+            k.strip().lower().encode(): v for k, v in browser_headers.items()
         }
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
@@ -114,12 +112,81 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             )
             raise IgnoreRequest()
 
-        if not self._automap:
-            return api_params
+        if self._automap:
+            self._map_params(api_params, request)
 
+        return api_params
+
+    def _map_headers(self, api_params, request):
+        response_body = api_params.get("httpResponseBody")
+        if response_body:
+            headers = api_params.get("customHttpRequestHeaders")
+            if headers is not None:
+                logger.warning(
+                    f"Request {request} defines the Zyte Data API "
+                    f"customHttpRequestHeaders parameter. Use Request.headers "
+                    f"instead."
+                )
+            elif request.headers:
+                headers = []
+                for k, v in request.headers.items():
+                    if not v:
+                        continue
+                    v = b",".join(v).decode()
+                    lowercase_k = k.strip().lower()
+                    if lowercase_k in self._unsupported_headers:
+                        if lowercase_k != b"user-agent" or v != DEFAULT_USER_AGENT:
+                            logger.warning(
+                                f"Request {request} defines header {k}, which "
+                                f"cannot be mapped into the Zyte Data API "
+                                f"customHttpRequestHeaders parameter."
+                            )
+                        continue
+                    k = k.decode()
+                    headers.append({"name": k, "value": v})
+                if headers:
+                    api_params["customHttpRequestHeaders"] = headers
+        if not response_body or any(
+            api_params.get(k) for k in ("browserHtml", "screenshot")
+        ):
+            headers = api_params.get("requestHeaders")
+            if headers is not None:
+                logger.warning(
+                    f"Request {request} defines the Zyte Data API "
+                    f"requestHeaders parameter. Use Request.headers instead."
+                )
+            elif request.headers:
+                request_headers = {}
+                for k, v in request.headers.items():
+                    if not v:
+                        continue
+                    v = b",".join(v).decode()
+                    lowercase_k = k.strip().lower()
+                    key = self._browser_headers.get(lowercase_k)
+                    if key is not None:
+                        request_headers[key] = v
+                    elif not (
+                        (
+                            lowercase_k == b"accept"
+                            and v == DEFAULT_REQUEST_HEADERS["Accept"]
+                        )
+                        or (
+                            lowercase_k == b"accept-language"
+                            and v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
+                        )
+                        or (lowercase_k == b"user-agent" and v == DEFAULT_USER_AGENT)
+                    ):
+                        logger.warning(
+                            f"Request {request} defines header {k}, which "
+                            f"cannot be mapped into the Zyte Data API "
+                            f"requestHeaders parameter."
+                        )
+                if request_headers:
+                    api_params["requestHeaders"] = request_headers
+
+    def _map_params(self, api_params, request):
         if not any(
-            api_params.get(k)
-            for k in ("httpResponseBody", "browserHtml", "screenshot")
+            api_params.get(k) for k in ("httpResponseBody", "browserHtml", "screenshot")
         ):
             api_params.setdefault("httpResponseBody", True)
         response_body = api_params.get("httpResponseBody")
@@ -157,75 +224,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                     f"parameter is True."
                 )
 
-        if response_body:
-            headers = api_params.get("customHttpRequestHeaders")
-            if headers is not None:
-                logger.warning(
-                    f"Request {request} defines the Zyte Data API "
-                    f"customHttpRequestHeaders parameter. Use Request.headers "
-                    f"instead."
-                )
-            elif request.headers:
-                headers = []
-                for k, v in request.headers.items():
-                    if not v:
-                        continue
-                    v = b','.join(v).decode()
-                    lowercase_k = k.strip().lower()
-                    if lowercase_k in self._unsupported_headers:
-                        if (
-                            lowercase_k != b'user-agent'
-                            or v != DEFAULT_USER_AGENT
-                        ):
-                            logger.warning(
-                                f"Request {request} defines header {k}, which "
-                                f"cannot be mapped into the Zyte Data API "
-                                f"customHttpRequestHeaders parameter."
-                            )
-                        continue
-                    k = k.decode()
-                    headers.append({"name": k, "value": v})
-                if headers:
-                    api_params["customHttpRequestHeaders"] = headers
-        if (
-            not response_body
-            or any(api_params.get(k) for k in ("browserHtml", "screenshot"))
-        ):
-            headers = api_params.get("requestHeaders")
-            if headers is not None:
-                logger.warning(
-                    f"Request {request} defines the Zyte Data API "
-                    f"requestHeaders parameter. Use Request.headers instead."
-                )
-            elif request.headers:
-                request_headers = {}
-                for k, v in request.headers.items():
-                    if not v:
-                        continue
-                    v = b','.join(v).decode()
-                    lowercase_k = k.strip().lower()
-                    key = self._browser_headers.get(lowercase_k)
-                    if key is not None:
-                        request_headers[key] = v
-                    elif not (
-                        (
-                            lowercase_k == b'accept'
-                            and v == DEFAULT_REQUEST_HEADERS['Accept']
-                        ) or (
-                            lowercase_k == b'accept-language'
-                            and v == DEFAULT_REQUEST_HEADERS['Accept-Language']
-                        ) or (
-                            lowercase_k == b'user-agent'
-                            and v == DEFAULT_USER_AGENT
-                        )
-                    ):
-                        logger.warning(
-                            f"Request {request} defines header {k}, which "
-                            f"cannot be mapped into the Zyte Data API "
-                            f"requestHeaders parameter."
-                        )
-                if request_headers:
-                    api_params["requestHeaders"] = request_headers
+        self._map_headers(api_params, request)
 
         body = api_params.get("httpRequestBody")
         if body:
@@ -257,29 +256,29 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def _update_stats(self):
         prefix = "scrapy-zyte-api"
         for stat in (
-            '429',
-            'attempts',
-            'errors',
-            'fatal_errors',
-            'processed',
-            'success',
+            "429",
+            "attempts",
+            "errors",
+            "fatal_errors",
+            "processed",
+            "success",
         ):
             self._stats.set_value(
                 f"{prefix}/{stat}",
                 getattr(self._client.agg_stats, f"n_{stat}"),
             )
         for stat in (
-            'error_ratio',
-            'success_ratio',
-            'throttle_ratio',
+            "error_ratio",
+            "success_ratio",
+            "throttle_ratio",
         ):
             self._stats.set_value(
                 f"{prefix}/{stat}",
                 getattr(self._client.agg_stats, stat)(),
             )
         for source, target in (
-            ('connect', 'connection'),
-            ('total', 'response'),
+            ("connect", "connection"),
+            ("total", "response"),
         ):
             self._stats.set_value(
                 f"{prefix}/mean_{target}_seconds",
@@ -292,7 +291,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 error_type = f"/{error_type}"
             self._stats.set_value(f"{prefix}/error_types{error_type}", count)
 
-        for counter in ('exception_types', 'status_codes',):
+        for counter in (
+            "exception_types",
+            "status_codes",
+        ):
             for key, value in getattr(self._client.agg_stats, counter).items():
                 self._stats.set_value(f"{prefix}/{counter}/{key}", value)
 

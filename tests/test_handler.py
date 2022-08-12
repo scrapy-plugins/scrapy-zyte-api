@@ -225,37 +225,37 @@ async def test_stats(mockserver):
         await handler.download_request(request, None)
 
         assert set(scrapy_stats.get_stats()) == {
-            f'scrapy-zyte-api/{stat}'
+            f"scrapy-zyte-api/{stat}"
             for stat in (
-                '429',
-                'attempts',
-                'error_ratio',
-                'errors',
-                'fatal_errors',
-                'mean_connection_seconds',
-                'mean_response_seconds',
-                'processed',
-                'status_codes/200',
-                'success_ratio',
-                'success',
-                'throttle_ratio',
+                "429",
+                "attempts",
+                "error_ratio",
+                "errors",
+                "fatal_errors",
+                "mean_connection_seconds",
+                "mean_response_seconds",
+                "processed",
+                "status_codes/200",
+                "success_ratio",
+                "success",
+                "throttle_ratio",
             )
         }
         for suffix, value in (
-            ('429', 0),
-            ('attempts', 1),
-            ('error_ratio', 0.0),
-            ('errors', 0),
-            ('fatal_errors', 0),
-            ('processed', 1),
-            ('status_codes/200', 1),
-            ('success_ratio', 1.0),
-            ('success', 1),
-            ('throttle_ratio', 0.0),
+            ("429", 0),
+            ("attempts", 1),
+            ("error_ratio", 0.0),
+            ("errors", 0),
+            ("fatal_errors", 0),
+            ("processed", 1),
+            ("status_codes/200", 1),
+            ("success_ratio", 1.0),
+            ("success", 1),
+            ("throttle_ratio", 0.0),
         ):
             stat = f"scrapy-zyte-api/{suffix}"
             assert scrapy_stats.get_value(stat) == value
-        for name in ('connection', 'response'):
+        for name in ("connection", "response"):
             stat = f"scrapy-zyte-api/mean_{name}_seconds"
             value = scrapy_stats.get_value(stat)
             assert isinstance(value, float)
