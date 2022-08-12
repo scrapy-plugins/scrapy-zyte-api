@@ -116,8 +116,12 @@ and ``scrapy.http.TextResponse``.
 If multiple requests target the same URL with different Zyte Data API
 parameters, pass ``dont_filter=True`` to ``Request``.
 
+
+.. _default-params:
+
 Setting default parameters
 --------------------------
+
 Often the same configuration needs to be used for all Zyte API requests.
 For example, all requests may need to set the same geolocation, or
 the spider only uses ``browserHtml`` requests.
@@ -133,13 +137,7 @@ following in the ``settings.py`` file or `any other settings within Scrapy
         "geolocation": "US",
     }
 
-
-``ZYTE_API_DEFAULT_PARAMS`` works if the ``zyte_api``
-key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
-is set, i.e. having ``ZYTE_API_DEFAULT_PARAMS`` doesn't make all requests
-to go through Zyte Data API. Parameters in ``ZYTE_API_DEFAULT_PARAMS`` are 
-merged with parameters set via the ``zyte_api`` meta key, with the values in 
-meta taking priority.
+For example:
 
 .. code-block:: python
 
@@ -191,49 +189,36 @@ meta taking priority.
             #     'download_slot': 'quotes.toscrape.com'
             # }
 
-There is a shortcut, in case a request uses the same parameters as
-defined in the ``ZYTE_API_DEFAULT_PARAMS`` setting, without any further
-customization - the ``zyte_api`` meta key can be set to ``True`` or ``{}``:
+``ZYTE_API_DEFAULT_PARAMS`` does not make requests automatically go through
+Zyte Data API. See :ref:`enabled`.
 
-.. code-block:: python
-
-    import scrapy
+Parameters in ``ZYTE_API_DEFAULT_PARAMS`` are merged with parameters set via
+the ``zyte_api`` meta key, with the values in meta taking priority.
 
 
-    class SampleQuotesSpider(scrapy.Spider):
-        name = "sample_quotes"
+.. _enabled:
 
-        custom_settings = {
-            "ZYTE_API_DEFAULT_PARAMS": {
-                "browserHtml": True,
-            }
-        }
+Controlling which requests go through Zyte Data API
+---------------------------------------------------
 
-        def start_requests(self):
-            yield scrapy.Request(
-                url="http://quotes.toscrape.com/",
-                callback=self.parse,
-                meta={"zyte_api": True},
-            )
+The ``ZYTE_API_ENABLED`` setting can be used to control whether all, none, or
+some requests go through Zyte Data API. It supports the following values:
 
-        def parse(self, response):
-            yield {"URL": response.url, "HTML": response.body}
+-   ``None`` (default): only requests where the ``zyte_api`` key in
+    Request.meta_ is set to ``True`` or set to a dictionary go through Zyte
+    Data API.
 
-            print(response.raw_api_response)
-            # {
-            #     'url': 'https://quotes.toscrape.com/',
-            #     'statusCode': 200,
-            #     'browserHtml': '<html> ... </html>',
-            # }
+    .. _Request.meta: https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta
 
-            print(response.request.meta)
-            # {
-            #     'zyte_api': {
-            #         'browserHtml': True,
-            #     },
-            #     'download_timeout': 180.0,
-            #     'download_slot': 'quotes.toscrape.com'
-            # }
+-   ``True``: all requests go through Zyte Data API, unless the ``zyte_api``
+    key in Request.meta_ is set to ``False``.
+
+-   ``False``: disables this plugin.
+
+Zyte Data API requests need parameters. You must either set those parameters in
+the ``zyte_api`` metadata key of every request or :ref:`set default parameters
+<default-params>`.
+
 
 Customizing the retry policy
 ----------------------------

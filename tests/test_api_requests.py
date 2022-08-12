@@ -91,9 +91,11 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
 
 @ensureDeferred
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
+@pytest.mark.filterwarnings("ignore:.*None is deprecated")
 @pytest.mark.parametrize(
     "meta,settings,expected,use_zyte_api",
     [
+        # Undefined ZYTE_API_ENABLED
         ({}, {}, {}, False),
         ({"zyte_api": {}}, {}, {}, False),
         ({"zyte_api": True}, {}, {}, False),
@@ -134,6 +136,186 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
             {"browserHtml": True, "geolocation": "US", "javascript": True},
             True,
         ),
+
+        # ZYTE_API_ENABLED=None
+        ({}, {"ZYTE_API_ENABLED": None}, {}, False),
+        ({"zyte_api": {}}, {"ZYTE_API_ENABLED": None}, {}, False),
+        ({"zyte_api": True}, {"ZYTE_API_ENABLED": None}, {}, False),
+        ({"zyte_api": False}, {"ZYTE_API_ENABLED": None}, {}, False),
+        (
+            {},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": None,
+            },
+            {"browserHtml": True, "geolocation": "CA"},
+            False,
+        ),
+        (
+            {"zyte_api": False},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": None,
+            },
+            {},
+            False,
+        ),
+        (
+            {"zyte_api": None},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": None,
+            },
+            {},
+            False,
+        ),
+        (
+            {"zyte_api": {}},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": None,
+            },
+            {"browserHtml": True, "geolocation": "CA"},
+            True,
+        ),
+        (
+            {"zyte_api": True},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": None,
+            },
+            {"browserHtml": True, "geolocation": "CA"},
+            True,
+        ),
+        (
+            {"zyte_api": {"javascript": True, "geolocation": "US"}},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": None,
+            },
+            {"browserHtml": True, "geolocation": "US", "javascript": True},
+            True,
+        ),
+
+        # ZYTE_API_ENABLED=True
+        ({}, {"ZYTE_API_ENABLED": True}, {}, False),
+        ({"zyte_api": {}}, {"ZYTE_API_ENABLED": True}, {}, False),
+        ({"zyte_api": True}, {"ZYTE_API_ENABLED": True}, {}, False),
+        ({"zyte_api": False}, {"ZYTE_API_ENABLED": True}, {}, False),
+        (
+            {},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": True,
+            },
+            {"browserHtml": True, "geolocation": "CA"},
+            True,
+        ),
+        (
+            {"zyte_api": False},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": True,
+            },
+            {},
+            False,
+        ),
+        (
+            {"zyte_api": None},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": True,
+            },
+            {},
+            False,
+        ),
+        (
+            {"zyte_api": {}},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": True,
+            },
+            {"browserHtml": True, "geolocation": "CA"},
+            True,
+        ),
+        (
+            {"zyte_api": True},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": True,
+            },
+            {"browserHtml": True, "geolocation": "CA"},
+            True,
+        ),
+        (
+            {"zyte_api": {"javascript": True, "geolocation": "US"}},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": True,
+            },
+            {"browserHtml": True, "geolocation": "US", "javascript": True},
+            True,
+        ),
+
+        # ZYTE_API_ENABLED=False
+        ({}, {"ZYTE_API_ENABLED": True}, {}, False),
+        ({"zyte_api": {}}, {"ZYTE_API_ENABLED": False}, {}, False),
+        ({"zyte_api": True}, {"ZYTE_API_ENABLED": False}, {}, False),
+        ({"zyte_api": False}, {"ZYTE_API_ENABLED": False}, {}, False),
+        (
+            {},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": False,
+            },
+            {"browserHtml": True, "geolocation": "CA"},
+            False,
+        ),
+        (
+            {"zyte_api": False},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": False,
+            },
+            {},
+            False,
+        ),
+        (
+            {"zyte_api": None},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": False,
+            },
+            {},
+            False,
+        ),
+        (
+            {"zyte_api": {}},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": False,
+            },
+            {"browserHtml": True, "geolocation": "CA"},
+            False,
+        ),
+        (
+            {"zyte_api": True},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": False,
+            },
+            {"browserHtml": True, "geolocation": "CA"},
+            False,
+        ),
+        (
+            {"zyte_api": {"javascript": True, "geolocation": "US"}},
+            {
+                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
+                "ZYTE_API_ENABLED": False,
+            },
+            {"browserHtml": True, "geolocation": "US", "javascript": True},
+            False,
+        ),
     ],
 )
 async def test_zyte_api_request_meta(
@@ -144,10 +326,14 @@ async def test_zyte_api_request_meta(
     mockserver,
 ):
     async with mockserver.make_handler(settings) as handler:
+        if handler is None:
+            assert not use_zyte_api
+            return
         req = Request(mockserver.urljoin("/"), meta=meta)
         unmocked_client = handler._client
         handler._client = mock.AsyncMock(unmocked_client)
         handler._client.request_raw.side_effect = unmocked_client.request_raw
+
         await handler.download_request(req, None)
 
         # What we're interested in is the Request call in the API
@@ -168,6 +354,16 @@ async def test_zyte_api_request_meta(
         assert args_used == expected
 
 
+@ensureDeferred
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
+async def test_zyte_api_request_meta_none_deprecation(mockserver):
+    async with mockserver.make_handler() as handler:
+        req = Request(mockserver.urljoin("/"), meta={"zyte_api": None})
+        handler._client = mock.AsyncMock(handler._client)
+        with pytest.warns(DeprecationWarning, match="None is deprecated"):
+            await handler.download_request(req, None)
+
+
 @pytest.mark.parametrize(
     "meta",
     [
@@ -175,7 +371,7 @@ async def test_zyte_api_request_meta(
         {"zyte_api": True},
         {"zyte_api": {"browserHtml": True}},
         {"zyte_api": {}},
-        {"zyte_api": None},
+        {"zyte_api": False},
         {"randomParameter": True},
         {},
         None,

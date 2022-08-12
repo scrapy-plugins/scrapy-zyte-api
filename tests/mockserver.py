@@ -146,10 +146,7 @@ class MockServer:
     async def make_handler(self, settings: dict = None):
         settings = settings or {}
         async with make_handler(settings, self.urljoin("/")) as handler:
-            try:
-                yield handler
-            finally:
-                await handler._close()  # NOQA
+            yield handler
 
 
 def main():

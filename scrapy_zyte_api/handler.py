@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Dict, Generator, Optional, Union
+from warnings import warn
 
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
@@ -25,6 +26,11 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self, settings: Settings, crawler: Crawler, client: AsyncClient = None
     ):
         super().__init__(settings=settings, crawler=crawler)
+        enabled = settings.get("ZYTE_API_ENABLED")
+        if enabled is False:
+            raise NotConfigured
+        self._enabled_by_default = enabled or False
+
         if not client:
             try:
                 client = AsyncClient(
@@ -66,10 +72,16 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         return super().download_request(request, spider)
 
     def _prepare_api_params(self, request: Request) -> Optional[dict]:
-        meta_params = request.meta.get("zyte_api")
-        if not meta_params and meta_params != {}:
+        meta_params = request.meta.get("zyte_api", self._enabled_by_default)
+        if meta_params is False:
             return None
-
+        if not meta_params and meta_params != {}:
+            warn(
+                f"Setting the zyte_api request metadata key to "
+                f"{meta_params!r} is deprecated. Use False instead.",
+                DeprecationWarning,
+            )
+            return None
         if meta_params is True:
             meta_params = {}
 
