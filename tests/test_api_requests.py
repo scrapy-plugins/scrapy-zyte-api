@@ -9,10 +9,8 @@ from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest, NotSupported
 from scrapy.http import Response, TextResponse
-from scrapy.settings.default_settings import (
-    DEFAULT_REQUEST_HEADERS,
-    USER_AGENT as DEFAULT_USER_AGENT,
-)
+from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
+from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
@@ -29,24 +27,6 @@ from .mockserver import DelayedResource, MockServer, produce_request_response
         {"zyte_api": {"browserHtml": True, "geolocation": "US"}},
         {"zyte_api": {"browserHtml": True, "geolocation": "US", "echoData": 123}},
         {"zyte_api": {"browserHtml": True, "randomParameter": None}},
-    ],
-)
-async def test_browser_html_request(meta: Dict[str, Dict[str, Any]], mockserver):
-    req, resp = await produce_request_response(mockserver, meta)
-    assert isinstance(resp, TextResponse)
-    assert resp.request is req
-    assert resp.url == req.url
-    assert resp.status == 200
-    assert "zyte-api" in resp.flags
-    assert resp.body == b"<html><body>Hello<h1>World!</h1></body></html>"
-    assert resp.text == "<html><body>Hello<h1>World!</h1></body></html>"
-    assert resp.css("h1 ::text").get() == "World!"
-    assert resp.xpath("//body/text()").getall() == ["Hello"]
-
-
-@pytest.mark.parametrize(
-    "meta",
-    [
         {"zyte_api": {"httpResponseBody": True}},
         {"zyte_api": {"httpResponseBody": True, "geolocation": "US"}},
         {
@@ -57,6 +37,48 @@ async def test_browser_html_request(meta: Dict[str, Dict[str, Any]], mockserver)
             }
         },
         {"zyte_api": {"httpResponseBody": True, "randomParameter": None}},
+    ],
+)
+async def test_html_response_and_headers(meta: Dict[str, Dict[str, Any]], mockserver):
+    req, resp = await produce_request_response(mockserver, meta)
+    assert isinstance(resp, TextResponse)
+    assert resp.request is req
+    assert resp.url == req.url
+    assert resp.status == 200
+    assert "zyte-api" in resp.flags
+    assert resp.body == b"<html><body>Hello<h1>World!</h1></body></html>"
+    assert resp.text == "<html><body>Hello<h1>World!</h1></body></html>"
+    assert resp.css("h1 ::text").get() == "World!"
+    assert resp.xpath("//body/text()").getall() == ["Hello"]
+    assert resp.headers == {b"Test_Header": [b"test_value"]}
+
+
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": False}},
+        {
+            "zyte_api": {
+                "httpResponseBody": True,
+                "httpResponseHeaders": False,
+                "geolocation": "US",
+            },
+        },
+        {
+            "zyte_api": {
+                "httpResponseBody": True,
+                "httpResponseHeaders": False,
+                "geolocation": "US",
+                "echoData": 123,
+            }
+        },
+        {
+            "zyte_api": {
+                "httpResponseBody": True,
+                "httpResponseHeaders": False,
+                "randomParameter": None,
+            },
+        },
     ],
 )
 @ensureDeferred
@@ -75,24 +97,6 @@ async def test_http_response_body_request(meta: Dict[str, Dict[str, Any]], mocks
         assert resp.xpath("//body/text()").getall() == ["Hello"]
 
 
-@pytest.mark.parametrize(
-    "meta",
-    [
-        {"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": True}},
-        {"zyte_api": {"browserHtml": True, "httpResponseHeaders": True}},
-    ],
-)
-@ensureDeferred
-async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mockserver):
-    req, resp = await produce_request_response(mockserver, meta)
-    assert resp.request is req
-    assert resp.url == req.url
-    assert resp.status == 200
-    assert "zyte-api" in resp.flags
-    assert resp.body == b"<html><body>Hello<h1>World!</h1></body></html>"
-    assert resp.headers == {b"Test_Header": [b"test_value"]}
-
-
 @ensureDeferred
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
 @pytest.mark.filterwarnings("ignore:.*None is deprecated")
@@ -101,13 +105,23 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
     [
         # Default ZYTE_API_ON_ALL_REQUESTS
         ({}, {}, {}, False),
-        ({"zyte_api": {}}, {}, {}, False),
-        ({"zyte_api": True}, {}, {}, False),
+        (
+            {"zyte_api": {}},
+            {},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            True,
+        ),
+        (
+            {"zyte_api": True},
+            {},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            True,
+        ),
         ({"zyte_api": False}, {}, {}, False),
         (
             {},
             {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {"browserHtml": True, "geolocation": "CA"},
+            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
             False,
         ),
         (
@@ -125,26 +139,40 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
         (
             {"zyte_api": {}},
             {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {"browserHtml": True, "geolocation": "CA"},
+            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
             True,
         ),
         (
             {"zyte_api": True},
             {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {"browserHtml": True, "geolocation": "CA"},
+            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
             True,
         ),
         (
             {"zyte_api": {"javascript": True, "geolocation": "US"}},
             {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {"browserHtml": True, "geolocation": "US", "javascript": True},
+            {
+                "browserHtml": True,
+                "geolocation": "US",
+                "javascript": True,
+                "httpResponseHeaders": True,
+            },
             True,
         ),
-
         # ZYTE_API_ON_ALL_REQUESTS=False
         ({}, {"ZYTE_API_ON_ALL_REQUESTS": False}, {}, False),
-        ({"zyte_api": {}}, {"ZYTE_API_ON_ALL_REQUESTS": False}, {}, False),
-        ({"zyte_api": True}, {"ZYTE_API_ON_ALL_REQUESTS": False}, {}, False),
+        (
+            {"zyte_api": {}},
+            {"ZYTE_API_ON_ALL_REQUESTS": False},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            True,
+        ),
+        (
+            {"zyte_api": True},
+            {"ZYTE_API_ON_ALL_REQUESTS": False},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            True,
+        ),
         ({"zyte_api": False}, {"ZYTE_API_ON_ALL_REQUESTS": False}, {}, False),
         (
             {},
@@ -179,7 +207,7 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
                 "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
                 "ZYTE_API_ON_ALL_REQUESTS": False,
             },
-            {"browserHtml": True, "geolocation": "CA"},
+            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
             True,
         ),
         (
@@ -188,7 +216,7 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
                 "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
                 "ZYTE_API_ON_ALL_REQUESTS": False,
             },
-            {"browserHtml": True, "geolocation": "CA"},
+            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
             True,
         ),
         (
@@ -197,14 +225,33 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
                 "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
                 "ZYTE_API_ON_ALL_REQUESTS": False,
             },
-            {"browserHtml": True, "geolocation": "US", "javascript": True},
+            {
+                "browserHtml": True,
+                "geolocation": "US",
+                "javascript": True,
+                "httpResponseHeaders": True,
+            },
             True,
         ),
-
         # ZYTE_API_ON_ALL_REQUESTS=True
-        ({}, {"ZYTE_API_ON_ALL_REQUESTS": True}, {}, False),
-        ({"zyte_api": {}}, {"ZYTE_API_ON_ALL_REQUESTS": True}, {}, False),
-        ({"zyte_api": True}, {"ZYTE_API_ON_ALL_REQUESTS": True}, {}, False),
+        (
+            {},
+            {"ZYTE_API_ON_ALL_REQUESTS": True},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            True,
+        ),
+        (
+            {"zyte_api": {}},
+            {"ZYTE_API_ON_ALL_REQUESTS": True},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            True,
+        ),
+        (
+            {"zyte_api": True},
+            {"ZYTE_API_ON_ALL_REQUESTS": True},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            True,
+        ),
         ({"zyte_api": False}, {"ZYTE_API_ON_ALL_REQUESTS": True}, {}, False),
         (
             {},
@@ -212,7 +259,7 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
                 "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
                 "ZYTE_API_ON_ALL_REQUESTS": True,
             },
-            {"browserHtml": True, "geolocation": "CA"},
+            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
             True,
         ),
         (
@@ -239,7 +286,7 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
                 "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
                 "ZYTE_API_ON_ALL_REQUESTS": True,
             },
-            {"browserHtml": True, "geolocation": "CA"},
+            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
             True,
         ),
         (
@@ -248,7 +295,7 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
                 "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
                 "ZYTE_API_ON_ALL_REQUESTS": True,
             },
-            {"browserHtml": True, "geolocation": "CA"},
+            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
             True,
         ),
         (
@@ -257,7 +304,12 @@ async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mo
                 "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
                 "ZYTE_API_ON_ALL_REQUESTS": True,
             },
-            {"browserHtml": True, "geolocation": "US", "javascript": True},
+            {
+                "browserHtml": True,
+                "geolocation": "US",
+                "javascript": True,
+                "httpResponseHeaders": True,
+            },
             True,
         ),
     ],
@@ -526,7 +578,9 @@ async def test_higher_concurrency():
         ),
         (
             {
-                "meta": {"zyte_api": {"httpResponseBody": False, "newOutputType": True}},
+                "meta": {
+                    "zyte_api": {"httpResponseBody": False, "newOutputType": True}
+                },
             },
             {},
             {
@@ -587,9 +641,7 @@ async def test_higher_concurrency():
             },
             [],
         ),
-
         # METHOD
-
         # Request.method is mapped as is.
         *(
             (
@@ -704,9 +756,7 @@ async def test_higher_concurrency():
             },
             ["can only be set when the httpResponseBody parameter"],
         ),
-
         # HEADERS
-
         # Headers are mapped to requestHeaders or customHttpRequestHeaders
         # depending on whether or not httpResponseBody is declared.
         (
@@ -950,7 +1000,9 @@ async def test_higher_concurrency():
         # The Cookie header is dropped with a warning.
         (
             {
-                "headers": {"Cookie": "a=b",},
+                "headers": {
+                    "Cookie": "a=b",
+                },
             },
             {},
             {
@@ -961,7 +1013,9 @@ async def test_higher_concurrency():
         ),
         (
             {
-                "headers": {"Cookie": "a=b",},
+                "headers": {
+                    "Cookie": "a=b",
+                },
                 "meta": {"zyte_api": {"browserHtml": True}},
             },
             {},
@@ -1060,9 +1114,7 @@ async def test_higher_concurrency():
             },
             [],
         ),
-
         # BODY
-
         # The body is copied into httpRequestBody, base64-encoded.
         (
             {
@@ -1133,9 +1185,7 @@ async def test_higher_concurrency():
             },
             ["can only be set when the httpResponseBody parameter"],
         ),
-
         # httpResponseHeaders
-
         # Warn if httpResponseHeaders is defined unnecessarily.
         (
             {
@@ -1152,7 +1202,7 @@ async def test_higher_concurrency():
 )
 async def test_automap(
     request_kwargs: Dict[str, Any],
-    settings: Dict[str, str],
+    settings: Dict[str, Any],
     expected: Union[Dict[str, str], Literal[False]],
     warnings: List[str],
     mockserver,
