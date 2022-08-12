@@ -26,11 +26,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self, settings: Settings, crawler: Crawler, client: AsyncClient = None
     ):
         super().__init__(settings=settings, crawler=crawler)
-        enabled = settings.get("ZYTE_API_ENABLED")
-        if enabled is False:
+        if not settings.getbool("ZYTE_API_ENABLED", True):
             raise NotConfigured
-        self._enabled_by_default = enabled or False
-
         if not client:
             try:
                 client = AsyncClient(
@@ -62,6 +59,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
         self._session = create_session(connection_pool_size=self._client.n_conn)
         self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
+        self._all = settings.getbool("ZYTE_API_ALL")
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._prepare_api_params(request)
@@ -72,7 +70,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         return super().download_request(request, spider)
 
     def _prepare_api_params(self, request: Request) -> Optional[dict]:
-        meta_params = request.meta.get("zyte_api", self._enabled_by_default)
+        meta_params = request.meta.get("zyte_api", self._all)
         if meta_params is False:
             return None
         if not meta_params and meta_params != {}:

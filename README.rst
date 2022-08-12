@@ -201,23 +201,19 @@ the ``zyte_api`` meta key, with the values in meta taking priority.
 Controlling which requests go through Zyte Data API
 ---------------------------------------------------
 
-The ``ZYTE_API_ENABLED`` setting can be used to control whether all, none, or
-some requests go through Zyte Data API. It supports the following values:
+By default, only requests where the ``zyte_api`` key in Request.meta_ is set to
+``True`` or set to a dictionary go through Zyte Data API.
 
--   ``None`` (default): only requests where the ``zyte_api`` key in
-    Request.meta_ is set to ``True`` or set to a dictionary go through Zyte
-    Data API.
+.. _Request.meta: https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta
 
-    .. _Request.meta: https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta
+Set the ``ZYTE_API_ALL`` setting to ``True`` to make all requests go through
+Zyte Data API unless the ``zyte_api`` key in Request.meta_ is set to ``False``.
 
--   ``True``: all requests go through Zyte Data API, unless the ``zyte_api``
-    key in Request.meta_ is set to ``False``.
+Zyte Data API requests need parameters. If you set the ``zyte_api`` key in
+Request.meta_ or the ``ZYTE_API_ALL`` setting to ``True``, you must also
+:ref:`set default parameters <default-params>`.
 
--   ``False``: disables this plugin.
-
-Zyte Data API requests need parameters. You must either set those parameters in
-the ``zyte_api`` metadata key of every request or :ref:`set default parameters
-<default-params>`.
+Set the ``ZYTE_API_ENABLED`` setting to ``False`` to disable this plugin.
 
 
 Customizing the retry policy
