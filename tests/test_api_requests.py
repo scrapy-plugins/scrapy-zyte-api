@@ -12,6 +12,7 @@ from scrapy.http import Response, TextResponse
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
+from zyte_api.aio.errors import RequestError
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS
 from .mockserver import DelayedResource, MockServer, produce_request_response
@@ -209,7 +210,7 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]], mockserver):
         ),
         (
             {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
-            IgnoreRequest,
+            RequestError,
             "Got Zyte API error (status=422, type='/request/unprocessable') while processing URL (http://example.com): "
             "Incompatible parameters were found in the request.",
         ),

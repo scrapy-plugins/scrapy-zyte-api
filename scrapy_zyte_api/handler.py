@@ -147,7 +147,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"Got Zyte API error (status={er.status}, type={er.parsed.type!r}) "
                 f"while processing URL ({request.url}): {error_detail}"
             )
-            raise IgnoreRequest()
+            raise er
         except Exception as er:
             logger.error(
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
