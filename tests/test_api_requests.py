@@ -7,7 +7,7 @@ import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
-from scrapy.exceptions import IgnoreRequest, NotSupported
+from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.test import get_crawler
@@ -204,7 +204,7 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]], mockserver):
     [
         (
             {"zyte_api": {"echoData": Request("http://test.com")}},
-            IgnoreRequest,
+            TypeError,
             "Got an error when processing Zyte API request (http://example.com): "
             "Object of type Request is not JSON serializable",
         ),
