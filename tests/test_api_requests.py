@@ -209,6 +209,12 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]], mockserver):
             "Object of type Request is not JSON serializable",
         ),
         (
+            {"zyte_api": ["some", "bad", "non-dict", "value"]},
+            ValueError,
+            "'zyte_api' parameters in the request meta should be provided as "
+            "dictionary, got <class 'list'> instead. (<POST http://example.com>).",
+        ),
+        (
             {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
             RequestError,
             "Got Zyte API error (status=422, type='/request/unprocessable') while processing URL (http://example.com): "
@@ -225,9 +231,9 @@ async def test_exceptions(
 ):
     async with mockserver.make_handler() as handler:
         req = Request("http://example.com", method="POST", meta=meta)
-        api_params = handler._prepare_api_params(req)
 
         with pytest.raises(exception_type):  # NOQA
+            api_params = handler._prepare_api_params(req)
             await deferred_from_coro(
                 handler._download_request(api_params, req, Spider("test"))  # NOQA
             )  # NOQA

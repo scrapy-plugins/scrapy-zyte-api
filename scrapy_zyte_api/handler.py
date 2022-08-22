@@ -76,11 +76,11 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         api_params: Dict[str, Any] = self._zyte_api_default_params or {}
         try:
             api_params.update(meta_params)
-        except TypeError:
+        except ValueError:
             logger.error(
-                f"zyte_api parameters in the request meta should be "
+                f"'zyte_api' parameters in the request meta should be "
                 f"provided as dictionary, got {type(request.meta.get('zyte_api'))} "
-                f"instead ({request.url})."
+                f"instead. ({request})."
             )
             raise
         return api_params
