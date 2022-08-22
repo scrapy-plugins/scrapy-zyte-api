@@ -215,6 +215,12 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]], mockserver):
             "dictionary, got <class 'list'> instead. (<POST http://example.com>).",
         ),
         (
+            {"zyte_api": 1},
+            TypeError,
+            "'zyte_api' parameters in the request meta should be provided as "
+            "dictionary, got <class 'int'> instead. (<POST http://example.com>).",
+        ),
+        (
             {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
             RequestError,
             "Got Zyte API error (status=422, type='/request/unprocessable') while processing URL (http://example.com): "
