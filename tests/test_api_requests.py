@@ -7,11 +7,12 @@ import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
-from scrapy.exceptions import IgnoreRequest, NotSupported
+from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
+from zyte_api.aio.errors import RequestError
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS
 from .mockserver import DelayedResource, MockServer, produce_request_response
@@ -203,13 +204,25 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]], mockserver):
     [
         (
             {"zyte_api": {"echoData": Request("http://test.com")}},
-            IgnoreRequest,
+            TypeError,
             "Got an error when processing Zyte API request (http://example.com): "
             "Object of type Request is not JSON serializable",
         ),
         (
+            {"zyte_api": ["some", "bad", "non-dict", "value"]},
+            ValueError,
+            "'zyte_api' parameters in the request meta should be provided as "
+            "dictionary, got <class 'list'> instead. (<POST http://example.com>).",
+        ),
+        (
+            {"zyte_api": 1},
+            TypeError,
+            "'zyte_api' parameters in the request meta should be provided as "
+            "dictionary, got <class 'int'> instead. (<POST http://example.com>).",
+        ),
+        (
             {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
-            IgnoreRequest,
+            RequestError,
             "Got Zyte API error (status=422, type='/request/unprocessable') while processing URL (http://example.com): "
             "Incompatible parameters were found in the request.",
         ),
@@ -224,9 +237,9 @@ async def test_exceptions(
 ):
     async with mockserver.make_handler() as handler:
         req = Request("http://example.com", method="POST", meta=meta)
-        api_params = handler._prepare_api_params(req)
 
         with pytest.raises(exception_type):  # NOQA
+            api_params = handler._prepare_api_params(req)
             await deferred_from_coro(
                 handler._download_request(api_params, req, Spider("test"))  # NOQA
             )  # NOQA

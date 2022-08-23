@@ -4,7 +4,7 @@ from typing import Any, Dict, Generator, Optional, Union
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
-from scrapy.exceptions import IgnoreRequest, NotConfigured
+from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
@@ -76,13 +76,13 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         api_params: Dict[str, Any] = self._zyte_api_default_params or {}
         try:
             api_params.update(meta_params)
-        except TypeError:
+        except (ValueError, TypeError):
             logger.error(
-                f"zyte_api parameters in the request meta should be "
+                f"'zyte_api' parameters in the request meta should be "
                 f"provided as dictionary, got {type(request.meta.get('zyte_api'))} "
-                f"instead ({request.url})."
+                f"instead. ({request})."
             )
-            raise IgnoreRequest()
+            raise
         return api_params
 
     def _update_stats(self):
@@ -147,12 +147,12 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"Got Zyte API error (status={er.status}, type={er.parsed.type!r}) "
                 f"while processing URL ({request.url}): {error_detail}"
             )
-            raise IgnoreRequest()
+            raise
         except Exception as er:
             logger.error(
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
             )
-            raise IgnoreRequest()
+            raise
         finally:
             self._update_stats()
 
