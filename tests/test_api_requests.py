@@ -1,6 +1,6 @@
 import sys
 from asyncio import iscoroutine
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Dict, List, Union
 from unittest import mock
 
 import pytest
@@ -14,6 +14,7 @@ from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
+from typing_extensions import Literal
 from zyte_api.aio.errors import RequestError
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS
