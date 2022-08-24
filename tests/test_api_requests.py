@@ -1092,7 +1092,10 @@ async def test_higher_concurrency():
         # in the future.
         (
             {
-                "headers": {"User-Agent": ""},
+                "headers": {
+                    "Cookie": "",
+                    "User-Agent": "",
+                },
             },
             {
                 "ZYTE_API_UNSUPPORTED_HEADERS": ["Cookie"],
@@ -1104,7 +1107,9 @@ async def test_higher_concurrency():
                     {"name": "User-Agent", "value": ""},
                 ],
             },
-            [],
+            [
+                "defines header b'Cookie', which cannot be mapped",
+            ],
         ),
         # You may update the ZYTE_API_BROWSER_HEADERS setting to extend support
         # for new fields that the requestHeaders parameter may support in the
