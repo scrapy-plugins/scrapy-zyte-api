@@ -106,7 +106,7 @@ async def test_http_response_headers_request(
         (
             {},
             {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {"browserHtml": True, "geolocation": "CA"},
+            {},
             False,
         ),
         (
@@ -150,7 +150,7 @@ async def test_http_response_headers_request(
                 "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
                 "ZYTE_API_ON_ALL_REQUESTS": False,
             },
-            {"browserHtml": True, "geolocation": "CA"},
+            {},
             False,
         ),
         (
