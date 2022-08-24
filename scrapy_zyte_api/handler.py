@@ -8,6 +8,7 @@ from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
+from scrapy.utils.misc import load_object
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
@@ -56,6 +57,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
         self._session = create_session(connection_pool_size=self._client.n_conn)
         self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
+        if self._retry_policy:
+            self._retry_policy = load_object(self._retry_policy)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._prepare_api_params(request)
@@ -134,7 +137,11 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
             api_data["jobId"] = self._job_id
-        retrying = request.meta.get("zyte_api_retry_policy") or self._retry_policy
+        retrying = request.meta.get("zyte_api_retry_policy")
+        if retrying:
+            retrying = load_object(retrying)
+        else:
+            retrying = self._retry_policy
         try:
             api_response = await self._client.request_raw(
                 api_data,
