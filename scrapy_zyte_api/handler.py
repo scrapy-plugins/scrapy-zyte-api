@@ -127,8 +127,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             if headers is not None:
                 logger.warning(
                     f"Request {request} defines the Zyte Data API "
-                    f"customHttpRequestHeaders parameter. Use Request.headers "
-                    f"instead."
+                    f"customHttpRequestHeaders parameter, overriding "
+                    f"Request.headers. Use Request.headers instead."
                 )
             elif request.headers:
                 headers = []
@@ -156,7 +156,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             if headers is not None:
                 logger.warning(
                     f"Request {request} defines the Zyte Data API "
-                    f"requestHeaders parameter. Use Request.headers instead."
+                    f"requestHeaders parameter, overriding Request.headers. "
+                    f"Use Request.headers instead."
                 )
             elif request.headers:
                 request_headers = {}
@@ -198,9 +199,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             if api_params.get("httpResponseHeaders") is True:
                 logger.warning(
                     "You do not need to set httpResponseHeaders to True if "
-                    "you httpResponseBody or browserHtml to True. Note that "
-                    "httpResponseBody is set to True automatically if neither "
-                    "browserHtml nor screenshot are set to True."
+                    "you set httpResponseBody or browserHtml to True. Note "
+                    "that httpResponseBody is set to True automatically if "
+                    "neither browserHtml nor screenshot are set to True."
                 )
             api_params.setdefault("httpResponseHeaders", True)
 
@@ -208,7 +209,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if method:
             logger.warning(
                 f"Request {request} uses the Zyte Data API httpRequestMethod "
-                f"parameter. Use Request.method instead."
+                f"parameter, overriding Request.method. Use Request.method "
+                f"instead."
             )
             if method != request.method:
                 logger.warning(
@@ -233,7 +235,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if body:
             logger.warning(
                 f"Request {request} uses the Zyte Data API httpRequestBody "
-                f"parameter. Use Request.body instead."
+                f"parameter, overriding Request.body. Use Request.body "
+                f"instead."
             )
             decoded_body = b64decode(body)
             if decoded_body != request.body:
