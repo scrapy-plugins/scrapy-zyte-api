@@ -2,6 +2,7 @@ import sys
 from asyncio import iscoroutine
 from typing import Any, Dict, List, Union
 from unittest import mock
+from unittest.mock import patch
 
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
@@ -16,6 +17,8 @@ from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
 from typing_extensions import Literal
 from zyte_api.aio.errors import RequestError
+
+from scrapy_zyte_api.handler import _get_api_params
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS
 from .mockserver import DelayedResource, MockServer, produce_request_response
@@ -406,18 +409,6 @@ async def test_coro_handling(meta: Dict[str, Dict[str, Any]], mockserver):
             "Object of type Request is not JSON serializable",
         ),
         (
-            {"zyte_api": ["some", "bad", "non-dict", "value"]},
-            ValueError,
-            "'zyte_api' parameters in the request meta should be provided as "
-            "dictionary, got <class 'list'> instead. (<POST http://example.com>).",
-        ),
-        (
-            {"zyte_api": 1},
-            TypeError,
-            "'zyte_api' parameters in the request meta should be provided as "
-            "dictionary, got <class 'int'> instead. (<POST http://example.com>).",
-        ),
-        (
             {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
             RequestError,
             "Got Zyte API error (status=422, type='/request/unprocessable') while processing URL (http://example.com): "
@@ -436,7 +427,14 @@ async def test_exceptions(
         req = Request("http://example.com", method="POST", meta=meta)
 
         with pytest.raises(exception_type):  # NOQA
-            api_params = handler._prepare_api_params(req)
+            api_params = _get_api_params(
+                req,
+                use_api_by_default=handler._on_all_requests,
+                automap_by_default=handler._automap,
+                default_params=handler._zyte_api_default_params,
+                unsupported_headers=handler._unsupported_headers,
+                browser_headers=handler._browser_headers,
+            )
             await deferred_from_coro(
                 handler._download_request(api_params, req, Spider("test"))  # NOQA
             )  # NOQA
@@ -456,7 +454,14 @@ async def test_job_id(job_id, mockserver):
             method="POST",
             meta={"zyte_api": {"browserHtml": True}},
         )
-        api_params = handler._prepare_api_params(req)
+        api_params = _get_api_params(
+            req,
+            use_api_by_default=handler._on_all_requests,
+            automap_by_default=handler._automap,
+            default_params=handler._zyte_api_default_params,
+            unsupported_headers=handler._unsupported_headers,
+            browser_headers=handler._browser_headers,
+        )
         resp = await deferred_from_coro(
             handler._download_request(api_params, req, Spider("test"))  # NOQA
         )
@@ -1286,3 +1291,151 @@ async def test_automap(
                 assert warning in caplog.text
         else:
             assert not caplog.records
+
+
+_UNSUPPORTED_HEADERS = {b"cookie", b"user-agent"}
+_BROWSER_HEADERS = {b"referer": "referer"}
+
+
+@ensureDeferred
+async def test_get_api_params_input_default(mockserver):
+    request = Request(url="https://example.com")
+    async with mockserver.make_handler() as handler:
+        patch_path = "scrapy_zyte_api.handler._get_api_params"
+        with patch(patch_path) as _get_api_params:
+            _get_api_params.side_effect = RuntimeError("That’s it!")
+            with pytest.raises(RuntimeError):
+                await handler.download_request(request, None)
+            _get_api_params.assert_called_once_with(
+                request,
+                use_api_by_default=False,
+                automap_by_default=True,
+                default_params={},
+                unsupported_headers=_UNSUPPORTED_HEADERS,
+                browser_headers=_BROWSER_HEADERS,
+            )
+
+
+@ensureDeferred
+async def test_get_api_params_input_custom(mockserver):
+    request = Request(url="https://example.com")
+    settings = {
+        "ZYTE_API_AUTOMAP": False,
+        "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
+        "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
+        "ZYTE_API_ON_ALL_REQUESTS": True,
+        "ZYTE_API_UNSUPPORTED_HEADERS": {"A"},
+    }
+    async with mockserver.make_handler(settings) as handler:
+        patch_path = "scrapy_zyte_api.handler._get_api_params"
+        with patch(patch_path) as _get_api_params:
+            _get_api_params.side_effect = RuntimeError("That’s it!")
+            with pytest.raises(RuntimeError):
+                await handler.download_request(request, None)
+            _get_api_params.assert_called_once_with(
+                request,
+                use_api_by_default=True,
+                automap_by_default=False,
+                default_params={"a": "b"},
+                unsupported_headers={b"a"},
+                browser_headers={b"b": "b"},
+            )
+
+
+_UNSET = object()
+
+
+@ensureDeferred
+@pytest.mark.parametrize(
+    "setting,meta,expected",
+    [
+        (False, _UNSET, None),
+        (False, False, None),
+        (False, True, {}),
+        (False, {}, {}),
+        (False, {"a": "b"}, {"a": "b"}),
+        (True, _UNSET, {}),
+        (True, False, None),
+        (True, True, {}),
+        (True, {}, {}),
+        (True, {"a": "b"}, {"a": "b"}),
+    ],
+)
+async def test_get_api_params_toggling(setting, meta, expected):
+    request = Request(url="https://example.com")
+    if meta is not _UNSET:
+        request.meta["zyte_api"] = meta
+    api_params = _get_api_params(
+        request,
+        use_api_by_default=setting,
+        automap_by_default=False,
+        default_params={},
+        unsupported_headers=_UNSUPPORTED_HEADERS,
+        browser_headers=_BROWSER_HEADERS,
+    )
+    assert api_params == expected
+
+
+@ensureDeferred
+@pytest.mark.parametrize("setting", [False, True])
+@pytest.mark.parametrize("meta", [None, 0, "", b"", []])
+async def test_get_api_params_disabling_deprecated(setting, meta):
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
+        api_params = _get_api_params(
+            request,
+            use_api_by_default=setting,
+            automap_by_default=False,
+            default_params={},
+            unsupported_headers=_UNSUPPORTED_HEADERS,
+            browser_headers=_BROWSER_HEADERS,
+        )
+    assert api_params is None
+
+
+@ensureDeferred
+@pytest.mark.parametrize(
+    "default_params,meta,expected",
+    [
+        ({}, {}, {}),
+        ({}, {"b": 2}, {"b": 2}),
+        ({"a": 1}, {}, {"a": 1}),
+        ({"a": 1}, {"b": 2}, {"a": 1, "b": 2}),
+        ({"a": 1}, {"a": 2}, {"a": 2}),
+    ],
+)
+async def test_get_api_params_default_params_merging(default_params, meta, expected):
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    api_params = _get_api_params(
+        request,
+        use_api_by_default=False,
+        automap_by_default=False,
+        default_params=default_params,
+        unsupported_headers=_UNSUPPORTED_HEADERS,
+        browser_headers=_BROWSER_HEADERS,
+    )
+    assert api_params == expected
+
+
+@ensureDeferred
+@pytest.mark.parametrize(
+    "meta,exception",
+    [
+        (1, TypeError),
+        (["a", "b"], ValueError),
+    ],
+)
+async def test_get_api_params_bad_meta_type(meta, exception):
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    with pytest.raises(exception):
+        _get_api_params(
+            request,
+            use_api_by_default=False,
+            automap_by_default=False,
+            default_params={},
+            unsupported_headers=_UNSUPPORTED_HEADERS,
+            browser_headers=_BROWSER_HEADERS,
+        )

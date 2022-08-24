@@ -1,6 +1,6 @@
 import logging
 from base64 import b64decode, b64encode
-from typing import Any, Dict, Generator, Optional, Union
+from typing import Any, Dict, Generator, Optional, Set, Union
 from warnings import warn
 
 from scrapy import Spider
@@ -23,6 +23,214 @@ from zyte_api.constants import API_URL
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 
 logger = logging.getLogger(__name__)
+
+
+def _update_api_params_from_request_headers(
+    api_params: Dict[str, Any],
+    request: Request,
+    *,
+    unsupported_headers: Set[str],
+    browser_headers: Dict[str, str],
+):
+    """Updates *api_params*, in place, based on *request*."""
+    response_body = api_params.get("httpResponseBody")
+    if response_body:
+        headers = api_params.get("customHttpRequestHeaders")
+        if headers is not None:
+            logger.warning(
+                f"Request {request} defines the Zyte Data API "
+                f"customHttpRequestHeaders parameter, overriding "
+                f"Request.headers. Use Request.headers instead."
+            )
+        elif request.headers:
+            headers = []
+            for k, v in request.headers.items():
+                if not v:
+                    continue
+                v = b",".join(v).decode()
+                lowercase_k = k.strip().lower()
+                if lowercase_k in unsupported_headers:
+                    if lowercase_k != b"user-agent" or v != DEFAULT_USER_AGENT:
+                        logger.warning(
+                            f"Request {request} defines header {k}, which "
+                            f"cannot be mapped into the Zyte Data API "
+                            f"customHttpRequestHeaders parameter."
+                        )
+                    continue
+                k = k.decode()
+                headers.append({"name": k, "value": v})
+            if headers:
+                api_params["customHttpRequestHeaders"] = headers
+    if not response_body or any(
+        api_params.get(k) for k in ("browserHtml", "screenshot")
+    ):
+        headers = api_params.get("requestHeaders")
+        if headers is not None:
+            logger.warning(
+                f"Request {request} defines the Zyte Data API "
+                f"requestHeaders parameter, overriding Request.headers. "
+                f"Use Request.headers instead."
+            )
+        elif request.headers:
+            request_headers = {}
+            for k, v in request.headers.items():
+                if not v:
+                    continue
+                v = b",".join(v).decode()
+                lowercase_k = k.strip().lower()
+                key = browser_headers.get(lowercase_k)
+                if key is not None:
+                    request_headers[key] = v
+                elif not (
+                    (
+                        lowercase_k == b"accept"
+                        and v == DEFAULT_REQUEST_HEADERS["Accept"]
+                    )
+                    or (
+                        lowercase_k == b"accept-language"
+                        and v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
+                    )
+                    or (lowercase_k == b"user-agent" and v == DEFAULT_USER_AGENT)
+                ):
+                    logger.warning(
+                        f"Request {request} defines header {k}, which "
+                        f"cannot be mapped into the Zyte Data API "
+                        f"requestHeaders parameter."
+                    )
+            if request_headers:
+                api_params["requestHeaders"] = request_headers
+
+
+def _update_api_params_from_request(
+    api_params: Dict[str, Any],
+    request: Request,
+    *,
+    unsupported_headers: Set[str],
+    browser_headers: Dict[str, str],
+):
+    if not any(
+        api_params.get(k) for k in ("httpResponseBody", "browserHtml", "screenshot")
+    ):
+        api_params.setdefault("httpResponseBody", True)
+    response_body = api_params.get("httpResponseBody")
+
+    if any(api_params.get(k) for k in ("httpResponseBody", "browserHtml")):
+        if api_params.get("httpResponseHeaders") is True:
+            logger.warning(
+                "You do not need to set httpResponseHeaders to True if "
+                "you set httpResponseBody or browserHtml to True. Note "
+                "that httpResponseBody is set to True automatically if "
+                "neither browserHtml nor screenshot are set to True."
+            )
+        api_params.setdefault("httpResponseHeaders", True)
+
+    method = api_params.get("httpRequestMethod")
+    if method:
+        logger.warning(
+            f"Request {request} uses the Zyte Data API httpRequestMethod "
+            f"parameter, overriding Request.method. Use Request.method "
+            f"instead."
+        )
+        if method != request.method:
+            logger.warning(
+                f"The HTTP method of request {request} ({request.method}) "
+                f"does not match the Zyte Data API httpRequestMethod "
+                f"parameter ({method})."
+            )
+    elif request.method != "GET":
+        if response_body:
+            api_params["httpRequestMethod"] = request.method
+        else:
+            logger.warning(
+                f"The HTTP method of request {request} ({request.method}) "
+                f"is being ignored. The httpRequestMethod parameter of "
+                f"Zyte Data API can only be set when the httpResponseBody "
+                f"parameter is True."
+            )
+
+    _update_api_params_from_request_headers(
+        api_params,
+        request,
+        unsupported_headers=unsupported_headers,
+        browser_headers=browser_headers,
+    )
+
+    body = api_params.get("httpRequestBody")
+    if body:
+        logger.warning(
+            f"Request {request} uses the Zyte Data API httpRequestBody "
+            f"parameter, overriding Request.body. Use Request.body "
+            f"instead."
+        )
+        decoded_body = b64decode(body)
+        if decoded_body != request.body:
+            logger.warning(
+                f"The body of request {request} ({request.body!r}) "
+                f"does not match the Zyte Data API httpRequestBody "
+                f"parameter ({body!r}; decoded: {decoded_body!r})."
+            )
+    elif request.body != b"":
+        if response_body:
+            base64_body = b64encode(request.body).decode()
+            api_params["httpRequestBody"] = base64_body
+        else:
+            logger.warning(
+                f"The body of request {request} ({request.body!r}) "
+                f"is being ignored. The httpRequestBody parameter of "
+                f"Zyte Data API can only be set when the httpResponseBody "
+                f"parameter is True."
+            )
+
+    return api_params
+
+
+def _get_api_params(
+    request: Request,
+    *,
+    use_api_by_default: bool,
+    automap_by_default: bool,
+    default_params: Optional[Dict[str, Any]],
+    unsupported_headers: Set[str],
+    browser_headers: Dict[str, str],
+) -> Optional[dict]:
+    """Returns a dictionary of API parameters that must be sent to Zyte Data
+    API for the specified request, or None if the request should not be driven
+    through Zyte Data API."""
+    meta_params = request.meta.get("zyte_api", use_api_by_default)
+    if meta_params is False:
+        return None
+
+    if not meta_params and meta_params != {}:
+        warn(
+            f"Setting the zyte_api request metadata key to "
+            f"{meta_params!r} is deprecated. Use False instead.",
+            DeprecationWarning,
+        )
+        return None
+
+    if meta_params is True:
+        meta_params = {}
+
+    api_params: Dict[str, Any] = default_params or {}
+    try:
+        api_params.update(meta_params)
+    except (ValueError, TypeError):
+        actual_type = type(request.meta.get("zyte_api"))
+        logger.error(
+            f"'zyte_api' parameters in the request meta should be provided as "
+            f"a dictionary, got {actual_type} instead ({request})."
+        )
+        raise
+
+    if request.meta.get("zyte_api_automap", automap_by_default):
+        _update_api_params_from_request(
+            api_params,
+            request,
+            unsupported_headers=unsupported_headers,
+            browser_headers=browser_headers,
+        )
+
+    return api_params
 
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
@@ -83,181 +291,19 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         }
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
-        api_params = self._prepare_api_params(request)
+        api_params = _get_api_params(
+            request,
+            use_api_by_default=self._on_all_requests,
+            automap_by_default=self._automap,
+            default_params=self._zyte_api_default_params,
+            unsupported_headers=self._unsupported_headers,
+            browser_headers=self._browser_headers,
+        )
         if api_params:
             return deferred_from_coro(
                 self._download_request(api_params, request, spider)
             )
         return super().download_request(request, spider)
-
-    def _prepare_api_params(self, request: Request) -> Optional[dict]:
-        meta_params = request.meta.get("zyte_api", self._on_all_requests)
-        if meta_params is False:
-            return None
-        if not meta_params and meta_params != {}:
-            warn(
-                f"Setting the zyte_api request metadata key to "
-                f"{meta_params!r} is deprecated. Use False instead.",
-                DeprecationWarning,
-            )
-            return None
-        if meta_params is True:
-            meta_params = {}
-
-        api_params: Dict[str, Any] = self._zyte_api_default_params or {}
-        try:
-            api_params.update(meta_params)
-        except (ValueError, TypeError):
-            logger.error(
-                f"'zyte_api' parameters in the request meta should be "
-                f"provided as dictionary, got {type(request.meta.get('zyte_api'))} "
-                f"instead. ({request})."
-            )
-            raise
-
-        if request.meta.get("zyte_api_automap", self._automap):
-            self._map_params(api_params, request)
-
-        return api_params
-
-    def _map_headers(self, api_params, request):
-        response_body = api_params.get("httpResponseBody")
-        if response_body:
-            headers = api_params.get("customHttpRequestHeaders")
-            if headers is not None:
-                logger.warning(
-                    f"Request {request} defines the Zyte Data API "
-                    f"customHttpRequestHeaders parameter, overriding "
-                    f"Request.headers. Use Request.headers instead."
-                )
-            elif request.headers:
-                headers = []
-                for k, v in request.headers.items():
-                    if not v:
-                        continue
-                    v = b",".join(v).decode()
-                    lowercase_k = k.strip().lower()
-                    if lowercase_k in self._unsupported_headers:
-                        if lowercase_k != b"user-agent" or v != DEFAULT_USER_AGENT:
-                            logger.warning(
-                                f"Request {request} defines header {k}, which "
-                                f"cannot be mapped into the Zyte Data API "
-                                f"customHttpRequestHeaders parameter."
-                            )
-                        continue
-                    k = k.decode()
-                    headers.append({"name": k, "value": v})
-                if headers:
-                    api_params["customHttpRequestHeaders"] = headers
-        if not response_body or any(
-            api_params.get(k) for k in ("browserHtml", "screenshot")
-        ):
-            headers = api_params.get("requestHeaders")
-            if headers is not None:
-                logger.warning(
-                    f"Request {request} defines the Zyte Data API "
-                    f"requestHeaders parameter, overriding Request.headers. "
-                    f"Use Request.headers instead."
-                )
-            elif request.headers:
-                request_headers = {}
-                for k, v in request.headers.items():
-                    if not v:
-                        continue
-                    v = b",".join(v).decode()
-                    lowercase_k = k.strip().lower()
-                    key = self._browser_headers.get(lowercase_k)
-                    if key is not None:
-                        request_headers[key] = v
-                    elif not (
-                        (
-                            lowercase_k == b"accept"
-                            and v == DEFAULT_REQUEST_HEADERS["Accept"]
-                        )
-                        or (
-                            lowercase_k == b"accept-language"
-                            and v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
-                        )
-                        or (lowercase_k == b"user-agent" and v == DEFAULT_USER_AGENT)
-                    ):
-                        logger.warning(
-                            f"Request {request} defines header {k}, which "
-                            f"cannot be mapped into the Zyte Data API "
-                            f"requestHeaders parameter."
-                        )
-                if request_headers:
-                    api_params["requestHeaders"] = request_headers
-
-    def _map_params(self, api_params, request):
-        if not any(
-            api_params.get(k) for k in ("httpResponseBody", "browserHtml", "screenshot")
-        ):
-            api_params.setdefault("httpResponseBody", True)
-        response_body = api_params.get("httpResponseBody")
-
-        if any(api_params.get(k) for k in ("httpResponseBody", "browserHtml")):
-            if api_params.get("httpResponseHeaders") is True:
-                logger.warning(
-                    "You do not need to set httpResponseHeaders to True if "
-                    "you set httpResponseBody or browserHtml to True. Note "
-                    "that httpResponseBody is set to True automatically if "
-                    "neither browserHtml nor screenshot are set to True."
-                )
-            api_params.setdefault("httpResponseHeaders", True)
-
-        method = api_params.get("httpRequestMethod")
-        if method:
-            logger.warning(
-                f"Request {request} uses the Zyte Data API httpRequestMethod "
-                f"parameter, overriding Request.method. Use Request.method "
-                f"instead."
-            )
-            if method != request.method:
-                logger.warning(
-                    f"The HTTP method of request {request} ({request.method}) "
-                    f"does not match the Zyte Data API httpRequestMethod "
-                    f"parameter ({method})."
-                )
-        elif request.method != "GET":
-            if response_body:
-                api_params["httpRequestMethod"] = request.method
-            else:
-                logger.warning(
-                    f"The HTTP method of request {request} ({request.method}) "
-                    f"is being ignored. The httpRequestMethod parameter of "
-                    f"Zyte Data API can only be set when the httpResponseBody "
-                    f"parameter is True."
-                )
-
-        self._map_headers(api_params, request)
-
-        body = api_params.get("httpRequestBody")
-        if body:
-            logger.warning(
-                f"Request {request} uses the Zyte Data API httpRequestBody "
-                f"parameter, overriding Request.body. Use Request.body "
-                f"instead."
-            )
-            decoded_body = b64decode(body)
-            if decoded_body != request.body:
-                logger.warning(
-                    f"The body of request {request} ({request.body!r}) "
-                    f"does not match the Zyte Data API httpRequestBody "
-                    f"parameter ({body!r}; decoded: {decoded_body!r})."
-                )
-        elif request.body != b"":
-            if response_body:
-                base64_body = b64encode(request.body).decode()
-                api_params["httpRequestBody"] = base64_body
-            else:
-                logger.warning(
-                    f"The body of request {request} ({request.body!r}) "
-                    f"is being ignored. The httpRequestBody parameter of "
-                    f"Zyte Data API can only be set when the httpResponseBody "
-                    f"parameter is True."
-                )
-
-        return api_params
 
     def _update_stats(self):
         prefix = "scrapy-zyte-api"
