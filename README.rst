@@ -60,6 +60,9 @@ Here's an example of the things needed inside a Scrapy project's ``settings.py``
 
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
+The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
+``False`` to disable this plugin.
+
 Usage
 -----
 
@@ -213,9 +216,6 @@ go through Zyte Data API unless the ``zyte_api`` key in Request.meta_ is set to
 Zyte Data API requests need parameters. If you set the ``zyte_api`` key in
 Request.meta_ or the ``ZYTE_API_ON_ALL_REQUESTS`` setting to ``True``, you must
 also :ref:`set default parameters <default-params>`.
-
-Set the ``ZYTE_API_ENABLED`` setting to ``False`` to disable this plugin.
-``ZYTE_API_ENABLED`` is ``True`` by default.
 
 
 Customizing the retry policy
