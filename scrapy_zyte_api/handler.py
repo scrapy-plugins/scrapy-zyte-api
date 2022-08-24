@@ -115,7 +115,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             )
             raise
 
-        if self._automap:
+        if request.meta.get("zyte_api_automap", self._automap):
             self._map_params(api_params, request)
 
         return api_params

@@ -527,13 +527,14 @@ async def test_higher_concurrency():
     "request_kwargs,settings,expected,warnings",
     [
         # Automatic mapping of request parameters to Zyte Data API parameters
-        # is enabled by default, but can be disabled.
+        # is enabled by default, but can be disabled, either globally or per
+        # request.
         #
         # httpResponseBody is set to True if no other main content is
         # requested.
         *(
             (
-                {},
+                request_kwargs,
                 settings,
                 {
                     "httpResponseBody": True,
@@ -541,14 +542,24 @@ async def test_higher_concurrency():
                 },
                 [],
             )
-            for settings in (
-                {},
-                {"ZYTE_API_AUTOMAP": True},
+            for request_kwargs, settings in (
+                ({}, {}),
+                ({}, {"ZYTE_API_AUTOMAP": True}),
+                (
+                    {"meta": {"zyte_api_automap": True}},
+                    {"ZYTE_API_AUTOMAP": False},
+                ),
             )
         ),
         (
             {},
             {"ZYTE_API_AUTOMAP": False},
+            False,
+            [],
+        ),
+        (
+            {"meta": {"zyte_api_automap": False}},
+            {},
             False,
             [],
         ),
