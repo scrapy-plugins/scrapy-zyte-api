@@ -10,6 +10,7 @@ from scrapy.exceptions import NotConfigured
 from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
+from zyte_api.aio.retry import RetryFactory
 from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
@@ -175,15 +176,38 @@ def test_custom_client():
     assert handler._client != AsyncClient(api_key="a", api_url="b")
 
 
+RETRY_POLICY_A = RetryFactory().build()
+RETRY_POLICY_B = RetryFactory().build()
+assert RETRY_POLICY_A != RETRY_POLICY_B
+
+
 @ensureDeferred
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
 @pytest.mark.parametrize(
     "settings,meta,expected",
     [
         ({}, {}, None),
-        ({"ZYTE_API_RETRY_POLICY": "a"}, {}, "a"),
-        ({}, {"zyte_api_retry_policy": "b"}, "b"),
-        ({"ZYTE_API_RETRY_POLICY": "a"}, {"zyte_api_retry_policy": "b"}, "b"),
+        (
+            {"ZYTE_API_RETRY_POLICY": "tests.test_handler.RETRY_POLICY_A"},
+            {},
+            RETRY_POLICY_A,
+        ),
+        ({}, {"zyte_api_retry_policy": RETRY_POLICY_B}, RETRY_POLICY_B),
+        (
+            {},
+            {"zyte_api_retry_policy": "tests.test_handler.RETRY_POLICY_B"},
+            RETRY_POLICY_B,
+        ),
+        (
+            {"ZYTE_API_RETRY_POLICY": "tests.test_handler.RETRY_POLICY_A"},
+            {"zyte_api_retry_policy": RETRY_POLICY_B},
+            RETRY_POLICY_B,
+        ),
+        (
+            {"ZYTE_API_RETRY_POLICY": "tests.test_handler.RETRY_POLICY_A"},
+            {"zyte_api_retry_policy": "tests.test_handler.RETRY_POLICY_B"},
+            RETRY_POLICY_B,
+        ),
     ],
 )
 async def test_retry_policy(
@@ -225,37 +249,37 @@ async def test_stats(mockserver):
         await handler.download_request(request, None)
 
         assert set(scrapy_stats.get_stats()) == {
-            f'scrapy-zyte-api/{stat}'
+            f"scrapy-zyte-api/{stat}"
             for stat in (
-                '429',
-                'attempts',
-                'error_ratio',
-                'errors',
-                'fatal_errors',
-                'mean_connection_seconds',
-                'mean_response_seconds',
-                'processed',
-                'status_codes/200',
-                'success_ratio',
-                'success',
-                'throttle_ratio',
+                "429",
+                "attempts",
+                "error_ratio",
+                "errors",
+                "fatal_errors",
+                "mean_connection_seconds",
+                "mean_response_seconds",
+                "processed",
+                "status_codes/200",
+                "success_ratio",
+                "success",
+                "throttle_ratio",
             )
         }
         for suffix, value in (
-            ('429', 0),
-            ('attempts', 1),
-            ('error_ratio', 0.0),
-            ('errors', 0),
-            ('fatal_errors', 0),
-            ('processed', 1),
-            ('status_codes/200', 1),
-            ('success_ratio', 1.0),
-            ('success', 1),
-            ('throttle_ratio', 0.0),
+            ("429", 0),
+            ("attempts", 1),
+            ("error_ratio", 0.0),
+            ("errors", 0),
+            ("fatal_errors", 0),
+            ("processed", 1),
+            ("status_codes/200", 1),
+            ("success_ratio", 1.0),
+            ("success", 1),
+            ("throttle_ratio", 0.0),
         ):
             stat = f"scrapy-zyte-api/{suffix}"
             assert scrapy_stats.get_value(stat) == value
-        for name in ('connection', 'response'):
+        for name in ("connection", "response"):
             stat = f"scrapy-zyte-api/mean_{name}_seconds"
             value = scrapy_stats.get_value(stat)
             assert isinstance(value, float)
