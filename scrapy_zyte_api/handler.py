@@ -91,29 +91,29 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def _update_stats(self):
         prefix = "scrapy-zyte-api"
         for stat in (
-            '429',
-            'attempts',
-            'errors',
-            'fatal_errors',
-            'processed',
-            'success',
+            "429",
+            "attempts",
+            "errors",
+            "fatal_errors",
+            "processed",
+            "success",
         ):
             self._stats.set_value(
                 f"{prefix}/{stat}",
                 getattr(self._client.agg_stats, f"n_{stat}"),
             )
         for stat in (
-            'error_ratio',
-            'success_ratio',
-            'throttle_ratio',
+            "error_ratio",
+            "success_ratio",
+            "throttle_ratio",
         ):
             self._stats.set_value(
                 f"{prefix}/{stat}",
                 getattr(self._client.agg_stats, stat)(),
             )
         for source, target in (
-            ('connect', 'connection'),
-            ('total', 'response'),
+            ("connect", "connection"),
+            ("total", "response"),
         ):
             self._stats.set_value(
                 f"{prefix}/mean_{target}_seconds",
@@ -126,7 +126,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 error_type = f"/{error_type}"
             self._stats.set_value(f"{prefix}/error_types{error_type}", count)
 
-        for counter in ('exception_types', 'status_codes',):
+        for counter in (
+            "exception_types",
+            "status_codes",
+        ):
             for key, value in getattr(self._client.agg_stats, counter).items():
                 self._stats.set_value(f"{prefix}/{counter}/{key}", value)
 
