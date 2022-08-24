@@ -957,6 +957,17 @@ async def test_higher_concurrency():
         (
             {
                 "headers": {"a": None},
+            },
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {
+                "headers": {"a": None},
                 "meta": {"zyte_api": {"browserHtml": True}},
             },
             {},
