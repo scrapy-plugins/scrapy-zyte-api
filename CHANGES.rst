@@ -10,8 +10,8 @@ Changes
 * Zyte Data API error responses (after retries) are no longer ignored, and
   instead raise a ``zyte_api.aio.errors.RequestError`` exception, which allows
   user-side handling of errors and provides better feedback for debugging.
-* Fixed the naming of stats for some error types
-* Updated the output examples on the README
+* Fixed the naming of stats for some error types.
+* Updated the output examples on the README.
 
 0.4.2 (2022-08-03)
 ------------------
