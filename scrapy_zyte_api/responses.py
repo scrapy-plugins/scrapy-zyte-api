@@ -18,6 +18,7 @@ class ZyteAPIMixin:
     }
 
     def __init__(self, *args, raw_api_response: Dict = None, **kwargs):
+        super().__init__(*args, **kwargs)
         self._raw_api_response = raw_api_response
 
     def replace(self, *args, **kwargs):

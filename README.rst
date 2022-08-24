@@ -60,6 +60,9 @@ Here's an example of the things needed inside a Scrapy project's ``settings.py``
 
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
+The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
+``False`` to disable this plugin.
+
 Usage
 -----
 
@@ -214,9 +217,6 @@ Zyte Data API requests need parameters. If you set the ``zyte_api`` key in
 Request.meta_ or the ``ZYTE_API_ON_ALL_REQUESTS`` setting to ``True``, you must
 also :ref:`set default parameters <default-params>`.
 
-Set the ``ZYTE_API_ENABLED`` setting to ``False`` to disable this plugin.
-``ZYTE_API_ENABLED`` is ``True`` by default.
-
 
 Customizing the retry policy
 ----------------------------
@@ -233,10 +233,20 @@ custom retry policy.
 
 A custom retry policy must be an instance of `tenacity.AsyncRetrying`_.
 
+Scrapy settings must be picklable, which `retry policies are not
+<https://github.com/jd/tenacity/issues/147>`_, so you cannot assign retry
+policy objects directly to the ``ZYTE_API_RETRY_POLICY`` setting, and must use
+their import path string instead.
+
+When setting a retry policy through request metadata, you can assign the
+``zyte_api_retry_policy`` request meta key either the retry policy object
+itself or its import path string. If you need your requests to be serializable,
+however, you may also need to use the import path string.
+
 For example, to also retry HTTP 521 errors the same as HTTP 520 errors, you can
 subclass RetryFactory_ as follows::
 
-    # settings.py
+    # project/retry_policies.py
     from tenacity import retry_if_exception
     from zyte_api.aio.retry import RetryFactory
 
@@ -260,7 +270,10 @@ subclass RetryFactory_ as follows::
                 return self.temporary_download_error_stop(retry_state)
             return super().stop(retry_state)
 
-    ZYTE_API_RETRY_POLICY = CustomRetryFactory().build()
+    CUSTOM_RETRY_POLICY = CustomRetryFactory().build()
+
+    # project/settings.py
+    ZYTE_API_RETRY_POLICY = "project.retry_policies.CUSTOM_RETRY_POLICY"
 
 .. _python-zyte-api: https://github.com/zytedata/python-zyte-api
 .. _RetryFactory: https://github.com/zytedata/python-zyte-api/blob/main/zyte_api/aio/retry.py

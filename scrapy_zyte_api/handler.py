@@ -6,12 +6,13 @@ from warnings import warn
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
-from scrapy.exceptions import IgnoreRequest, NotConfigured
+from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from scrapy.utils.defer import deferred_from_coro
+from scrapy.utils.misc import load_object
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
@@ -62,6 +63,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
         self._session = create_session(connection_pool_size=self._client.n_conn)
         self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
+        if self._retry_policy:
+            self._retry_policy = load_object(self._retry_policy)
         self._on_all_requests = settings.getbool("ZYTE_API_ON_ALL_REQUESTS")
         self._automap = settings.getbool("ZYTE_API_AUTOMAP", True)
         self._unsupported_headers = {
@@ -104,13 +107,13 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         api_params: Dict[str, Any] = self._zyte_api_default_params or {}
         try:
             api_params.update(meta_params)
-        except TypeError:
+        except (ValueError, TypeError):
             logger.error(
-                f"zyte_api parameters in the request meta should be "
+                f"'zyte_api' parameters in the request meta should be "
                 f"provided as dictionary, got {type(request.meta.get('zyte_api'))} "
-                f"instead ({request.url})."
+                f"instead. ({request})."
             )
-            raise IgnoreRequest()
+            raise
 
         if self._automap:
             self._map_params(api_params, request)
@@ -305,7 +308,11 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
             api_data["jobId"] = self._job_id
-        retrying = request.meta.get("zyte_api_retry_policy") or self._retry_policy
+        retrying = request.meta.get("zyte_api_retry_policy")
+        if retrying:
+            retrying = load_object(retrying)
+        else:
+            retrying = self._retry_policy
         try:
             api_response = await self._client.request_raw(
                 api_data,
@@ -318,12 +325,12 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"Got Zyte API error (status={er.status}, type={er.parsed.type!r}) "
                 f"while processing URL ({request.url}): {error_detail}"
             )
-            raise IgnoreRequest()
+            raise
         except Exception as er:
             logger.error(
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
             )
-            raise IgnoreRequest()
+            raise
         finally:
             self._update_stats()
 
