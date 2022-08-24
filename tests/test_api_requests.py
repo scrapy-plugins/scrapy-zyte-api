@@ -80,7 +80,9 @@ async def test_http_response_body_request(meta: Dict[str, Dict[str, Any]], mocks
     ],
 )
 @ensureDeferred
-async def test_http_response_headers_request(meta: Dict[str, Dict[str, Any]], mockserver):
+async def test_http_response_headers_request(
+    meta: Dict[str, Dict[str, Any]], mockserver
+):
     req, resp = await produce_request_response(mockserver, meta)
     assert resp.request is req
     assert resp.url == req.url

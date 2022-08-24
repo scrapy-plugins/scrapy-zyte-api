@@ -8,6 +8,7 @@ from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
+from scrapy.utils.misc import load_object
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
@@ -56,6 +57,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
         self._session = create_session(connection_pool_size=self._client.n_conn)
         self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
+        if self._retry_policy:
+            self._retry_policy = load_object(self._retry_policy)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._prepare_api_params(request)
@@ -88,29 +91,29 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def _update_stats(self):
         prefix = "scrapy-zyte-api"
         for stat in (
-            '429',
-            'attempts',
-            'errors',
-            'fatal_errors',
-            'processed',
-            'success',
+            "429",
+            "attempts",
+            "errors",
+            "fatal_errors",
+            "processed",
+            "success",
         ):
             self._stats.set_value(
                 f"{prefix}/{stat}",
                 getattr(self._client.agg_stats, f"n_{stat}"),
             )
         for stat in (
-            'error_ratio',
-            'success_ratio',
-            'throttle_ratio',
+            "error_ratio",
+            "success_ratio",
+            "throttle_ratio",
         ):
             self._stats.set_value(
                 f"{prefix}/{stat}",
                 getattr(self._client.agg_stats, stat)(),
             )
         for source, target in (
-            ('connect', 'connection'),
-            ('total', 'response'),
+            ("connect", "connection"),
+            ("total", "response"),
         ):
             self._stats.set_value(
                 f"{prefix}/mean_{target}_seconds",
@@ -123,7 +126,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 error_type = f"/{error_type}"
             self._stats.set_value(f"{prefix}/error_types{error_type}", count)
 
-        for counter in ('exception_types', 'status_codes',):
+        for counter in (
+            "exception_types",
+            "status_codes",
+        ):
             for key, value in getattr(self._client.agg_stats, counter).items():
                 self._stats.set_value(f"{prefix}/{counter}/{key}", value)
 
@@ -134,7 +140,11 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         api_data = {**{"url": request.url}, **api_params}
         if self._job_id is not None:
             api_data["jobId"] = self._job_id
-        retrying = request.meta.get("zyte_api_retry_policy") or self._retry_policy
+        retrying = request.meta.get("zyte_api_retry_policy")
+        if retrying:
+            retrying = load_object(retrying)
+        else:
+            retrying = self._retry_policy
         try:
             api_response = await self._client.request_raw(
                 api_data,
