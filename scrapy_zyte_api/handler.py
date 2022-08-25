@@ -1,6 +1,7 @@
 import logging
 from base64 import b64decode, b64encode
-from typing import Any, Dict, Generator, Optional, Set, Union
+from copy import copy
+from typing import Any, Dict, Generator, Mapping, Optional, Set, Union
 from warnings import warn
 
 from scrapy import Spider
@@ -23,6 +24,12 @@ from zyte_api.constants import API_URL
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 
 logger = logging.getLogger(__name__)
+
+
+_DEFAULT_API_PARAMS = {
+    "browserHtml": False,
+    "screenshot": False,
+}
 
 
 def _update_api_params_from_request_headers(
@@ -101,18 +108,34 @@ def _update_api_params_from_request_headers(
                 api_params["requestHeaders"] = request_headers
 
 
-def _update_api_params_from_request(
+def _update_api_params_from_request(  # NOQA
     api_params: Dict[str, Any],
     request: Request,
     *,
     unsupported_headers: Set[str],
     browser_headers: Dict[str, str],
+    default_params: Dict[str, Any],
 ):
     if not any(
         api_params.get(k) for k in ("httpResponseBody", "browserHtml", "screenshot")
     ):
         api_params.setdefault("httpResponseBody", True)
+    elif api_params.get("httpResponseBody") is True and not any(
+        api_params.get(k) for k in ("browserHtml", "screenshot")
+    ):
+        logger.warning(
+            "You do not need to set httpResponseBody to True if neither "
+            "browserHtml nor screenshot are set to True."
+        )
+    elif api_params.get("httpResponseBody") is False:
+        logging.warning(
+            f"Request {request} unnecessarily defines the Zyte Data API "
+            f"'httpResponseBody' parameter with its default value, False. "
+            f"It will not be sent to the server."
+        )
     response_body = api_params.get("httpResponseBody")
+    if response_body is False:
+        api_params.pop("httpResponseBody")
 
     if any(api_params.get(k) for k in ("httpResponseBody", "browserHtml")):
         if api_params.get("httpResponseHeaders") is True:
@@ -123,6 +146,15 @@ def _update_api_params_from_request(
                 "neither browserHtml nor screenshot are set to True."
             )
         api_params.setdefault("httpResponseHeaders", True)
+    elif api_params.get("httpResponseHeaders") is False:
+        logger.warning(
+            "You do not need to set httpResponseHeaders to False if "
+            "you do set httpResponseBody or browserHtml to True. Note "
+            "that httpResponseBody is set to True automatically if "
+            "neither browserHtml nor screenshot are set to True."
+        )
+    if api_params.get("httpResponseHeaders") is False:
+        api_params.pop("httpResponseHeaders")
 
     method = api_params.get("httpRequestMethod")
     if method:
@@ -181,6 +213,16 @@ def _update_api_params_from_request(
                 f"parameter is True."
             )
 
+    for param, default_value in _DEFAULT_API_PARAMS.items():
+        if api_params.get(param) != default_value:
+            continue
+        logging.warning(
+            f"Request {request} unnecessarily defines the Zyte Data API "
+            f"{param!r} parameter with its default value, {default_value!r}. "
+            f"It will not be sent to the server."
+        )
+        api_params.pop(param)
+
     return api_params
 
 
@@ -189,7 +231,7 @@ def _get_api_params(
     *,
     use_api_by_default: bool,
     automap_by_default: bool,
-    default_params: Optional[Dict[str, Any]],
+    default_params: Dict[str, Any],
     unsupported_headers: Set[str],
     browser_headers: Dict[str, str],
 ) -> Optional[dict]:
@@ -210,17 +252,28 @@ def _get_api_params(
 
     if meta_params is True:
         meta_params = {}
-
-    api_params: Dict[str, Any] = default_params or {}
-    try:
-        api_params.update(meta_params)
-    except (ValueError, TypeError):
-        actual_type = type(request.meta.get("zyte_api"))
+    elif not isinstance(meta_params, Mapping):
         logger.error(
             f"'zyte_api' parameters in the request meta should be provided as "
-            f"a dictionary, got {actual_type} instead ({request})."
+            f"a dictionary, got {type(meta_params)} instead in {request}."
         )
-        raise
+        raise ValueError("The value of the 'zyte_api' meta key of ")
+
+    api_params = copy(default_params)
+    for k in list(meta_params):
+        if meta_params[k] is not None:
+            continue
+        meta_params.pop(k)
+        if k in api_params:
+            api_params.pop(k)
+        else:
+            logger.warning(
+                f"In request {request} 'zyte_api' parameter {k} is None, "
+                f"which is a value reserved to unset parameters defined in "
+                f"the ZYTE_API_DEFAULT_PARAMS setting, but the setting does "
+                f"not define such a parameter."
+            )
+    api_params.update(meta_params)
 
     if request.meta.get("zyte_api_automap", automap_by_default):
         _update_api_params_from_request(
@@ -228,6 +281,7 @@ def _get_api_params(
             request,
             unsupported_headers=unsupported_headers,
             browser_headers=browser_headers,
+            default_params=default_params,
         )
 
     return api_params
@@ -269,6 +323,15 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._stats = crawler.stats
         self._job_id = crawler.settings.get("JOB")
         self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
+        for param in list(self._zyte_api_default_params):
+            if self._zyte_api_default_params[param] is not None:
+                continue
+            logger.warning(
+                f"Parameter {param!r} in the ZYTE_API_DEFAULT_PARAMS "
+                f"setting is None. Default parameters should never be "
+                f"None."
+            )
+            self._zyte_api_default_params.pop(param)
         self._session = create_session(connection_pool_size=self._client.n_conn)
         self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
         if self._retry_policy:

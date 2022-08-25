@@ -12,7 +12,6 @@ from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
-from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
 from typing_extensions import Literal
@@ -103,294 +102,22 @@ async def test_http_response_body_request(meta: Dict[str, Dict[str, Any]], mocks
 
 
 @ensureDeferred
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
-@pytest.mark.filterwarnings("ignore:.*None is deprecated")
-@pytest.mark.parametrize(
-    "meta,settings,expected,use_zyte_api",
-    [
-        # Default ZYTE_API_ON_ALL_REQUESTS
-        ({}, {}, {}, False),
-        (
-            {"zyte_api": {}},
-            {},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": True},
-            {},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
-            True,
-        ),
-        ({"zyte_api": False}, {}, {}, False),
-        (
-            {},
-            {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {},
-            False,
-        ),
-        (
-            {"zyte_api": False},
-            {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {},
-            False,
-        ),
-        (
-            {"zyte_api": None},
-            {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {},
-            False,
-        ),
-        (
-            {"zyte_api": {}},
-            {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": True},
-            {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": {"javascript": True, "geolocation": "US"}},
-            {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"}},
-            {
-                "browserHtml": True,
-                "geolocation": "US",
-                "javascript": True,
-                "httpResponseHeaders": True,
-            },
-            True,
-        ),
-        # ZYTE_API_ON_ALL_REQUESTS=False
-        ({}, {"ZYTE_API_ON_ALL_REQUESTS": False}, {}, False),
-        (
-            {"zyte_api": {}},
-            {"ZYTE_API_ON_ALL_REQUESTS": False},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": True},
-            {"ZYTE_API_ON_ALL_REQUESTS": False},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
-            True,
-        ),
-        ({"zyte_api": False}, {"ZYTE_API_ON_ALL_REQUESTS": False}, {}, False),
-        (
-            {},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": False,
-            },
-            {},
-            False,
-        ),
-        (
-            {"zyte_api": False},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": False,
-            },
-            {},
-            False,
-        ),
-        (
-            {"zyte_api": None},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": False,
-            },
-            {},
-            False,
-        ),
-        (
-            {"zyte_api": {}},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": False,
-            },
-            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": True},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": False,
-            },
-            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": {"javascript": True, "geolocation": "US"}},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": False,
-            },
-            {
-                "browserHtml": True,
-                "geolocation": "US",
-                "javascript": True,
-                "httpResponseHeaders": True,
-            },
-            True,
-        ),
-        # ZYTE_API_ON_ALL_REQUESTS=True
-        (
-            {},
-            {"ZYTE_API_ON_ALL_REQUESTS": True},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": {}},
-            {"ZYTE_API_ON_ALL_REQUESTS": True},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": True},
-            {"ZYTE_API_ON_ALL_REQUESTS": True},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
-            True,
-        ),
-        ({"zyte_api": False}, {"ZYTE_API_ON_ALL_REQUESTS": True}, {}, False),
-        (
-            {},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": True,
-            },
-            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": False},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": True,
-            },
-            {},
-            False,
-        ),
-        (
-            {"zyte_api": None},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": True,
-            },
-            {},
-            False,
-        ),
-        (
-            {"zyte_api": {}},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": True,
-            },
-            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": True},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": True,
-            },
-            {"browserHtml": True, "geolocation": "CA", "httpResponseHeaders": True},
-            True,
-        ),
-        (
-            {"zyte_api": {"javascript": True, "geolocation": "US"}},
-            {
-                "ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True, "geolocation": "CA"},
-                "ZYTE_API_ON_ALL_REQUESTS": True,
-            },
-            {
-                "browserHtml": True,
-                "geolocation": "US",
-                "javascript": True,
-                "httpResponseHeaders": True,
-            },
-            True,
-        ),
-    ],
-)
-async def test_zyte_api_request_meta(
-    meta: Dict[str, Dict[str, Any]],
-    settings: Dict[str, str],
-    expected: Dict[str, str],
-    use_zyte_api: bool,
-    mockserver,
-):
-    async with mockserver.make_handler(settings) as handler:
-        req = Request(mockserver.urljoin("/"), meta=meta)
-        unmocked_client = handler._client
-        handler._client = mock.AsyncMock(unmocked_client)
-        handler._client.request_raw.side_effect = unmocked_client.request_raw
-
-        await handler.download_request(req, None)
-
-        # What we're interested in is the Request call in the API
-        request_call = [
-            c for c in handler._client.mock_calls if "request_raw(" in str(c)
-        ]
-
-        if not use_zyte_api:
-            assert request_call == []
-            return
-
-        elif not request_call:
-            pytest.fail("The client's request_raw() method was not called.")
-
-        args_used = request_call[0].args[0]
-        args_used.pop("url")
-
-        assert args_used == expected
-
-
-@ensureDeferred
 async def test_disable(mockserver):
     settings = {"ZYTE_API_ENABLED": False}
     async with mockserver.make_handler(settings) as handler:
         assert handler is None
 
 
+@pytest.mark.parametrize("zyte_api", [True, False])
 @ensureDeferred
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
-async def test_zyte_api_request_meta_none_deprecation(mockserver):
-    async with mockserver.make_handler() as handler:
-        req = Request(mockserver.urljoin("/"), meta={"zyte_api": None})
-        handler._client = mock.AsyncMock(handler._client)
-        with pytest.warns(DeprecationWarning, match="None is deprecated"):
-            await handler.download_request(req, None)
-
-
-@pytest.mark.parametrize(
-    "meta",
-    [
-        {"zyte_api": {"waka": True}},
-        {"zyte_api": True},
-        {"zyte_api": {"browserHtml": True}},
-        {"zyte_api": {}},
-        {"zyte_api": False},
-        {"randomParameter": True},
-        {},
-        None,
-    ],
-)
-@ensureDeferred
-async def test_coro_handling(meta: Dict[str, Dict[str, Any]], mockserver):
+async def test_coro_handling(zyte_api: bool, mockserver):
     settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
     async with mockserver.make_handler(settings) as handler:
         req = Request(
             # this should really be a URL to a website, not to the API server,
             # but API server URL works ok
             mockserver.urljoin("/"),
-            meta=meta,
+            meta={"zyte_api": zyte_api},
         )
         dfd = handler.download_request(req, Spider("test"))
         assert not iscoroutine(dfd)
@@ -425,28 +152,14 @@ async def test_exceptions(
 ):
     async with mockserver.make_handler() as handler:
         req = Request("http://example.com", method="POST", meta=meta)
-
-        with pytest.raises(exception_type):  # NOQA
-            api_params = _get_api_params(
-                req,
-                use_api_by_default=handler._on_all_requests,
-                automap_by_default=handler._automap,
-                default_params=handler._zyte_api_default_params,
-                unsupported_headers=handler._unsupported_headers,
-                browser_headers=handler._browser_headers,
-            )
-            await deferred_from_coro(
-                handler._download_request(api_params, req, Spider("test"))  # NOQA
-            )  # NOQA
+        with pytest.raises(exception_type):
+            await handler.download_request(req, None)
         assert exception_text in caplog.text
 
 
-@pytest.mark.parametrize(
-    "job_id",
-    ["547773/99/6"],
-)
 @ensureDeferred
-async def test_job_id(job_id, mockserver):
+async def test_job_id(mockserver):
+    job_id = "547773/99/6"
     settings = {"JOB": job_id}
     async with mockserver.make_handler(settings) as handler:
         req = Request(
@@ -454,17 +167,7 @@ async def test_job_id(job_id, mockserver):
             method="POST",
             meta={"zyte_api": {"browserHtml": True}},
         )
-        api_params = _get_api_params(
-            req,
-            use_api_by_default=handler._on_all_requests,
-            automap_by_default=handler._automap,
-            default_params=handler._zyte_api_default_params,
-            unsupported_headers=handler._unsupported_headers,
-            browser_headers=handler._browser_headers,
-        )
-        resp = await deferred_from_coro(
-            handler._download_request(api_params, req, Spider("test"))  # NOQA
-        )
+        resp = await handler.download_request(req, None)
 
     assert resp.request is req
     assert resp.url == req.url
@@ -483,7 +186,7 @@ async def test_higher_concurrency():
     response_indexes = []
     expected_first_indexes = {0, concurrency - 1}
     fast_seconds = 0.001
-    slow_seconds = 0.1
+    slow_seconds = 0.2
 
     with MockServer(DelayedResource) as server:
 
@@ -532,482 +235,6 @@ async def test_higher_concurrency():
 @pytest.mark.parametrize(
     "request_kwargs,settings,expected,warnings",
     [
-        # Automatic mapping of request parameters to Zyte Data API parameters
-        # is enabled by default, but can be disabled, either globally or per
-        # request.
-        #
-        # httpResponseBody is set to True if no other main content is
-        # requested.
-        *(
-            (
-                request_kwargs,
-                settings,
-                {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
-                },
-                [],
-            )
-            for request_kwargs, settings in (
-                ({}, {}),
-                ({}, {"ZYTE_API_AUTOMAP": True}),
-                (
-                    {"meta": {"zyte_api_automap": True}},
-                    {"ZYTE_API_AUTOMAP": False},
-                ),
-            )
-        ),
-        (
-            {},
-            {"ZYTE_API_AUTOMAP": False},
-            False,
-            [],
-        ),
-        (
-            {"meta": {"zyte_api_automap": False}},
-            {},
-            False,
-            [],
-        ),
-        *(
-            (
-                {"meta": {"zyte_api": {"a": "b"}}},
-                settings,
-                {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
-                    "a": "b",
-                },
-                [],
-            )
-            for settings in (
-                {},
-                {"ZYTE_API_AUTOMAP": True},
-            )
-        ),
-        (
-            {"meta": {"zyte_api": {"a": "b"}}},
-            {"ZYTE_API_AUTOMAP": False},
-            {
-                "a": "b",
-            },
-            [],
-        ),
-        # httpResponseBody can be unset through meta. That way, if a new main
-        # output type other than browserHtml and screenshot is implemented in
-        # the future, you can request the new output type and also prevent
-        # httpResponseBody from being enabled automatically, without the need
-        # to disable automated mapping completely.
-        (
-            {"meta": {"zyte_api": {"httpResponseBody": False}}},
-            {},
-            {
-                "httpResponseBody": False,
-            },
-            [],
-        ),
-        (
-            {
-                "meta": {
-                    "zyte_api": {"httpResponseBody": False, "newOutputType": True}
-                },
-            },
-            {},
-            {
-                "httpResponseBody": False,
-                "newOutputType": True,
-            },
-            [],
-        ),
-        # httpResponseHeaders is automatically set to True for httpResponseBody
-        # (shown in prior tests) and browserHtml.
-        (
-            {
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-        ),
-        # httpResponseHeaders is not set for screenshot.
-        (
-            {
-                "meta": {"zyte_api": {"screenshot": True}},
-            },
-            {},
-            {
-                "screenshot": True,
-            },
-            [],
-        ),
-        # httpResponseHeaders can be unset through meta.
-        (
-            {
-                "meta": {"zyte_api": {"httpResponseHeaders": False}},
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": False,
-            },
-            [],
-        ),
-        (
-            {
-                "meta": {
-                    "zyte_api": {
-                        "browserHtml": True,
-                        "httpResponseHeaders": False,
-                    },
-                },
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": False,
-            },
-            [],
-        ),
-        # METHOD
-        # Request.method is mapped as is.
-        *(
-            (
-                {"method": method},
-                {},
-                {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
-                    "httpRequestMethod": method,
-                },
-                [],
-            )
-            for method in (
-                "POST",
-                "PUT",
-                "DELETE",
-                "OPTIONS",
-                "TRACE",
-                "PATCH",
-            )
-        ),
-        # Request.method is mapped even for methods that Zyte Data API does not
-        # support.
-        *(
-            (
-                {"method": method},
-                {},
-                {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
-                    "httpRequestMethod": method,
-                },
-                [],
-            )
-            for method in (
-                "HEAD",
-                "CONNECT",
-                "FOO",
-            )
-        ),
-        # An exception is the default method (GET), which is not mapped.
-        (
-            {"method": "GET"},
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-        ),
-        # httpRequestMethod should not be defined through meta.
-        (
-            {
-                "meta": {
-                    "zyte_api": {
-                        "httpRequestMethod": "GET",
-                    },
-                },
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "httpRequestMethod": "GET",
-            },
-            ["Use Request.method instead"],
-        ),
-        # If defined through meta, httpRequestMethod takes precedence, warning
-        # about value mismatches.
-        (
-            {
-                "method": "POST",
-                "meta": {
-                    "zyte_api": {
-                        "httpRequestMethod": "PATCH",
-                    },
-                },
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "httpRequestMethod": "PATCH",
-            },
-            [
-                "Use Request.method instead",
-                "does not match the Zyte Data API httpRequestMethod parameter",
-            ],
-        ),
-        # A non-GET method should not be used unless httpResponseBody is also
-        # used.
-        (
-            {
-                "method": "POST",
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            ["can only be set when the httpResponseBody parameter"],
-        ),
-        (
-            {
-                "method": "POST",
-                "meta": {"zyte_api": {"screenshot": True}},
-            },
-            {},
-            {
-                "screenshot": True,
-            },
-            ["can only be set when the httpResponseBody parameter"],
-        ),
-        # HEADERS
-        # Headers are mapped to requestHeaders or customHttpRequestHeaders
-        # depending on whether or not httpResponseBody is declared.
-        (
-            {
-                "headers": {"Referer": "a"},
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "customHttpRequestHeaders": [
-                    {"name": "Referer", "value": "a"},
-                ],
-            },
-            [],
-        ),
-        (
-            {
-                "headers": {"Referer": "a"},
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-                "requestHeaders": {"referer": "a"},
-            },
-            [],
-        ),
-        # We intentionally generate requestHeaders even if browserHtml and
-        # screenshot are not used, assuming that future additional outputs are
-        # more likely to use requestHeaders than to use
-        # customHttpRequestHeaders.
-        (
-            {
-                "headers": {"Referer": "a"},
-                "meta": {"zyte_api": {"httpResponseBody": False}},
-            },
-            {},
-            {
-                "httpResponseBody": False,
-                "requestHeaders": {"referer": "a"},
-            },
-            [],
-        ),
-        # If both httpResponseBody and currently-incompatible attributes
-        # (browserHtml, screenshot) are declared, both fields are generated.
-        # This is in case a single request is allowed to combine both in the
-        # future.
-        (
-            {
-                "headers": {"Referer": "a"},
-                "meta": {
-                    "zyte_api": {
-                        "httpResponseBody": True,
-                        "browserHtml": True,
-                        # Makes the mock API server return 200 despite the
-                        # bad input.
-                        "passThrough": True,
-                    },
-                },
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-                "customHttpRequestHeaders": [
-                    {"name": "Referer", "value": "a"},
-                ],
-                "requestHeaders": {"referer": "a"},
-                "passThrough": True,
-            },
-            [],
-        ),
-        # If requestHeaders or customHttpRequestHeaders are used, their value
-        # prevails, but a warning is issued.
-        (
-            {
-                "headers": {"Referer": "a"},
-                "meta": {
-                    "zyte_api": {
-                        "customHttpRequestHeaders": [
-                            {"name": "Referer", "value": "b"},
-                        ],
-                    },
-                },
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "customHttpRequestHeaders": [
-                    {"name": "Referer", "value": "b"},
-                ],
-            },
-            ["Use Request.headers instead"],
-        ),
-        (
-            {
-                "headers": {"Referer": "a"},
-                "meta": {
-                    "zyte_api": {
-                        "browserHtml": True,
-                        "requestHeaders": {"referer": "b"},
-                    },
-                },
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-                "requestHeaders": {"referer": "b"},
-            },
-            ["Use Request.headers instead"],
-        ),
-        # A request should not have headers if requestHeaders or
-        # customHttpRequestHeaders are also used, even if they match.
-        (
-            {
-                "headers": {"Referer": "b"},
-                "meta": {
-                    "zyte_api": {
-                        "customHttpRequestHeaders": [
-                            {"name": "Referer", "value": "b"},
-                        ],
-                    },
-                },
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "customHttpRequestHeaders": [
-                    {"name": "Referer", "value": "b"},
-                ],
-            },
-            ["Use Request.headers instead"],
-        ),
-        (
-            {
-                "headers": {"Referer": "b"},
-                "meta": {
-                    "zyte_api": {
-                        "browserHtml": True,
-                        "requestHeaders": {"referer": "b"},
-                    },
-                },
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-                "requestHeaders": {"referer": "b"},
-            },
-            ["Use Request.headers instead"],
-        ),
-        # Unsupported headers not present in Scrapy requests by default are
-        # dropped with a warning.
-        # If all headers are unsupported, the header parameter is not even set.
-        (
-            {
-                "headers": {"a": "b"},
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
-        # Headers with None as value are silently ignored.
-        (
-            {
-                "headers": {"a": None},
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-        ),
-        (
-            {
-                "headers": {"a": None},
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-        ),
-        # Headers with an empty string as value are not silently ignored.
-        (
-            {
-                "headers": {"a": ""},
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
-        # Unsupported headers are looked up case-insensitively.
-        (
-            {
-                "headers": {"user-Agent": ""},
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
         # The Accept and Accept-Language headers, when unsupported, are dropped
         # silently if their value matches the default value of Scrapy for
         # DEFAULT_REQUEST_HEADERS, or with a warning otherwise.
@@ -1293,8 +520,11 @@ async def test_automap(
             assert not caplog.records
 
 
-_UNSUPPORTED_HEADERS = {b"cookie", b"user-agent"}
-_BROWSER_HEADERS = {b"referer": "referer"}
+AUTOMAP_BY_DEFAULT = True
+BROWSER_HEADERS = {b"referer": "referer"}
+DEFAULT_PARAMS: Dict[str, Any] = {}
+UNSUPPORTED_HEADERS = {b"cookie", b"user-agent"}
+USE_API_BY_DEFAULT = False
 
 
 @ensureDeferred
@@ -1308,11 +538,11 @@ async def test_get_api_params_input_default(mockserver):
                 await handler.download_request(request, None)
             _get_api_params.assert_called_once_with(
                 request,
-                use_api_by_default=False,
-                automap_by_default=True,
-                default_params={},
-                unsupported_headers=_UNSUPPORTED_HEADERS,
-                browser_headers=_BROWSER_HEADERS,
+                use_api_by_default=USE_API_BY_DEFAULT,
+                automap_by_default=AUTOMAP_BY_DEFAULT,
+                default_params=DEFAULT_PARAMS,
+                unsupported_headers=UNSUPPORTED_HEADERS,
+                browser_headers=BROWSER_HEADERS,
             )
 
 
@@ -1342,44 +572,46 @@ async def test_get_api_params_input_custom(mockserver):
             )
 
 
-_UNSET = object()
+UNSET = object()
 
 
-@ensureDeferred
 @pytest.mark.parametrize(
     "setting,meta,expected",
     [
-        (False, _UNSET, None),
-        (False, False, None),
-        (False, True, {}),
-        (False, {}, {}),
-        (False, {"a": "b"}, {"a": "b"}),
-        (True, _UNSET, {}),
-        (True, False, None),
-        (True, True, {}),
+        (False, None, None),
+        (False, {}, None),
+        (False, {"a": "b"}, None),
+        (False, {"zyte_api": False}, None),
+        (False, {"zyte_api": True}, {}),
+        (False, {"zyte_api": {}}, {}),
+        (False, {"zyte_api": {"a": "b"}}, {"a": "b"}),
+        (False, {"zyte_api": {"browserHtml": True}}, {"browserHtml": True}),
+        (True, None, {}),
         (True, {}, {}),
-        (True, {"a": "b"}, {"a": "b"}),
+        (True, {"a": "b"}, {}),
+        (True, {"zyte_api": False}, None),
+        (True, {"zyte_api": True}, {}),
+        (True, {"zyte_api": {}}, {}),
+        (True, {"zyte_api": {"a": "b"}}, {"a": "b"}),
+        (True, {"zyte_api": {"browserHtml": True}}, {"browserHtml": True}),
     ],
 )
-async def test_get_api_params_toggling(setting, meta, expected):
-    request = Request(url="https://example.com")
-    if meta is not _UNSET:
-        request.meta["zyte_api"] = meta
+def test_api_toggling(setting, meta, expected):
+    request = Request(url="https://example.com", meta=meta)
     api_params = _get_api_params(
         request,
         use_api_by_default=setting,
         automap_by_default=False,
-        default_params={},
-        unsupported_headers=_UNSUPPORTED_HEADERS,
-        browser_headers=_BROWSER_HEADERS,
+        default_params=DEFAULT_PARAMS,
+        unsupported_headers=UNSUPPORTED_HEADERS,
+        browser_headers=BROWSER_HEADERS,
     )
     assert api_params == expected
 
 
-@ensureDeferred
 @pytest.mark.parametrize("setting", [False, True])
 @pytest.mark.parametrize("meta", [None, 0, "", b"", []])
-async def test_get_api_params_disabling_deprecated(setting, meta):
+def test_api_disabling_deprecated(setting, meta):
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
     with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
@@ -1387,55 +619,758 @@ async def test_get_api_params_disabling_deprecated(setting, meta):
             request,
             use_api_by_default=setting,
             automap_by_default=False,
-            default_params={},
-            unsupported_headers=_UNSUPPORTED_HEADERS,
-            browser_headers=_BROWSER_HEADERS,
+            default_params=DEFAULT_PARAMS,
+            unsupported_headers=UNSUPPORTED_HEADERS,
+            browser_headers=BROWSER_HEADERS,
         )
     assert api_params is None
 
 
 @ensureDeferred
+async def test_default_params_none(mockserver, caplog):
+    request = Request(url="https://example.com")
+    settings = {
+        "ZYTE_API_DEFAULT_PARAMS": {"a": None, "b": "c"},
+    }
+    with caplog.at_level("WARNING"):
+        async with mockserver.make_handler(settings) as handler:
+            patch_path = "scrapy_zyte_api.handler._get_api_params"
+            with patch(patch_path) as _get_api_params:
+                _get_api_params.side_effect = RuntimeError("That’s it!")
+                with pytest.raises(RuntimeError):
+                    await handler.download_request(request, None)
+                _get_api_params.assert_called_once_with(
+                    request,
+                    use_api_by_default=USE_API_BY_DEFAULT,
+                    automap_by_default=AUTOMAP_BY_DEFAULT,
+                    default_params={"b": "c"},
+                    unsupported_headers=UNSUPPORTED_HEADERS,
+                    browser_headers=BROWSER_HEADERS,
+                )
+    assert "Parameter 'a' in the ZYTE_API_DEFAULT_PARAMS setting is None" in caplog.text
+
+
 @pytest.mark.parametrize(
-    "default_params,meta,expected",
+    "default_params,meta,expected,warnings",
     [
-        ({}, {}, {}),
-        ({}, {"b": 2}, {"b": 2}),
-        ({"a": 1}, {}, {"a": 1}),
-        ({"a": 1}, {"b": 2}, {"a": 1, "b": 2}),
-        ({"a": 1}, {"a": 2}, {"a": 2}),
+        ({}, {}, {}, []),
+        ({}, {"b": 2}, {"b": 2}, []),
+        ({}, {"b": None}, {}, ["does not define such a parameter"]),
+        ({"a": 1}, {}, {"a": 1}, []),
+        ({"a": 1}, {"b": 2}, {"a": 1, "b": 2}, []),
+        ({"a": 1}, {"b": None}, {"a": 1}, ["does not define such a parameter"]),
+        ({"a": 1}, {"a": 2}, {"a": 2}, []),
+        ({"a": 1}, {"a": None}, {}, []),
     ],
 )
-async def test_get_api_params_default_params_merging(default_params, meta, expected):
+def test_default_params_merging(default_params, meta, expected, warnings, caplog):
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
-    api_params = _get_api_params(
-        request,
-        use_api_by_default=False,
-        automap_by_default=False,
-        default_params=default_params,
-        unsupported_headers=_UNSUPPORTED_HEADERS,
-        browser_headers=_BROWSER_HEADERS,
-    )
+    with caplog.at_level("WARNING"):
+        api_params = _get_api_params(
+            request,
+            use_api_by_default=USE_API_BY_DEFAULT,
+            automap_by_default=False,
+            default_params=default_params,
+            unsupported_headers=UNSUPPORTED_HEADERS,
+            browser_headers=BROWSER_HEADERS,
+        )
     assert api_params == expected
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
 
 
-@ensureDeferred
+@pytest.mark.xfail(reason="To be implemented", strict=True)
 @pytest.mark.parametrize(
-    "meta,exception",
+    "default_params,meta,expected,warnings",
     [
-        (1, TypeError),
-        (["a", "b"], ValueError),
+        (
+            {"screenshot": True, "httpResponseHeaders": True},
+            {"browserHtml": True},
+            {"browserHtml": True, "httpResponseHeaders": True, "screenshot": True},
+            [],
+        ),
+        (
+            {"browserHtml": True, "httpResponseHeaders": False},
+            {"screenshot": True, "browserHtml": False},
+            {"screenshot": True},
+            [],
+        ),
     ],
 )
-async def test_get_api_params_bad_meta_type(meta, exception):
+def test_default_params_automap(default_params, meta, expected, warnings, caplog):
+    """Warnings about unneeded parameters should not apply if those parameters are needed to extend or override default parameters."""
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
-    with pytest.raises(exception):
+    with caplog.at_level("WARNING"):
+        api_params = _get_api_params(
+            request,
+            use_api_by_default=USE_API_BY_DEFAULT,
+            automap_by_default=AUTOMAP_BY_DEFAULT,
+            default_params=default_params,
+            unsupported_headers=UNSUPPORTED_HEADERS,
+            browser_headers=BROWSER_HEADERS,
+        )
+    assert api_params == expected
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
+
+
+def test_default_params_immutability():
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = {"a": None}
+    default_params = {"a": "b"}
+    _get_api_params(
+        request,
+        use_api_by_default=USE_API_BY_DEFAULT,
+        automap_by_default=AUTOMAP_BY_DEFAULT,
+        default_params=default_params,
+        unsupported_headers=UNSUPPORTED_HEADERS,
+        browser_headers=BROWSER_HEADERS,
+    )
+    assert default_params == {"a": "b"}
+
+
+@pytest.mark.parametrize("meta", [1, ["a", "b"]])
+def test_bad_meta_type(meta):
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    with pytest.raises(ValueError):
         _get_api_params(
             request,
-            use_api_by_default=False,
+            use_api_by_default=USE_API_BY_DEFAULT,
             automap_by_default=False,
-            default_params={},
-            unsupported_headers=_UNSUPPORTED_HEADERS,
-            browser_headers=_BROWSER_HEADERS,
+            default_params=DEFAULT_PARAMS,
+            unsupported_headers=UNSUPPORTED_HEADERS,
+            browser_headers=BROWSER_HEADERS,
         )
+
+
+@pytest.mark.parametrize(
+    "setting,meta,expected",
+    [
+        (False, UNSET, False),
+        (False, False, False),
+        (False, True, True),
+        (True, UNSET, True),
+        (True, False, False),
+        (True, True, True),
+    ],
+)
+def test_automap_toggling(setting, meta, expected):
+    request = Request(url="https://example.com")
+    if meta is not UNSET:
+        request.meta["zyte_api_automap"] = meta
+    api_params = _get_api_params(
+        request,
+        use_api_by_default=True,
+        automap_by_default=setting,
+        default_params=DEFAULT_PARAMS,
+        unsupported_headers=UNSUPPORTED_HEADERS,
+        browser_headers=BROWSER_HEADERS,
+    )
+    assert bool(api_params) == expected
+
+
+def _test_automap(request_kwargs, meta, expected, warnings, caplog):
+    request = Request(url="https://example.com", **request_kwargs)
+    request.meta["zyte_api"] = meta
+    with caplog.at_level("WARNING"):
+        api_params = _get_api_params(
+            request,
+            use_api_by_default=USE_API_BY_DEFAULT,
+            automap_by_default=AUTOMAP_BY_DEFAULT,
+            default_params=DEFAULT_PARAMS,
+            unsupported_headers=UNSUPPORTED_HEADERS,
+            browser_headers=BROWSER_HEADERS,
+        )
+    assert api_params == expected
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
+
+
+@pytest.mark.parametrize(
+    "meta,expected,warnings",
+    [
+        ({}, {"httpResponseBody": True, "httpResponseHeaders": True}, []),
+        (
+            {"httpResponseBody": True},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            ["do not need to set httpResponseBody to True"],
+        ),
+        (
+            {"httpResponseBody": False},
+            {},
+            [],
+        ),
+        (
+            {"httpResponseBody": True, "browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"browserHtml": True},
+            {"browserHtml": True, "httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {"screenshot": True},
+            {"screenshot": True},
+            [],
+        ),
+        (
+            {"unknown": True},
+            {"httpResponseBody": True, "httpResponseHeaders": True, "unknown": True},
+            [],
+        ),
+        (
+            {"unknown": True, "httpResponseBody": False},
+            {"unknown": True},
+            [],
+        ),
+    ],
+)
+def test_automap_main_outputs(meta, expected, warnings, caplog):
+    _test_automap({}, meta, expected, warnings, caplog)
+
+
+@pytest.mark.parametrize(
+    "meta,expected,warnings",
+    [
+        ({"httpResponseHeaders": False}, {"httpResponseBody": True}, []),
+        (
+            {"httpResponseHeaders": True},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            ["do not need to set httpResponseHeaders to True"],
+        ),
+        (
+            {"httpResponseBody": True, "httpResponseHeaders": False},
+            {"httpResponseBody": True},
+            ["do not need to set httpResponseBody to True"],
+        ),
+        (
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            [
+                "do not need to set httpResponseHeaders to True",
+                "do not need to set httpResponseBody to True",
+            ],
+        ),
+        (
+            {"httpResponseBody": False, "httpResponseHeaders": False},
+            {},
+            ["do not need to set httpResponseHeaders to False"],
+        ),
+        (
+            {"httpResponseBody": False, "httpResponseHeaders": True},
+            {"httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {"browserHtml": True, "httpResponseHeaders": False},
+            {"browserHtml": True},
+            [],
+        ),
+        (
+            {"browserHtml": True, "httpResponseHeaders": True},
+            {"browserHtml": True, "httpResponseHeaders": True},
+            ["do not need to set httpResponseHeaders to True"],
+        ),
+        (
+            {
+                "httpResponseBody": True,
+                "browserHtml": True,
+                "httpResponseHeaders": False,
+            },
+            {"browserHtml": True, "httpResponseBody": True},
+            [],
+        ),
+        (
+            {
+                "httpResponseBody": True,
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            {
+                "browserHtml": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["do not need to set httpResponseHeaders to True"],
+        ),
+        (
+            {"screenshot": True, "httpResponseHeaders": False},
+            {"screenshot": True},
+            ["do not need to set httpResponseHeaders to False"],
+        ),
+        (
+            {"screenshot": True, "httpResponseHeaders": True},
+            {"screenshot": True, "httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {"unknown": True, "httpResponseHeaders": True},
+            {"unknown": True, "httpResponseBody": True, "httpResponseHeaders": True},
+            ["do not need to set httpResponseHeaders to True"],
+        ),
+        (
+            {"unknown": True, "httpResponseHeaders": False},
+            {"unknown": True, "httpResponseBody": True},
+            [],
+        ),
+        (
+            {"unknown": True, "httpResponseBody": False, "httpResponseHeaders": True},
+            {"unknown": True, "httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {"unknown": True, "httpResponseBody": False, "httpResponseHeaders": False},
+            {"unknown": True},
+            ["do not need to set httpResponseHeaders to False"],
+        ),
+    ],
+)
+def test_automap_header_output(meta, expected, warnings, caplog):
+    _test_automap({}, meta, expected, warnings, caplog)
+
+
+@pytest.mark.parametrize(
+    "method,meta,expected,warnings",
+    [
+        (
+            "GET",
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        *(
+            (
+                method,
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "httpRequestMethod": method,
+                },
+                [],
+            )
+            for method in (
+                "POST",
+                "PUT",
+                "DELETE",
+                "OPTIONS",
+                "TRACE",
+                "PATCH",
+                "HEAD",
+                "CONNECT",
+                "FOO",
+            )
+        ),
+        *(
+            (
+                request_method,
+                {"httpRequestMethod": meta_method},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "httpRequestMethod": meta_method,
+                },
+                ["Use Request.method"],
+            )
+            for request_method, meta_method in (
+                ("GET", "GET"),
+                ("POST", "POST"),
+            )
+        ),
+        *(
+            (
+                request_method,
+                {"httpRequestMethod": meta_method},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "httpRequestMethod": meta_method,
+                },
+                [
+                    "Use Request.method",
+                    "does not match the Zyte Data API httpRequestMethod",
+                ],
+            )
+            for request_method, meta_method in (
+                ("GET", "POST"),
+                ("PUT", "GET"),
+            )
+        ),
+        (
+            "POST",
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            ["can only be set when the httpResponseBody parameter"],
+        ),
+        (
+            "POST",
+            {"screenshot": True},
+            {
+                "screenshot": True,
+            },
+            ["can only be set when the httpResponseBody parameter"],
+        ),
+    ],
+)
+def test_automap_method(method, meta, expected, warnings, caplog):
+    _test_automap({"method": method}, meta, expected, warnings, caplog)
+
+
+@pytest.mark.parametrize(
+    "headers,meta,expected,warnings",
+    [
+        # Base header mapping scenarios for a supported header.
+        (
+            {"Referer": "a"},
+            {},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"browserHtml": True, "httpResponseBody": True},
+            {
+                "browserHtml": True,
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"screenshot": True},
+            {
+                "screenshot": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"screenshot": True, "httpResponseBody": True},
+            {
+                "screenshot": True,
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"unknown": True},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "unknown": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"unknown": True, "httpResponseBody": False},
+            {
+                "requestHeaders": {"referer": "a"},
+                "unknown": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"httpResponseBody": False},
+            {
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        # Headers with None as value are ignored.
+        (
+            {"Referer": None},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": None},
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": None},
+            {"browserHtml": True, "httpResponseBody": True},
+            {
+                "browserHtml": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": None},
+            {"screenshot": True},
+            {
+                "screenshot": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": None},
+            {"screenshot": True, "httpResponseBody": True},
+            {
+                "screenshot": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": None},
+            {"unknown": True},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "unknown": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": None},
+            {"unknown": True, "httpResponseBody": False},
+            {
+                "unknown": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": None},
+            {"httpResponseBody": False},
+            {},
+            [],
+        ),
+        # Warn if header parameters are used, even if the values match request
+        # headers.
+        (
+            {"Referer": "a"},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "b"},
+                ]
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "b"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.headers instead"],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                "browserHtml": True,
+                "requestHeaders": {"referer": "b"},
+            },
+            {
+                "browserHtml": True,
+                "requestHeaders": {"referer": "b"},
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.headers instead"],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ]
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.headers instead"],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                "browserHtml": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            {
+                "browserHtml": True,
+                "requestHeaders": {"referer": "a"},
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.headers instead"],
+        ),
+        # Unsupported headers not present in Scrapy requests by default are
+        # dropped with a warning.
+        # If all headers are unsupported, the header parameter is not even set.
+        (
+            {"Cookie": "a=b"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped"],
+        ),
+        (
+            {"a": "b"},
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped"],
+        ),
+        # Headers with an empty string as value are not silently ignored.
+        (
+            {"Cookie": ""},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped"],
+        ),
+        (
+            {"a": ""},
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped"],
+        ),
+        # Unsupported headers are looked up case-insensitively.
+        (
+            {"user-Agent": ""},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped"],
+        ),
+    ],
+)
+def test_automap_headers(headers, meta, expected, warnings, caplog):
+    _test_automap({"headers": headers}, meta, expected, warnings, caplog)
+
+
+@pytest.mark.parametrize(
+    "meta,expected,warnings",
+    [
+        (
+            {
+                "httpResponseBody": False,
+            },
+            {},
+            [],
+        ),
+        (
+            {
+                "browserHtml": True,
+                "httpResponseBody": False,
+            },
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            ["unnecessarily defines"],
+        ),
+        (
+            {
+                "browserHtml": False,
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["unnecessarily defines"],
+        ),
+        (
+            {
+                "screenshot": False,
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["unnecessarily defines"],
+        ),
+        (
+            {
+                "httpResponseHeaders": False,
+            },
+            {
+                "httpResponseBody": True,
+            },
+            [],
+        ),
+    ],
+)
+def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
+    _test_automap({}, meta, expected, warnings, caplog)
