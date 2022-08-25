@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.5.0 (to be released)
-----------------------
+0.5.0 (2022-08-25)
+------------------
 
 * Zyte Data API error responses (after retries) are no longer ignored, and
   instead raise a ``zyte_api.aio.errors.RequestError`` exception, which allows
