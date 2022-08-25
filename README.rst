@@ -264,7 +264,8 @@ For example, to also retry HTTP 521 errors the same as HTTP 520 errors, you can
 subclass RetryFactory_ as follows::
 
     # project/retry_policies.py
-    from tenacity import retry_if_exception
+    from tenacity import retry_if_exception, RetryCallState
+    from zyte_api.aio.errors import RequestError
     from zyte_api.aio.retry import RetryFactory
 
     def is_http_521(exc: BaseException) -> bool:
