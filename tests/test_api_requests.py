@@ -28,12 +28,16 @@ from .mockserver import DelayedResource, MockServer, produce_request_response
         {
             "httpResponseBody": True,
             "httpResponseHeaders": False,
-            "customHttpRequestHeaders": {"Accept": "application/octet-stream"},
+            "customHttpRequestHeaders": [
+                {"name": "Accept", "value": "application/octet-stream"}
+            ],
         },
         pytest.param(
             {
                 "httpResponseBody": True,
-                "customHttpRequestHeaders": {"Accept": "application/octet-stream"},
+                "customHttpRequestHeaders": [
+                    {"name": "Accept", "value": "application/octet-stream"}
+                ],
             },
             marks=pytest.mark.xfail(
                 reason="https://github.com/scrapy-plugins/scrapy-zyte-api/issues/47",
