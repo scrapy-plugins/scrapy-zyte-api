@@ -66,9 +66,7 @@ class DefaultResource(LeafResource):
             html = "<html><body>Hello<h1>World!</h1></body></html>"
 
         if "browserHtml" in request_data:
-            if "httpResponseBody" in request_data and not request_data.get(
-                "passThrough"
-            ):
+            if "httpResponseBody" in request_data:
                 request.setResponseCode(422)
                 return json.dumps(
                     {
