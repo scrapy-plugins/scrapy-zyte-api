@@ -78,8 +78,13 @@ class DefaultResource(LeafResource):
                 ).encode()
             response_data["browserHtml"] = html
         if "httpResponseBody" in request_data:
-            base64_html = b64encode(html.encode()).decode()
-            response_data["httpResponseBody"] = base64_html
+            headers = request_data.get("customHttpRequestHeaders", {})
+            accept = headers.get("Accept", None)
+            if accept == "application/octet-stream":
+                body = b64encode(b"\x00").decode()
+            else:
+                body = b64encode(html.encode()).decode()
+            response_data["httpResponseBody"] = body
 
         if request_data.get("httpResponseHeaders") is True:
             response_data["httpResponseHeaders"] = [

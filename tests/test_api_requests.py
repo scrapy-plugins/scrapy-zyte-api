@@ -8,7 +8,6 @@ import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
-from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
@@ -23,28 +22,56 @@ from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS
 from .mockserver import DelayedResource, MockServer, produce_request_response
 
 
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {
+            "httpResponseBody": True,
+            "httpResponseHeaders": False,
+            "customHttpRequestHeaders": {"Accept": "application/octet-stream"},
+        },
+        pytest.param(
+            {
+                "httpResponseBody": True,
+                "customHttpRequestHeaders": {"Accept": "application/octet-stream"},
+            },
+            marks=pytest.mark.xfail(
+                reason="https://github.com/scrapy-plugins/scrapy-zyte-api/issues/47",
+                strict=True,
+            ),
+        ),
+    ],
+)
+@ensureDeferred
+async def test_response_binary(meta: Dict[str, Dict[str, Any]], mockserver):
+    req, resp = await produce_request_response(mockserver, {"zyte_api": meta})
+    assert isinstance(resp, Response)
+    assert not isinstance(resp, TextResponse)
+    assert resp.request is req
+    assert resp.url == req.url
+    assert resp.status == 200
+    assert "zyte-api" in resp.flags
+    assert resp.body == b"\x00"
+
+
 @ensureDeferred
 @pytest.mark.parametrize(
     "meta",
     [
-        {"zyte_api": {"browserHtml": True}},
-        {"zyte_api": {"browserHtml": True, "geolocation": "US"}},
-        {"zyte_api": {"browserHtml": True, "geolocation": "US", "echoData": 123}},
-        {"zyte_api": {"browserHtml": True, "randomParameter": None}},
-        {"zyte_api": {"httpResponseBody": True}},
-        {"zyte_api": {"httpResponseBody": True, "geolocation": "US"}},
-        {
-            "zyte_api": {
-                "httpResponseBody": True,
-                "geolocation": "US",
-                "echoData": 123,
-            }
-        },
-        {"zyte_api": {"httpResponseBody": True, "randomParameter": None}},
+        {"browserHtml": True},
+        {"browserHtml": True, "httpResponseHeaders": False},
+        {"httpResponseBody": True},
+        pytest.param(
+            {"httpResponseBody": True, "httpResponseHeaders": False},
+            marks=pytest.mark.xfail(
+                reason="https://github.com/scrapy-plugins/scrapy-zyte-api/issues/47",
+                strict=True,
+            ),
+        ),
     ],
 )
-async def test_html_response_and_headers(meta: Dict[str, Dict[str, Any]], mockserver):
-    req, resp = await produce_request_response(mockserver, meta)
+async def test_response_html(meta: Dict[str, Dict[str, Any]], mockserver):
+    req, resp = await produce_request_response(mockserver, {"zyte_api": meta})
     assert isinstance(resp, TextResponse)
     assert resp.request is req
     assert resp.url == req.url
@@ -54,51 +81,10 @@ async def test_html_response_and_headers(meta: Dict[str, Dict[str, Any]], mockse
     assert resp.text == "<html><body>Hello<h1>World!</h1></body></html>"
     assert resp.css("h1 ::text").get() == "World!"
     assert resp.xpath("//body/text()").getall() == ["Hello"]
-    assert resp.headers == {b"Test_Header": [b"test_value"]}
-
-
-@pytest.mark.parametrize(
-    "meta",
-    [
-        {"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": False}},
-        {
-            "zyte_api": {
-                "httpResponseBody": True,
-                "httpResponseHeaders": False,
-                "geolocation": "US",
-            },
-        },
-        {
-            "zyte_api": {
-                "httpResponseBody": True,
-                "httpResponseHeaders": False,
-                "geolocation": "US",
-                "echoData": 123,
-            }
-        },
-        {
-            "zyte_api": {
-                "httpResponseBody": True,
-                "httpResponseHeaders": False,
-                "randomParameter": None,
-            },
-        },
-    ],
-)
-@ensureDeferred
-async def test_http_response_body_request(meta: Dict[str, Dict[str, Any]], mockserver):
-    req, resp = await produce_request_response(mockserver, meta)
-    assert isinstance(resp, Response)
-    assert resp.request is req
-    assert resp.url == req.url
-    assert resp.status == 200
-    assert "zyte-api" in resp.flags
-    assert resp.body == b"<html><body>Hello<h1>World!</h1></body></html>"
-
-    with pytest.raises(NotSupported):
-        assert resp.css("h1 ::text").get() == "World!"
-    with pytest.raises(NotSupported):
-        assert resp.xpath("//body/text()").getall() == ["Hello"]
+    if meta.get("httpResponseHeaders", True) is True:
+        assert resp.headers == {b"Test_Header": [b"test_value"]}
+    else:
+        assert not resp.headers
 
 
 @ensureDeferred
