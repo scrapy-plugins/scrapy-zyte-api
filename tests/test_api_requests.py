@@ -1094,7 +1094,8 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             [],
         ),
         # Warn if header parameters are used in meta, even if the values match
-        # request headers. If they do not match, meta takes precedence.
+        # request headers, and even if there are no request headers to match in
+        # the first place. If they do not match, meta takes precedence.
         (
             {"Referer": "a"},
             {
@@ -1152,6 +1153,72 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "httpResponseHeaders": True,
             },
             ["Use Request.headers instead"],
+        ),
+        (
+            {},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ]
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.headers instead"],
+        ),
+        (
+            {},
+            {
+                "browserHtml": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            {
+                "browserHtml": True,
+                "requestHeaders": {"referer": "a"},
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.headers instead"],
+        ),
+        # If httpRequestBody is True and requestHeaders is defined in meta, or
+        # if browserHtml is True and customHttpRequestHeaders is defined in
+        # meta, keep the meta parameters and do not issue a warning. There is
+        # no need for a warning because the request should get an error
+        # response from Zyte Data API. And if Zyte Data API were not to send an
+        # error response, that would mean the Zyte Data API has started
+        # supporting this scenario, all the more reason not to warn and let the
+        # parameters reach Zyte Data API.
+        (
+            {},
+            {
+                "requestHeaders": {"referer": "a"},
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {},
+            {
+                "browserHtml": True,
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+            },
+            {
+                "browserHtml": True,
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseHeaders": True,
+            },
+            [],
         ),
         # Unsupported headers not present in Scrapy requests by default are
         # dropped with a warning.
@@ -1468,7 +1535,8 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
 )
 def test_default_params_automap(default_params, meta, expected, warnings, caplog):
     """Warnings about unneeded parameters should not apply if those parameters
-    are needed to extend or override default parameters."""
+    are needed to extend or override parameters set in the
+    ``ZYTE_API_DEFAULT_PARAMS`` setting."""
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
     with caplog.at_level("WARNING"):
