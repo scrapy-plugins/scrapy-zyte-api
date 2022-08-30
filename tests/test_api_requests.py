@@ -370,6 +370,9 @@ def test_use_api_by_default(setting, meta, expected):
 @pytest.mark.parametrize("setting", [False, True])
 @pytest.mark.parametrize("meta", [None, 0, "", b"", []])
 def test_api_disabling_deprecated(setting, meta):
+    """Test how undocumented falsy values of the ``zyte_api`` request metadata
+    key (*meta*) can be used to disable the use of Zyte Data API, but trigger a
+    deprecation warning asking to replace them with False."""
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
     with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
