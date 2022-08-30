@@ -8,6 +8,7 @@ import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
+from scrapy.exceptions import CloseSpider
 from scrapy.http import Response, TextResponse
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
@@ -181,13 +182,15 @@ async def test_exceptions(
 
 @ensureDeferred
 async def test_higher_concurrency():
-    """Send DEFAULT_CLIENT_CONCURRENCY + 1 requests, the first and last taking
-    less time than the rest, and ensure that the first 2 responses are the
-    first and the last, verifying that a concurrency ≥
-    DEFAULT_CLIENT_CONCURRENCY + 1 has been reached."""
+    """Make sure that CONCURRENT_REQUESTS and CONCURRENT_REQUESTS_PER_DOMAIN
+    have an effect on Zyte Data API requests."""
+    # Send DEFAULT_CLIENT_CONCURRENCY + 1 requests, the last one taking less
+    # time than the rest, and ensure that the first response comes from the
+    # last request, verifying that a concurrency ≥ DEFAULT_CLIENT_CONCURRENCY
+    # + 1 has been reached.
     concurrency = DEFAULT_CLIENT_CONCURRENCY + 1
     response_indexes = []
-    expected_first_indexes = {0, concurrency - 1}
+    expected_first_index = concurrency - 1
     fast_seconds = 0.001
     slow_seconds = 0.2
 
@@ -206,7 +209,7 @@ async def test_higher_concurrency():
                                 "browserHtml": True,
                                 "delay": (
                                     fast_seconds
-                                    if index in expected_first_indexes
+                                    if index == expected_first_index
                                     else slow_seconds
                                 ),
                             },
@@ -216,6 +219,7 @@ async def test_higher_concurrency():
 
             async def parse(self, response):
                 response_indexes.append(response.meta["index"])
+                raise CloseSpider
 
         crawler = get_crawler(
             TestSpider,
@@ -228,9 +232,7 @@ async def test_higher_concurrency():
         )
         await crawler.crawl()
 
-    assert (
-        set(response_indexes[: len(expected_first_indexes)]) == expected_first_indexes
-    )
+    assert response_indexes[0] == expected_first_index
 
 
 @ensureDeferred
