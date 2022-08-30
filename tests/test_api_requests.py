@@ -792,6 +792,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
 @pytest.mark.parametrize(
     "method,meta,expected,warnings",
     [
+        # The GET HTTP method is not mapped, since it is the default method.
         (
             "GET",
             {},
@@ -801,6 +802,9 @@ def test_automap_header_output(meta, expected, warnings, caplog):
             },
             [],
         ),
+        # Other HTTP methods, regardless of whether they are supported,
+        # unsupported, or unknown, are mapped as httpRequestMethod, letting
+        # Zyte Data API decide whether or not they are allowed.
         *(
             (
                 method,
@@ -824,6 +828,9 @@ def test_automap_header_output(meta, expected, warnings, caplog):
                 "FOO",
             )
         ),
+        # If httpRequestMethod is also specified in meta with the same value
+        # as Request.method, a warning is logged asking to use only
+        # Request.meta.
         *(
             (
                 request_method,
@@ -840,6 +847,9 @@ def test_automap_header_output(meta, expected, warnings, caplog):
                 ("POST", "POST"),
             )
         ),
+        # If httpRequestMethod is also specified in meta with a different value
+        # from Request.method, a warning is logged asking to use Request.meta,
+        # and the meta value takes precedence.
         *(
             (
                 request_method,
@@ -859,6 +869,9 @@ def test_automap_header_output(meta, expected, warnings, caplog):
                 ("PUT", "GET"),
             )
         ),
+        # If httpResponseBody is not True, implicitly or explicitly,
+        # Request.method is not mapped, and a warning is issued if its value
+        # is anything other than GET.
         (
             "POST",
             {"browserHtml": True},
