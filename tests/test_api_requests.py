@@ -898,7 +898,8 @@ def test_automap_method(method, meta, expected, warnings, caplog):
 @pytest.mark.parametrize(
     "headers,meta,expected,warnings",
     [
-        # Base header mapping scenarios for a supported header.
+        # If httpResponseBody is True, implicitly or explicitly,
+        # Request.headers are mapped as customHttpRequestHeaders.
         (
             {"Referer": "a"},
             {},
@@ -911,6 +912,8 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
+        # If browserHtml or screenshot are True, Request.headers are mapped as
+        # requestHeaders.
         (
             {"Referer": "a"},
             {"browserHtml": True},
@@ -921,6 +924,18 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
+        (
+            {"Referer": "a"},
+            {"screenshot": True},
+            {
+                "requestHeaders": {"referer": "a"},
+                "screenshot": True,
+            },
+            [],
+        ),
+        # If both httpResponseBody and browserHtml (or screenshot, or both) are
+        # True, implicitly or explicitly, Request.headers are mapped both as
+        # customHttpRequestHeaders and as requestHeaders.
         (
             {"Referer": "a"},
             {"browserHtml": True, "httpResponseBody": True},
@@ -937,27 +952,42 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         ),
         (
             {"Referer": "a"},
-            {"screenshot": True},
-            {
-                "screenshot": True,
-                "requestHeaders": {"referer": "a"},
-            },
-            [],
-        ),
-        (
-            {"Referer": "a"},
             {"screenshot": True, "httpResponseBody": True},
             {
-                "screenshot": True,
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
                 "requestHeaders": {"referer": "a"},
+                "screenshot": True,
             },
             [],
         ),
+        (
+            {"Referer": "a"},
+            {"browserHtml": True, "screenshot": True, "httpResponseBody": True},
+            {
+                "browserHtml": True,
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "requestHeaders": {"referer": "a"},
+                "screenshot": True,
+            },
+            [],
+        ),
+        # If httpResponseBody is True, implicitly or explicitly, and there is
+        # no other known main output parameter (browserHtml, screenshot),
+        # Request.headers are mapped as customHttpRequestHeaders only.
+        #
+        # While future main output parameters are likely to use requestHeaders
+        # instead, we cannot known if an unknown parameter is a main output
+        # parameter or a different type of parameter for httpRequestBody, and
+        # what we know for sure is that, at the time of writing, Zyte Data API
+        # does not allow requestHeaders to be combined with httpRequestBody.
         (
             {"Referer": "a"},
             {"unknownMainOutput": True},
@@ -971,6 +1001,18 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
+        # If no known main output is requested, implicitly or explicitly, we
+        # assume that some unknown main output is being requested, and we map
+        # Request.headers as requestHeaders because that is the most likely way
+        # headers will need to be mapped for a future main output.
+        (
+            {"Referer": "a"},
+            {"httpResponseBody": False},
+            {
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
         (
             {"Referer": "a"},
             {"unknownMainOutput": True, "httpResponseBody": False},
@@ -980,15 +1022,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
-        (
-            {"Referer": "a"},
-            {"httpResponseBody": False},
-            {
-                "requestHeaders": {"referer": "a"},
-            },
-            [],
-        ),
-        # Headers with None as value are ignored.
+        # Headers with None as value are not mapped.
         (
             {"Referer": None},
             {},
@@ -1059,8 +1093,37 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {},
             [],
         ),
-        # Warn if header parameters are used, even if the values match request
-        # headers.
+        # Warn if header parameters are used in meta, even if the values match
+        # request headers. If they do not match, meta takes precedence.
+        (
+            {"Referer": "a"},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ]
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.headers instead"],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                "browserHtml": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            {
+                "browserHtml": True,
+                "requestHeaders": {"referer": "a"},
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.headers instead"],
+        ),
         (
             {"Referer": "a"},
             {
@@ -1086,35 +1149,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "requestHeaders": {"referer": "b"},
-                "httpResponseHeaders": True,
-            },
-            ["Use Request.headers instead"],
-        ),
-        (
-            {"Referer": "a"},
-            {
-                "customHttpRequestHeaders": [
-                    {"name": "Referer", "value": "a"},
-                ]
-            },
-            {
-                "customHttpRequestHeaders": [
-                    {"name": "Referer", "value": "a"},
-                ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["Use Request.headers instead"],
-        ),
-        (
-            {"Referer": "a"},
-            {
-                "browserHtml": True,
-                "requestHeaders": {"referer": "a"},
-            },
-            {
-                "browserHtml": True,
-                "requestHeaders": {"referer": "a"},
                 "httpResponseHeaders": True,
             },
             ["Use Request.headers instead"],
@@ -1173,7 +1207,11 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         # silently if their value matches the default value of Scrapy for
         # DEFAULT_REQUEST_HEADERS, or with a warning otherwise.
         (
-            DEFAULT_REQUEST_HEADERS,
+            {
+                k: v
+                for k, v in DEFAULT_REQUEST_HEADERS.items()
+                if k in {"Accept", "Accept-Language"}
+            },
             {"browserHtml": True},
             {
                 "browserHtml": True,
