@@ -10,10 +10,7 @@ setuptools.setup(
     author_email="info@zyte.com",
     url="https://github.com/scrapy-plugins/scrapy-zyte-api",
     packages=["scrapy_zyte_api"],
-    install_requires=[
-        "scrapy>=2.6.0",
-        "zyte-api>=0.3.0",
-    ],
+    install_requires=["zyte-api>=0.3.0", "scrapy>=2.6.0"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
