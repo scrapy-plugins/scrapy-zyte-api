@@ -486,6 +486,10 @@ def test_default_params_merging(setting, meta, expected, warnings, caplog):
 
 
 def test_default_params_immutability():
+    """Make sure that the merging of Zyte Data API parameters from the
+    ``ZYTE_API_DEFAULT_PARAMS`` setting with those from the ``zyte_api``
+    request metadata key does not affect the contents of the setting for later
+    requests."""
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = {"a": None}
     default_params = {"a": "b"}
