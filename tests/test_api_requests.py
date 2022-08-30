@@ -386,6 +386,19 @@ def test_api_disabling_deprecated(setting, meta):
     assert api_params is None
 
 
+@pytest.mark.parametrize("meta", [1, ["a", "b"]])
+def test_bad_meta_type(meta):
+    """Test how undocumented truthy values for the ``zyte_api`` request
+    metadata key (*meta*) trigger a :exc:`ValueError` exception."""
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    with pytest.raises(ValueError):
+        _get_api_params(
+            request,
+            **GET_API_PARAMS_KWARGS,
+        )
+
+
 @ensureDeferred
 async def test_job_id(mockserver):
     """Test how the value of the ``JOB`` setting (*setting*) is included as
@@ -485,6 +498,19 @@ def test_default_params_merging(setting, meta, expected, warnings, caplog):
         assert not caplog.records
 
 
+@pytest.mark.parametrize(
+    "meta,expected,warnings",
+    [
+        ({}, {}, {}, []),
+        ({}, {"b": 2}, {"b": 2}, []),
+        ({}, {"b": None}, {}, ["does not define such a parameter"]),
+        ({"a": 1}, {}, {"a": 1}, []),
+        ({"a": 1}, {"b": 2}, {"a": 1, "b": 2}, []),
+        ({"a": 1}, {"b": None}, {"a": 1}, ["does not define such a parameter"]),
+        ({"a": 1}, {"a": 2}, {"a": 2}, []),
+        ({"a": 1}, {"a": None}, {}, []),
+    ],
+)
 def test_default_params_immutability():
     """Make sure that the merging of Zyte Data API parameters from the
     ``ZYTE_API_DEFAULT_PARAMS`` setting with those from the ``zyte_api``
@@ -501,17 +527,6 @@ def test_default_params_immutability():
         },
     )
     assert default_params == {"a": "b"}
-
-
-@pytest.mark.parametrize("meta", [1, ["a", "b"]])
-def test_bad_meta_type(meta):
-    request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
-    with pytest.raises(ValueError):
-        _get_api_params(
-            request,
-            **GET_API_PARAMS_KWARGS,
-        )
 
 
 @pytest.mark.parametrize(
