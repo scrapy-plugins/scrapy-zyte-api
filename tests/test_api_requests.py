@@ -593,26 +593,27 @@ def _test_automap(global_kwargs, request_kwargs, meta, expected, warnings, caplo
 @pytest.mark.parametrize(
     "meta,expected,warnings",
     [
+        # If no other known main output is specified in meta, httpResponseBody
+        # is requested.
         ({}, {"httpResponseBody": True, "httpResponseHeaders": True}, []),
+        (
+            {"unknownMainOutput": True},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "unknownMainOutput": True,
+            },
+            [],
+        ),
+        # If httpResponseBody is unnecessarily requested in meta, a warning is
+        # logged.
         (
             {"httpResponseBody": True},
             {"httpResponseBody": True, "httpResponseHeaders": True},
             ["do not need to set httpResponseBody to True"],
         ),
-        (
-            {"httpResponseBody": False},
-            {},
-            [],
-        ),
-        (
-            {"httpResponseBody": True, "browserHtml": True},
-            {
-                "browserHtml": True,
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-        ),
+        # If other main outputs are specified in meta, httpRequestBody is not
+        # set.
         (
             {"browserHtml": True},
             {"browserHtml": True, "httpResponseHeaders": True},
@@ -624,13 +625,32 @@ def _test_automap(global_kwargs, request_kwargs, meta, expected, warnings, caplo
             [],
         ),
         (
-            {"unknown": True},
-            {"httpResponseBody": True, "httpResponseHeaders": True, "unknown": True},
+            {"browserHtml": True, "screenshot": True},
+            {"browserHtml": True, "httpResponseHeaders": True, "screenshot": True},
+            [],
+        ),
+        # If no known main output is specified, and httpResponseBody is
+        # explicitly set to False, httpResponseBody is unset and no main output
+        # is added.
+        (
+            {"httpResponseBody": False},
+            {},
             [],
         ),
         (
-            {"unknown": True, "httpResponseBody": False},
-            {"unknown": True},
+            {"httpResponseBody": False, "unknownMainOutput": True},
+            {"unknownMainOutput": True},
+            [],
+        ),
+        # We allow httpResponseBody and browserHtml to be both set to True, in
+        # case that becomes possible in the future.
+        (
+            {"httpResponseBody": True, "browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
             [],
         ),
     ],
