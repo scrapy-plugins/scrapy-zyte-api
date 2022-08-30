@@ -1,5 +1,6 @@
 import sys
 from asyncio import iscoroutine
+from copy import copy
 from typing import Any, Dict, List, Union
 from unittest import mock
 from unittest.mock import patch
@@ -499,26 +500,33 @@ def test_default_params_merging(setting, meta, expected, warnings, caplog):
 
 
 @pytest.mark.parametrize(
-    "meta,expected,warnings",
+    "setting,meta",
     [
-        ({}, {}, {}, []),
-        ({}, {"b": 2}, {"b": 2}, []),
-        ({}, {"b": None}, {}, ["does not define such a parameter"]),
-        ({"a": 1}, {}, {"a": 1}, []),
-        ({"a": 1}, {"b": 2}, {"a": 1, "b": 2}, []),
-        ({"a": 1}, {"b": None}, {"a": 1}, ["does not define such a parameter"]),
-        ({"a": 1}, {"a": 2}, {"a": 2}, []),
-        ({"a": 1}, {"a": None}, {}, []),
+        # append
+        (
+            {"a": "b"},
+            {"b": "c"},
+        ),
+        # overwrite
+        (
+            {"a": "b"},
+            {"a": "c"},
+        ),
+        # drop
+        (
+            {"a": "b"},
+            {"a": None},
+        ),
     ],
 )
-def test_default_params_immutability():
+def test_default_params_immutability(setting, meta):
     """Make sure that the merging of Zyte Data API parameters from the
-    ``ZYTE_API_DEFAULT_PARAMS`` setting with those from the ``zyte_api``
-    request metadata key does not affect the contents of the setting for later
-    requests."""
+    ``ZYTE_API_DEFAULT_PARAMS`` setting (*setting*) with those from the
+    ``zyte_api`` request metadata key (*meta*) does not affect the contents of
+    the setting for later requests."""
     request = Request(url="https://example.com")
-    request.meta["zyte_api"] = {"a": None}
-    default_params = {"a": "b"}
+    request.meta["zyte_api"] = meta
+    default_params = copy(setting)
     _get_api_params(
         request,
         **{
@@ -526,7 +534,7 @@ def test_default_params_immutability():
             "default_params": default_params,
         },
     )
-    assert default_params == {"a": "b"}
+    assert default_params == setting
 
 
 @pytest.mark.parametrize(
