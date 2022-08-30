@@ -104,11 +104,27 @@ async def test_response_html(meta: Dict[str, Dict[str, Any]], mockserver):
         assert not resp.headers
 
 
+UNSET = object()
+
+
 @ensureDeferred
-async def test_disable(mockserver):
-    settings = {"ZYTE_API_ENABLED": False}
+@pytest.mark.parametrize(
+    "setting,enabled",
+    [
+        (UNSET, True),
+        (True, True),
+        (False, False),
+    ],
+)
+async def test_enabled(setting, enabled, mockserver):
+    settings = {}
+    if setting is not UNSET:
+        settings["ZYTE_API_ENABLED"] = setting
     async with mockserver.make_handler(settings) as handler:
-        assert handler is None
+        if enabled:
+            assert handler is not None
+        else:
+            assert handler is None
 
 
 @pytest.mark.parametrize("zyte_api", [True, False])
@@ -573,9 +589,6 @@ async def test_get_api_params_input_custom(mockserver):
                 unsupported_headers={b"a"},
                 browser_headers={b"b": "b"},
             )
-
-
-UNSET = object()
 
 
 @pytest.mark.parametrize(
