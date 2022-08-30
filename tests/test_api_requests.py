@@ -413,8 +413,8 @@ async def test_default_params_none(mockserver, caplog):
     expected to be a valid value.
 
     Note that ``None`` is however a valid value for parameters defined in the
-    ``zyte_api`` request metadata key to unset parameters set in the
-    ZYTE_API_DEFAULT_PARAMS setting for a specific request.
+    ``zyte_api`` request metadata key. It can be used to unset parameters set
+    in the ``ZYTE_API_DEFAULT_PARAMS`` setting for that specific request.
 
     Also note that :func:`test_get_api_params_input_custom` already tests how
     the ``ZYTE_API_DEFAULT_PARAMS`` setting is mapped to the corresponding
@@ -442,7 +442,7 @@ async def test_default_params_none(mockserver, caplog):
 
 
 @pytest.mark.parametrize(
-    "default_params,meta,expected,warnings",
+    "setting,meta,expected,warnings",
     [
         ({}, {}, {}, []),
         ({}, {"b": 2}, {"b": 2}, []),
@@ -454,7 +454,19 @@ async def test_default_params_none(mockserver, caplog):
         ({"a": 1}, {"a": None}, {}, []),
     ],
 )
-def test_default_params_merging(default_params, meta, expected, warnings, caplog):
+def test_default_params_merging(setting, meta, expected, warnings, caplog):
+    """Test how Zyte Data API parameters defined in the
+    ``ZYTE_API_DEFAULT_PARAMS`` setting (*setting*) and those defined in the ``zyte_api`` request metadata key (*meta*) are combined.
+
+    Request metadata takes precedence. Also, ``None`` values in request
+    metadata can be used to unset parameters defined in the setting. Request
+    metadata ``None`` values for keys that do not exist in the setting cause a
+    warning.
+
+    Note that :func:`test_get_api_params_input_custom` already tests how the
+    ``ZYTE_API_DEFAULT_PARAMS`` setting is mapped to the corresponding
+    :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
+    """
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
     with caplog.at_level("WARNING"):
@@ -462,7 +474,7 @@ def test_default_params_merging(default_params, meta, expected, warnings, caplog
             request,
             **{
                 **GET_API_PARAMS_KWARGS,
-                "default_params": default_params,
+                "default_params": setting,
             },
         )
     assert api_params == expected
