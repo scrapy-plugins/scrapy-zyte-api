@@ -1,7 +1,7 @@
 import sys
 from asyncio import iscoroutine
 from copy import copy
-from typing import Any, Dict, List, Union
+from typing import Any, Dict
 from unittest import mock
 from unittest.mock import patch
 
@@ -15,7 +15,6 @@ from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
-from typing_extensions import Literal
 from zyte_api.aio.errors import RequestError
 
 from scrapy_zyte_api.handler import _get_api_params
@@ -571,7 +570,7 @@ def test_automap_toggling(setting, meta, expected):
     assert bool(api_params) == expected
 
 
-def _test_automap(request_kwargs, meta, expected, warnings, caplog):
+def _test_automap(global_kwargs, request_kwargs, meta, expected, warnings, caplog):
     request = Request(url="https://example.com", **request_kwargs)
     request.meta["zyte_api"] = meta
     with caplog.at_level("WARNING"):
@@ -579,6 +578,7 @@ def _test_automap(request_kwargs, meta, expected, warnings, caplog):
             request,
             **{
                 **GET_API_PARAMS_KWARGS,
+                **global_kwargs,
                 "automap_by_default": True,
             },
         )
@@ -588,296 +588,6 @@ def _test_automap(request_kwargs, meta, expected, warnings, caplog):
             assert warning in caplog.text
     else:
         assert not caplog.records
-
-
-@ensureDeferred
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
-@pytest.mark.parametrize(
-    "request_kwargs,settings,expected,warnings",
-    [
-        # The Accept and Accept-Language headers, when unsupported, are dropped
-        # silently if their value matches the default value of Scrapy for
-        # DEFAULT_REQUEST_HEADERS, or with a warning otherwise.
-        (
-            {
-                "headers": DEFAULT_REQUEST_HEADERS,
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-        ),
-        (
-            {
-                "headers": {
-                    "Accept": "application/json",
-                    "Accept-Language": "uk",
-                },
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
-        # The Cookie header is dropped with a warning.
-        (
-            {
-                "headers": {
-                    "Cookie": "a=b",
-                },
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
-        (
-            {
-                "headers": {
-                    "Cookie": "a=b",
-                },
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
-        # The User-Agent header, which Scrapy sets by default, is dropped
-        # silently if it matches the default value of the USER_AGENT setting,
-        # or with a warning otherwise.
-        (
-            {
-                "headers": {"User-Agent": DEFAULT_USER_AGENT},
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-        ),
-        (
-            {
-                "headers": {"User-Agent": ""},
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
-        (
-            {
-                "headers": {"User-Agent": DEFAULT_USER_AGENT},
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-        ),
-        (
-            {
-                "headers": {"User-Agent": ""},
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
-        # You may update the ZYTE_API_UNSUPPORTED_HEADERS setting to remove
-        # headers that the customHttpRequestHeaders parameter starts supporting
-        # in the future.
-        (
-            {
-                "headers": {
-                    "Cookie": "",
-                    "User-Agent": "",
-                },
-            },
-            {
-                "ZYTE_API_UNSUPPORTED_HEADERS": ["Cookie"],
-            },
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "customHttpRequestHeaders": [
-                    {"name": "User-Agent", "value": ""},
-                ],
-            },
-            [
-                "defines header b'Cookie', which cannot be mapped",
-            ],
-        ),
-        # You may update the ZYTE_API_BROWSER_HEADERS setting to extend support
-        # for new fields that the requestHeaders parameter may support in the
-        # future.
-        (
-            {
-                "headers": {"User-Agent": ""},
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {
-                "ZYTE_API_BROWSER_HEADERS": {
-                    "Referer": "referer",
-                    "User-Agent": "userAgent",
-                },
-            },
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-                "requestHeaders": {"userAgent": ""},
-            },
-            [],
-        ),
-        # BODY
-        # The body is copied into httpRequestBody, base64-encoded.
-        (
-            {
-                "body": "a",
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "httpRequestBody": "YQ==",
-            },
-            [],
-        ),
-        # httpRequestBody defined in meta takes precedence, but it causes a
-        # warning.
-        (
-            {
-                "body": "a",
-                "meta": {"zyte_api": {"httpRequestBody": "Yg=="}},
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "httpRequestBody": "Yg==",
-            },
-            [
-                "Use Request.body instead",
-                "does not match the Zyte Data API httpRequestBody parameter",
-            ],
-        ),
-        # httpRequestBody defined in meta causes a warning even if it matches
-        # request.body.
-        (
-            {
-                "body": "a",
-                "meta": {"zyte_api": {"httpRequestBody": "YQ=="}},
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "httpRequestBody": "YQ==",
-            },
-            ["Use Request.body instead"],
-        ),
-        # A body should not be used unless httpResponseBody is also used.
-        (
-            {
-                "body": "a",
-                "meta": {"zyte_api": {"browserHtml": True}},
-            },
-            {},
-            {
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            ["can only be set when the httpResponseBody parameter"],
-        ),
-        (
-            {
-                "body": "a",
-                "meta": {"zyte_api": {"screenshot": True}},
-            },
-            {},
-            {
-                "screenshot": True,
-            },
-            ["can only be set when the httpResponseBody parameter"],
-        ),
-        # httpResponseHeaders
-        # Warn if httpResponseHeaders is defined unnecessarily.
-        (
-            {
-                "meta": {"zyte_api": {"httpResponseHeaders": True}},
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["do not need to set httpResponseHeaders"],
-        ),
-    ],
-)
-async def test_automap(
-    request_kwargs: Dict[str, Any],
-    settings: Dict[str, Any],
-    expected: Union[Dict[str, str], Literal[False]],
-    warnings: List[str],
-    mockserver,
-    caplog,
-):
-    settings.update({"ZYTE_API_ON_ALL_REQUESTS": True, "ZYTE_API_AUTOMAP": True})
-    async with mockserver.make_handler(settings) as handler:
-        if expected is False:
-            # Only the Zyte Data API client is mocked, meaning requests that
-            # do not go through Zyte Data API are actually sent, so we point
-            # them to the mock server to avoid internet connections in tests.
-            request_kwargs["url"] = mockserver.urljoin("/")
-        else:
-            request_kwargs["url"] = "https://toscrape.com"
-        request = Request(**request_kwargs)
-        unmocked_client = handler._client
-        handler._client = mock.AsyncMock(unmocked_client)
-        handler._client.request_raw.side_effect = unmocked_client.request_raw
-        with caplog.at_level("WARNING"):
-            await handler.download_request(request, None)
-
-        # What we're interested in is the Request call in the API
-        request_call = [
-            c for c in handler._client.mock_calls if "request_raw(" in str(c)
-        ]
-
-        if expected is False:
-            assert request_call == []
-            return
-
-        if not request_call:
-            pytest.fail("The client's request_raw() method was not called.")
-
-        args_used = request_call[0].args[0]
-        args_used.pop("url")
-        assert args_used == expected
-
-        if warnings:
-            for warning in warnings:
-                assert warning in caplog.text
-        else:
-            assert not caplog.records
 
 
 @pytest.mark.parametrize(
@@ -926,7 +636,7 @@ async def test_automap(
     ],
 )
 def test_automap_main_outputs(meta, expected, warnings, caplog):
-    _test_automap({}, meta, expected, warnings, caplog)
+    _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -1026,7 +736,7 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
     ],
 )
 def test_automap_header_output(meta, expected, warnings, caplog):
-    _test_automap({}, meta, expected, warnings, caplog)
+    _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -1119,7 +829,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
     ],
 )
 def test_automap_method(method, meta, expected, warnings, caplog):
-    _test_automap({"method": method}, meta, expected, warnings, caplog)
+    _test_automap({}, {"method": method}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -1396,10 +1106,191 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             ["cannot be mapped"],
         ),
+        # The Accept and Accept-Language headers, when unsupported, are dropped
+        # silently if their value matches the default value of Scrapy for
+        # DEFAULT_REQUEST_HEADERS, or with a warning otherwise.
+        (
+            DEFAULT_REQUEST_HEADERS,
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {
+                "Accept": "application/json",
+                "Accept-Language": "uk",
+            },
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped"],
+        ),
+        # The User-Agent header, which Scrapy sets by default, is dropped
+        # silently if it matches the default value of the USER_AGENT setting,
+        # or with a warning otherwise.
+        (
+            {"User-Agent": DEFAULT_USER_AGENT},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"User-Agent": ""},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped"],
+        ),
+        (
+            {"User-Agent": DEFAULT_USER_AGENT},
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"User-Agent": ""},
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped"],
+        ),
     ],
 )
 def test_automap_headers(headers, meta, expected, warnings, caplog):
-    _test_automap({"headers": headers}, meta, expected, warnings, caplog)
+    _test_automap({}, {"headers": headers}, meta, expected, warnings, caplog)
+
+
+@pytest.mark.parametrize(
+    "global_kwargs,headers,meta,expected,warnings",
+    [
+        # You may update the ZYTE_API_UNSUPPORTED_HEADERS setting to remove
+        # headers that the customHttpRequestHeaders parameter starts supporting
+        # in the future.
+        (
+            {
+                "unsupported_headers": {b"cookie"},
+            },
+            {
+                "Cookie": "",
+                "User-Agent": "",
+            },
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "customHttpRequestHeaders": [
+                    {"name": "User-Agent", "value": ""},
+                ],
+            },
+            [
+                "defines header b'Cookie', which cannot be mapped",
+            ],
+        ),
+        # You may update the ZYTE_API_BROWSER_HEADERS setting to extend support
+        # for new fields that the requestHeaders parameter may support in the
+        # future.
+        (
+            {
+                "browser_headers": {
+                    b"referer": "referer",
+                    b"user-agent": "userAgent",
+                },
+            },
+            {"User-Agent": ""},
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+                "requestHeaders": {"userAgent": ""},
+            },
+            [],
+        ),
+    ],
+)
+def test_automap_header_settings(
+    global_kwargs, headers, meta, expected, warnings, caplog
+):
+    _test_automap(global_kwargs, {"headers": headers}, meta, expected, warnings, caplog)
+
+
+@pytest.mark.parametrize(
+    "body,meta,expected,warnings",
+    [
+        # The body is copied into httpRequestBody, base64-encoded.
+        (
+            "a",
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "httpRequestBody": "YQ==",
+            },
+            [],
+        ),
+        # httpRequestBody defined in meta takes precedence, but it causes a
+        # warning.
+        (
+            "a",
+            {"httpRequestBody": "Yg=="},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "httpRequestBody": "Yg==",
+            },
+            [
+                "Use Request.body instead",
+                "does not match the Zyte Data API httpRequestBody parameter",
+            ],
+        ),
+        # httpRequestBody defined in meta causes a warning even if it matches
+        # request.body.
+        (
+            "a",
+            {"httpRequestBody": "YQ=="},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "httpRequestBody": "YQ==",
+            },
+            ["Use Request.body instead"],
+        ),
+        # A body should not be used unless httpResponseBody is also used.
+        (
+            "a",
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            ["can only be set when the httpResponseBody parameter"],
+        ),
+        (
+            "a",
+            {"screenshot": True},
+            {
+                "screenshot": True,
+            },
+            ["can only be set when the httpResponseBody parameter"],
+        ),
+    ],
+)
+def test_automap_body(body, meta, expected, warnings, caplog):
+    _test_automap({}, {"body": body}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -1455,7 +1346,7 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
     ],
 )
 def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
-    _test_automap({}, meta, expected, warnings, caplog)
+    _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.xfail(reason="To be implemented", strict=True)

@@ -12,7 +12,6 @@ setuptools.setup(
     packages=["scrapy_zyte_api"],
     install_requires=[
         "scrapy>=2.6.0",
-        "typing-extensions>=3.10",
         "zyte-api>=0.3.0",
     ],
     classifiers=[
