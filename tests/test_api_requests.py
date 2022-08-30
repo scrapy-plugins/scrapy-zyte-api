@@ -662,16 +662,40 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
 @pytest.mark.parametrize(
     "meta,expected,warnings",
     [
-        ({"httpResponseHeaders": False}, {"httpResponseBody": True}, []),
+        # Test cases where httpResponseHeaders is not specifically set to True
+        # or False, where it is automatically set to True if httpResponseBody
+        # or browserHtml are also True, are covered in
+        # test_automap_main_outputs.
+        #
+        # If httpResponseHeaders is set to True in a scenario where it would
+        # not be implicitly set to True, it is passed as such.
+        (
+            {"httpResponseBody": False, "httpResponseHeaders": True},
+            {"httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {"screenshot": True, "httpResponseHeaders": True},
+            {"screenshot": True, "httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {
+                "unknownMainOutput": True,
+                "httpResponseBody": False,
+                "httpResponseHeaders": True,
+            },
+            {"unknownMainOutput": True, "httpResponseHeaders": True},
+            [],
+        ),
+        # If httpResponseHeaders is unnecessarily set to True where
+        # httpResponseBody or browserHtml are set to True implicitly or
+        # explicitly, httpResponseHeaders is set to True, and a warning is
+        # logged.
         (
             {"httpResponseHeaders": True},
             {"httpResponseBody": True, "httpResponseHeaders": True},
             ["do not need to set httpResponseHeaders to True"],
-        ),
-        (
-            {"httpResponseBody": True, "httpResponseHeaders": False},
-            {"httpResponseBody": True},
-            ["do not need to set httpResponseBody to True"],
         ),
         (
             {"httpResponseBody": True, "httpResponseHeaders": True},
@@ -682,24 +706,45 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
             ],
         ),
         (
-            {"httpResponseBody": False, "httpResponseHeaders": False},
-            {},
-            ["do not need to set httpResponseHeaders to False"],
+            {"browserHtml": True, "httpResponseHeaders": True},
+            {"browserHtml": True, "httpResponseHeaders": True},
+            ["do not need to set httpResponseHeaders to True"],
         ),
         (
-            {"httpResponseBody": False, "httpResponseHeaders": True},
-            {"httpResponseHeaders": True},
-            [],
+            {
+                "httpResponseBody": True,
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            {
+                "browserHtml": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["do not need to set httpResponseHeaders to True"],
+        ),
+        (
+            {"unknownMainOutput": True, "httpResponseHeaders": True},
+            {
+                "unknownMainOutput": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["do not need to set httpResponseHeaders to True"],
+        ),
+        # If httpResponseHeaders is set to False, httpResponseHeaders is not
+        # defined, even if httpResponseBody or browserHtml are set to True,
+        # implicitly or explicitly.
+        ({"httpResponseHeaders": False}, {"httpResponseBody": True}, []),
+        (
+            {"httpResponseBody": True, "httpResponseHeaders": False},
+            {"httpResponseBody": True},
+            ["do not need to set httpResponseBody to True"],
         ),
         (
             {"browserHtml": True, "httpResponseHeaders": False},
             {"browserHtml": True},
             [],
-        ),
-        (
-            {"browserHtml": True, "httpResponseHeaders": True},
-            {"browserHtml": True, "httpResponseHeaders": True},
-            ["do not need to set httpResponseHeaders to True"],
         ),
         (
             {
@@ -711,17 +756,18 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
             [],
         ),
         (
-            {
-                "httpResponseBody": True,
-                "browserHtml": True,
-                "httpResponseHeaders": True,
-            },
-            {
-                "browserHtml": True,
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["do not need to set httpResponseHeaders to True"],
+            {"unknownMainOutput": True, "httpResponseHeaders": False},
+            {"unknownMainOutput": True, "httpResponseBody": True},
+            [],
+        ),
+        # If httpResponseHeaders is unnecessarily set to False where
+        # httpResponseBody and browserHtml are set to False implicitly or
+        # explicitly, httpResponseHeaders is not defined, and a warning is
+        # logged.
+        (
+            {"httpResponseBody": False, "httpResponseHeaders": False},
+            {},
+            ["do not need to set httpResponseHeaders to False"],
         ),
         (
             {"screenshot": True, "httpResponseHeaders": False},
@@ -729,28 +775,12 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
             ["do not need to set httpResponseHeaders to False"],
         ),
         (
-            {"screenshot": True, "httpResponseHeaders": True},
-            {"screenshot": True, "httpResponseHeaders": True},
-            [],
-        ),
-        (
-            {"unknown": True, "httpResponseHeaders": True},
-            {"unknown": True, "httpResponseBody": True, "httpResponseHeaders": True},
-            ["do not need to set httpResponseHeaders to True"],
-        ),
-        (
-            {"unknown": True, "httpResponseHeaders": False},
-            {"unknown": True, "httpResponseBody": True},
-            [],
-        ),
-        (
-            {"unknown": True, "httpResponseBody": False, "httpResponseHeaders": True},
-            {"unknown": True, "httpResponseHeaders": True},
-            [],
-        ),
-        (
-            {"unknown": True, "httpResponseBody": False, "httpResponseHeaders": False},
-            {"unknown": True},
+            {
+                "unknownMainOutput": True,
+                "httpResponseBody": False,
+                "httpResponseHeaders": False,
+            },
+            {"unknownMainOutput": True},
             ["do not need to set httpResponseHeaders to False"],
         ),
     ],
@@ -917,23 +947,23 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         ),
         (
             {"Referer": "a"},
-            {"unknown": True},
+            {"unknownMainOutput": True},
             {
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
-                "unknown": True,
+                "unknownMainOutput": True,
             },
             [],
         ),
         (
             {"Referer": "a"},
-            {"unknown": True, "httpResponseBody": False},
+            {"unknownMainOutput": True, "httpResponseBody": False},
             {
                 "requestHeaders": {"referer": "a"},
-                "unknown": True,
+                "unknownMainOutput": True,
             },
             [],
         ),
@@ -994,19 +1024,19 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         ),
         (
             {"Referer": None},
-            {"unknown": True},
+            {"unknownMainOutput": True},
             {
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
-                "unknown": True,
+                "unknownMainOutput": True,
             },
             [],
         ),
         (
             {"Referer": None},
-            {"unknown": True, "httpResponseBody": False},
+            {"unknownMainOutput": True, "httpResponseBody": False},
             {
-                "unknown": True,
+                "unknownMainOutput": True,
             },
             [],
         ),
