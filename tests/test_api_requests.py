@@ -1397,13 +1397,10 @@ def test_automap_body(body, meta, expected, warnings, caplog):
 @pytest.mark.parametrize(
     "meta,expected,warnings",
     [
-        (
-            {
-                "httpResponseBody": False,
-            },
-            {},
-            [],
-        ),
+        # When httpResponseBody, browserHtml, screenshot, or
+        # httpResponseHeaders, are unnecessarily set to False, they are not
+        # defined in the parameters sent to Zyte Data API, and a warning is
+        # logged.
         (
             {
                 "browserHtml": True,
@@ -1438,11 +1435,12 @@ def test_automap_body(body, meta, expected, warnings, caplog):
         (
             {
                 "httpResponseHeaders": False,
+                "screenshot": True,
             },
             {
-                "httpResponseBody": True,
+                "screenshot": True,
             },
-            [],
+            ["do not need to set httpResponseHeaders to False"],
         ),
     ],
 )
