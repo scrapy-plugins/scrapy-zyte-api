@@ -130,6 +130,9 @@ async def test_enabled(setting, enabled, mockserver):
 @pytest.mark.parametrize("zyte_api", [True, False])
 @ensureDeferred
 async def test_coro_handling(zyte_api: bool, mockserver):
+    """ScrapyZyteAPIDownloadHandler.download_request must return a deferred
+    both when using Zyte Data API and when using the regular downloader
+    logic."""
     settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
     async with mockserver.make_handler(settings) as handler:
         req = Request(
@@ -174,25 +177,6 @@ async def test_exceptions(
         with pytest.raises(exception_type):
             await handler.download_request(req, None)
         assert exception_text in caplog.text
-
-
-@ensureDeferred
-async def test_job_id(mockserver):
-    job_id = "547773/99/6"
-    settings = {"JOB": job_id}
-    async with mockserver.make_handler(settings) as handler:
-        req = Request(
-            "http://example.com",
-            method="POST",
-            meta={"zyte_api": {"browserHtml": True}},
-        )
-        resp = await handler.download_request(req, None)
-
-    assert resp.request is req
-    assert resp.url == req.url
-    assert resp.status == 200
-    assert "zyte-api" in resp.flags
-    assert resp.body == f"<html>{job_id}</html>".encode("utf8")
 
 
 @ensureDeferred
@@ -544,6 +528,15 @@ BROWSER_HEADERS = {b"referer": "referer"}
 DEFAULT_PARAMS: Dict[str, Any] = {}
 UNSUPPORTED_HEADERS = {b"cookie", b"user-agent"}
 USE_API_BY_DEFAULT = False
+JOB_ID = None
+GET_API_PARAMS_KWARGS = {
+    "use_api_by_default": USE_API_BY_DEFAULT,
+    "automap_by_default": AUTOMAP_BY_DEFAULT,
+    "default_params": DEFAULT_PARAMS,
+    "unsupported_headers": UNSUPPORTED_HEADERS,
+    "browser_headers": BROWSER_HEADERS,
+    "job_id": JOB_ID,
+}
 
 
 @ensureDeferred
@@ -557,11 +550,7 @@ async def test_get_api_params_input_default(mockserver):
                 await handler.download_request(request, None)
             _get_api_params.assert_called_once_with(
                 request,
-                use_api_by_default=USE_API_BY_DEFAULT,
-                automap_by_default=AUTOMAP_BY_DEFAULT,
-                default_params=DEFAULT_PARAMS,
-                unsupported_headers=UNSUPPORTED_HEADERS,
-                browser_headers=BROWSER_HEADERS,
+                **GET_API_PARAMS_KWARGS,
             )
 
 
@@ -569,6 +558,7 @@ async def test_get_api_params_input_default(mockserver):
 async def test_get_api_params_input_custom(mockserver):
     request = Request(url="https://example.com")
     settings = {
+        "JOB": "1/2/3",
         "ZYTE_API_AUTOMAP": False,
         "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
         "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
@@ -588,6 +578,7 @@ async def test_get_api_params_input_custom(mockserver):
                 default_params={"a": "b"},
                 unsupported_headers={b"a"},
                 browser_headers={b"b": "b"},
+                job_id="1/2/3",
             )
 
 
@@ -616,11 +607,10 @@ def test_api_toggling(setting, meta, expected):
     request = Request(url="https://example.com", meta=meta)
     api_params = _get_api_params(
         request,
-        use_api_by_default=setting,
-        automap_by_default=False,
-        default_params=DEFAULT_PARAMS,
-        unsupported_headers=UNSUPPORTED_HEADERS,
-        browser_headers=BROWSER_HEADERS,
+        **{
+            **GET_API_PARAMS_KWARGS,
+            "use_api_by_default": setting,
+        },
     )
     assert api_params == expected
 
@@ -633,13 +623,25 @@ def test_api_disabling_deprecated(setting, meta):
     with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
         api_params = _get_api_params(
             request,
-            use_api_by_default=setting,
-            automap_by_default=False,
-            default_params=DEFAULT_PARAMS,
-            unsupported_headers=UNSUPPORTED_HEADERS,
-            browser_headers=BROWSER_HEADERS,
+            **{
+                **GET_API_PARAMS_KWARGS,
+                "use_api_by_default": setting,
+            },
         )
     assert api_params is None
+
+
+@ensureDeferred
+async def test_job_id(mockserver):
+    request = Request(url="https://example.com", meta={"zyte_api": True})
+    api_params = _get_api_params(
+        request,
+        **{
+            **GET_API_PARAMS_KWARGS,
+            "job_id": "1/2/3",
+        },
+    )
+    assert api_params["jobId"] == "1/2/3"
 
 
 @ensureDeferred
@@ -657,11 +659,10 @@ async def test_default_params_none(mockserver, caplog):
                     await handler.download_request(request, None)
                 _get_api_params.assert_called_once_with(
                     request,
-                    use_api_by_default=USE_API_BY_DEFAULT,
-                    automap_by_default=AUTOMAP_BY_DEFAULT,
-                    default_params={"b": "c"},
-                    unsupported_headers=UNSUPPORTED_HEADERS,
-                    browser_headers=BROWSER_HEADERS,
+                    **{
+                        **GET_API_PARAMS_KWARGS,
+                        "default_params": {"b": "c"},
+                    },
                 )
     assert "Parameter 'a' in the ZYTE_API_DEFAULT_PARAMS setting is None" in caplog.text
 
@@ -685,11 +686,10 @@ def test_default_params_merging(default_params, meta, expected, warnings, caplog
     with caplog.at_level("WARNING"):
         api_params = _get_api_params(
             request,
-            use_api_by_default=USE_API_BY_DEFAULT,
-            automap_by_default=False,
-            default_params=default_params,
-            unsupported_headers=UNSUPPORTED_HEADERS,
-            browser_headers=BROWSER_HEADERS,
+            **{
+                **GET_API_PARAMS_KWARGS,
+                "default_params": default_params,
+            },
         )
     assert api_params == expected
     if warnings:
@@ -724,11 +724,10 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
     with caplog.at_level("WARNING"):
         api_params = _get_api_params(
             request,
-            use_api_by_default=USE_API_BY_DEFAULT,
-            automap_by_default=True,
-            default_params=default_params,
-            unsupported_headers=UNSUPPORTED_HEADERS,
-            browser_headers=BROWSER_HEADERS,
+            **{
+                **GET_API_PARAMS_KWARGS,
+                "automap_by_default": True,
+            },
         )
     assert api_params == expected
     if warnings:
@@ -744,11 +743,10 @@ def test_default_params_immutability():
     default_params = {"a": "b"}
     _get_api_params(
         request,
-        use_api_by_default=USE_API_BY_DEFAULT,
-        automap_by_default=AUTOMAP_BY_DEFAULT,
-        default_params=default_params,
-        unsupported_headers=UNSUPPORTED_HEADERS,
-        browser_headers=BROWSER_HEADERS,
+        **{
+            **GET_API_PARAMS_KWARGS,
+            "default_params": default_params,
+        },
     )
     assert default_params == {"a": "b"}
 
@@ -760,11 +758,7 @@ def test_bad_meta_type(meta):
     with pytest.raises(ValueError):
         _get_api_params(
             request,
-            use_api_by_default=USE_API_BY_DEFAULT,
-            automap_by_default=False,
-            default_params=DEFAULT_PARAMS,
-            unsupported_headers=UNSUPPORTED_HEADERS,
-            browser_headers=BROWSER_HEADERS,
+            **GET_API_PARAMS_KWARGS,
         )
 
 
@@ -785,11 +779,11 @@ def test_automap_toggling(setting, meta, expected):
         request.meta["zyte_api_automap"] = meta
     api_params = _get_api_params(
         request,
-        use_api_by_default=True,
-        automap_by_default=setting,
-        default_params=DEFAULT_PARAMS,
-        unsupported_headers=UNSUPPORTED_HEADERS,
-        browser_headers=BROWSER_HEADERS,
+        **{
+            **GET_API_PARAMS_KWARGS,
+            "use_api_by_default": True,
+            "automap_by_default": setting,
+        },
     )
     assert bool(api_params) == expected
 
@@ -800,11 +794,10 @@ def _test_automap(request_kwargs, meta, expected, warnings, caplog):
     with caplog.at_level("WARNING"):
         api_params = _get_api_params(
             request,
-            use_api_by_default=USE_API_BY_DEFAULT,
-            automap_by_default=True,
-            default_params=DEFAULT_PARAMS,
-            unsupported_headers=UNSUPPORTED_HEADERS,
-            browser_headers=BROWSER_HEADERS,
+            **{
+                **GET_API_PARAMS_KWARGS,
+                "automap_by_default": True,
+            },
         )
     assert api_params == expected
     if warnings:

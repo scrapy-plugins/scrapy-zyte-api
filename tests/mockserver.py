@@ -60,11 +60,7 @@ class DefaultResource(LeafResource):
             return json.dumps(response_data).encode()
         response_data["url"] = request_data["url"]
 
-        if request_data.get("jobId") is not None:
-            html = f"<html>{request_data['jobId']}</html>"
-        else:
-            html = "<html><body>Hello<h1>World!</h1></body></html>"
-
+        html = "<html><body>Hello<h1>World!</h1></body></html>"
         if "browserHtml" in request_data:
             if "httpResponseBody" in request_data:
                 request.setResponseCode(422)

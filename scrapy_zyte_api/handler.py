@@ -234,6 +234,7 @@ def _get_api_params(
     default_params: Dict[str, Any],
     unsupported_headers: Set[str],
     browser_headers: Dict[str, str],
+    job_id: Optional[str],
 ) -> Optional[dict]:
     """Returns a dictionary of API parameters that must be sent to Zyte Data
     API for the specified request, or None if the request should not be driven
@@ -283,6 +284,9 @@ def _get_api_params(
             browser_headers=browser_headers,
             default_params=default_params,
         )
+
+    if job_id is not None:
+        api_params["jobId"] = job_id
 
     return api_params
 
@@ -361,6 +365,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             default_params=self._zyte_api_default_params,
             unsupported_headers=self._unsupported_headers,
             browser_headers=self._browser_headers,
+            job_id=self._job_id,
         )
         if api_params:
             return deferred_from_coro(
@@ -418,8 +423,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
         # Define url by default
         api_data = {**{"url": request.url}, **api_params}
-        if self._job_id is not None:
-            api_data["jobId"] = self._job_id
         retrying = request.meta.get("zyte_api_retry_policy")
         if retrying:
             retrying = load_object(retrying)
