@@ -337,7 +337,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if self._retry_policy:
             self._retry_policy = load_object(self._retry_policy)
         self._on_all_requests = settings.getbool("ZYTE_API_ON_ALL_REQUESTS")
-        self._automap = settings.getbool("ZYTE_API_AUTOMAP", True)
+        self._automap = settings.getbool("ZYTE_API_AUTOMAP", False)
         self._unsupported_headers = {
             header.strip().lower().encode()
             for header in settings.getlist(

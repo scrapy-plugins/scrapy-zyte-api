@@ -27,7 +27,6 @@ from .mockserver import DelayedResource, MockServer, produce_request_response
     [
         {
             "httpResponseBody": True,
-            "httpResponseHeaders": False,
             "customHttpRequestHeaders": [
                 {"name": "Accept", "value": "application/octet-stream"}
             ],
@@ -35,6 +34,7 @@ from .mockserver import DelayedResource, MockServer, produce_request_response
         pytest.param(
             {
                 "httpResponseBody": True,
+                "httpResponseHeaders": True,
                 "customHttpRequestHeaders": [
                     {"name": "Accept", "value": "application/octet-stream"}
                 ],
@@ -48,6 +48,13 @@ from .mockserver import DelayedResource, MockServer, produce_request_response
 )
 @ensureDeferred
 async def test_response_binary(meta: Dict[str, Dict[str, Any]], mockserver):
+    """Test that binary (i.e. non-text) responses from Zyte Data API are
+    successfully mapped to a subclass of Response that is not also a subclass
+    of TextResponse.
+
+    Whether response headers are retrieved or not should have no impact on the
+    outcome if the body is unequivocally binary.
+    """
     req, resp = await produce_request_response(mockserver, {"zyte_api": meta})
     assert isinstance(resp, Response)
     assert not isinstance(resp, TextResponse)
@@ -62,11 +69,11 @@ async def test_response_binary(meta: Dict[str, Dict[str, Any]], mockserver):
 @pytest.mark.parametrize(
     "meta",
     [
+        {"browserHtml": True, "httpResponseHeaders": True},
         {"browserHtml": True},
-        {"browserHtml": True, "httpResponseHeaders": False},
-        {"httpResponseBody": True},
+        {"httpResponseBody": True, "httpResponseHeaders": True},
         pytest.param(
-            {"httpResponseBody": True, "httpResponseHeaders": False},
+            {"httpResponseBody": True},
             marks=pytest.mark.xfail(
                 reason="https://github.com/scrapy-plugins/scrapy-zyte-api/issues/47",
                 strict=True,
@@ -75,6 +82,12 @@ async def test_response_binary(meta: Dict[str, Dict[str, Any]], mockserver):
     ],
 )
 async def test_response_html(meta: Dict[str, Dict[str, Any]], mockserver):
+    """Test that HTML responses from Zyte Data API are successfully mapped to a
+    subclass of TextResponse.
+
+    Whether response headers are retrieved or not should have no impact on the
+    outcome if the body is unequivocally HTML.
+    """
     req, resp = await produce_request_response(mockserver, {"zyte_api": meta})
     assert isinstance(resp, TextResponse)
     assert resp.request is req
@@ -85,7 +98,7 @@ async def test_response_html(meta: Dict[str, Dict[str, Any]], mockserver):
     assert resp.text == "<html><body>Hello<h1>World!</h1></body></html>"
     assert resp.css("h1 ::text").get() == "World!"
     assert resp.xpath("//body/text()").getall() == ["Hello"]
-    if meta.get("httpResponseHeaders", True) is True:
+    if meta.get("httpResponseHeaders", False) is True:
         assert resp.headers == {b"Test_Header": [b"test_value"]}
     else:
         assert not resp.headers
@@ -471,7 +484,7 @@ async def test_automap(
     mockserver,
     caplog,
 ):
-    settings.update({"ZYTE_API_ON_ALL_REQUESTS": True})
+    settings.update({"ZYTE_API_ON_ALL_REQUESTS": True, "ZYTE_API_AUTOMAP": True})
     async with mockserver.make_handler(settings) as handler:
         if expected is False:
             # Only the Zyte Data API client is mocked, meaning requests that
@@ -510,7 +523,7 @@ async def test_automap(
             assert not caplog.records
 
 
-AUTOMAP_BY_DEFAULT = True
+AUTOMAP_BY_DEFAULT = False
 BROWSER_HEADERS = {b"referer": "referer"}
 DEFAULT_PARAMS: Dict[str, Any] = {}
 UNSUPPORTED_HEADERS = {b"cookie", b"user-agent"}
@@ -699,7 +712,7 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
         api_params = _get_api_params(
             request,
             use_api_by_default=USE_API_BY_DEFAULT,
-            automap_by_default=AUTOMAP_BY_DEFAULT,
+            automap_by_default=True,
             default_params=default_params,
             unsupported_headers=UNSUPPORTED_HEADERS,
             browser_headers=BROWSER_HEADERS,
@@ -775,7 +788,7 @@ def _test_automap(request_kwargs, meta, expected, warnings, caplog):
         api_params = _get_api_params(
             request,
             use_api_by_default=USE_API_BY_DEFAULT,
-            automap_by_default=AUTOMAP_BY_DEFAULT,
+            automap_by_default=True,
             default_params=DEFAULT_PARAMS,
             unsupported_headers=UNSUPPORTED_HEADERS,
             browser_headers=BROWSER_HEADERS,
