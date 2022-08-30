@@ -541,6 +541,14 @@ def test_default_params_immutability():
     ],
 )
 def test_automap_toggling(setting, meta, expected):
+    """Test how the value of the ``ZYTE_API_AUTOMAP`` setting (*setting*) in combination with the ``zyte_api_automap`` request metadata key (*meta*)
+    determines whether or not automated mapping is enabled for a request
+    (*expected*).
+
+    Note that :func:`test_get_api_params_input_custom` already tests how the
+    ``ZYTE_API_AUTOMAP`` setting is mapped to the corresponding
+    :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
+    """
     request = Request(url="https://example.com")
     if meta is not UNSET:
         request.meta["zyte_api_automap"] = meta
