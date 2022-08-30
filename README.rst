@@ -244,10 +244,13 @@ itself or its import path string. If you need your requests to be serializable,
 however, you may also need to use the import path string.
 
 For example, to also retry HTTP 521 errors the same as HTTP 520 errors, you can
-subclass RetryFactory_ as follows::
+subclass RetryFactory_ as follows:
+
+.. code-block:: python
 
     # project/retry_policies.py
-    from tenacity import retry_if_exception
+    from tenacity import retry_if_exception, RetryCallState
+    from zyte_api.aio.errors import RequestError
     from zyte_api.aio.retry import RetryFactory
 
     def is_http_521(exc: BaseException) -> bool:
