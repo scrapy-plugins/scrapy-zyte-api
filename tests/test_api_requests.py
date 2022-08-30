@@ -235,6 +235,290 @@ async def test_higher_concurrency():
     assert response_indexes[0] == expected_first_index
 
 
+AUTOMAP_BY_DEFAULT = False
+BROWSER_HEADERS = {b"referer": "referer"}
+DEFAULT_PARAMS: Dict[str, Any] = {}
+UNSUPPORTED_HEADERS = {b"cookie", b"user-agent"}
+USE_API_BY_DEFAULT = False
+JOB_ID = None
+GET_API_PARAMS_KWARGS = {
+    "use_api_by_default": USE_API_BY_DEFAULT,
+    "automap_by_default": AUTOMAP_BY_DEFAULT,
+    "default_params": DEFAULT_PARAMS,
+    "unsupported_headers": UNSUPPORTED_HEADERS,
+    "browser_headers": BROWSER_HEADERS,
+    "job_id": JOB_ID,
+}
+
+
+@ensureDeferred
+async def test_get_api_params_input_default(mockserver):
+    request = Request(url="https://example.com")
+    async with mockserver.make_handler() as handler:
+        patch_path = "scrapy_zyte_api.handler._get_api_params"
+        with patch(patch_path) as _get_api_params:
+            _get_api_params.side_effect = RuntimeError("That’s it!")
+            with pytest.raises(RuntimeError):
+                await handler.download_request(request, None)
+            _get_api_params.assert_called_once_with(
+                request,
+                **GET_API_PARAMS_KWARGS,
+            )
+
+
+@ensureDeferred
+async def test_get_api_params_input_custom(mockserver):
+    request = Request(url="https://example.com")
+    settings = {
+        "JOB": "1/2/3",
+        "ZYTE_API_AUTOMAP": False,
+        "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
+        "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
+        "ZYTE_API_ON_ALL_REQUESTS": True,
+        "ZYTE_API_UNSUPPORTED_HEADERS": {"A"},
+    }
+    async with mockserver.make_handler(settings) as handler:
+        patch_path = "scrapy_zyte_api.handler._get_api_params"
+        with patch(patch_path) as _get_api_params:
+            _get_api_params.side_effect = RuntimeError("That’s it!")
+            with pytest.raises(RuntimeError):
+                await handler.download_request(request, None)
+            _get_api_params.assert_called_once_with(
+                request,
+                use_api_by_default=True,
+                automap_by_default=False,
+                default_params={"a": "b"},
+                unsupported_headers={b"a"},
+                browser_headers={b"b": "b"},
+                job_id="1/2/3",
+            )
+
+
+@pytest.mark.parametrize(
+    "setting,meta,expected",
+    [
+        (False, None, None),
+        (False, {}, None),
+        (False, {"a": "b"}, None),
+        (False, {"zyte_api": False}, None),
+        (False, {"zyte_api": True}, {}),
+        (False, {"zyte_api": {}}, {}),
+        (False, {"zyte_api": {"a": "b"}}, {"a": "b"}),
+        (False, {"zyte_api": {"browserHtml": True}}, {"browserHtml": True}),
+        (True, None, {}),
+        (True, {}, {}),
+        (True, {"a": "b"}, {}),
+        (True, {"zyte_api": False}, None),
+        (True, {"zyte_api": True}, {}),
+        (True, {"zyte_api": {}}, {}),
+        (True, {"zyte_api": {"a": "b"}}, {"a": "b"}),
+        (True, {"zyte_api": {"browserHtml": True}}, {"browserHtml": True}),
+    ],
+)
+def test_api_toggling(setting, meta, expected):
+    request = Request(url="https://example.com", meta=meta)
+    api_params = _get_api_params(
+        request,
+        **{
+            **GET_API_PARAMS_KWARGS,
+            "use_api_by_default": setting,
+        },
+    )
+    assert api_params == expected
+
+
+@pytest.mark.parametrize("setting", [False, True])
+@pytest.mark.parametrize("meta", [None, 0, "", b"", []])
+def test_api_disabling_deprecated(setting, meta):
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
+        api_params = _get_api_params(
+            request,
+            **{
+                **GET_API_PARAMS_KWARGS,
+                "use_api_by_default": setting,
+            },
+        )
+    assert api_params is None
+
+
+@ensureDeferred
+async def test_job_id(mockserver):
+    request = Request(url="https://example.com", meta={"zyte_api": True})
+    api_params = _get_api_params(
+        request,
+        **{
+            **GET_API_PARAMS_KWARGS,
+            "job_id": "1/2/3",
+        },
+    )
+    assert api_params["jobId"] == "1/2/3"
+
+
+@ensureDeferred
+async def test_default_params_none(mockserver, caplog):
+    request = Request(url="https://example.com")
+    settings = {
+        "ZYTE_API_DEFAULT_PARAMS": {"a": None, "b": "c"},
+    }
+    with caplog.at_level("WARNING"):
+        async with mockserver.make_handler(settings) as handler:
+            patch_path = "scrapy_zyte_api.handler._get_api_params"
+            with patch(patch_path) as _get_api_params:
+                _get_api_params.side_effect = RuntimeError("That’s it!")
+                with pytest.raises(RuntimeError):
+                    await handler.download_request(request, None)
+                _get_api_params.assert_called_once_with(
+                    request,
+                    **{
+                        **GET_API_PARAMS_KWARGS,
+                        "default_params": {"b": "c"},
+                    },
+                )
+    assert "Parameter 'a' in the ZYTE_API_DEFAULT_PARAMS setting is None" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "default_params,meta,expected,warnings",
+    [
+        ({}, {}, {}, []),
+        ({}, {"b": 2}, {"b": 2}, []),
+        ({}, {"b": None}, {}, ["does not define such a parameter"]),
+        ({"a": 1}, {}, {"a": 1}, []),
+        ({"a": 1}, {"b": 2}, {"a": 1, "b": 2}, []),
+        ({"a": 1}, {"b": None}, {"a": 1}, ["does not define such a parameter"]),
+        ({"a": 1}, {"a": 2}, {"a": 2}, []),
+        ({"a": 1}, {"a": None}, {}, []),
+    ],
+)
+def test_default_params_merging(default_params, meta, expected, warnings, caplog):
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    with caplog.at_level("WARNING"):
+        api_params = _get_api_params(
+            request,
+            **{
+                **GET_API_PARAMS_KWARGS,
+                "default_params": default_params,
+            },
+        )
+    assert api_params == expected
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
+
+
+@pytest.mark.xfail(reason="To be implemented", strict=True)
+@pytest.mark.parametrize(
+    "default_params,meta,expected,warnings",
+    [
+        (
+            {"screenshot": True, "httpResponseHeaders": True},
+            {"browserHtml": True},
+            {"browserHtml": True, "httpResponseHeaders": True, "screenshot": True},
+            [],
+        ),
+        (
+            {"browserHtml": True, "httpResponseHeaders": False},
+            {"screenshot": True, "browserHtml": False},
+            {"screenshot": True},
+            [],
+        ),
+    ],
+)
+def test_default_params_automap(default_params, meta, expected, warnings, caplog):
+    """Warnings about unneeded parameters should not apply if those parameters are needed to extend or override default parameters."""
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    with caplog.at_level("WARNING"):
+        api_params = _get_api_params(
+            request,
+            **{
+                **GET_API_PARAMS_KWARGS,
+                "automap_by_default": True,
+            },
+        )
+    assert api_params == expected
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
+
+
+def test_default_params_immutability():
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = {"a": None}
+    default_params = {"a": "b"}
+    _get_api_params(
+        request,
+        **{
+            **GET_API_PARAMS_KWARGS,
+            "default_params": default_params,
+        },
+    )
+    assert default_params == {"a": "b"}
+
+
+@pytest.mark.parametrize("meta", [1, ["a", "b"]])
+def test_bad_meta_type(meta):
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    with pytest.raises(ValueError):
+        _get_api_params(
+            request,
+            **GET_API_PARAMS_KWARGS,
+        )
+
+
+@pytest.mark.parametrize(
+    "setting,meta,expected",
+    [
+        (False, UNSET, False),
+        (False, False, False),
+        (False, True, True),
+        (True, UNSET, True),
+        (True, False, False),
+        (True, True, True),
+    ],
+)
+def test_automap_toggling(setting, meta, expected):
+    request = Request(url="https://example.com")
+    if meta is not UNSET:
+        request.meta["zyte_api_automap"] = meta
+    api_params = _get_api_params(
+        request,
+        **{
+            **GET_API_PARAMS_KWARGS,
+            "use_api_by_default": True,
+            "automap_by_default": setting,
+        },
+    )
+    assert bool(api_params) == expected
+
+
+def _test_automap(request_kwargs, meta, expected, warnings, caplog):
+    request = Request(url="https://example.com", **request_kwargs)
+    request.meta["zyte_api"] = meta
+    with caplog.at_level("WARNING"):
+        api_params = _get_api_params(
+            request,
+            **{
+                **GET_API_PARAMS_KWARGS,
+                "automap_by_default": True,
+            },
+        )
+    assert api_params == expected
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
+
+
 @ensureDeferred
 @pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
 @pytest.mark.parametrize(
@@ -523,290 +807,6 @@ async def test_automap(
                 assert warning in caplog.text
         else:
             assert not caplog.records
-
-
-AUTOMAP_BY_DEFAULT = False
-BROWSER_HEADERS = {b"referer": "referer"}
-DEFAULT_PARAMS: Dict[str, Any] = {}
-UNSUPPORTED_HEADERS = {b"cookie", b"user-agent"}
-USE_API_BY_DEFAULT = False
-JOB_ID = None
-GET_API_PARAMS_KWARGS = {
-    "use_api_by_default": USE_API_BY_DEFAULT,
-    "automap_by_default": AUTOMAP_BY_DEFAULT,
-    "default_params": DEFAULT_PARAMS,
-    "unsupported_headers": UNSUPPORTED_HEADERS,
-    "browser_headers": BROWSER_HEADERS,
-    "job_id": JOB_ID,
-}
-
-
-@ensureDeferred
-async def test_get_api_params_input_default(mockserver):
-    request = Request(url="https://example.com")
-    async with mockserver.make_handler() as handler:
-        patch_path = "scrapy_zyte_api.handler._get_api_params"
-        with patch(patch_path) as _get_api_params:
-            _get_api_params.side_effect = RuntimeError("That’s it!")
-            with pytest.raises(RuntimeError):
-                await handler.download_request(request, None)
-            _get_api_params.assert_called_once_with(
-                request,
-                **GET_API_PARAMS_KWARGS,
-            )
-
-
-@ensureDeferred
-async def test_get_api_params_input_custom(mockserver):
-    request = Request(url="https://example.com")
-    settings = {
-        "JOB": "1/2/3",
-        "ZYTE_API_AUTOMAP": False,
-        "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
-        "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
-        "ZYTE_API_ON_ALL_REQUESTS": True,
-        "ZYTE_API_UNSUPPORTED_HEADERS": {"A"},
-    }
-    async with mockserver.make_handler(settings) as handler:
-        patch_path = "scrapy_zyte_api.handler._get_api_params"
-        with patch(patch_path) as _get_api_params:
-            _get_api_params.side_effect = RuntimeError("That’s it!")
-            with pytest.raises(RuntimeError):
-                await handler.download_request(request, None)
-            _get_api_params.assert_called_once_with(
-                request,
-                use_api_by_default=True,
-                automap_by_default=False,
-                default_params={"a": "b"},
-                unsupported_headers={b"a"},
-                browser_headers={b"b": "b"},
-                job_id="1/2/3",
-            )
-
-
-@pytest.mark.parametrize(
-    "setting,meta,expected",
-    [
-        (False, None, None),
-        (False, {}, None),
-        (False, {"a": "b"}, None),
-        (False, {"zyte_api": False}, None),
-        (False, {"zyte_api": True}, {}),
-        (False, {"zyte_api": {}}, {}),
-        (False, {"zyte_api": {"a": "b"}}, {"a": "b"}),
-        (False, {"zyte_api": {"browserHtml": True}}, {"browserHtml": True}),
-        (True, None, {}),
-        (True, {}, {}),
-        (True, {"a": "b"}, {}),
-        (True, {"zyte_api": False}, None),
-        (True, {"zyte_api": True}, {}),
-        (True, {"zyte_api": {}}, {}),
-        (True, {"zyte_api": {"a": "b"}}, {"a": "b"}),
-        (True, {"zyte_api": {"browserHtml": True}}, {"browserHtml": True}),
-    ],
-)
-def test_api_toggling(setting, meta, expected):
-    request = Request(url="https://example.com", meta=meta)
-    api_params = _get_api_params(
-        request,
-        **{
-            **GET_API_PARAMS_KWARGS,
-            "use_api_by_default": setting,
-        },
-    )
-    assert api_params == expected
-
-
-@pytest.mark.parametrize("setting", [False, True])
-@pytest.mark.parametrize("meta", [None, 0, "", b"", []])
-def test_api_disabling_deprecated(setting, meta):
-    request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
-    with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
-        api_params = _get_api_params(
-            request,
-            **{
-                **GET_API_PARAMS_KWARGS,
-                "use_api_by_default": setting,
-            },
-        )
-    assert api_params is None
-
-
-@ensureDeferred
-async def test_job_id(mockserver):
-    request = Request(url="https://example.com", meta={"zyte_api": True})
-    api_params = _get_api_params(
-        request,
-        **{
-            **GET_API_PARAMS_KWARGS,
-            "job_id": "1/2/3",
-        },
-    )
-    assert api_params["jobId"] == "1/2/3"
-
-
-@ensureDeferred
-async def test_default_params_none(mockserver, caplog):
-    request = Request(url="https://example.com")
-    settings = {
-        "ZYTE_API_DEFAULT_PARAMS": {"a": None, "b": "c"},
-    }
-    with caplog.at_level("WARNING"):
-        async with mockserver.make_handler(settings) as handler:
-            patch_path = "scrapy_zyte_api.handler._get_api_params"
-            with patch(patch_path) as _get_api_params:
-                _get_api_params.side_effect = RuntimeError("That’s it!")
-                with pytest.raises(RuntimeError):
-                    await handler.download_request(request, None)
-                _get_api_params.assert_called_once_with(
-                    request,
-                    **{
-                        **GET_API_PARAMS_KWARGS,
-                        "default_params": {"b": "c"},
-                    },
-                )
-    assert "Parameter 'a' in the ZYTE_API_DEFAULT_PARAMS setting is None" in caplog.text
-
-
-@pytest.mark.parametrize(
-    "default_params,meta,expected,warnings",
-    [
-        ({}, {}, {}, []),
-        ({}, {"b": 2}, {"b": 2}, []),
-        ({}, {"b": None}, {}, ["does not define such a parameter"]),
-        ({"a": 1}, {}, {"a": 1}, []),
-        ({"a": 1}, {"b": 2}, {"a": 1, "b": 2}, []),
-        ({"a": 1}, {"b": None}, {"a": 1}, ["does not define such a parameter"]),
-        ({"a": 1}, {"a": 2}, {"a": 2}, []),
-        ({"a": 1}, {"a": None}, {}, []),
-    ],
-)
-def test_default_params_merging(default_params, meta, expected, warnings, caplog):
-    request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
-    with caplog.at_level("WARNING"):
-        api_params = _get_api_params(
-            request,
-            **{
-                **GET_API_PARAMS_KWARGS,
-                "default_params": default_params,
-            },
-        )
-    assert api_params == expected
-    if warnings:
-        for warning in warnings:
-            assert warning in caplog.text
-    else:
-        assert not caplog.records
-
-
-@pytest.mark.xfail(reason="To be implemented", strict=True)
-@pytest.mark.parametrize(
-    "default_params,meta,expected,warnings",
-    [
-        (
-            {"screenshot": True, "httpResponseHeaders": True},
-            {"browserHtml": True},
-            {"browserHtml": True, "httpResponseHeaders": True, "screenshot": True},
-            [],
-        ),
-        (
-            {"browserHtml": True, "httpResponseHeaders": False},
-            {"screenshot": True, "browserHtml": False},
-            {"screenshot": True},
-            [],
-        ),
-    ],
-)
-def test_default_params_automap(default_params, meta, expected, warnings, caplog):
-    """Warnings about unneeded parameters should not apply if those parameters are needed to extend or override default parameters."""
-    request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
-    with caplog.at_level("WARNING"):
-        api_params = _get_api_params(
-            request,
-            **{
-                **GET_API_PARAMS_KWARGS,
-                "automap_by_default": True,
-            },
-        )
-    assert api_params == expected
-    if warnings:
-        for warning in warnings:
-            assert warning in caplog.text
-    else:
-        assert not caplog.records
-
-
-def test_default_params_immutability():
-    request = Request(url="https://example.com")
-    request.meta["zyte_api"] = {"a": None}
-    default_params = {"a": "b"}
-    _get_api_params(
-        request,
-        **{
-            **GET_API_PARAMS_KWARGS,
-            "default_params": default_params,
-        },
-    )
-    assert default_params == {"a": "b"}
-
-
-@pytest.mark.parametrize("meta", [1, ["a", "b"]])
-def test_bad_meta_type(meta):
-    request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
-    with pytest.raises(ValueError):
-        _get_api_params(
-            request,
-            **GET_API_PARAMS_KWARGS,
-        )
-
-
-@pytest.mark.parametrize(
-    "setting,meta,expected",
-    [
-        (False, UNSET, False),
-        (False, False, False),
-        (False, True, True),
-        (True, UNSET, True),
-        (True, False, False),
-        (True, True, True),
-    ],
-)
-def test_automap_toggling(setting, meta, expected):
-    request = Request(url="https://example.com")
-    if meta is not UNSET:
-        request.meta["zyte_api_automap"] = meta
-    api_params = _get_api_params(
-        request,
-        **{
-            **GET_API_PARAMS_KWARGS,
-            "use_api_by_default": True,
-            "automap_by_default": setting,
-        },
-    )
-    assert bool(api_params) == expected
-
-
-def _test_automap(request_kwargs, meta, expected, warnings, caplog):
-    request = Request(url="https://example.com", **request_kwargs)
-    request.meta["zyte_api"] = meta
-    with caplog.at_level("WARNING"):
-        api_params = _get_api_params(
-            request,
-            **{
-                **GET_API_PARAMS_KWARGS,
-                "automap_by_default": True,
-            },
-        )
-    assert api_params == expected
-    if warnings:
-        for warning in warnings:
-            assert warning in caplog.text
-    else:
-        assert not caplog.records
 
 
 @pytest.mark.parametrize(
