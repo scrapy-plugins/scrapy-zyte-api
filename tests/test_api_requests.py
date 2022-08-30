@@ -485,44 +485,6 @@ def test_default_params_merging(setting, meta, expected, warnings, caplog):
         assert not caplog.records
 
 
-@pytest.mark.xfail(reason="To be implemented", strict=True)
-@pytest.mark.parametrize(
-    "default_params,meta,expected,warnings",
-    [
-        (
-            {"screenshot": True, "httpResponseHeaders": True},
-            {"browserHtml": True},
-            {"browserHtml": True, "httpResponseHeaders": True, "screenshot": True},
-            [],
-        ),
-        (
-            {"browserHtml": True, "httpResponseHeaders": False},
-            {"screenshot": True, "browserHtml": False},
-            {"screenshot": True},
-            [],
-        ),
-    ],
-)
-def test_default_params_automap(default_params, meta, expected, warnings, caplog):
-    """Warnings about unneeded parameters should not apply if those parameters are needed to extend or override default parameters."""
-    request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
-    with caplog.at_level("WARNING"):
-        api_params = _get_api_params(
-            request,
-            **{
-                **GET_API_PARAMS_KWARGS,
-                "automap_by_default": True,
-            },
-        )
-    assert api_params == expected
-    if warnings:
-        for warning in warnings:
-            assert warning in caplog.text
-    else:
-        assert not caplog.records
-
-
 def test_default_params_immutability():
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = {"a": None}
@@ -1459,3 +1421,42 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
 )
 def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
     _test_automap({}, meta, expected, warnings, caplog)
+
+
+@pytest.mark.xfail(reason="To be implemented", strict=True)
+@pytest.mark.parametrize(
+    "default_params,meta,expected,warnings",
+    [
+        (
+            {"screenshot": True, "httpResponseHeaders": True},
+            {"browserHtml": True},
+            {"browserHtml": True, "httpResponseHeaders": True, "screenshot": True},
+            [],
+        ),
+        (
+            {"browserHtml": True, "httpResponseHeaders": False},
+            {"screenshot": True, "browserHtml": False},
+            {"screenshot": True},
+            [],
+        ),
+    ],
+)
+def test_default_params_automap(default_params, meta, expected, warnings, caplog):
+    """Warnings about unneeded parameters should not apply if those parameters
+    are needed to extend or override default parameters."""
+    request = Request(url="https://example.com")
+    request.meta["zyte_api"] = meta
+    with caplog.at_level("WARNING"):
+        api_params = _get_api_params(
+            request,
+            **{
+                **GET_API_PARAMS_KWARGS,
+                "automap_by_default": True,
+            },
+        )
+    assert api_params == expected
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
