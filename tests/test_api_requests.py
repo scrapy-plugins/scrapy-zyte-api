@@ -336,7 +336,6 @@ async def test_get_api_params_output_side_effects(output, uses_zyte_api, mockser
         (False, {"zyte_api": True}, {}),
         (False, {"zyte_api": {}}, {}),
         (False, {"zyte_api": {"a": "b"}}, {"a": "b"}),
-        (False, {"zyte_api": {"browserHtml": True}}, {"browserHtml": True}),
         (True, None, {}),
         (True, {}, {}),
         (True, {"a": "b"}, {}),
@@ -344,10 +343,19 @@ async def test_get_api_params_output_side_effects(output, uses_zyte_api, mockser
         (True, {"zyte_api": True}, {}),
         (True, {"zyte_api": {}}, {}),
         (True, {"zyte_api": {"a": "b"}}, {"a": "b"}),
-        (True, {"zyte_api": {"browserHtml": True}}, {"browserHtml": True}),
     ],
 )
-def test_api_toggling(setting, meta, expected):
+def test_use_api_by_default(setting, meta, expected):
+    """Test how the value of the ZYTE_API_ON_ALL_REQUESTS (*setting*) in
+    combination with request metadata (*meta*) determines what Zyte Data API
+    parameters are used (*expected*).
+
+    Note that :func:`test_get_api_params_output_side_effects` already tests how
+    *expected* affects whether the request is sent through Zyte Data API or
+    not, and :func:`test_get_api_params_input_custom` tests how the
+    ZYTE_API_ON_ALL_REQUESTS setting is mapped to the corresponding
+    :func:`~scrapy_zyte_api.handler._get_api_params`` parameter.
+    """
     request = Request(url="https://example.com", meta=meta)
     api_params = _get_api_params(
         request,
