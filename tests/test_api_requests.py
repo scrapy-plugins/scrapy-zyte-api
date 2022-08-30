@@ -294,6 +294,38 @@ async def test_get_api_params_input_custom(mockserver):
             )
 
 
+@ensureDeferred
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
+@pytest.mark.parametrize(
+    "output,uses_zyte_api",
+    [
+        (None, False),
+        ({}, True),
+        ({"a": "b"}, True),
+    ],
+)
+async def test_get_api_params_output_side_effects(output, uses_zyte_api, mockserver):
+    """If _get_api_params returns None, requests go outside Zyte API, but if it
+    returns a dictionary, even if empty, requests go through Zyte API."""
+    request = Request(url=mockserver.urljoin("/"))
+    async with mockserver.make_handler() as handler:
+        patch_path = "scrapy_zyte_api.handler._get_api_params"
+        with patch(patch_path) as _get_api_params:
+            patch_path = "scrapy_zyte_api.handler.super"
+            with patch(patch_path) as super:
+                handler._download_request = mock.AsyncMock(side_effect=RuntimeError)
+                super_mock = mock.Mock()
+                super_mock.download_request = mock.AsyncMock(side_effect=RuntimeError)
+                super.return_value = super_mock
+                _get_api_params.return_value = output
+                with pytest.raises(RuntimeError):
+                    await handler.download_request(request, None)
+    if uses_zyte_api:
+        handler._download_request.assert_called()
+    else:
+        super_mock.download_request.assert_called()
+
+
 @pytest.mark.parametrize(
     "setting,meta,expected",
     [

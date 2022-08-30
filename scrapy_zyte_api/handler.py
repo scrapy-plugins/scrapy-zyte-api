@@ -367,7 +367,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             browser_headers=self._browser_headers,
             job_id=self._job_id,
         )
-        if api_params:
+        if api_params is not None:
             return deferred_from_coro(
                 self._download_request(api_params, request, spider)
             )
