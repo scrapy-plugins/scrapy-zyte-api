@@ -1,6 +1,8 @@
 from base64 import b64decode
 from typing import Dict, List, Optional, Tuple, Union
 
+import scrapy
+from pkg_resources import parse_version
 from scrapy import Request
 from scrapy.http import Response, TextResponse
 from scrapy.responsetypes import responsetypes
@@ -20,11 +22,27 @@ class ZyteAPIMixin:
     def __init__(self, *args, raw_api_response: Dict = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._raw_api_response = raw_api_response
+        if not hasattr(self, "attributes"):
+            self.attributes: Tuple[str, ...] = (
+                "url",
+                "status",
+                "headers",
+                "body",
+                "request",
+                "flags",
+                "certificate",
+            )
+            if parse_version(scrapy.__version__) >= parse_version("2.1.0"):
+                self.attributes += ("ip_address",)
+        self.attributes += ("raw_api_response",)
 
     def replace(self, *args, **kwargs):
         if kwargs.get("raw_api_response"):
             raise ValueError("Replacing the value of 'raw_api_response' isn't allowed.")
-        return super().replace(*args, **kwargs)
+        for attribute in self.attributes:
+            kwargs.setdefault(attribute, getattr(self, attribute))
+        cls = kwargs.pop("cls", self.__class__)
+        return cls(*args, **kwargs)
 
     @property
     def raw_api_response(self) -> Optional[Dict]:
@@ -47,9 +65,6 @@ class ZyteAPIMixin:
 
 
 class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
-
-    attributes: Tuple[str, ...] = TextResponse.attributes + ("raw_api_response",)
-
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
         """Alternative constructor to instantiate the response from the raw
@@ -75,11 +90,12 @@ class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
             raw_api_response=api_response,
         )
 
+    def replace(self, *args, **kwargs):
+        kwargs.setdefault("encoding", self.encoding)
+        return ZyteAPIMixin.replace(self, *args, **kwargs)
+
 
 class ZyteAPIResponse(ZyteAPIMixin, Response):
-
-    attributes: Tuple[str, ...] = Response.attributes + ("raw_api_response",)
-
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
         """Alternative constructor to instantiate the response from the raw

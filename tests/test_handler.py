@@ -241,7 +241,7 @@ async def test_retry_policy(
 @ensureDeferred
 async def test_stats(mockserver):
     async with make_handler({}, mockserver.urljoin("/")) as handler:
-        scrapy_stats = handler._crawler.stats
+        scrapy_stats = handler._stats
         assert scrapy_stats.get_stats() == {}
 
         meta = {"zyte_api": {"foo": "bar"}}
