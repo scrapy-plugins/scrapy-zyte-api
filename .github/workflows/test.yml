@@ -37,7 +37,7 @@ jobs:
         python -m pip install tox
     - name: tox
       run: |
-        tox -e ${{ matrix.toxenv  || 'py' }}
+        tox -e ${{ matrix.toxenv || 'py' }}
     - name: coverage
       if: ${{ success() }}
       run: bash <(curl -s https://codecov.io/bash)
