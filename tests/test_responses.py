@@ -1,8 +1,6 @@
 from base64 import b64encode
 
 import pytest
-import scrapy
-from pkg_resources import parse_version
 from scrapy import Request
 from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
@@ -12,6 +10,7 @@ from scrapy_zyte_api.responses import (
     ZyteAPITextResponse,
     _process_response,
 )
+from scrapy_zyte_api.utils import _RESPONSE_HAS_IP_ADDRESS, _RESPONSE_HAS_PROTOCOL
 
 PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
 URL = "https://example.com"
@@ -66,10 +65,9 @@ def test_init(api_response, cls):
     assert not response.flags
     assert response.request is None
     assert response.certificate is None
-    scrapy_version = parse_version(scrapy.__version__)
-    if scrapy_version >= parse_version("2.1.0"):
+    if _RESPONSE_HAS_IP_ADDRESS:
         assert response.ip_address is None
-    if scrapy_version >= parse_version("2.5.0"):
+    if _RESPONSE_HAS_PROTOCOL:
         assert response.protocol is None
 
 
@@ -91,10 +89,9 @@ def test_text_from_api_response(api_response, cls):
     assert response.flags == ["zyte-api"]
     assert response.request is None
     assert response.certificate is None
-    scrapy_version = parse_version(scrapy.__version__)
-    if scrapy_version >= parse_version("2.1.0"):
+    if _RESPONSE_HAS_IP_ADDRESS:
         assert response.ip_address is None
-    if scrapy_version >= parse_version("2.5.0"):
+    if _RESPONSE_HAS_PROTOCOL:
         assert response.protocol is None
 
 

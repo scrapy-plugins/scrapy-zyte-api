@@ -18,9 +18,17 @@ jobs:
       matrix:
         include:
         - python-version: '3.7'
-          toxenv: pinned
+          toxenv: pinned-scrapy-2.0
         - python-version: '3.7'
           toxenv: pinned-scrapy-2.1
+        - python-version: '3.7'
+          toxenv: pinned-scrapy-2.3
+        - python-version: '3.7'
+          toxenv: pinned-scrapy-2.4
+        - python-version: '3.7'
+          toxenv: pinned-scrapy-2.5
+        - python-version: '3.7'
+          toxenv: pinned-scrapy-2.6
         - python-version: '3.8'
         - python-version: '3.9'
         - python-version: '3.10'

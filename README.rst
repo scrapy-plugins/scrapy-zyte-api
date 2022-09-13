@@ -22,7 +22,7 @@ Requirements
 ------------
 
 * Python 3.7+
-* Scrapy 2.6+
+* Scrapy 2.0.1+
 
 Installation
 ------------
