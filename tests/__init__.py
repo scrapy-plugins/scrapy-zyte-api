@@ -4,7 +4,6 @@ from typing import Optional
 
 from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
-from twisted.internet.asyncioreactor import AsyncioSelectorReactor
 from zyte_api.aio.client import AsyncClient
 
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
@@ -18,7 +17,7 @@ SETTINGS = {
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
     },
     "ZYTE_API_KEY": _API_KEY,
-    "TWISTED_REACTOR": AsyncioSelectorReactor,
+    "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
 }
 UNSET = object()
 
