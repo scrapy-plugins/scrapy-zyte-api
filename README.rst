@@ -63,7 +63,7 @@ Here's an example of the things needed inside a Scrapy project's ``settings.py``
 Usage
 -----
 
-To enable a ``scrapy.Request`` to go through Zyte Data API, the ``zyte_api`` key in
+To enable a ``scrapy.Request`` to go through Zyte API, the ``zyte_api`` key in
 `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
 must be present and contain a dict with Zyte API parameters:
 
@@ -96,25 +96,24 @@ must be present and contain a dict with Zyte API parameters:
             #     'browserHtml': '<html> ... </html>',
             # }
 
-You can see the full list of parameters in the `Zyte Data API Specification
+You can see the full list of parameters in the `Zyte API Specification
 <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
 The ``url`` parameter is filled automatically from ``request.url``, other 
 parameters should be set explicitly.
 
-The raw Zyte Data API response can be accessed via the ``raw_api_response``
+The raw Zyte API response can be accessed via the ``raw_api_response``
 attribute of the response object.
 
-When you use the Zyte Data API parameters ``browserHtml``, 
-``httpResponseBody``, or ``httpResponseHeaders``, the response body and headers 
-are set accordingly.
+When you use the Zyte API parameters ``browserHtml``, ``httpResponseBody``, or
+``httpResponseHeaders``, the response body and headers are set accordingly.
 
-Note that, for Zyte Data API requests, the spider gets responses of
+Note that, for Zyte API requests, the spider gets responses of
 ``ZyteAPIResponse`` and ``ZyteAPITextResponse`` types,
 which are respectively subclasses of ``scrapy.http.Response``
 and ``scrapy.http.TextResponse``.
 
-If multiple requests target the same URL with different Zyte Data API
-parameters, pass ``dont_filter=True`` to ``Request``.
+If multiple requests target the same URL with different Zyte API parameters,
+pass ``dont_filter=True`` to ``Request``.
 
 Setting default parameters
 --------------------------
@@ -137,9 +136,9 @@ following in the ``settings.py`` file or `any other settings within Scrapy
 ``ZYTE_API_DEFAULT_PARAMS`` works if the ``zyte_api``
 key in `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
 is set, i.e. having ``ZYTE_API_DEFAULT_PARAMS`` doesn't make all requests
-to go through Zyte Data API. Parameters in ``ZYTE_API_DEFAULT_PARAMS`` are 
-merged with parameters set via the ``zyte_api`` meta key, with the values in 
-meta taking priority.
+to go through Zyte API. Parameters in ``ZYTE_API_DEFAULT_PARAMS`` are merged
+with parameters set via the ``zyte_api`` meta key, with the values in meta
+taking priority.
 
 .. code-block:: python
 
