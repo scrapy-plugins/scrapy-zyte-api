@@ -49,7 +49,7 @@ in the ``settings.py`` of your Scrapy project.
 You also need to set the ``ZYTE_API_KEY``.
 
 Lastly, make sure to `install the asyncio-based Twisted reactor
-<https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor)>`_
+<https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor>`_
 in the ``settings.py`` file as well.
 
 Here's an example of the things needed inside a Scrapy project's ``settings.py`` file:
@@ -75,14 +75,13 @@ Usage
 
 You can send a request through Zyte API in one of the following ways:
 
--   Setting all Zyte API parameters :ref:`manually <manual>`, keeping full
-    control of what is sent to Zyte API.
+-   Setting all Zyte API parameters manually, keeping full control of what is
+    sent to Zyte API. See **Sending requests with manually-defined parameters**
+    below.
 
--   Letting Zyte API parameters be chosen :ref:`automatically <automap>` based
-    on your Scrapy request parameters where possible.
-
-    You can :ref:`make this the default behavior for all requests
-    <transparent-mode>`.
+-   Letting Zyte API parameters be chosen automatically based on your Scrapy
+    request parameters where possible. See **Sending requests with
+    automatically-mapped parameters** below.
 
 The raw Zyte API response can be accessed via the ``raw_api_response``
 attribute of the response object.
@@ -97,8 +96,6 @@ subclasses of ``scrapy.http.Response`` and ``scrapy.http.TextResponse``.
 If multiple requests target the same URL with different Zyte API parameters,
 pass ``dont_filter=True`` to ``Request``.
 
-
-.. _manual:
 
 Sending requests with manually-defined parameters
 -------------------------------------------------
@@ -144,8 +141,6 @@ See the `Zyte API documentation`_ to learn about Zyte API parameters.
 .. _Zyte API documentation: https://docs.zyte.com/zyte-api/get-started.html
 
 
-.. _automap:
-
 Sending requests with automatically-mapped parameters
 -----------------------------------------------------
 
@@ -153,7 +148,7 @@ To send a Scrapy request through Zyte API letting Zyte API parameters be
 automatically chosen based on the parameters of that Scrapy request, set the
 ``zyte_api_automap`` key in
 `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
-to ``True``. See also :ref:`transparent-mode`.
+to ``True``. See also **Using transparent mode** below.
 
 Automated parameter mapping chooses Zyte API parameters as follows by default:
 
@@ -230,8 +225,6 @@ Zyte API does not currently support, and may never support:
     ``browserHtml`` is used as the Scrapy response body.
 
 
-.. _transparent-mode:
-
 Using transparent mode
 ----------------------
 
@@ -242,17 +235,17 @@ requests as follows:
     are *not* sent through Zyte API.
 
 -   Requests with the ``zyte_api`` request meta key set to a ``dict`` are sent
-    through Zyte API with :ref:`manually-defined parameters <manual>`.
+    through Zyte API with manually-defined parameters. See **Sending requests
+    with manually-defined parameters** above.
 
--   All other requests are sent through Zyte API with
-    :ref:`automatically-mapped parameters <automap>`.
+-   All other requests are sent through Zyte API with automatically-mapped
+    parameters. See **Sending requests with automatically-mapped parameters**
+    above.
 
     You do not need to set the ``zyte-api-automap`` request meta key to
     ``True``, but you can set it to a dictionary to extend your request
     parameters.
 
-
-.. _default-params:
 
 Setting default parameters
 ==========================
@@ -265,13 +258,15 @@ The following settings allow you to define Zyte API parameters to be included
 in all requests:
 
 -   ``ZYTE_API_DEFAULT_PARAMS`` is a ``dict`` of parameters to be combined with
-    :ref:`manually-defined parameters <manual>`.
+    manually-defined parameters. See **Sending requests with manually-defined
+    parameters** above.
 
     You may set the ``zyte_api`` request meta key to an empty ``dict`` to only
     use default parameters for that request.
 
 -   ``ZYTE_API_AUTOMAP_PARAMS`` is a ``dict`` of parameters to be combined with
-    :ref:`automatically-mapped parameters <automap>`.
+    automatically-mapped parameters. See **Sending requests with
+    automatically-mapped parameters** above.
 
 For example, if you set ``ZYTE_API_DEFAULT_PARAMS`` to
 ``{"geolocation": "US"}`` and ``zyte_api`` to ``{"browserHtml": True}``,
