@@ -32,6 +32,89 @@ _DEFAULT_API_PARAMS = {
 }
 
 
+def _iter_headers(
+    *,
+    api_params: Dict[str, Any],
+    request: Request,
+    parameter: str,
+):
+    headers = api_params.get(parameter)
+    if headers is not None:
+        logger.warning(
+            f"Request {request} defines the Zyte API {parameter} parameter, "
+            f"overriding Request.headers. Use Request.headers instead."
+        )
+        return
+    if not request.headers:
+        return
+    for k, v in request.headers.items():
+        if not v:
+            continue
+        decoded_v = b",".join(v).decode()
+        lowercase_k = k.strip().lower()
+        yield k, lowercase_k, decoded_v
+
+
+def _map_custom_http_request_headers(
+    *,
+    api_params: Dict[str, Any],
+    request: Request,
+    unsupported_headers: Set[str],
+):
+    headers = []
+    for k, lowercase_k, decoded_v in _iter_headers(
+        api_params=api_params,
+        request=request,
+        parameter="customHttpRequestHeaders",
+    ):
+        if lowercase_k in unsupported_headers:
+            if lowercase_k != b"user-agent" or decoded_v != DEFAULT_USER_AGENT:
+                logger.warning(
+                    f"Request {request} defines header {k}, which "
+                    f"cannot be mapped into the Zyte API "
+                    f"customHttpRequestHeaders parameter."
+                )
+            continue
+        headers.append({"name": k.decode(), "value": decoded_v})
+    if headers:
+        api_params["customHttpRequestHeaders"] = headers
+
+
+def _map_request_headers(
+    *,
+    api_params: Dict[str, Any],
+    request: Request,
+    browser_headers: Dict[str, str],
+):
+    request_headers = {}
+    for k, lowercase_k, decoded_v in _iter_headers(
+        api_params=api_params,
+        request=request,
+        parameter="requestHeaders",
+    ):
+        key = browser_headers.get(lowercase_k)
+        if key is not None:
+            request_headers[key] = decoded_v
+        elif not (
+            (
+                lowercase_k == b"accept"
+                and decoded_v == DEFAULT_REQUEST_HEADERS["Accept"]
+            )
+            or (
+                lowercase_k == b"accept-language"
+                and decoded_v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
+            )
+            or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
+        ):
+            logger.warning(
+                f"Request {request} defines header {k}, which "
+                f"cannot be mapped into the Zyte API requestHeaders "
+                f"parameter."
+            )
+    if request_headers:
+        api_params["requestHeaders"] = request_headers
+
+
 def _update_api_params_from_request_headers(
     api_params: Dict[str, Any],
     request: Request,
@@ -42,70 +125,19 @@ def _update_api_params_from_request_headers(
     """Updates *api_params*, in place, based on *request*."""
     response_body = api_params.get("httpResponseBody")
     if response_body:
-        headers = api_params.get("customHttpRequestHeaders")
-        if headers is not None:
-            logger.warning(
-                f"Request {request} defines the Zyte API "
-                f"customHttpRequestHeaders parameter, overriding "
-                f"Request.headers. Use Request.headers instead."
-            )
-        elif request.headers:
-            headers = []
-            for k, v in request.headers.items():
-                if not v:
-                    continue
-                v = b",".join(v).decode()
-                lowercase_k = k.strip().lower()
-                if lowercase_k in unsupported_headers:
-                    if lowercase_k != b"user-agent" or v != DEFAULT_USER_AGENT:
-                        logger.warning(
-                            f"Request {request} defines header {k}, which "
-                            f"cannot be mapped into the Zyte API "
-                            f"customHttpRequestHeaders parameter."
-                        )
-                    continue
-                k = k.decode()
-                headers.append({"name": k, "value": v})
-            if headers:
-                api_params["customHttpRequestHeaders"] = headers
+        _map_custom_http_request_headers(
+            api_params=api_params,
+            request=request,
+            unsupported_headers=unsupported_headers,
+        )
     if not response_body or any(
         api_params.get(k) for k in ("browserHtml", "screenshot")
     ):
-        headers = api_params.get("requestHeaders")
-        if headers is not None:
-            logger.warning(
-                f"Request {request} defines the Zyte API requestHeaders "
-                f"parameter, overriding Request.headers. Use Request.headers "
-                f"instead."
-            )
-        elif request.headers:
-            request_headers = {}
-            for k, v in request.headers.items():
-                if not v:
-                    continue
-                v = b",".join(v).decode()
-                lowercase_k = k.strip().lower()
-                key = browser_headers.get(lowercase_k)
-                if key is not None:
-                    request_headers[key] = v
-                elif not (
-                    (
-                        lowercase_k == b"accept"
-                        and v == DEFAULT_REQUEST_HEADERS["Accept"]
-                    )
-                    or (
-                        lowercase_k == b"accept-language"
-                        and v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
-                    )
-                    or (lowercase_k == b"user-agent" and v == DEFAULT_USER_AGENT)
-                ):
-                    logger.warning(
-                        f"Request {request} defines header {k}, which "
-                        f"cannot be mapped into the Zyte API requestHeaders "
-                        f"parameter."
-                    )
-            if request_headers:
-                api_params["requestHeaders"] = request_headers
+        _map_request_headers(
+            api_params=api_params,
+            request=request,
+            browser_headers=browser_headers,
+        )
 
 
 def _update_api_params_from_request(  # NOQA
