@@ -219,15 +219,7 @@ def _set_http_request_method_from_request(
                 f"({method})."
             )
     elif request.method != "GET":
-        if api_params.get("httpResponseBody"):
-            api_params["httpRequestMethod"] = request.method
-        else:
-            logger.warning(
-                f"The HTTP method of request {request} ({request.method}) "
-                f"is being ignored. The httpRequestMethod parameter of "
-                f"Zyte API can only be set when the httpResponseBody "
-                f"parameter is True."
-            )
+        api_params["httpRequestMethod"] = request.method
 
 
 def _set_http_request_body_from_request(

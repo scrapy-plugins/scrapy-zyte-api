@@ -922,24 +922,25 @@ def test_automap_header_output(meta, expected, warnings, caplog):
             )
         ),
         # If httpResponseBody is not True, implicitly or explicitly,
-        # Request.method is not mapped, and a warning is issued if its value
-        # is anything other than GET.
+        # Request.method is still mapped for anything other than GET.
         (
             "POST",
             {"browserHtml": True},
             {
                 "browserHtml": True,
+                "httpRequestMethod": "POST",
                 "httpResponseHeaders": True,
             },
-            ["can only be set when the httpResponseBody parameter"],
+            [],
         ),
         (
             "POST",
             {"screenshot": True},
             {
                 "screenshot": True,
+                "httpRequestMethod": "POST",
             },
-            ["can only be set when the httpResponseBody parameter"],
+            [],
         ),
     ],
 )
