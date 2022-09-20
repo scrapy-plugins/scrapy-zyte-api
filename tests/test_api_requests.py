@@ -543,8 +543,9 @@ async def test_default_params_none(mockserver, caplog):
 def test_default_params_merging(
     arg_key, meta_key, ignore_keys, setting, meta, expected, warnings, caplog
 ):
-    """Test how Zyte API parameters defined in the *arg_key* setting and those
-    defined in the *meta_key* request metadata key are combined.
+    """Test how Zyte API parameters defined in the *arg_key* _get_api_params
+    parameter and those defined in the *meta_key* request metadata key are
+    combined.
 
     Request metadata takes precedence. Also, ``None`` values in request
     metadata can be used to unset parameters defined in the setting. Request
@@ -553,10 +554,6 @@ def test_default_params_merging(
 
     This test also makes sure that, when `None` is used to unset a parameter,
     the original request metadata key value is not modified.
-
-    Note that :func:`test_get_api_params_input_custom` already tests how the
-    ``ZYTE_API_DEFAULT_PARAMS`` setting is mapped to the corresponding
-    :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
@@ -598,68 +595,43 @@ def test_default_params_merging(
         ),
     ],
 )
-def test_default_params_immutability(setting, meta):
-    """Make sure that the merging of Zyte API parameters from the
-    ``ZYTE_API_DEFAULT_PARAMS`` setting (*setting*) with those from the
-    ``zyte_api`` request metadata key (*meta*) does not affect the contents of
-    the setting for later requests."""
+@pytest.mark.parametrize(
+    "arg_key,meta_key",
+    [
+        ("default_params", "zyte_api"),
+        (
+            "automap_params",
+            "zyte_api_automap",
+        ),
+    ],
+)
+def test_default_params_immutability(arg_key, meta_key, setting, meta):
+    """Make sure that the merging of Zyte API parameters from the *arg_key*
+    _get_api_params parameter with those from the *meta_key* request metadata
+    key does not affect the contents of the setting for later requests."""
     request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
+    request.meta[meta_key] = meta
     default_params = copy(setting)
     _get_api_params(
         request,
         **{
             **GET_API_PARAMS_KWARGS,
-            "default_params": default_params,
+            arg_key: default_params,
         },
     )
     assert default_params == setting
 
 
-@pytest.mark.parametrize(
-    "setting,meta,expected",
-    [
-        (False, UNSET, False),
-        (False, False, False),
-        (False, True, True),
-        (True, UNSET, True),
-        (True, False, False),
-        (True, True, True),
-    ],
-)
-def test_automap_toggling(setting, meta, expected):
-    """Test how the value of the ``ZYTE_API_AUTOMAP`` setting (*setting*) in combination with the ``zyte_api_automap`` request metadata key (*meta*)
-    determines whether or not automated mapping is enabled for a request
-    (*expected*).
-
-    Note that :func:`test_get_api_params_input_custom` already tests how the
-    ``ZYTE_API_AUTOMAP`` setting is mapped to the corresponding
-    :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
-    """
-    request = Request(url="https://example.com")
-    if meta is not UNSET:
-        request.meta["zyte_api_automap"] = meta
-    api_params = _get_api_params(
-        request,
-        **{
-            **GET_API_PARAMS_KWARGS,
-            "use_api_by_default": True,
-            "automap_by_default": setting,
-        },
-    )
-    assert bool(api_params) == expected
-
-
 def _test_automap(global_kwargs, request_kwargs, meta, expected, warnings, caplog):
     request = Request(url="https://example.com", **request_kwargs)
-    request.meta["zyte_api"] = meta
+    request.meta["zyte_api_automap"] = meta
     with caplog.at_level("WARNING"):
         api_params = _get_api_params(
             request,
             **{
                 **GET_API_PARAMS_KWARGS,
                 **global_kwargs,
-                "automap_by_default": True,
+                "transparent_mode": True,
             },
         )
     assert api_params == expected
@@ -1594,7 +1566,7 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
     _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
-@pytest.mark.xfail(reason="To be implemented", strict=True)
+# @pytest.mark.xfail(reason="To be implemented", strict=True)
 @pytest.mark.parametrize(
     "default_params,meta,expected,warnings",
     [
@@ -1615,15 +1587,16 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
 def test_default_params_automap(default_params, meta, expected, warnings, caplog):
     """Warnings about unneeded parameters should not apply if those parameters
     are needed to extend or override parameters set in the
-    ``ZYTE_API_DEFAULT_PARAMS`` setting."""
+    ``ZYTE_API_AUTOMAP_PARAMS`` setting."""
     request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
+    request.meta["zyte_api_automap"] = meta
     with caplog.at_level("WARNING"):
         api_params = _get_api_params(
             request,
             **{
                 **GET_API_PARAMS_KWARGS,
-                "automap_by_default": True,
+                "transparent_mode": True,
+                "automap_params": default_params,
             },
         )
     assert api_params == expected

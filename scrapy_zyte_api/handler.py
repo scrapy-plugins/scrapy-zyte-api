@@ -112,6 +112,8 @@ def _update_api_params_from_request(  # NOQA
     api_params: Dict[str, Any],
     request: Request,
     *,
+    default_params: Dict[str, Any],
+    meta_params: Dict[str, Any],
     unsupported_headers: Set[str],
     browser_headers: Dict[str, str],
 ):
@@ -137,7 +139,11 @@ def _update_api_params_from_request(  # NOQA
         api_params.pop("httpResponseBody")
 
     if any(api_params.get(k) for k in ("httpResponseBody", "browserHtml")):
-        if api_params.get("httpResponseHeaders") is True:
+        if api_params.get("httpResponseHeaders") is True and not (
+            default_params.get("httpResponseHeaders") is True
+            and "httpResponseHeaders" not in meta_params
+        ):
+            logger.error(default_params)
             logger.warning(
                 "You do not need to set httpResponseHeaders to True if "
                 "you set httpResponseBody or browserHtml to True. Note "
@@ -145,7 +151,10 @@ def _update_api_params_from_request(  # NOQA
                 "neither browserHtml nor screenshot are set to True."
             )
         api_params.setdefault("httpResponseHeaders", True)
-    elif api_params.get("httpResponseHeaders") is False:
+    elif (
+        api_params.get("httpResponseHeaders") is False
+        and not default_params.get("httpResponseHeaders") is False
+    ):
         logger.warning(
             "You do not need to set httpResponseHeaders to False if "
             "you do set httpResponseBody or browserHtml to True. Note "
@@ -214,11 +223,12 @@ def _update_api_params_from_request(  # NOQA
     for param, default_value in _DEFAULT_API_PARAMS.items():
         if api_params.get(param) != default_value:
             continue
-        logging.warning(
-            f"Request {request} unnecessarily defines the Zyte API {param!r} "
-            f"parameter with its default value, {default_value!r}. It will "
-            f"not be sent to the server."
-        )
+        if param not in default_params or default_params.get(param) == default_value:
+            logging.warning(
+                f"Request {request} unnecessarily defines the Zyte API {param!r} "
+                f"parameter with its default value, {default_value!r}. It will "
+                f"not be sent to the server."
+            )
         api_params.pop(param)
 
     return api_params
@@ -292,15 +302,9 @@ def _get_automap_params(
         )
     else:
         meta_params = copy(meta_params)
+    original_meta_params = copy(meta_params)
 
     params = copy(default_params)
-
-    _update_api_params_from_request(
-        params,
-        request,
-        unsupported_headers=unsupported_headers,
-        browser_headers=browser_headers,
-    )
 
     for k in list(meta_params):
         if meta_params[k] is not None:
@@ -316,6 +320,15 @@ def _get_automap_params(
                 f"does not define such a parameter."
             )
     params.update(meta_params)
+
+    _update_api_params_from_request(
+        params,
+        request,
+        default_params=default_params,
+        meta_params=original_meta_params,
+        unsupported_headers=unsupported_headers,
+        browser_headers=browser_headers,
+    )
 
     return params
 
