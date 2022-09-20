@@ -18,23 +18,29 @@ scrapy-zyte-api
    :target: https://codecov.io/gh/scrapy-plugins/scrapy-zyte-api
    :alt: Coverage report
 
+
+Scrapy plugin for `Zyte API`_.
+
+.. _Zyte API: https://docs.zyte.com/zyte-api/get-started.html
+
+
 Requirements
-------------
+============
 
 * Python 3.7+
 * Scrapy 2.0.1+
 
+
 Installation
-------------
+============
 
 .. code-block::
 
     pip install scrapy-zyte-api
 
-This package requires Python 3.7+.
 
 Configuration
--------------
+=============
 
 Replace the default ``http`` and ``https`` in Scrapy's
 `DOWNLOAD_HANDLERS <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-DOWNLOAD_HANDLERS>`_
@@ -63,46 +69,20 @@ Here's an example of the things needed inside a Scrapy project's ``settings.py``
 The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 ``False`` to disable this plugin.
 
+
 Usage
------
+=====
 
-To enable a ``scrapy.Request`` to go through Zyte API, the ``zyte_api`` key in
-`Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
-must be present and contain a dict with Zyte API parameters:
+You can send a request through Zyte API in one of the following ways:
 
-.. code-block:: python
+-   Setting all Zyte API parameters :ref:`manually <manual>`, keeping full
+    control of what is sent to Zyte API.
 
-    import scrapy
+-   Letting Zyte API parameters be chosen :ref:`automatically <automap>` based
+    on your Scrapy request parameters where possible.
 
-
-    class SampleQuotesSpider(scrapy.Spider):
-        name = "sample_quotes"
-
-        def start_requests(self):
-            yield scrapy.Request(
-                url="http://quotes.toscrape.com/",
-                callback=self.parse,
-                meta={
-                    "zyte_api": {
-                        "browserHtml": True,
-                    }
-                },
-            )
-
-        def parse(self, response):
-            yield {"URL": response.url, "HTML": response.body}
-
-            print(response.raw_api_response)
-            # {
-            #     'url': 'https://quotes.toscrape.com/',
-            #     'statusCode': 200,
-            #     'browserHtml': '<html> ... </html>',
-            # }
-
-You can see the full list of parameters in the `Zyte API Specification
-<https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
-The ``url`` parameter is filled automatically from ``request.url``, other 
-parameters should be set explicitly.
+    You can :ref:`make this the default behavior for all requests
+    <transparent-mode>`.
 
 The raw Zyte API response can be accessed via the ``raw_api_response``
 attribute of the response object.
@@ -111,33 +91,25 @@ When you use the Zyte API parameters ``browserHtml``, ``httpResponseBody``, or
 ``httpResponseHeaders``, the response body and headers are set accordingly.
 
 Note that, for Zyte API requests, the spider gets responses of
-``ZyteAPIResponse`` and ``ZyteAPITextResponse`` types,
-which are respectively subclasses of ``scrapy.http.Response``
-and ``scrapy.http.TextResponse``.
+``ZyteAPIResponse`` and ``ZyteAPITextResponse`` types, which are respectively
+subclasses of ``scrapy.http.Response`` and ``scrapy.http.TextResponse``.
 
 If multiple requests target the same URL with different Zyte API parameters,
 pass ``dont_filter=True`` to ``Request``.
 
 
-.. _default-params:
+.. _manual:
 
-Setting default parameters
---------------------------
+Sending requests with manually-defined parameters
+-------------------------------------------------
 
-Often the same configuration needs to be used for all Zyte API requests.
-For example, all requests may need to set the same geolocation, or
-the spider only uses ``browserHtml`` requests.
+To send a Scrapy request through Zyte API with manually-defined parameters,
+define your Zyte API parameters in the ``zyte_api`` key in
+`Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
+as a ``dict``.
 
-To set the default parameters for Zyte API enabled requests, you can set the
-following in the ``settings.py`` file or `any other settings within Scrapy
-<https://docs.scrapy.org/en/latest/topics/settings.html#populating-the-settings>`_:
-
-.. code-block:: python
-
-    ZYTE_API_DEFAULT_PARAMS = {
-        "browserHtml": True,
-        "geolocation": "US",
-    }
+The only exception is the ``url`` parameter, which should not be defined as a
+Zyte API parameter. The value from ``Request.url`` is used automatically.
 
 For example:
 
@@ -149,76 +121,168 @@ For example:
     class SampleQuotesSpider(scrapy.Spider):
         name = "sample_quotes"
 
-        custom_settings = {
-            "ZYTE_API_DEFAULT_PARAMS": {
-                "geolocation": "US",  # You can set any Geolocation region you want.
-            }
-        }
-
         def start_requests(self):
             yield scrapy.Request(
                 url="http://quotes.toscrape.com/",
-                callback=self.parse,
                 meta={
                     "zyte_api": {
                         "browserHtml": True,
-                        "javascript": True,
-                        "echoData": {"some_value_I_could_track": 123},
                     }
                 },
             )
 
         def parse(self, response):
-            yield {"URL": response.url, "HTML": response.body}
-
             print(response.raw_api_response)
             # {
             #     'url': 'https://quotes.toscrape.com/',
             #     'statusCode': 200,
-            #     'browserHtml': '<html> ... </html>',
-            #     'echoData': {'some_value_I_could_track': 123},
+            #     'browserHtml': '<html>…</html>',
             # }
 
-            print(response.request.meta)
-            # {
-            #     'zyte_api': {
-            #         'browserHtml': True,
-            #         'geolocation': 'US',
-            #         'javascript': True,
-            #         'echoData': {'some_value_I_could_track': 123}
-            #     },
-            #     'download_timeout': 180.0,
-            #     'download_slot': 'quotes.toscrape.com'
-            # }
+See the `Zyte API documentation`_ to learn about Zyte API parameters.
 
-``ZYTE_API_DEFAULT_PARAMS`` does not make requests automatically go through
-Zyte Data API. See :ref:`enabled`.
-
-Parameters in ``ZYTE_API_DEFAULT_PARAMS`` are merged with parameters set via
-the ``zyte_api`` meta key, with the values in meta taking priority.
+.. _Zyte API documentation: https://docs.zyte.com/zyte-api/get-started.html
 
 
-.. _enabled:
+.. _automap:
 
-Controlling which requests go through Zyte Data API
----------------------------------------------------
+Sending requests with automatically-mapped parameters
+-----------------------------------------------------
 
-By default, only requests where the ``zyte_api`` key in Request.meta_ is set to
-``True`` or set to a dictionary go through Zyte Data API.
+To send a Scrapy request through Zyte API letting Zyte API parameters be
+automatically chosen based on the parameters of that Scrapy request, set the
+``zyte_api_automap`` key in
+`Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
+to ``True``. See also :ref:`transparent-mode`.
 
-.. _Request.meta: https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta
+Automated parameter mapping chooses Zyte API parameters as follows by default:
 
-Set the ``ZYTE_API_ON_ALL_REQUESTS`` setting to ``True`` to make all requests
-go through Zyte Data API unless the ``zyte_api`` key in Request.meta_ is set to
-``False``. ``ZYTE_API_ON_ALL_REQUESTS`` is ``False`` by default.
+-   ``httpResponseBody`` and ``httpResponseHeaders`` are set to ``True``.
 
-Zyte Data API requests need parameters. If you set the ``zyte_api`` key in
-Request.meta_ or the ``ZYTE_API_ON_ALL_REQUESTS`` setting to ``True``, you must
-also :ref:`set default parameters <default-params>`.
+-   ``Rerquest.url`` becomes ``url``, same as in requests with manually-defined
+    parameters.
+
+-   If ``Rerquest.method`` is something other than ``"GET"``, it becomes
+    ``httpRequestMethod``.
+
+-   ``Rerquest.headers`` become ``customHttpRequestHeaders``.
+
+-   ``Rerquest.body`` is base64-encoded as ``httpRequestBody``.
+
+Instead of setting ``zyte_api_automap`` to ``True``, you may set it to a
+``dict`` of Zyte API parameters to extend or override choices made by automated
+parameter mapping. Some parameters modify the result of automated parameter
+mapping as a side effect:
+
+-   Setting ``browserHtml`` or ``screenshot`` to ``True`` unsets
+    ``httpResponseBody``, and makes ``Request.headers`` become
+    ``requestHeaders`` instead of ``customHttpRequestHeaders``.
+
+-   Setting ``screenshot`` to ``True`` without also setting ``browserHtml`` to
+    ``True`` unsets ``httpResponseHeaders``.
+
+When mapping headers, unsupported headers are excluded from the mapping. Use
+the following settings to change which headers are mapped and how they are
+mapped:
+
+-   ``ZYTE_API_UNSUPPORTED_HEADERS`` determines headers that *cannot* be mapped
+    as ``customHttpRequestHeaders``, and its default value is:
+
+    .. code-block:: python
+
+       ["Cookie", "User-Agent"]
+
+-   ``ZYTE_API_BROWSER_HEADERS`` determines headers that *can* be mapped as
+    ``requestHeaders``. It is a ``dict``, where keys are header names and
+    values are the key that represents them in ``requestHeaders``. Its default
+    value is:
+
+    .. code-block:: python
+
+       {"Referer": "referer"}
+
+To maximize support for potential future changes in Zyte API, automated
+parameter mapping allows some parameter values and parameter combinations that
+Zyte API does not currently support, and may never support:
+
+-   ``Rerquest.method`` becomes ``httpRequestMethod`` even for unsupported_
+    ``httpRequestMethod`` values, and even if ``httpResponseBody`` is unset.
+
+    .. _unsupported: https://docs.zyte.com/zyte-api/usage/extract.html#zyte-api-set-method
+
+-   You can set ``customHttpRequestHeaders`` or ``requestHeaders`` to ``True``
+    to force their mapping from ``Request.headers`` in scenarios where they
+    would not be mapped otherwise.
+
+    Conversely, you can set ``customHttpRequestHeaders`` or ``requestHeaders``
+    to ``False`` to prevent their mapping from ``Request.headers``.
+
+-   ``Rerquest.body`` becomes ``httpRequestBody`` even if ``httpResponseBody``
+    is unset.
+
+-   You can set ``httpResponseBody`` to ``False`` (which unsets the parameter),
+    and not set ``browserHtml`` or ``screenshot`` to ``True``. In this case,
+    ``Request.headers`` is mapped as ``requestHeaders``.
+
+-   You can set ``httpResponseBody`` to ``True`` and also set ``browserHtml``
+    or ``screenshot`` to ``True``. In this case, ``Request.headers`` is mapped
+    both as ``customHttpRequestHeaders`` and as ``requestHeaders``, and
+    ``browserHtml`` is used as the Scrapy response body.
+
+
+.. _transparent-mode:
+
+Using transparent mode
+----------------------
+
+Set the ``ZYTE_API_TRANSPARENT_MODE`` setting to ``True`` to handle Scrapy
+requests as follows:
+
+-   Requests with the ``zyte_api_automap`` request meta key set to ``False``
+    are *not* sent through Zyte API.
+
+-   Requests with the ``zyte_api`` request meta key set to a ``dict`` are sent
+    through Zyte API with :ref:`manually-defined parameters <manual>`.
+
+-   All other requests are sent through Zyte API with
+    :ref:`automatically-mapped parameters <automap>`.
+
+    You do not need to set the ``zyte-api-automap`` request meta key to
+    ``True``, but you can set it to a dictionary to extend your request
+    parameters.
+
+
+.. _default-params:
+
+Setting default parameters
+==========================
+
+Often the same configuration needs to be used for all Zyte API requests. For
+example, all requests may need to set the same geolocation, or the spider only
+uses ``browserHtml`` requests.
+
+The following settings allow you to define Zyte API parameters to be included
+in all requests:
+
+-   ``ZYTE_API_DEFAULT_PARAMS`` is a ``dict`` of parameters to be combined with
+    :ref:`manually-defined parameters <manual>`.
+
+    You may set the ``zyte_api`` request meta key to an empty ``dict`` to only
+    use default parameters for that request.
+
+-   ``ZYTE_API_AUTOMAP_PARAMS`` is a ``dict`` of parameters to be combined with
+    :ref:`automatically-mapped parameters <automap>`.
+
+For example, if you set ``ZYTE_API_DEFAULT_PARAMS`` to
+``{"geolocation": "US"}`` and ``zyte_api`` to ``{"browserHtml": True}``,
+``{"url: "…", "geolocation": "US", "browserHtml": True}`` is sent to Zyte API.
+
+Parameters in these settings are merged with request-specific parameters, with
+request-specific parameters taking precedence.
 
 
 Customizing the retry policy
-----------------------------
+============================
 
 API requests are retried automatically using the default retry policy of
 `python-zyte-api`_.
@@ -237,7 +301,7 @@ Scrapy settings must be picklable, which `retry policies are not
 policy objects directly to the ``ZYTE_API_RETRY_POLICY`` setting, and must use
 their import path string instead.
 
-When setting a retry policy through request metadata, you can assign the
+When setting a retry policy through request meta, you can assign the
 ``zyte_api_retry_policy`` request meta key either the retry policy object
 itself or its import path string. If you need your requests to be serializable,
 however, you may also need to use the import path string.
@@ -283,7 +347,7 @@ subclass RetryFactory_ as follows:
 
 
 Stats
------
+=====
 
 Stats from python-zyte-api_ are exposed as Scrapy stats with the
 ``scrapy-zyte-api`` prefix.
