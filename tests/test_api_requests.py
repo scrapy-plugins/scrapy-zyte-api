@@ -49,7 +49,7 @@ from .mockserver import DelayedResource, MockServer, produce_request_response
 )
 @ensureDeferred
 async def test_response_binary(meta: Dict[str, Dict[str, Any]], mockserver):
-    """Test that binary (i.e. non-text) responses from Zyte Data API are
+    """Test that binary (i.e. non-text) responses from Zyte API are
     successfully mapped to a subclass of Response that is not also a subclass
     of TextResponse.
 
@@ -83,7 +83,7 @@ async def test_response_binary(meta: Dict[str, Dict[str, Any]], mockserver):
     ],
 )
 async def test_response_html(meta: Dict[str, Dict[str, Any]], mockserver):
-    """Test that HTML responses from Zyte Data API are successfully mapped to a
+    """Test that HTML responses from Zyte API are successfully mapped to a
     subclass of TextResponse.
 
     Whether response headers are retrieved or not should have no impact on the
@@ -132,8 +132,7 @@ async def test_enabled(setting, enabled, mockserver):
 @ensureDeferred
 async def test_coro_handling(zyte_api: bool, mockserver):
     """ScrapyZyteAPIDownloadHandler.download_request must return a deferred
-    both when using Zyte Data API and when using the regular downloader
-    logic."""
+    both when using Zyte API and when using the regular downloader logic."""
     settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
     async with mockserver.make_handler(settings) as handler:
         req = Request(
@@ -183,7 +182,7 @@ async def test_exceptions(
 @ensureDeferred
 async def test_higher_concurrency():
     """Make sure that CONCURRENT_REQUESTS and CONCURRENT_REQUESTS_PER_DOMAIN
-    have an effect on Zyte Data API requests."""
+    have an effect on Zyte API requests."""
     # Send DEFAULT_CLIENT_CONCURRENCY + 1 requests, the last one taking less
     # time than the rest, and ensure that the first response comes from the
     # last request, verifying that a concurrency ≥ DEFAULT_CLIENT_CONCURRENCY
@@ -348,11 +347,11 @@ async def test_get_api_params_output_side_effects(output, uses_zyte_api, mockser
 def test_api_toggling(setting, meta, expected):
     """Test how the value of the ``ZYTE_API_ON_ALL_REQUESTS`` setting
     (*setting*) in combination with request metadata (*meta*) determines what
-    Zyte Data API parameters are used (*expected*).
+    Zyte API parameters are used (*expected*).
 
     Note that :func:`test_get_api_params_output_side_effects` already tests how
-    *expected* affects whether the request is sent through Zyte Data API or
-    not, and :func:`test_get_api_params_input_custom` tests how the
+    *expected* affects whether the request is sent through Zyte API or not,
+    and :func:`test_get_api_params_input_custom` tests how the
     ``ZYTE_API_ON_ALL_REQUESTS`` setting is mapped to the corresponding
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
@@ -371,7 +370,7 @@ def test_api_toggling(setting, meta, expected):
 @pytest.mark.parametrize("meta", [None, 0, "", b"", []])
 def test_api_disabling_deprecated(setting, meta):
     """Test how undocumented falsy values of the ``zyte_api`` request metadata
-    key (*meta*) can be used to disable the use of Zyte Data API, but trigger a
+    key (*meta*) can be used to disable the use of Zyte API, but trigger a
     deprecation warning asking to replace them with False."""
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
@@ -402,7 +401,7 @@ def test_bad_meta_type(meta):
 @ensureDeferred
 async def test_job_id(mockserver):
     """Test how the value of the ``JOB`` setting (*setting*) is included as
-    ``jobId`` among the parameters sent to Zyte Data API.
+    ``jobId`` among the parameters sent to Zyte API.
 
     Note that :func:`test_get_api_params_input_custom` already tests how the
     ``JOB`` setting is mapped to the corresponding
@@ -468,8 +467,9 @@ async def test_default_params_none(mockserver, caplog):
     ],
 )
 def test_default_params_merging(setting, meta, expected, warnings, caplog):
-    """Test how Zyte Data API parameters defined in the
-    ``ZYTE_API_DEFAULT_PARAMS`` setting (*setting*) and those defined in the ``zyte_api`` request metadata key (*meta*) are combined.
+    """Test how Zyte API parameters defined in the ``ZYTE_API_DEFAULT_PARAMS``
+    setting (*setting*) and those defined in the ``zyte_api`` request metadata
+    key (*meta*) are combined.
 
     Request metadata takes precedence. Also, ``None`` values in request
     metadata can be used to unset parameters defined in the setting. Request
@@ -519,7 +519,7 @@ def test_default_params_merging(setting, meta, expected, warnings, caplog):
     ],
 )
 def test_default_params_immutability(setting, meta):
-    """Make sure that the merging of Zyte Data API parameters from the
+    """Make sure that the merging of Zyte API parameters from the
     ``ZYTE_API_DEFAULT_PARAMS`` setting (*setting*) with those from the
     ``zyte_api`` request metadata key (*meta*) does not affect the contents of
     the setting for later requests."""
@@ -804,7 +804,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
         ),
         # Other HTTP methods, regardless of whether they are supported,
         # unsupported, or unknown, are mapped as httpRequestMethod, letting
-        # Zyte Data API decide whether or not they are allowed.
+        # Zyte API decide whether or not they are allowed.
         *(
             (
                 method,
@@ -861,7 +861,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
                 },
                 [
                     "Use Request.method",
-                    "does not match the Zyte Data API httpRequestMethod",
+                    "does not match the Zyte API httpRequestMethod",
                 ],
             )
             for request_method, meta_method in (
@@ -986,8 +986,8 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         # While future main output parameters are likely to use requestHeaders
         # instead, we cannot known if an unknown parameter is a main output
         # parameter or a different type of parameter for httpRequestBody, and
-        # what we know for sure is that, at the time of writing, Zyte Data API
-        # does not allow requestHeaders to be combined with httpRequestBody.
+        # what we know for sure is that, at the time of writing, Zyte API does
+        # not allow requestHeaders to be combined with httpRequestBody.
         (
             {"Referer": "a"},
             {"unknownMainOutput": True},
@@ -1187,10 +1187,10 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         # if browserHtml is True and customHttpRequestHeaders is defined in
         # meta, keep the meta parameters and do not issue a warning. There is
         # no need for a warning because the request should get an error
-        # response from Zyte Data API. And if Zyte Data API were not to send an
-        # error response, that would mean the Zyte Data API has started
-        # supporting this scenario, all the more reason not to warn and let the
-        # parameters reach Zyte Data API.
+        # response from Zyte API. And if Zyte API were not to send an error
+        # response, that would mean the Zyte API has started supporting this
+        # scenario, all the more reason not to warn and let the parameters
+        # reach Zyte API.
         (
             {},
             {
@@ -1422,7 +1422,7 @@ def test_automap_header_settings(
             },
             [
                 "Use Request.body instead",
-                "does not match the Zyte Data API httpRequestBody parameter",
+                "does not match the Zyte API httpRequestBody parameter",
             ],
         ),
         # httpRequestBody defined in meta causes a warning even if it matches
@@ -1466,8 +1466,7 @@ def test_automap_body(body, meta, expected, warnings, caplog):
     [
         # When httpResponseBody, browserHtml, screenshot, or
         # httpResponseHeaders, are unnecessarily set to False, they are not
-        # defined in the parameters sent to Zyte Data API, and a warning is
-        # logged.
+        # defined in the parameters sent to Zyte API, and a warning is logged.
         (
             {
                 "browserHtml": True,

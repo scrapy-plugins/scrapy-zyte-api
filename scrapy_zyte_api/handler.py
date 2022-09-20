@@ -45,7 +45,7 @@ def _update_api_params_from_request_headers(
         headers = api_params.get("customHttpRequestHeaders")
         if headers is not None:
             logger.warning(
-                f"Request {request} defines the Zyte Data API "
+                f"Request {request} defines the Zyte API "
                 f"customHttpRequestHeaders parameter, overriding "
                 f"Request.headers. Use Request.headers instead."
             )
@@ -60,7 +60,7 @@ def _update_api_params_from_request_headers(
                     if lowercase_k != b"user-agent" or v != DEFAULT_USER_AGENT:
                         logger.warning(
                             f"Request {request} defines header {k}, which "
-                            f"cannot be mapped into the Zyte Data API "
+                            f"cannot be mapped into the Zyte API "
                             f"customHttpRequestHeaders parameter."
                         )
                     continue
@@ -74,9 +74,9 @@ def _update_api_params_from_request_headers(
         headers = api_params.get("requestHeaders")
         if headers is not None:
             logger.warning(
-                f"Request {request} defines the Zyte Data API "
-                f"requestHeaders parameter, overriding Request.headers. "
-                f"Use Request.headers instead."
+                f"Request {request} defines the Zyte API requestHeaders "
+                f"parameter, overriding Request.headers. Use Request.headers "
+                f"instead."
             )
         elif request.headers:
             request_headers = {}
@@ -101,8 +101,8 @@ def _update_api_params_from_request_headers(
                 ):
                     logger.warning(
                         f"Request {request} defines header {k}, which "
-                        f"cannot be mapped into the Zyte Data API "
-                        f"requestHeaders parameter."
+                        f"cannot be mapped into the Zyte API requestHeaders "
+                        f"parameter."
                     )
             if request_headers:
                 api_params["requestHeaders"] = request_headers
@@ -129,7 +129,7 @@ def _update_api_params_from_request(  # NOQA
         )
     elif api_params.get("httpResponseBody") is False:
         logging.warning(
-            f"Request {request} unnecessarily defines the Zyte Data API "
+            f"Request {request} unnecessarily defines the Zyte API "
             f"'httpResponseBody' parameter with its default value, False. "
             f"It will not be sent to the server."
         )
@@ -159,15 +159,15 @@ def _update_api_params_from_request(  # NOQA
     method = api_params.get("httpRequestMethod")
     if method:
         logger.warning(
-            f"Request {request} uses the Zyte Data API httpRequestMethod "
+            f"Request {request} uses the Zyte API httpRequestMethod "
             f"parameter, overriding Request.method. Use Request.method "
             f"instead."
         )
         if method != request.method:
             logger.warning(
                 f"The HTTP method of request {request} ({request.method}) "
-                f"does not match the Zyte Data API httpRequestMethod "
-                f"parameter ({method})."
+                f"does not match the Zyte API httpRequestMethod parameter "
+                f"({method})."
             )
     elif request.method != "GET":
         if response_body:
@@ -176,7 +176,7 @@ def _update_api_params_from_request(  # NOQA
             logger.warning(
                 f"The HTTP method of request {request} ({request.method}) "
                 f"is being ignored. The httpRequestMethod parameter of "
-                f"Zyte Data API can only be set when the httpResponseBody "
+                f"Zyte API can only be set when the httpResponseBody "
                 f"parameter is True."
             )
 
@@ -190,16 +190,15 @@ def _update_api_params_from_request(  # NOQA
     body = api_params.get("httpRequestBody")
     if body:
         logger.warning(
-            f"Request {request} uses the Zyte Data API httpRequestBody "
-            f"parameter, overriding Request.body. Use Request.body "
-            f"instead."
+            f"Request {request} uses the Zyte API httpRequestBody parameter, "
+            f"overriding Request.body. Use Request.body instead."
         )
         decoded_body = b64decode(body)
         if decoded_body != request.body:
             logger.warning(
                 f"The body of request {request} ({request.body!r}) "
-                f"does not match the Zyte Data API httpRequestBody "
-                f"parameter ({body!r}; decoded: {decoded_body!r})."
+                f"does not match the Zyte API httpRequestBody parameter "
+                f"({body!r}; decoded: {decoded_body!r})."
             )
     elif request.body != b"":
         if response_body:
@@ -209,7 +208,7 @@ def _update_api_params_from_request(  # NOQA
             logger.warning(
                 f"The body of request {request} ({request.body!r}) "
                 f"is being ignored. The httpRequestBody parameter of "
-                f"Zyte Data API can only be set when the httpResponseBody "
+                f"Zyte API can only be set when the httpResponseBody "
                 f"parameter is True."
             )
 
@@ -217,9 +216,9 @@ def _update_api_params_from_request(  # NOQA
         if api_params.get(param) != default_value:
             continue
         logging.warning(
-            f"Request {request} unnecessarily defines the Zyte Data API "
-            f"{param!r} parameter with its default value, {default_value!r}. "
-            f"It will not be sent to the server."
+            f"Request {request} unnecessarily defines the Zyte API {param!r} "
+            f"parameter with its default value, {default_value!r}. It will "
+            f"not be sent to the server."
         )
         api_params.pop(param)
 
@@ -236,9 +235,9 @@ def _get_api_params(
     browser_headers: Dict[str, str],
     job_id: Optional[str],
 ) -> Optional[dict]:
-    """Returns a dictionary of API parameters that must be sent to Zyte Data
-    API for the specified request, or None if the request should not be driven
-    through Zyte Data API."""
+    """Returns a dictionary of API parameters that must be sent to Zyte API for
+    the specified request, or None if the request should not be sent through
+    Zyte API."""
     meta_params = request.meta.get("zyte_api", use_api_by_default)
     if meta_params is False:
         return None
