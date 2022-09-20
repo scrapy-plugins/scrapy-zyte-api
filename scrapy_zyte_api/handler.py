@@ -309,6 +309,49 @@ def _update_api_params_from_request(
     return api_params
 
 
+def _copy_meta_params_as_dict(
+    meta_params: Dict[str, Any],
+    *,
+    param: str,
+    request: Request,
+):
+    if meta_params is True:
+        return {}
+    elif not isinstance(meta_params, Mapping):
+        raise ValueError(
+            f"'{param}' parameters in the request meta should be provided as "
+            f"a dictionary, got {type(meta_params)} instead in {request}."
+        )
+    else:
+        return copy(meta_params)
+
+
+def _merge_params(
+    *,
+    default_params: Dict[str, Any],
+    meta_params: Dict[str, Any],
+    param: str,
+    setting: str,
+    request: Request,
+):
+    params = copy(default_params)
+    for k in list(meta_params):
+        if meta_params[k] is not None:
+            continue
+        meta_params.pop(k)
+        if k in params:
+            params.pop(k)
+        else:
+            logger.warning(
+                f"In request {request} {param!r} parameter {k} is None, "
+                f"which is a value reserved to unset parameters defined in "
+                f"the {setting} setting, but the setting does not define such "
+                f"a parameter."
+            )
+    params.update(meta_params)
+    return params
+
+
 def _get_raw_params(
     request: Request,
     *,
@@ -326,33 +369,19 @@ def _get_raw_params(
         )
         return None
 
-    if meta_params is True:
-        meta_params = {}
-    elif not isinstance(meta_params, Mapping):
-        raise ValueError(
-            f"'zyte_api' parameters in the request meta should be provided as "
-            f"a dictionary, got {type(meta_params)} instead in {request}."
-        )
-    else:
-        meta_params = copy(meta_params)
+    meta_params = _copy_meta_params_as_dict(
+        meta_params,
+        param="zyte_api",
+        request=request,
+    )
 
-    params = copy(default_params)
-    for k in list(meta_params):
-        if meta_params[k] is not None:
-            continue
-        meta_params.pop(k)
-        if k in params:
-            params.pop(k)
-        else:
-            logger.warning(
-                f"In request {request} 'zyte_api' parameter {k} is None, "
-                f"which is a value reserved to unset parameters defined in "
-                f"the ZYTE_API_DEFAULT_PARAMS setting, but the setting does "
-                f"not define such a parameter."
-            )
-    params.update(meta_params)
-
-    return params
+    return _merge_params(
+        default_params=default_params,
+        meta_params=meta_params,
+        param="zyte_api",
+        setting="ZYTE_API_DEFAULT_PARAMS",
+        request=request,
+    )
 
 
 def _get_automap_params(
@@ -367,34 +396,21 @@ def _get_automap_params(
     if meta_params is False:
         return None
 
-    if meta_params is True:
-        meta_params = {}
-    elif not isinstance(meta_params, Mapping):
-        raise ValueError(
-            f"'zyte_api_automap' parameters in the request meta should be "
-            f"provided as a dictionary, got {type(meta_params)} instead in "
-            f"{request}."
-        )
-    else:
-        meta_params = copy(meta_params)
+    meta_params = _copy_meta_params_as_dict(
+        meta_params,
+        param="zyte_api_automap",
+        request=request,
+    )
+
     original_meta_params = copy(meta_params)
 
-    params = copy(default_params)
-
-    for k in list(meta_params):
-        if meta_params[k] is not None:
-            continue
-        meta_params.pop(k)
-        if k in params:
-            params.pop(k)
-        else:
-            logger.warning(
-                f"In request {request} 'zyte_api_automap' parameter {k} is "
-                f"None, which is a value reserved to unset parameters defined "
-                f"in the ZYTE_API_AUTOMAP_PARAMS setting, but the setting "
-                f"does not define such a parameter."
-            )
-    params.update(meta_params)
+    params = _merge_params(
+        default_params=default_params,
+        meta_params=meta_params,
+        param="zyte_api_automap",
+        setting="ZYTE_API_AUTOMAP_PARAMS",
+        request=request,
+    )
 
     _update_api_params_from_request(
         params,
