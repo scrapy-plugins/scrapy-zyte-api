@@ -13,6 +13,7 @@ from scrapy_zyte_api.responses import (
 from scrapy_zyte_api.utils import _RESPONSE_HAS_IP_ADDRESS, _RESPONSE_HAS_PROTOCOL
 
 PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
+PAGE_CONTENT_2 = "<html><body>Ceci n’est pas une pipe</body></html>"
 URL = "https://example.com"
 
 
@@ -34,6 +35,20 @@ def raw_api_response_body():
     return {
         "url": "https://example.com",
         "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+        "echoData": {"some_value": "here"},
+        "httpResponseHeaders": [
+            {"name": "Content-Type", "value": "text/html"},
+            {"name": "Content-Length", "value": len(PAGE_CONTENT)},
+        ],
+        "statusCode": 200,
+    }
+
+
+def raw_api_response_mixed():
+    return {
+        "url": URL,
+        "browserHtml": PAGE_CONTENT,
+        "httpResponseBody": b64encode(PAGE_CONTENT_2.encode("utf-8")),
         "echoData": {"some_value": "here"},
         "httpResponseHeaders": [
             {"name": "Content-Type", "value": "text/html"},
@@ -76,6 +91,7 @@ def test_init(api_response, cls):
     [
         (raw_api_response_browser, ZyteAPITextResponse),
         (raw_api_response_body, ZyteAPIResponse),
+        (raw_api_response_mixed, ZyteAPITextResponse),
     ],
 )
 def test_text_from_api_response(api_response, cls):
