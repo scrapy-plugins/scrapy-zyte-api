@@ -1,6 +1,13 @@
 Changes
 =======
 
+0.5.1 (2022-09-20)
+------------------
+
+* Raise the minimum dependency of Zyte API's Python API to ``zyte-api>=0.4.0``.
+  This changes all the requests to Zyte API to have have ``Accept-Encoding: br``
+  and automatically decompress brotli responses.
+
 0.5.0 (2022-08-25)
 ------------------
 
