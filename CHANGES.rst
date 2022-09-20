@@ -1,6 +1,15 @@
 Changes
 =======
 
+0.5.1 (2022-09-20)
+------------------
+
+* Raise the minimum dependency of Zyte API's Python API to ``zyte-api>=0.4.0``.
+  This changes all the requests to Zyte API to have have ``Accept-Encoding: br``
+  and automatically decompress brotli responses.
+* Rename "Zyte Data API" to simply "Zyte API" in the README.
+* Lower the minimum Scrapy version from ``2.6.0`` to ``2.0.1``.
+
 0.5.0 (2022-08-25)
 ------------------
 
