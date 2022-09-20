@@ -176,9 +176,10 @@ mapping as a side effect:
 -   Setting ``screenshot`` to ``True`` without also setting ``browserHtml`` to
     ``True`` unsets ``httpResponseHeaders``.
 
-When mapping headers, unsupported headers are excluded from the mapping. Use
-the following settings to change which headers are mapped and how they are
-mapped:
+When mapping headers, unsupported headers are excluded from the mapping. If
+Zyte API header support changes in the future, and you cannot upgrade to a
+version of scrapy-zyte-api that includes such changes, use the following
+settings to change which headers are mapped and how they are mapped:
 
 -   ``ZYTE_API_UNSUPPORTED_HEADERS`` determines headers that *cannot* be mapped
     as ``customHttpRequestHeaders``, and its default value is:
