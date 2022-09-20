@@ -1490,23 +1490,25 @@ def test_automap_header_settings(
             },
             ["Use Request.body instead"],
         ),
-        # A body should not be used unless httpResponseBody is also used.
+        # The body is mapped even if httpResponseBody is not used.
         (
             "a",
             {"browserHtml": True},
             {
                 "browserHtml": True,
+                "httpRequestBody": "YQ==",
                 "httpResponseHeaders": True,
             },
-            ["can only be set when the httpResponseBody parameter"],
+            [],
         ),
         (
             "a",
             {"screenshot": True},
             {
+                "httpRequestBody": "YQ==",
                 "screenshot": True,
             },
-            ["can only be set when the httpResponseBody parameter"],
+            [],
         ),
     ],
 )

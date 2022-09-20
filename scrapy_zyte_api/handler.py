@@ -241,16 +241,8 @@ def _set_http_request_body_from_request(
                 f"({body!r}; decoded: {decoded_body!r})."
             )
     elif request.body != b"":
-        if api_params.get("httpResponseBody"):
-            base64_body = b64encode(request.body).decode()
-            api_params["httpRequestBody"] = base64_body
-        else:
-            logger.warning(
-                f"The body of request {request} ({request.body!r}) "
-                f"is being ignored. The httpRequestBody parameter of "
-                f"Zyte API can only be set when the httpResponseBody "
-                f"parameter is True."
-            )
+        base64_body = b64encode(request.body).decode()
+        api_params["httpRequestBody"] = base64_body
 
 
 def _unset_unneeded_api_params(
