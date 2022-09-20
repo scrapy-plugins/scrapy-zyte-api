@@ -162,7 +162,7 @@ Automated parameter mapping chooses Zyte API parameters as follows by default:
 
 -   ``Request.headers`` become ``customHttpRequestHeaders``.
 
--   ``Request.body`` is base64-encoded as ``httpRequestBody``.
+-   ``Request.body`` becomes ``httpRequestBody``.
 
 Instead of setting ``zyte_api_automap`` to ``True``, you may set it to a
 ``dict`` of Zyte API parameters to extend or override choices made by automated
