@@ -115,10 +115,10 @@ def _map_request_headers(
         api_params["requestHeaders"] = request_headers
 
 
-def _update_api_params_from_request_headers(
+def _set_request_headers_from_request(
+    *,
     api_params: Dict[str, Any],
     request: Request,
-    *,
     unsupported_headers: Set[str],
     browser_headers: Dict[str, str],
 ):
@@ -140,14 +140,10 @@ def _update_api_params_from_request_headers(
         )
 
 
-def _update_api_params_from_request(  # NOQA
+def _set_http_response_body_from_request(
+    *,
     api_params: Dict[str, Any],
     request: Request,
-    *,
-    default_params: Dict[str, Any],
-    meta_params: Dict[str, Any],
-    unsupported_headers: Set[str],
-    browser_headers: Dict[str, str],
 ):
     if not any(
         api_params.get(k) for k in ("httpResponseBody", "browserHtml", "screenshot")
@@ -166,10 +162,17 @@ def _update_api_params_from_request(  # NOQA
             f"'httpResponseBody' parameter with its default value, False. "
             f"It will not be sent to the server."
         )
-    response_body = api_params.get("httpResponseBody")
-    if response_body is False:
+    if api_params.get("httpResponseBody") is False:
         api_params.pop("httpResponseBody")
 
+
+def _set_http_response_headers_from_request(
+    *,
+    api_params: Dict[str, Any],
+    default_params: Dict[str, Any],
+    meta_params: Dict[str, Any],
+    request: Request,
+):
     if any(api_params.get(k) for k in ("httpResponseBody", "browserHtml")):
         if api_params.get("httpResponseHeaders") is True and not (
             default_params.get("httpResponseHeaders") is True
@@ -196,6 +199,12 @@ def _update_api_params_from_request(  # NOQA
     if api_params.get("httpResponseHeaders") is False:
         api_params.pop("httpResponseHeaders")
 
+
+def _set_http_request_method_from_request(
+    *,
+    api_params: Dict[str, Any],
+    request: Request,
+):
     method = api_params.get("httpRequestMethod")
     if method:
         logger.warning(
@@ -210,7 +219,7 @@ def _update_api_params_from_request(  # NOQA
                 f"({method})."
             )
     elif request.method != "GET":
-        if response_body:
+        if api_params.get("httpResponseBody"):
             api_params["httpRequestMethod"] = request.method
         else:
             logger.warning(
@@ -220,13 +229,12 @@ def _update_api_params_from_request(  # NOQA
                 f"parameter is True."
             )
 
-    _update_api_params_from_request_headers(
-        api_params,
-        request,
-        unsupported_headers=unsupported_headers,
-        browser_headers=browser_headers,
-    )
 
+def _set_http_request_body_from_request(
+    *,
+    api_params: Dict[str, Any],
+    request: Request,
+):
     body = api_params.get("httpRequestBody")
     if body:
         logger.warning(
@@ -241,7 +249,7 @@ def _update_api_params_from_request(  # NOQA
                 f"({body!r}; decoded: {decoded_body!r})."
             )
     elif request.body != b"":
-        if response_body:
+        if api_params.get("httpResponseBody"):
             base64_body = b64encode(request.body).decode()
             api_params["httpRequestBody"] = base64_body
         else:
@@ -252,6 +260,13 @@ def _update_api_params_from_request(  # NOQA
                 f"parameter is True."
             )
 
+
+def _unset_unneeded_api_params(
+    *,
+    api_params: Dict[str, Any],
+    default_params: Dict[str, Any],
+    request: Request,
+):
     for param, default_value in _DEFAULT_API_PARAMS.items():
         if api_params.get(param) != default_value:
             continue
@@ -263,6 +278,34 @@ def _update_api_params_from_request(  # NOQA
             )
         api_params.pop(param)
 
+
+def _update_api_params_from_request(
+    api_params: Dict[str, Any],
+    request: Request,
+    *,
+    default_params: Dict[str, Any],
+    meta_params: Dict[str, Any],
+    unsupported_headers: Set[str],
+    browser_headers: Dict[str, str],
+):
+    _set_http_response_body_from_request(api_params=api_params, request=request)
+    _set_http_response_headers_from_request(
+        api_params=api_params,
+        request=request,
+        default_params=default_params,
+        meta_params=meta_params,
+    )
+    _set_http_request_method_from_request(api_params=api_params, request=request)
+    _set_request_headers_from_request(
+        api_params=api_params,
+        request=request,
+        unsupported_headers=unsupported_headers,
+        browser_headers=browser_headers,
+    )
+    _set_http_request_body_from_request(api_params=api_params, request=request)
+    _unset_unneeded_api_params(
+        api_params=api_params, request=request, default_params=default_params
+    )
     return api_params
 
 
