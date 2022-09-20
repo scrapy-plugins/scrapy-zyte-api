@@ -22,7 +22,7 @@ Requirements
 ------------
 
 * Python 3.7+
-* Scrapy 2.6+
+* Scrapy 2.0.1+
 
 Installation
 ------------
@@ -66,7 +66,7 @@ The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 Usage
 -----
 
-To enable a ``scrapy.Request`` to go through Zyte Data API, the ``zyte_api`` key in
+To enable a ``scrapy.Request`` to go through Zyte API, the ``zyte_api`` key in
 `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
 must be present and contain a dict with Zyte API parameters:
 
@@ -99,25 +99,24 @@ must be present and contain a dict with Zyte API parameters:
             #     'browserHtml': '<html> ... </html>',
             # }
 
-You can see the full list of parameters in the `Zyte Data API Specification
+You can see the full list of parameters in the `Zyte API Specification
 <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
 The ``url`` parameter is filled automatically from ``request.url``, other 
 parameters should be set explicitly.
 
-The raw Zyte Data API response can be accessed via the ``raw_api_response``
+The raw Zyte API response can be accessed via the ``raw_api_response``
 attribute of the response object.
 
-When you use the Zyte Data API parameters ``browserHtml``, 
-``httpResponseBody``, or ``httpResponseHeaders``, the response body and headers 
-are set accordingly.
+When you use the Zyte API parameters ``browserHtml``, ``httpResponseBody``, or
+``httpResponseHeaders``, the response body and headers are set accordingly.
 
-Note that, for Zyte Data API requests, the spider gets responses of
+Note that, for Zyte API requests, the spider gets responses of
 ``ZyteAPIResponse`` and ``ZyteAPITextResponse`` types,
 which are respectively subclasses of ``scrapy.http.Response``
 and ``scrapy.http.TextResponse``.
 
-If multiple requests target the same URL with different Zyte Data API
-parameters, pass ``dont_filter=True`` to ``Request``.
+If multiple requests target the same URL with different Zyte API parameters,
+pass ``dont_filter=True`` to ``Request``.
 
 
 .. _default-params:

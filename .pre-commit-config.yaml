@@ -18,4 +18,6 @@ repos:
     rev: v0.971
     hooks:
     - id: mypy
+      additional_dependencies:
+      - types-setuptools
       args: [--ignore-missing-imports, --no-warn-no-return]
