@@ -445,13 +445,13 @@ def _get_api_params(
             unsupported_headers=unsupported_headers,
             browser_headers=browser_headers,
         )
+        if api_params is None:
+            return None
     elif request.meta.get("zyte_api_automap", False) is not False:
         raise ValueError(
             f"Request {request} combines manually-defined parameters and "
             f"automatically-mapped parameters."
         )
-    if api_params is None:
-        return None
 
     if job_id is not None:
         api_params["jobId"] = job_id
@@ -470,6 +470,31 @@ def _load_default_params(settings, setting):
         )
         params.pop(param)
     return params
+
+
+def _load_unsupported_headers(settings):
+    return {
+        header.strip().lower().encode()
+        for header in settings.getlist(
+            "ZYTE_API_UNSUPPORTED_HEADERS",
+            ["Cookie", "User-Agent"],
+        )
+    }
+
+
+def _load_browser_headers(settings):
+    browser_headers = settings.getdict(
+        "ZYTE_API_BROWSER_HEADERS",
+        {"Referer": "referer"},
+    )
+    return {k.strip().lower().encode(): v for k, v in browser_headers.items()}
+
+
+def _load_retry_policy(settings):
+    policy = settings.get("ZYTE_API_RETRY_POLICY")
+    if policy:
+        policy = load_object(policy)
+    return policy
 
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
@@ -504,28 +529,15 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
         self._stats = crawler.stats
-        self._job_id = crawler.settings.get("JOB")
-        self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
-        self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
         self._session = create_session(connection_pool_size=self._client.n_conn)
-        self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
-        if self._retry_policy:
-            self._retry_policy = load_object(self._retry_policy)
+
+        self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
+        self._browser_headers = _load_browser_headers(settings)
+        self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
+        self._job_id = crawler.settings.get("JOB")
+        self._retry_policy = _load_retry_policy(settings)
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
-        self._unsupported_headers = {
-            header.strip().lower().encode()
-            for header in settings.getlist(
-                "ZYTE_API_UNSUPPORTED_HEADERS",
-                ["Cookie", "User-Agent"],
-            )
-        }
-        browser_headers = settings.getdict(
-            "ZYTE_API_BROWSER_HEADERS",
-            {"Referer": "referer"},
-        )
-        self._browser_headers = {
-            k.strip().lower().encode(): v for k, v in browser_headers.items()
-        }
+        self._unsupported_headers = _load_unsupported_headers(settings)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = _get_api_params(
