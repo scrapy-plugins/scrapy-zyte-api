@@ -114,7 +114,6 @@ def _update_api_params_from_request(  # NOQA
     *,
     unsupported_headers: Set[str],
     browser_headers: Dict[str, str],
-    default_params: Dict[str, Any],
 ):
     if not any(
         api_params.get(k) for k in ("httpResponseBody", "browserHtml", "screenshot")
@@ -225,20 +224,12 @@ def _update_api_params_from_request(  # NOQA
     return api_params
 
 
-def _get_api_params(
+def _get_raw_params(
     request: Request,
     *,
-    use_api_by_default: bool,
-    automap_by_default: bool,
     default_params: Dict[str, Any],
-    unsupported_headers: Set[str],
-    browser_headers: Dict[str, str],
-    job_id: Optional[str],
-) -> Optional[dict]:
-    """Returns a dictionary of API parameters that must be sent to Zyte API for
-    the specified request, or None if the request should not be sent through
-    Zyte API."""
-    meta_params = request.meta.get("zyte_api", use_api_by_default)
+):
+    meta_params = request.meta.get("zyte_api", False)
     if meta_params is False:
         return None
 
@@ -253,19 +244,18 @@ def _get_api_params(
     if meta_params is True:
         meta_params = {}
     elif not isinstance(meta_params, Mapping):
-        logger.error(
+        raise ValueError(
             f"'zyte_api' parameters in the request meta should be provided as "
             f"a dictionary, got {type(meta_params)} instead in {request}."
         )
-        raise ValueError("The value of the 'zyte_api' meta key of ")
 
-    api_params = copy(default_params)
+    params = copy(default_params)
     for k in list(meta_params):
         if meta_params[k] is not None:
             continue
         meta_params.pop(k)
-        if k in api_params:
-            api_params.pop(k)
+        if k in params:
+            params.pop(k)
         else:
             logger.warning(
                 f"In request {request} 'zyte_api' parameter {k} is None, "
@@ -273,21 +263,106 @@ def _get_api_params(
                 f"the ZYTE_API_DEFAULT_PARAMS setting, but the setting does "
                 f"not define such a parameter."
             )
-    api_params.update(meta_params)
+    params.update(meta_params)
 
-    if request.meta.get("zyte_api_automap", automap_by_default):
-        _update_api_params_from_request(
-            api_params,
+    return params
+
+
+def _get_automap_params(
+    request: Request,
+    *,
+    default_enabled: bool,
+    default_params: Dict[str, Any],
+    unsupported_headers: Set[str],
+    browser_headers: Dict[str, str],
+):
+    meta_params = request.meta.get("zyte_api_automap", default_enabled)
+    if meta_params is False:
+        return None
+
+    if meta_params is True:
+        meta_params = {}
+    elif not isinstance(meta_params, Mapping):
+        raise ValueError(
+            f"'zyte_api_automap' parameters in the request meta should be "
+            f"provided as a dictionary, got {type(meta_params)} instead in "
+            f"{request}."
+        )
+
+    params = copy(default_params)
+
+    _update_api_params_from_request(
+        params,
+        request,
+        unsupported_headers=unsupported_headers,
+        browser_headers=browser_headers,
+    )
+
+    for k in list(meta_params):
+        if meta_params[k] is not None:
+            continue
+        meta_params.pop(k)
+        if k in params:
+            params.pop(k)
+        else:
+            logger.warning(
+                f"In request {request} 'zyte_api_automap' parameter {k} is "
+                f"None, which is a value reserved to unset parameters defined "
+                f"in the ZYTE_API_AUTOMAP_PARAMS setting, but the setting "
+                f"does not define such a parameter."
+            )
+    params.update(meta_params)
+
+    return params
+
+
+def _get_api_params(
+    request: Request,
+    *,
+    default_params: Dict[str, Any],
+    transparent_mode: bool,
+    automap_params: Dict[str, Any],
+    unsupported_headers: Set[str],
+    browser_headers: Dict[str, str],
+    job_id: Optional[str],
+) -> Optional[dict]:
+    """Returns a dictionary of API parameters that must be sent to Zyte API for
+    the specified request, or None if the request should not be sent through
+    Zyte API."""
+    api_params = _get_raw_params(request, default_params=default_params)
+    if api_params is None:
+        api_params = _get_automap_params(
             request,
+            default_enabled=transparent_mode,
+            default_params=automap_params,
             unsupported_headers=unsupported_headers,
             browser_headers=browser_headers,
-            default_params=default_params,
         )
+    elif request.meta.get("zyte_api_automap", False) is not False:
+        raise ValueError(
+            f"Request {request} combines manually-defined parameters and "
+            f"automatically-mapped parameters."
+        )
+    if api_params is None:
+        return None
 
     if job_id is not None:
         api_params["jobId"] = job_id
 
     return api_params
+
+
+def _load_default_params(settings, setting):
+    params = settings.getdict(setting)
+    for param in list(params):
+        if params[param] is not None:
+            continue
+        logger.warning(
+            f"Parameter {param!r} in the {setting} setting is None. Default "
+            f"parameters should never be None."
+        )
+        params.pop(param)
+    return params
 
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
@@ -323,22 +398,13 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         )
         self._stats = crawler.stats
         self._job_id = crawler.settings.get("JOB")
-        self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
-        for param in list(self._zyte_api_default_params):
-            if self._zyte_api_default_params[param] is not None:
-                continue
-            logger.warning(
-                f"Parameter {param!r} in the ZYTE_API_DEFAULT_PARAMS "
-                f"setting is None. Default parameters should never be "
-                f"None."
-            )
-            self._zyte_api_default_params.pop(param)
+        self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
+        self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
         self._session = create_session(connection_pool_size=self._client.n_conn)
         self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
         if self._retry_policy:
             self._retry_policy = load_object(self._retry_policy)
-        self._on_all_requests = settings.getbool("ZYTE_API_ON_ALL_REQUESTS")
-        self._automap = settings.getbool("ZYTE_API_AUTOMAP", False)
+        self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._unsupported_headers = {
             header.strip().lower().encode()
             for header in settings.getlist(
@@ -357,9 +423,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = _get_api_params(
             request,
-            use_api_by_default=self._on_all_requests,
-            automap_by_default=self._automap,
-            default_params=self._zyte_api_default_params,
+            default_params=self._default_params,
+            transparent_mode=self._transparent_mode,
+            automap_params=self._automap_params,
             unsupported_headers=self._unsupported_headers,
             browser_headers=self._browser_headers,
             job_id=self._job_id,

@@ -1,6 +1,8 @@
 import sys
 from asyncio import iscoroutine
 from copy import copy
+from functools import partial
+from inspect import isclass
 from typing import Any, Dict
 from unittest import mock
 from unittest.mock import patch
@@ -234,16 +236,16 @@ async def test_higher_concurrency():
     assert response_indexes[0] == expected_first_index
 
 
-AUTOMAP_BY_DEFAULT = False
+AUTOMAP_PARAMS: Dict[str, Any] = {}
 BROWSER_HEADERS = {b"referer": "referer"}
 DEFAULT_PARAMS: Dict[str, Any] = {}
+TRANSPARENT_MODE = False
 UNSUPPORTED_HEADERS = {b"cookie", b"user-agent"}
-USE_API_BY_DEFAULT = False
 JOB_ID = None
 GET_API_PARAMS_KWARGS = {
-    "use_api_by_default": USE_API_BY_DEFAULT,
-    "automap_by_default": AUTOMAP_BY_DEFAULT,
     "default_params": DEFAULT_PARAMS,
+    "transparent_mode": TRANSPARENT_MODE,
+    "automap_params": AUTOMAP_PARAMS,
     "unsupported_headers": UNSUPPORTED_HEADERS,
     "browser_headers": BROWSER_HEADERS,
     "job_id": JOB_ID,
@@ -270,10 +272,10 @@ async def test_get_api_params_input_custom(mockserver):
     request = Request(url="https://example.com")
     settings = {
         "JOB": "1/2/3",
-        "ZYTE_API_AUTOMAP": False,
+        "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
         "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
-        "ZYTE_API_ON_ALL_REQUESTS": True,
+        "ZYTE_API_AUTOMAP_PARAMS": {"c": "d"},
         "ZYTE_API_UNSUPPORTED_HEADERS": {"A"},
     }
     async with mockserver.make_handler(settings) as handler:
@@ -284,9 +286,9 @@ async def test_get_api_params_input_custom(mockserver):
                 await handler.download_request(request, None)
             _get_api_params.assert_called_once_with(
                 request,
-                use_api_by_default=True,
-                automap_by_default=False,
                 default_params={"a": "b"},
+                transparent_mode=True,
+                automap_params={"c": "d"},
                 unsupported_headers={b"a"},
                 browser_headers={b"b": "b"},
                 job_id="1/2/3",
@@ -325,6 +327,12 @@ async def test_get_api_params_output_side_effects(output, uses_zyte_api, mockser
         super_mock.download_request.assert_called()
 
 
+DEFAULT_AUTOMAP_PARAMS: Dict[str, Any] = {
+    "httpResponseBody": True,
+    "httpResponseHeaders": True,
+}
+
+
 @pytest.mark.parametrize(
     "setting,meta,expected",
     [
@@ -335,35 +343,88 @@ async def test_get_api_params_output_side_effects(output, uses_zyte_api, mockser
         (False, {"zyte_api": True}, {}),
         (False, {"zyte_api": {}}, {}),
         (False, {"zyte_api": {"a": "b"}}, {"a": "b"}),
-        (True, None, {}),
-        (True, {}, {}),
-        (True, {"a": "b"}, {}),
-        (True, {"zyte_api": False}, None),
+        (False, {"zyte_api_automap": False}, None),
+        (False, {"zyte_api_automap": True}, DEFAULT_AUTOMAP_PARAMS),
+        (False, {"zyte_api_automap": {}}, DEFAULT_AUTOMAP_PARAMS),
+        (False, {"zyte_api_automap": {"a": "b"}}, {**DEFAULT_AUTOMAP_PARAMS, "a": "b"}),
+        (False, {"zyte_api": False, "zyte_api_automap": False}, None),
+        (False, {"zyte_api": False, "zyte_api_automap": True}, DEFAULT_AUTOMAP_PARAMS),
+        (False, {"zyte_api": False, "zyte_api_automap": {}}, DEFAULT_AUTOMAP_PARAMS),
+        (
+            False,
+            {"zyte_api": False, "zyte_api_automap": {"a": "b"}},
+            {**DEFAULT_AUTOMAP_PARAMS, "a": "b"},
+        ),
+        (False, {"zyte_api": True, "zyte_api_automap": False}, {}),
+        (False, {"zyte_api": True, "zyte_api_automap": True}, ValueError),
+        (False, {"zyte_api": True, "zyte_api_automap": {}}, ValueError),
+        (False, {"zyte_api": True, "zyte_api_automap": {"a": "b"}}, ValueError),
+        (False, {"zyte_api": {}, "zyte_api_automap": False}, {}),
+        (False, {"zyte_api": {}, "zyte_api_automap": True}, ValueError),
+        (False, {"zyte_api": {}, "zyte_api_automap": {}}, ValueError),
+        (False, {"zyte_api": {}, "zyte_api_automap": {"a": "b"}}, ValueError),
+        (False, {"zyte_api": {"a": "b"}, "zyte_api_automap": False}, {"a": "b"}),
+        (False, {"zyte_api": {"a": "b"}, "zyte_api_automap": True}, ValueError),
+        (False, {"zyte_api": {"a": "b"}, "zyte_api_automap": {}}, ValueError),
+        (False, {"zyte_api": {"a": "b"}, "zyte_api_automap": {"a": "b"}}, ValueError),
+        (True, None, DEFAULT_AUTOMAP_PARAMS),
+        (True, {}, DEFAULT_AUTOMAP_PARAMS),
+        (True, {"a": "b"}, DEFAULT_AUTOMAP_PARAMS),
+        (True, {"zyte_api": False}, DEFAULT_AUTOMAP_PARAMS),
         (True, {"zyte_api": True}, {}),
         (True, {"zyte_api": {}}, {}),
         (True, {"zyte_api": {"a": "b"}}, {"a": "b"}),
+        (True, {"zyte_api_automap": False}, None),
+        (True, {"zyte_api_automap": True}, DEFAULT_AUTOMAP_PARAMS),
+        (True, {"zyte_api_automap": {}}, DEFAULT_AUTOMAP_PARAMS),
+        (True, {"zyte_api_automap": {"a": "b"}}, {**DEFAULT_AUTOMAP_PARAMS, "a": "b"}),
+        (True, {"zyte_api": False, "zyte_api_automap": False}, None),
+        (True, {"zyte_api": False, "zyte_api_automap": True}, DEFAULT_AUTOMAP_PARAMS),
+        (True, {"zyte_api": False, "zyte_api_automap": {}}, DEFAULT_AUTOMAP_PARAMS),
+        (
+            True,
+            {"zyte_api": False, "zyte_api_automap": {"a": "b"}},
+            {**DEFAULT_AUTOMAP_PARAMS, "a": "b"},
+        ),
+        (True, {"zyte_api": True, "zyte_api_automap": False}, {}),
+        (True, {"zyte_api": True, "zyte_api_automap": True}, ValueError),
+        (True, {"zyte_api": True, "zyte_api_automap": {}}, ValueError),
+        (True, {"zyte_api": True, "zyte_api_automap": {"a": "b"}}, ValueError),
+        (True, {"zyte_api": {}, "zyte_api_automap": False}, {}),
+        (True, {"zyte_api": {}, "zyte_api_automap": True}, ValueError),
+        (True, {"zyte_api": {}, "zyte_api_automap": {}}, ValueError),
+        (True, {"zyte_api": {}, "zyte_api_automap": {"a": "b"}}, ValueError),
+        (True, {"zyte_api": {"a": "b"}, "zyte_api_automap": False}, {"a": "b"}),
+        (True, {"zyte_api": {"a": "b"}, "zyte_api_automap": True}, ValueError),
+        (True, {"zyte_api": {"a": "b"}, "zyte_api_automap": {}}, ValueError),
+        (True, {"zyte_api": {"a": "b"}, "zyte_api_automap": {"a": "b"}}, ValueError),
     ],
 )
-def test_api_toggling(setting, meta, expected):
-    """Test how the value of the ``ZYTE_API_ON_ALL_REQUESTS`` setting
+def test_transparent_mode_toggling(setting, meta, expected):
+    """Test how the value of the ``ZYTE_API_TRANSPARENT_MODE`` setting
     (*setting*) in combination with request metadata (*meta*) determines what
     Zyte API parameters are used (*expected*).
 
     Note that :func:`test_get_api_params_output_side_effects` already tests how
     *expected* affects whether the request is sent through Zyte API or not,
     and :func:`test_get_api_params_input_custom` tests how the
-    ``ZYTE_API_ON_ALL_REQUESTS`` setting is mapped to the corresponding
+    ``ZYTE_API_TRANSPARENT_MODE`` setting is mapped to the corresponding
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com", meta=meta)
-    api_params = _get_api_params(
+    func = partial(
+        _get_api_params,
         request,
         **{
             **GET_API_PARAMS_KWARGS,
-            "use_api_by_default": setting,
+            "transparent_mode": setting,
         },
     )
-    assert api_params == expected
+    if isclass(expected):
+        with pytest.raises(expected):
+            func()
+    else:
+        assert func() == expected
 
 
 @pytest.mark.parametrize("setting", [False, True])
