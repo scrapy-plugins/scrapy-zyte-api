@@ -335,6 +335,7 @@ def _merge_params(
     request: Request,
 ):
     params = copy(default_params)
+    meta_params = copy(meta_params)
     for k in list(meta_params):
         if meta_params[k] is not None:
             continue
@@ -402,8 +403,6 @@ def _get_automap_params(
         request=request,
     )
 
-    original_meta_params = copy(meta_params)
-
     params = _merge_params(
         default_params=default_params,
         meta_params=meta_params,
@@ -416,7 +415,7 @@ def _get_automap_params(
         params,
         request,
         default_params=default_params,
-        meta_params=original_meta_params,
+        meta_params=meta_params,
         unsupported_headers=unsupported_headers,
         browser_headers=browser_headers,
     )
