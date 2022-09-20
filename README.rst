@@ -154,15 +154,15 @@ Automated parameter mapping chooses Zyte API parameters as follows by default:
 
 -   ``httpResponseBody`` and ``httpResponseHeaders`` are set to ``True``.
 
--   ``Rerquest.url`` becomes ``url``, same as in requests with manually-defined
+-   ``Request.url`` becomes ``url``, same as in requests with manually-defined
     parameters.
 
--   If ``Rerquest.method`` is something other than ``"GET"``, it becomes
+-   If ``Request.method`` is something other than ``"GET"``, it becomes
     ``httpRequestMethod``.
 
--   ``Rerquest.headers`` become ``customHttpRequestHeaders``.
+-   ``Request.headers`` become ``customHttpRequestHeaders``.
 
--   ``Rerquest.body`` is base64-encoded as ``httpRequestBody``.
+-   ``Request.body`` is base64-encoded as ``httpRequestBody``.
 
 Instead of setting ``zyte_api_automap`` to ``True``, you may set it to a
 ``dict`` of Zyte API parameters to extend or override choices made by automated
@@ -200,7 +200,7 @@ To maximize support for potential future changes in Zyte API, automated
 parameter mapping allows some parameter values and parameter combinations that
 Zyte API does not currently support, and may never support:
 
--   ``Rerquest.method`` becomes ``httpRequestMethod`` even for unsupported_
+-   ``Request.method`` becomes ``httpRequestMethod`` even for unsupported_
     ``httpRequestMethod`` values, and even if ``httpResponseBody`` is unset.
 
     .. _unsupported: https://docs.zyte.com/zyte-api/usage/extract.html#zyte-api-set-method
@@ -212,7 +212,7 @@ Zyte API does not currently support, and may never support:
     Conversely, you can set ``customHttpRequestHeaders`` or ``requestHeaders``
     to ``False`` to prevent their mapping from ``Request.headers``.
 
--   ``Rerquest.body`` becomes ``httpRequestBody`` even if ``httpResponseBody``
+-   ``Request.body`` becomes ``httpRequestBody`` even if ``httpResponseBody``
     is unset.
 
 -   You can set ``httpResponseBody`` to ``False`` (which unsets the parameter),
