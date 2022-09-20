@@ -248,6 +248,8 @@ def _get_raw_params(
             f"'zyte_api' parameters in the request meta should be provided as "
             f"a dictionary, got {type(meta_params)} instead in {request}."
         )
+    else:
+        meta_params = copy(meta_params)
 
     params = copy(default_params)
     for k in list(meta_params):
@@ -288,6 +290,8 @@ def _get_automap_params(
             f"provided as a dictionary, got {type(meta_params)} instead in "
             f"{request}."
         )
+    else:
+        meta_params = copy(meta_params)
 
     params = copy(default_params)
 

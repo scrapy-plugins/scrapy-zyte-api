@@ -427,9 +427,8 @@ def test_transparent_mode_toggling(setting, meta, expected):
         assert func() == expected
 
 
-@pytest.mark.parametrize("setting", [False, True])
 @pytest.mark.parametrize("meta", [None, 0, "", b"", []])
-def test_api_disabling_deprecated(setting, meta):
+def test_api_disabling_deprecated(meta):
     """Test how undocumented falsy values of the ``zyte_api`` request metadata
     key (*meta*) can be used to disable the use of Zyte API, but trigger a
     deprecation warning asking to replace them with False."""
@@ -438,20 +437,18 @@ def test_api_disabling_deprecated(setting, meta):
     with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
         api_params = _get_api_params(
             request,
-            **{
-                **GET_API_PARAMS_KWARGS,
-                "use_api_by_default": setting,
-            },
+            **GET_API_PARAMS_KWARGS,
         )
     assert api_params is None
 
 
-@pytest.mark.parametrize("meta", [1, ["a", "b"]])
-def test_bad_meta_type(meta):
-    """Test how undocumented truthy values for the ``zyte_api`` request
-    metadata key (*meta*) trigger a :exc:`ValueError` exception."""
-    request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
+@pytest.mark.parametrize("key", ["zyte_api", "zyte_api_automap"])
+@pytest.mark.parametrize("value", [1, ["a", "b"]])
+def test_bad_meta_type(key, value):
+    """Test how undocumented truthy values (*value*) for the ``zyte_api`` and
+    ``zyte_api_automap`` request metadata keys (*key*) trigger a
+    :exc:`ValueError` exception."""
+    request = Request(url="https://example.com", meta={key: value})
     with pytest.raises(ValueError):
         _get_api_params(
             request,
@@ -459,16 +456,18 @@ def test_bad_meta_type(meta):
         )
 
 
+@pytest.mark.parametrize("meta", ["zyte_api", "zyte_api_automap"])
 @ensureDeferred
-async def test_job_id(mockserver):
-    """Test how the value of the ``JOB`` setting (*setting*) is included as
-    ``jobId`` among the parameters sent to Zyte API.
+async def test_job_id(meta, mockserver):
+    """Test how the value of the ``JOB`` setting is included as ``jobId`` among
+    the parameters sent to Zyte API, both with manually-defined parameters and
+    with automatically-mapped parameters.
 
     Note that :func:`test_get_api_params_input_custom` already tests how the
     ``JOB`` setting is mapped to the corresponding
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
-    request = Request(url="https://example.com", meta={"zyte_api": True})
+    request = Request(url="https://example.com", meta={meta: True})
     api_params = _get_api_params(
         request,
         **{
@@ -482,20 +481,21 @@ async def test_job_id(mockserver):
 @ensureDeferred
 async def test_default_params_none(mockserver, caplog):
     """Test how setting a value to ``None`` in the dictionary of the
-    ZYTE_API_DEFAULT_PARAMS setting causes a warning, because that is not
-    expected to be a valid value.
+    ZYTE_API_DEFAULT_PARAMS and ZYTE_API_AUTOMAP_PARAMS settings causes a
+    warning, because that is not expected to be a valid value.
 
     Note that ``None`` is however a valid value for parameters defined in the
-    ``zyte_api`` request metadata key. It can be used to unset parameters set
-    in the ``ZYTE_API_DEFAULT_PARAMS`` setting for that specific request.
+    ``zyte_api`` and ``zyte_api_automap`` request metadata keys. It can be used
+    to unset parameters set in those settings for a specific request.
 
     Also note that :func:`test_get_api_params_input_custom` already tests how
-    the ``ZYTE_API_DEFAULT_PARAMS`` setting is mapped to the corresponding
+    the settings are mapped to the corresponding
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com")
     settings = {
         "ZYTE_API_DEFAULT_PARAMS": {"a": None, "b": "c"},
+        "ZYTE_API_AUTOMAP_PARAMS": {"d": None, "e": "f"},
     }
     with caplog.at_level("WARNING"):
         async with mockserver.make_handler(settings) as handler:
@@ -509,9 +509,11 @@ async def test_default_params_none(mockserver, caplog):
                     **{
                         **GET_API_PARAMS_KWARGS,
                         "default_params": {"b": "c"},
+                        "automap_params": {"e": "f"},
                     },
                 )
     assert "Parameter 'a' in the ZYTE_API_DEFAULT_PARAMS setting is None" in caplog.text
+    assert "Parameter 'd' in the ZYTE_API_AUTOMAP_PARAMS setting is None" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -527,30 +529,47 @@ async def test_default_params_none(mockserver, caplog):
         ({"a": 1}, {"a": None}, {}, []),
     ],
 )
-def test_default_params_merging(setting, meta, expected, warnings, caplog):
-    """Test how Zyte API parameters defined in the ``ZYTE_API_DEFAULT_PARAMS``
-    setting (*setting*) and those defined in the ``zyte_api`` request metadata
-    key (*meta*) are combined.
+@pytest.mark.parametrize(
+    "arg_key,meta_key,ignore_keys",
+    [
+        ("default_params", "zyte_api", set()),
+        (
+            "automap_params",
+            "zyte_api_automap",
+            {"httpResponseBody", "httpResponseHeaders"},
+        ),
+    ],
+)
+def test_default_params_merging(
+    arg_key, meta_key, ignore_keys, setting, meta, expected, warnings, caplog
+):
+    """Test how Zyte API parameters defined in the *arg_key* setting and those
+    defined in the *meta_key* request metadata key are combined.
 
     Request metadata takes precedence. Also, ``None`` values in request
     metadata can be used to unset parameters defined in the setting. Request
     metadata ``None`` values for keys that do not exist in the setting cause a
     warning.
 
+    This test also makes sure that, when `None` is used to unset a parameter,
+    the original request metadata key value is not modified.
+
     Note that :func:`test_get_api_params_input_custom` already tests how the
     ``ZYTE_API_DEFAULT_PARAMS`` setting is mapped to the corresponding
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com")
-    request.meta["zyte_api"] = meta
+    request.meta[meta_key] = meta
     with caplog.at_level("WARNING"):
         api_params = _get_api_params(
             request,
             **{
                 **GET_API_PARAMS_KWARGS,
-                "default_params": setting,
+                arg_key: setting,
             },
         )
+    for key in ignore_keys:
+        api_params.pop(key)
     assert api_params == expected
     if warnings:
         for warning in warnings:
