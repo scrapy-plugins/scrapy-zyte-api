@@ -1075,6 +1075,95 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
+        # False disables header mapping.
+        (
+            {"Referer": "a"},
+            {"customHttpRequestHeaders": False},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"browserHtml": True, "requestHeaders": False},
+            {
+                "browserHtml": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                "browserHtml": True,
+                "httpResponseBody": True,
+                "customHttpRequestHeaders": False,
+            },
+            {
+                "browserHtml": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"browserHtml": True, "httpResponseBody": True, "requestHeaders": False},
+            {
+                "browserHtml": True,
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                "browserHtml": True,
+                "httpResponseBody": True,
+                "customHttpRequestHeaders": False,
+                "requestHeaders": False,
+            },
+            {
+                "browserHtml": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        # True forces header mapping.
+        (
+            {"Referer": "a"},
+            {"requestHeaders": True},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"browserHtml": True, "customHttpRequestHeaders": True},
+            {
+                "browserHtml": True,
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseHeaders": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
         # Headers with None as value are not mapped.
         (
             {"Referer": None},

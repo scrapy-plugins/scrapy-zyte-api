@@ -39,7 +39,7 @@ def _iter_headers(
     parameter: str,
 ):
     headers = api_params.get(parameter)
-    if headers is not None:
+    if headers not in (None, True):
         logger.warning(
             f"Request {request} defines the Zyte API {parameter} parameter, "
             f"overriding Request.headers. Use Request.headers instead."
@@ -123,21 +123,38 @@ def _set_request_headers_from_request(
     browser_headers: Dict[str, str],
 ):
     """Updates *api_params*, in place, based on *request*."""
+    custom_http_request_headers = api_params.get("customHttpRequestHeaders")
+    request_headers = api_params.get("requestHeaders")
     response_body = api_params.get("httpResponseBody")
-    if response_body:
+
+    if (
+        response_body
+        and custom_http_request_headers is not False
+        or custom_http_request_headers is True
+    ):
         _map_custom_http_request_headers(
             api_params=api_params,
             request=request,
             unsupported_headers=unsupported_headers,
         )
-    if not response_body or any(
-        api_params.get(k) for k in ("browserHtml", "screenshot")
+    elif custom_http_request_headers is False:
+        api_params.pop("customHttpRequestHeaders")
+
+    if (
+        (
+            not response_body
+            or any(api_params.get(k) for k in ("browserHtml", "screenshot"))
+        )
+        and request_headers is not False
+        or request_headers is True
     ):
         _map_request_headers(
             api_params=api_params,
             request=request,
             browser_headers=browser_headers,
         )
+    elif request_headers is False:
+        api_params.pop("requestHeaders")
 
 
 def _set_http_response_body_from_request(
