@@ -1037,7 +1037,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         # Request.headers are mapped as customHttpRequestHeaders only.
         #
         # While future main output parameters are likely to use requestHeaders
-        # instead, we cannot known if an unknown parameter is a main output
+        # instead, we cannot know if an unknown parameter is a main output
         # parameter or a different type of parameter for httpRequestBody, and
         # what we know for sure is that, at the time of writing, Zyte API does
         # not allow requestHeaders to be combined with httpRequestBody.
