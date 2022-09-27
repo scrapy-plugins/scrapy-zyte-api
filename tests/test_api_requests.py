@@ -427,7 +427,7 @@ def test_transparent_mode_toggling(setting, meta, expected):
         assert func() == expected
 
 
-@pytest.mark.parametrize("meta", [None, 0, "", b"", []])
+@pytest.mark.parametrize("meta", [None, 0, "", b"", [], ()])
 def test_api_disabling_deprecated(meta):
     """Test how undocumented falsy values of the ``zyte_api`` request metadata
     key (*meta*) can be used to disable the use of Zyte API, but trigger a
