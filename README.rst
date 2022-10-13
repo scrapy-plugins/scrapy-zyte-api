@@ -73,15 +73,19 @@ The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 Usage
 =====
 
-You can send a request through Zyte API in one of the following ways:
+You can send requests through Zyte API in one of the following ways:
 
--   Setting all Zyte API parameters manually, keeping full control of what is
-    sent to Zyte API. See **Sending requests with manually-defined parameters**
-    below.
+-   Send all request through Zyte API by default, letting Zyte API parameters
+    be chosen automatically based on your Scrapy request parameters. See
+    **Using transparent mode** below.
 
--   Letting Zyte API parameters be chosen automatically based on your Scrapy
-    request parameters where possible. See **Sending requests with
-    automatically-mapped parameters** below.
+-   Send specific requests through Zyte API, setting all Zyte API parameters
+    manually, keeping full control of what is sent to Zyte API. See **Sending
+    requests with manually-defined parameters** below.
+
+-   Send specific requests through Zyte API, letting Zyte API parameters be
+    chosen automatically based on your Scrapy request parameters. See **Sending
+    requests with automatically-mapped parameters** below.
 
 The raw Zyte API response can be accessed via the ``raw_api_response``
 attribute of the response object.
@@ -95,6 +99,28 @@ subclasses of ``scrapy.http.Response`` and ``scrapy.http.TextResponse``.
 
 If multiple requests target the same URL with different Zyte API parameters,
 pass ``dont_filter=True`` to ``Request``.
+
+
+Using transparent mode
+----------------------
+
+Set the ``ZYTE_API_TRANSPARENT_MODE`` setting to ``True`` to handle Scrapy
+requests as follows:
+
+-   By default, requests are sent through Zyte API with automatically-mapped
+    parameters. See **Sending requests with automatically-mapped parameters**
+    below for details about automatic parameter mapping.
+
+    You do not need to set the ``zyte-api-automap`` request meta key to
+    ``True``, but you can set it to a dictionary to extend your Zyte API
+    request parameters.
+
+-   Requests with the ``zyte_api`` request meta key set to a ``dict`` are sent
+    through Zyte API with manually-defined parameters. See **Sending requests
+    with manually-defined parameters** below.
+
+-   Requests with the ``zyte_api_automap`` request meta key set to ``False``
+    are *not* sent through Zyte API.
 
 
 Sending requests with manually-defined parameters
@@ -148,7 +174,14 @@ To send a Scrapy request through Zyte API letting Zyte API parameters be
 automatically chosen based on the parameters of that Scrapy request, set the
 ``zyte_api_automap`` key in
 `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
-to ``True``. See also **Using transparent mode** below.
+to ``True``.
+
+See also **Using transparent mode** above and **Automated parameter mapping**
+below.
+
+
+Automated parameter mapping
+---------------------------
 
 Automated parameter mapping chooses Zyte API parameters as follows by default:
 
@@ -164,10 +197,11 @@ Automated parameter mapping chooses Zyte API parameters as follows by default:
 
 -   ``Request.body`` becomes ``httpRequestBody``.
 
-Instead of setting ``zyte_api_automap`` to ``True``, you may set it to a
-``dict`` of Zyte API parameters to extend or override choices made by automated
-parameter mapping. Some parameters modify the result of automated parameter
-mapping as a side effect:
+You may set the ``zyte_api_automap`` key in
+`Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
+to a ``dict`` of Zyte API parameters to extend or override choices made by
+automated parameter mapping. Some parameters modify the result of automated
+parameter mapping as a side effect:
 
 -   Setting ``browserHtml`` or ``screenshot`` to ``True`` unsets
     ``httpResponseBody``, and makes ``Request.headers`` become
@@ -224,28 +258,6 @@ Zyte API does not currently support, and may never support:
     or ``screenshot`` to ``True``. In this case, ``Request.headers`` is mapped
     both as ``customHttpRequestHeaders`` and as ``requestHeaders``, and
     ``browserHtml`` is used as the Scrapy response body.
-
-
-Using transparent mode
-----------------------
-
-Set the ``ZYTE_API_TRANSPARENT_MODE`` setting to ``True`` to handle Scrapy
-requests as follows:
-
--   Requests with the ``zyte_api_automap`` request meta key set to ``False``
-    are *not* sent through Zyte API.
-
--   Requests with the ``zyte_api`` request meta key set to a ``dict`` are sent
-    through Zyte API with manually-defined parameters. See **Sending requests
-    with manually-defined parameters** above.
-
--   All other requests are sent through Zyte API with automatically-mapped
-    parameters. See **Sending requests with automatically-mapped parameters**
-    above.
-
-    You do not need to set the ``zyte-api-automap`` request meta key to
-    ``True``, but you can set it to a dictionary to extend your request
-    parameters.
 
 
 Setting default parameters
