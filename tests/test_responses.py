@@ -52,7 +52,7 @@ def raw_api_response_mixed():
         "echoData": {"some_value": "here"},
         "httpResponseHeaders": [
             {"name": "Content-Type", "value": "text/html"},
-            {"name": "Content-Length", "value": len(PAGE_CONTENT)},
+            {"name": "Content-Length", "value": len(PAGE_CONTENT_2)},
         ],
         "statusCode": 200,
     }
