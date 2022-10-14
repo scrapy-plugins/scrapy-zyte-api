@@ -87,8 +87,28 @@ You can send requests through Zyte API in one of the following ways:
     chosen automatically based on your Scrapy request parameters. See **Sending
     requests with automatically-mapped parameters** below.
 
-The raw Zyte API response can be accessed via the ``raw_api_response``
-attribute of the response object.
+Zyte API response parameters are mapped into Scrapy response parameters where
+possible. The raw Zyte API response can be accessed via the
+``raw_api_response`` attribute of the response object:
+
+.. code-block:: python
+
+    def parse(self, response):
+        print(response.url)
+        # "https://quotes.toscrape.com/"
+        print(response.status)
+        # 200
+        print(response.headers)
+        # {b"Content-Type": [b"text/html"], …}
+        print(response.text)
+        # "<html>…</html>"
+        print(response.raw_api_response)
+        # {
+        #     "url": "https://quotes.toscrape.com/",
+        #     "statusCode": 200,
+        #     "httpResponseBody": "PGh0bWw+4oCmPC9odG1sPg==",
+        #     "httpResponseHeaders": […],
+        # }
 
 When you use the Zyte API parameters ``browserHtml``, ``httpResponseBody``, or
 ``httpResponseHeaders``, the response body and headers are set accordingly.
@@ -122,6 +142,25 @@ requests as follows:
 -   Requests with the ``zyte_api_automap`` request meta key set to ``False``
     are *not* sent through Zyte API.
 
+For example:
+
+.. code-block:: python
+
+    import scrapy
+
+
+    class SampleQuotesSpider(scrapy.Spider):
+        name = "sample_quotes"
+        start_urls = ["http://quotes.toscrape.com/"]
+
+        custom_settings = {
+            "ZYTE_API_TRANSPARENT_MODE": True,
+        }
+
+        def parse(self, response):
+            print(response.text)
+            # "<html>…</html>"
+
 
 Sending requests with manually-defined parameters
 -------------------------------------------------
@@ -149,18 +188,15 @@ For example:
                 url="http://quotes.toscrape.com/",
                 meta={
                     "zyte_api": {
-                        "browserHtml": True,
+                        "httpResponseBody": True,
+                        "httpResponseHeaders": True,
                     }
                 },
             )
 
         def parse(self, response):
-            print(response.raw_api_response)
-            # {
-            #     'url': 'https://quotes.toscrape.com/',
-            #     'statusCode': 200,
-            #     'browserHtml': '<html>…</html>',
-            # }
+            print(response.text)
+            # "<html>…</html>"
 
 See the `Zyte API documentation`_ to learn about Zyte API parameters.
 
@@ -175,6 +211,30 @@ automatically chosen based on the parameters of that Scrapy request, set the
 ``zyte_api_automap`` key in
 `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
 to ``True``.
+
+For example:
+
+.. code-block:: python
+
+    import scrapy
+
+
+    class SampleQuotesSpider(scrapy.Spider):
+        name = "sample_quotes"
+
+        def start_requests(self):
+            yield scrapy.Request(
+                url="http://quotes.toscrape.com/",
+                meta={
+                    "zyte_api": {
+                        "zyte_api_automap": True,
+                    }
+                },
+            )
+
+        def parse(self, response):
+            print(response.text)
+            # "<html>…</html>"
 
 See also **Using transparent mode** above and **Automated parameter mapping**
 below.
