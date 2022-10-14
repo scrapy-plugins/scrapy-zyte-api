@@ -124,8 +124,8 @@ pass ``dont_filter=True`` to ``Request``.
 Using transparent mode
 ----------------------
 
-Set the ``ZYTE_API_TRANSPARENT_MODE`` setting to ``True`` to handle Scrapy
-requests as follows:
+Set the ``ZYTE_API_TRANSPARENT_MODE`` `Scrapy setting`_ to ``True`` to handle
+Scrapy requests as follows:
 
 -   By default, requests are sent through Zyte API with automatically-mapped
     parameters. See **Sending requests with automatically-mapped parameters**
@@ -151,7 +151,7 @@ For example:
 
     class SampleQuotesSpider(scrapy.Spider):
         name = "sample_quotes"
-        start_urls = ["http://quotes.toscrape.com/"]
+        start_urls = ["https://quotes.toscrape.com/"]
 
         custom_settings = {
             "ZYTE_API_TRANSPARENT_MODE": True,
@@ -185,7 +185,7 @@ For example:
 
         def start_requests(self):
             yield scrapy.Request(
-                url="http://quotes.toscrape.com/",
+                url="https://quotes.toscrape.com/",
                 meta={
                     "zyte_api": {
                         "httpResponseBody": True,
@@ -227,7 +227,7 @@ For example:
 
         def start_requests(self):
             yield scrapy.Request(
-                url="http://quotes.toscrape.com/",
+                url="https://quotes.toscrape.com/",
                 meta={
                     "zyte_api": {
                         "zyte_api_automap": True,
@@ -246,7 +246,10 @@ below.
 Automated parameter mapping
 ---------------------------
 
-Automated parameter mapping chooses Zyte API parameters as follows by default:
+When you enable automated parameter mapping, be it through transparent mode
+(see **Using transparent mode** above) or for a speicfic request (see **Sending
+requests with automatically-mapped parameters** above), Zyte API parameters are
+chosen as follows by default:
 
 -   ``httpResponseBody`` and ``httpResponseHeaders`` are set to ``True``.
 
@@ -259,6 +262,31 @@ Automated parameter mapping chooses Zyte API parameters as follows by default:
 -   ``Request.headers`` become ``customHttpRequestHeaders``.
 
 -   ``Request.body`` becomes ``httpRequestBody``.
+
+For example, the following Scrapy request:
+
+.. code-block:: python
+
+    Request(
+        method="POST"
+        url="https://httpbin.org/anything",
+        headers={"Content-Type": "application/json"},
+        body=b'{"foo": "bar"}',
+    )
+
+Results in a request to the Zyte API data extraction endpoint with the
+following parameters:
+
+.. code-block:: javascript
+
+    {
+        "httpResponseBody": true,
+        "httpResponseHeaders": true,
+        "url": "https://httpbin.org/anything",
+        "httpRequestMethod": "POST",
+        "customHttpRequestHeaders": [{"name": "Content-Type", "value": "application/json"}],
+        "httpRequestBody": "eyJmb28iOiAiYmFyIn0="
+    }
 
 You may set the ``zyte_api_automap`` key in
 `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
@@ -273,9 +301,32 @@ parameter mapping as a side effect:
 -   Setting ``screenshot`` to ``True`` without also setting ``browserHtml`` to
     ``True`` unsets ``httpResponseHeaders``.
 
+For example, the following Scrapy request:
+
+.. code-block:: python
+
+    Request(
+        url="https://quotes.toscrape.com",
+        headers={"Referer": "https://example.com/"},
+        meta={"zyte_api_automap": {"screenshot": True}},
+    )
+
+Results in a request to the Zyte API data extraction endpoint with the
+following parameters:
+
+.. code-block:: javascript
+
+    {
+        "screenshot": true,
+        "url": "https://quotes.toscrape.com",
+        "requestHeaders": {"referer": "https://example.com/"},
+    }
+
 When mapping headers, headers not supported by Zyte API are excluded from the
-mapping by default. Use the following settings to change which headers are
-included or excluded from header mapping:
+mapping by default. Use the following `Scrapy settings`_` to change which
+headers are included or excluded from header mapping:
+
+.. _Scrapy settings: https://docs.scrapy.org/en/latest/topics/settings.html
 
 -   ``ZYTE_API_SKIP_HEADERS`` determines headers that must *not* be mapped as
     ``customHttpRequestHeaders``, and its default value is:
