@@ -240,13 +240,13 @@ AUTOMAP_PARAMS: Dict[str, Any] = {}
 BROWSER_HEADERS = {b"referer": "referer"}
 DEFAULT_PARAMS: Dict[str, Any] = {}
 TRANSPARENT_MODE = False
-UNSUPPORTED_HEADERS = {b"cookie", b"user-agent"}
+SKIP_HEADERS = {b"cookie", b"user-agent"}
 JOB_ID = None
 GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
     "transparent_mode": TRANSPARENT_MODE,
     "automap_params": AUTOMAP_PARAMS,
-    "unsupported_headers": UNSUPPORTED_HEADERS,
+    "skip_headers": SKIP_HEADERS,
     "browser_headers": BROWSER_HEADERS,
     "job_id": JOB_ID,
 }
@@ -276,7 +276,7 @@ async def test_get_api_params_input_custom(mockserver):
         "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
         "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
         "ZYTE_API_AUTOMAP_PARAMS": {"c": "d"},
-        "ZYTE_API_UNSUPPORTED_HEADERS": {"A"},
+        "ZYTE_API_SKIP_HEADERS": {"A"},
     }
     async with mockserver.make_handler(settings) as handler:
         patch_path = "scrapy_zyte_api.handler._get_api_params"
@@ -289,7 +289,7 @@ async def test_get_api_params_input_custom(mockserver):
                 default_params={"a": "b"},
                 transparent_mode=True,
                 automap_params={"c": "d"},
-                unsupported_headers={b"a"},
+                skip_headers={b"a"},
                 browser_headers={b"b": "b"},
                 job_id="1/2/3",
             )
@@ -1488,12 +1488,12 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
 @pytest.mark.parametrize(
     "global_kwargs,headers,meta,expected,warnings",
     [
-        # You may update the ZYTE_API_UNSUPPORTED_HEADERS setting to remove
+        # You may update the ZYTE_API_SKIP_HEADERS setting to remove
         # headers that the customHttpRequestHeaders parameter starts supporting
         # in the future.
         (
             {
-                "unsupported_headers": {b"cookie"},
+                "skip_headers": {b"cookie"},
             },
             {
                 "Cookie": "",

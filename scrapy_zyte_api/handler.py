@@ -59,7 +59,7 @@ def _map_custom_http_request_headers(
     *,
     api_params: Dict[str, Any],
     request: Request,
-    unsupported_headers: Set[str],
+    skip_headers: Set[str],
 ):
     headers = []
     for k, lowercase_k, decoded_v in _iter_headers(
@@ -67,7 +67,7 @@ def _map_custom_http_request_headers(
         request=request,
         parameter="customHttpRequestHeaders",
     ):
-        if lowercase_k in unsupported_headers:
+        if lowercase_k in skip_headers:
             if lowercase_k != b"user-agent" or decoded_v != DEFAULT_USER_AGENT:
                 logger.warning(
                     f"Request {request} defines header {k}, which "
@@ -119,7 +119,7 @@ def _set_request_headers_from_request(
     *,
     api_params: Dict[str, Any],
     request: Request,
-    unsupported_headers: Set[str],
+    skip_headers: Set[str],
     browser_headers: Dict[str, str],
 ):
     """Updates *api_params*, in place, based on *request*."""
@@ -135,7 +135,7 @@ def _set_request_headers_from_request(
         _map_custom_http_request_headers(
             api_params=api_params,
             request=request,
-            unsupported_headers=unsupported_headers,
+            skip_headers=skip_headers,
         )
     elif custom_http_request_headers is False:
         api_params.pop("customHttpRequestHeaders")
@@ -286,7 +286,7 @@ def _update_api_params_from_request(
     *,
     default_params: Dict[str, Any],
     meta_params: Dict[str, Any],
-    unsupported_headers: Set[str],
+    skip_headers: Set[str],
     browser_headers: Dict[str, str],
 ):
     _set_http_response_body_from_request(api_params=api_params, request=request)
@@ -300,7 +300,7 @@ def _update_api_params_from_request(
     _set_request_headers_from_request(
         api_params=api_params,
         request=request,
-        unsupported_headers=unsupported_headers,
+        skip_headers=skip_headers,
         browser_headers=browser_headers,
     )
     _set_http_request_body_from_request(api_params=api_params, request=request)
@@ -391,7 +391,7 @@ def _get_automap_params(
     *,
     default_enabled: bool,
     default_params: Dict[str, Any],
-    unsupported_headers: Set[str],
+    skip_headers: Set[str],
     browser_headers: Dict[str, str],
 ):
     meta_params = request.meta.get("zyte_api_automap", default_enabled)
@@ -417,7 +417,7 @@ def _get_automap_params(
         request,
         default_params=default_params,
         meta_params=meta_params,
-        unsupported_headers=unsupported_headers,
+        skip_headers=skip_headers,
         browser_headers=browser_headers,
     )
 
@@ -430,7 +430,7 @@ def _get_api_params(
     default_params: Dict[str, Any],
     transparent_mode: bool,
     automap_params: Dict[str, Any],
-    unsupported_headers: Set[str],
+    skip_headers: Set[str],
     browser_headers: Dict[str, str],
     job_id: Optional[str],
 ) -> Optional[dict]:
@@ -443,7 +443,7 @@ def _get_api_params(
             request,
             default_enabled=transparent_mode,
             default_params=automap_params,
-            unsupported_headers=unsupported_headers,
+            skip_headers=skip_headers,
             browser_headers=browser_headers,
         )
         if api_params is None:
@@ -473,11 +473,11 @@ def _load_default_params(settings, setting):
     return params
 
 
-def _load_unsupported_headers(settings):
+def _load_skip_headers(settings):
     return {
         header.strip().lower().encode()
         for header in settings.getlist(
-            "ZYTE_API_UNSUPPORTED_HEADERS",
+            "ZYTE_API_SKIP_HEADERS",
             ["Cookie", "User-Agent"],
         )
     }
@@ -538,7 +538,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._job_id = crawler.settings.get("JOB")
         self._retry_policy = _load_retry_policy(settings)
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
-        self._unsupported_headers = _load_unsupported_headers(settings)
+        self._skip_headers = _load_skip_headers(settings)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = _get_api_params(
@@ -546,7 +546,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             default_params=self._default_params,
             transparent_mode=self._transparent_mode,
             automap_params=self._automap_params,
-            unsupported_headers=self._unsupported_headers,
+            skip_headers=self._skip_headers,
             browser_headers=self._browser_headers,
             job_id=self._job_id,
         )
