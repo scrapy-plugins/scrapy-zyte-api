@@ -1658,7 +1658,6 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
     _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
-# @pytest.mark.xfail(reason="To be implemented", strict=True)
 @pytest.mark.parametrize(
     "default_params,meta,expected,warnings",
     [
