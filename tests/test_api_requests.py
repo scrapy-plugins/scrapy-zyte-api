@@ -882,7 +882,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
         ),
         # If httpRequestMethod is also specified in meta with the same value
         # as Request.method, a warning is logged asking to use only
-        # Request.meta.
+        # Request.method.
         *(
             (
                 request_method,
