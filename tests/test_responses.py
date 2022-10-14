@@ -58,7 +58,6 @@ def raw_api_response_mixed():
     }
 
 
-EXPECTED_HEADERS = {b"Content-Type": [b"text/html"], b"Content-Length": [b"44"]}
 EXPECTED_BODY = PAGE_CONTENT.encode("utf-8")
 
 
@@ -87,20 +86,24 @@ def test_init(api_response, cls):
 
 
 @pytest.mark.parametrize(
-    "api_response,cls",
+    "api_response,cls,content_length",
     [
-        (raw_api_response_browser, ZyteAPITextResponse),
-        (raw_api_response_body, ZyteAPIResponse),
-        (raw_api_response_mixed, ZyteAPITextResponse),
+        (raw_api_response_browser, ZyteAPITextResponse, 44),
+        (raw_api_response_body, ZyteAPIResponse, 44),
+        (raw_api_response_mixed, ZyteAPITextResponse, 49),
     ],
 )
-def test_text_from_api_response(api_response, cls):
+def test_text_from_api_response(api_response, cls, content_length):
     response = cls.from_api_response(api_response())
     assert response.raw_api_response == api_response()
 
     assert response.url == URL
     assert response.status == 200
-    assert response.headers == EXPECTED_HEADERS
+    expected_headers = {
+        b"Content-Type": [b"text/html"],
+        b"Content-Length": [str(content_length).encode()],
+    }
+    assert response.headers == expected_headers
     assert response.body == EXPECTED_BODY
     assert response.flags == ["zyte-api"]
     assert response.request is None
