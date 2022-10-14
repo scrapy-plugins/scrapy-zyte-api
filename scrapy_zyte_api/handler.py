@@ -36,13 +36,14 @@ def _iter_headers(
     *,
     api_params: Dict[str, Any],
     request: Request,
-    parameter: str,
+    header_parameter: str,
 ):
-    headers = api_params.get(parameter)
+    headers = api_params.get(header_parameter)
     if headers not in (None, True):
         logger.warning(
-            f"Request {request} defines the Zyte API {parameter} parameter, "
-            f"overriding Request.headers. Use Request.headers instead."
+            f"Request {request} defines the Zyte API {header_parameter} "
+            f"parameter, overriding Request.headers. Use Request.headers "
+            f"instead."
         )
         return
     if not request.headers:
@@ -65,7 +66,7 @@ def _map_custom_http_request_headers(
     for k, lowercase_k, decoded_v in _iter_headers(
         api_params=api_params,
         request=request,
-        parameter="customHttpRequestHeaders",
+        header_parameter="customHttpRequestHeaders",
     ):
         if lowercase_k in skip_headers:
             if lowercase_k != b"user-agent" or decoded_v != DEFAULT_USER_AGENT:
@@ -90,7 +91,7 @@ def _map_request_headers(
     for k, lowercase_k, decoded_v in _iter_headers(
         api_params=api_params,
         request=request,
-        parameter="requestHeaders",
+        header_parameter="requestHeaders",
     ):
         key = browser_headers.get(lowercase_k)
         if key is not None:
