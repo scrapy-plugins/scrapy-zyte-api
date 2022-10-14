@@ -198,8 +198,11 @@ For example:
             print(response.text)
             # "<html>…</html>"
 
-See the `Zyte API documentation`_ to learn about Zyte API parameters.
+To learn about Zyte API parameters, see the `data extraction usage`_ and
+`API reference`_ pages of the `Zyte API documentation`_.
 
+.. _API reference: https://docs.zyte.com/zyte-api/openapi.html
+.. _data extraction usage: https://docs.zyte.com/zyte-api/usage/extract.html
 .. _Zyte API documentation: https://docs.zyte.com/zyte-api/get-started.html
 
 
