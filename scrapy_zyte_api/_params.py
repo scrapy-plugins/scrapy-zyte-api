@@ -193,7 +193,7 @@ def _set_http_response_headers_from_request(
     ):
         logger.warning(
             "You do not need to set httpResponseHeaders to False if "
-            "you do set httpResponseBody or browserHtml to True. Note "
+            "neither httpResponseBody nor browserHtml are set to True. Note "
             "that httpResponseBody is set to True automatically if "
             "neither browserHtml nor screenshot are set to True."
         )
