@@ -36,7 +36,7 @@ async def make_handler(settings: dict, api_url: Optional[str] = None):
             settings=None,
             crawler=crawler,
         )
-    except NotConfigured:
+    except NotConfigured:  # i.e. ZYTE_API_ENABLED=False
         handler = None
     try:
         yield handler
