@@ -401,6 +401,10 @@ For example, if you set ``ZYTE_API_DEFAULT_PARAMS`` to
 Parameters in these settings are merged with request-specific parameters, with
 request-specific parameters taking precedence.
 
+``ZYTE_API_DEFAULT_PARAMS`` has no effect on requests that use automated
+parameter mapping, and ``ZYTE_API_AUTOMAP_PARAMS`` has no effect on requests
+that use manually-defined parameters.
+
 
 Customizing the retry policy
 ============================
