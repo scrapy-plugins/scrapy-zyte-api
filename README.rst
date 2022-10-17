@@ -88,37 +88,11 @@ You can send requests through Zyte API in one of the following ways:
     requests with automatically-mapped parameters** below.
 
 Zyte API response parameters are mapped into Scrapy response parameters where
-possible. The raw Zyte API response can be accessed via the
-``raw_api_response`` attribute of the response object:
-
-.. code-block:: python
-
-    def parse(self, response):
-        print(response.url)
-        # "https://quotes.toscrape.com/"
-        print(response.status)
-        # 200
-        print(response.headers)
-        # {b"Content-Type": [b"text/html"], …}
-        print(response.text)
-        # "<html>…</html>"
-        print(response.raw_api_response)
-        # {
-        #     "url": "https://quotes.toscrape.com/",
-        #     "statusCode": 200,
-        #     "httpResponseBody": "PGh0bWw+4oCmPC9odG1sPg==",
-        #     "httpResponseHeaders": […],
-        # }
-
-When you use the Zyte API parameters ``browserHtml``, ``httpResponseBody``, or
-``httpResponseHeaders``, the response body and headers are set accordingly.
-
-Note that, for Zyte API requests, the spider gets responses of
-``ZyteAPIResponse`` and ``ZyteAPITextResponse`` types, which are respectively
-subclasses of ``scrapy.http.Response`` and ``scrapy.http.TextResponse``.
+possible. See **Response mapping** below for details.
 
 If multiple requests target the same URL with different Zyte API parameters,
-pass ``dont_filter=True`` to ``Request``.
+pass ``dont_filter=True`` to ``Request`` to prevent the duplicate request
+filter of Scrapy from dropping all but the first request.
 
 
 Using transparent mode
@@ -129,7 +103,7 @@ Scrapy requests as follows:
 
 -   By default, requests are sent through Zyte API with automatically-mapped
     parameters. See **Sending requests with automatically-mapped parameters**
-    below for details about automatic parameter mapping.
+    below for details about automatic request parameter mapping.
 
     You do not need to set the ``zyte-api-automap`` request meta key to
     ``True``, but you can set it to a dictionary to extend your Zyte API
@@ -265,17 +239,105 @@ For example:
             print(response.text)
             # "<html>…</html>"
 
-See also **Using transparent mode** above and **Automated parameter mapping**
-below.
+See also **Using transparent mode** above and **Automated request parameter
+mapping** below.
 
 
-Automated parameter mapping
----------------------------
+Response mapping
+----------------
 
-When you enable automated parameter mapping, be it through transparent mode
-(see **Using transparent mode** above) or for a speicfic request (see **Sending
-requests with automatically-mapped parameters** above), Zyte API parameters are
-chosen as follows by default:
+Zyte API responses are mapped with one of the following classes:
+
+-   ``scrapy_zyte_api.responses.ZyteAPITextResponse``, a subclass of
+    ``scrapy.http.TextResponse``, is used to map text responses, i.e. responses
+    with ``browserHtml`` or responses with both ``httpResponseBody`` and
+    ``httpResponseHeaders`` with a text body (e.g. plain text, HTML, JSON).
+
+-   ``scrapy_zyte_api.responses.ZyteAPIResponse``, a subclass of
+    ``scrapy.http.Response``, is used to map any other response.
+
+Zyte API response parameters are mapped into response class attributes where
+possible:
+
+-   ``url`` becomes ``response.url``.
+
+-   ``statusCode`` becomes ``response.status``.
+
+-   ``httpResponseHeaders`` becomes ``response.headers``.
+
+-   ``browserHtml`` and ``httpResponseBody`` are mapped into both
+    ``response.text`` (``str``) and ``response.body`` (``bytes``).
+
+    If none of these parameters were present, e.g. if the only requested output
+    was ``screenshot``, ``response.text`` and ``response.body`` would be empty.
+
+    If a future version of Zyte API supported requesting both outputs on the
+    same request, and both parameters were present, ``browserHtml`` would be
+    the one mapped into ``response.text`` and ``response.body``.
+
+Both response classes have a ``raw_zyte_api`` attribute that contains a
+``dict`` with the complete, raw response from Zyte API, where you can find all
+Zyte API response parameters, including those that are not mapped into other
+response class atttributes.
+
+For example, for a request for ``httpResponseBody`` and
+``httpResponseHeaders``, you would get:
+
+.. code-block:: python
+
+    def parse(self, response):
+        print(response.url)
+        # "https://quotes.toscrape.com/"
+        print(response.status)
+        # 200
+        print(response.headers)
+        # {b"Content-Type": [b"text/html"], …}
+        print(response.text)
+        # "<html>…</html>"
+        print(response.body)
+        # b"<html>…</html>"
+        print(response.raw_api_response)
+        # {
+        #     "url": "https://quotes.toscrape.com/",
+        #     "statusCode": 200,
+        #     "httpResponseBody": "PGh0bWw+4oCmPC9odG1sPg==",
+        #     "httpResponseHeaders": […],
+        # }
+
+For a request for ``screenshot``, on the other hand, the response would look
+as follows:
+
+.. code-block:: python
+
+    def parse(self, response):
+        print(response.url)
+        # "https://quotes.toscrape.com/"
+        print(response.status)
+        # 200
+        print(response.headers)
+        # {}
+        print(response.text)
+        # ""
+        print(response.body)
+        # b""
+        print(response.raw_api_response)
+        # {
+        #     "url": "https://quotes.toscrape.com/",
+        #     "statusCode": 200,
+        #     "screenshot": "iVBORw0KGgoAAAANSUh…",
+        # }
+        from base64 import b64decode
+        print(b64decode(response.raw_api_response["screenshot"]))
+        # b'\x89PNG\r\n\x1a\n\x00\x00\x00\r…'
+
+
+Automated request parameter mapping
+-----------------------------------
+
+When you enable automated request parameter mapping, be it through transparent
+mode (see **Using transparent mode** above) or for a specific request (see
+**Sending requests with automatically-mapped parameters** above), Zyte API
+parameters are chosen as follows by default:
 
 -   ``httpResponseBody`` and ``httpResponseHeaders`` are set to ``True``.
 
@@ -317,8 +379,8 @@ following parameters:
 You may set the ``zyte_api_automap`` key in
 `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
 to a ``dict`` of Zyte API parameters to extend or override choices made by
-automated parameter mapping. Some parameters modify the result of automated
-parameter mapping as a side effect:
+automated request parameter mapping. Some parameters modify the result of
+automated request parameter mapping as a side effect:
 
 -   Setting ``browserHtml`` or ``screenshot`` to ``True`` unsets
     ``httpResponseBody``, and makes ``Request.headers`` become
@@ -371,8 +433,8 @@ headers are included or excluded from header mapping:
        {"Referer": "referer"}
 
 To maximize support for potential future changes in Zyte API, automated
-parameter mapping allows some parameter values and parameter combinations that
-Zyte API does not currently support, and may never support:
+request parameter mapping allows some parameter values and parameter
+combinations that Zyte API does not currently support, and may never support:
 
 -   ``Request.method`` becomes ``httpRequestMethod`` even for unsupported_
     ``httpRequestMethod`` values, and even if ``httpResponseBody`` is unset.
@@ -428,8 +490,8 @@ Parameters in these settings are merged with request-specific parameters, with
 request-specific parameters taking precedence.
 
 ``ZYTE_API_DEFAULT_PARAMS`` has no effect on requests that use automated
-parameter mapping, and ``ZYTE_API_AUTOMAP_PARAMS`` has no effect on requests
-that use manually-defined parameters.
+request parameter mapping, and ``ZYTE_API_AUTOMAP_PARAMS`` has no effect on
+requests that use manually-defined parameters.
 
 
 Customizing the retry policy
