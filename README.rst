@@ -493,6 +493,17 @@ request-specific parameters taking precedence.
 request parameter mapping, and ``ZYTE_API_AUTOMAP_PARAMS`` has no effect on
 requests that use manually-defined parameters.
 
+When using transparent mode (see **Using transparent mode** above), be careful
+of which parameters you define through ``ZYTE_API_AUTOMAP_PARAMS``. In
+transparent mode, all Scrapy requests go through Zyte API, even requests that
+Scrapy sends automatically, such as those for ``robots.txt`` files when
+ROBOTSTXT_OBEY_ is ``True``, or those for sitemaps when using a `sitemap
+spider`_. Certain parameters, like ``browserHtml`` or ``screenshot``, are not
+meant to be used for every single request.
+
+.. _ROBOTSTXT_OBEY: https://docs.scrapy.org/en/latest/topics/settings.html#robotstxt-obey
+.. _sitemap spider: https://docs.scrapy.org/en/latest/topics/spiders.html#sitemapspider
+
 
 Customizing the retry policy
 ============================
