@@ -188,6 +188,32 @@ For example:
                 url="https://quotes.toscrape.com/",
                 meta={
                     "zyte_api": {
+                        "browserHtml": True,
+                    }
+                },
+            )
+
+        def parse(self, response):
+            print(response.text)
+            # "<html>…</html>"
+
+Note that response headers are necessary for raw response decoding. When
+defining parameters manually and requesting ``httpResponseBody`` extraction,
+remember to also request ``httpResponseHeaders`` extraction:
+
+.. code-block:: python
+
+    import scrapy
+
+
+    class SampleQuotesSpider(scrapy.Spider):
+        name = "sample_quotes"
+
+        def start_requests(self):
+            yield scrapy.Request(
+                url="https://quotes.toscrape.com/",
+                meta={
+                    "zyte_api": {
                         "httpResponseBody": True,
                         "httpResponseHeaders": True,
                     }
@@ -198,7 +224,7 @@ For example:
             print(response.text)
             # "<html>…</html>"
 
-To learn about Zyte API parameters, see the `data extraction usage`_ and
+To learn more about Zyte API parameters, see the `data extraction usage`_ and
 `API reference`_ pages of the `Zyte API documentation`_.
 
 .. _API reference: https://docs.zyte.com/zyte-api/openapi.html
