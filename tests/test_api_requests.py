@@ -156,14 +156,21 @@ async def test_coro_handling(zyte_api: bool, mockserver):
         (
             {"zyte_api": {"echoData": Request("http://test.com")}},
             TypeError,
-            "Got an error when processing Zyte API request (http://example.com): "
-            "Object of type Request is not JSON serializable",
+            (
+                "Got an error when processing Zyte API request "
+                "(http://example.com): Object of type Request is not JSON "
+                "serializable"
+            ),
         ),
         (
             {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
             RequestError,
-            "Got Zyte API error (status=422, type='/request/unprocessable') while processing URL (http://example.com): "
-            "Incompatible parameters were found in the request.",
+            (
+                "Got Zyte API error (status=422, "
+                "type='/request/unprocessable') while processing URL "
+                "(http://example.com): Incompatible parameters were found in "
+                "the request."
+            ),
         ),
     ],
 )
@@ -657,18 +664,19 @@ def _test_automap(global_kwargs, request_kwargs, meta, expected, warnings, caplo
             },
             [],
         ),
-        # If httpResponseBody is unnecessarily requested in meta, a warning is
-        # logged.
+        # httpResponseBody can be explicitly requested in meta, and should be
+        # in cases where a binary response is expected, since automated mapping
+        # may stop working for binary responses in the future.
         (
             {"httpResponseBody": True},
             {"httpResponseBody": True, "httpResponseHeaders": True},
-            ["do not need to set httpResponseBody to True"],
+            [],
         ),
         # If other main outputs are specified in meta, httpRequestBody is not
         # set.
         (
             {"browserHtml": True},
-            {"browserHtml": True, "httpResponseHeaders": True},
+            {"browserHtml": True},
             [],
         ),
         (
@@ -678,7 +686,7 @@ def _test_automap(global_kwargs, request_kwargs, meta, expected, warnings, caplo
         ),
         (
             {"browserHtml": True, "screenshot": True},
-            {"browserHtml": True, "httpResponseHeaders": True, "screenshot": True},
+            {"browserHtml": True, "screenshot": True},
             [],
         ),
         # If no known main output is specified, and httpResponseBody is
@@ -716,14 +724,18 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
     [
         # Test cases where httpResponseHeaders is not specifically set to True
         # or False, where it is automatically set to True if httpResponseBody
-        # or browserHtml are also True, are covered in
-        # test_automap_main_outputs.
+        # is also True, are covered in test_automap_main_outputs.
         #
         # If httpResponseHeaders is set to True in a scenario where it would
         # not be implicitly set to True, it is passed as such.
         (
             {"httpResponseBody": False, "httpResponseHeaders": True},
             {"httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {"browserHtml": True, "httpResponseHeaders": True},
+            {"browserHtml": True, "httpResponseHeaders": True},
             [],
         ),
         (
@@ -740,32 +752,25 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
             {"unknownMainOutput": True, "httpResponseHeaders": True},
             [],
         ),
-        # If httpResponseHeaders is unnecessarily set to True where
-        # httpResponseBody or browserHtml are set to True implicitly or
-        # explicitly, httpResponseHeaders is set to True, and a warning is
-        # logged.
+        # Setting httpResponseHeaders to True where it would be already True
+        # implicitly, i.e. where httpResponseBody is set to True implicitly or
+        # explicitly, is OK and should not generate any warning. It is a way
+        # to make code future-proof, in case in the future httpResponseHeaders
+        # stops being set to True by default in those scenarios.
         (
             {"httpResponseHeaders": True},
             {"httpResponseBody": True, "httpResponseHeaders": True},
-            ["do not need to set httpResponseHeaders to True"],
+            [],
         ),
         (
             {"httpResponseBody": True, "httpResponseHeaders": True},
             {"httpResponseBody": True, "httpResponseHeaders": True},
-            [
-                "do not need to set httpResponseHeaders to True",
-                "do not need to set httpResponseBody to True",
-            ],
-        ),
-        (
-            {"browserHtml": True, "httpResponseHeaders": True},
-            {"browserHtml": True, "httpResponseHeaders": True},
-            ["do not need to set httpResponseHeaders to True"],
+            [],
         ),
         (
             {
-                "httpResponseBody": True,
                 "browserHtml": True,
+                "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
             {
@@ -773,7 +778,7 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
-            ["do not need to set httpResponseHeaders to True"],
+            [],
         ),
         (
             {"unknownMainOutput": True, "httpResponseHeaders": True},
@@ -782,20 +787,15 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
-            ["do not need to set httpResponseHeaders to True"],
+            [],
         ),
         # If httpResponseHeaders is set to False, httpResponseHeaders is not
-        # defined, even if httpResponseBody or browserHtml are set to True,
-        # implicitly or explicitly.
+        # defined, even if httpResponseBody is set to True, implicitly or
+        # explicitly.
         ({"httpResponseHeaders": False}, {"httpResponseBody": True}, []),
         (
             {"httpResponseBody": True, "httpResponseHeaders": False},
             {"httpResponseBody": True},
-            ["do not need to set httpResponseBody to True"],
-        ),
-        (
-            {"browserHtml": True, "httpResponseHeaders": False},
-            {"browserHtml": True},
             [],
         ),
         (
@@ -813,12 +813,17 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
             [],
         ),
         # If httpResponseHeaders is unnecessarily set to False where
-        # httpResponseBody and browserHtml are set to False implicitly or
-        # explicitly, httpResponseHeaders is not defined, and a warning is
+        # httpResponseBody is set to False implicitly or explicitly,
+        # httpResponseHeaders is not defined, and a warning is
         # logged.
         (
             {"httpResponseBody": False, "httpResponseHeaders": False},
             {},
+            ["do not need to set httpResponseHeaders to False"],
+        ),
+        (
+            {"browserHtml": True, "httpResponseHeaders": False},
+            {"browserHtml": True},
             ["do not need to set httpResponseHeaders to False"],
         ),
         (
@@ -929,7 +934,6 @@ def test_automap_header_output(meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "httpRequestMethod": "POST",
-                "httpResponseHeaders": True,
             },
             [],
         ),
@@ -972,7 +976,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
                 "requestHeaders": {"referer": "a"},
             },
             [],
@@ -1090,7 +1093,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True, "requestHeaders": False},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
             },
             [],
         ),
@@ -1159,7 +1161,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseHeaders": True,
                 "requestHeaders": {"referer": "a"},
             },
             [],
@@ -1179,7 +1180,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
             },
             [],
         ),
@@ -1263,7 +1263,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "requestHeaders": {"referer": "a"},
-                "httpResponseHeaders": True,
             },
             ["Use Request.headers instead"],
         ),
@@ -1292,7 +1291,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "requestHeaders": {"referer": "b"},
-                "httpResponseHeaders": True,
             },
             ["Use Request.headers instead"],
         ),
@@ -1321,7 +1319,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "requestHeaders": {"referer": "a"},
-                "httpResponseHeaders": True,
             },
             ["Use Request.headers instead"],
         ),
@@ -1358,7 +1355,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseHeaders": True,
             },
             [],
         ),
@@ -1379,7 +1375,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
             },
             ["cannot be mapped"],
         ),
@@ -1398,7 +1393,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
             },
             ["cannot be mapped"],
         ),
@@ -1424,7 +1418,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
             },
             [],
         ),
@@ -1436,7 +1429,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
             },
             ["cannot be mapped"],
         ),
@@ -1466,7 +1458,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
             },
             [],
         ),
@@ -1475,7 +1466,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
             },
             ["cannot be mapped"],
         ),
@@ -1525,7 +1515,6 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
                 "requestHeaders": {"userAgent": ""},
             },
             [],
@@ -1586,7 +1575,6 @@ def test_automap_header_settings(
             {
                 "browserHtml": True,
                 "httpRequestBody": "YQ==",
-                "httpResponseHeaders": True,
             },
             [],
         ),
@@ -1618,7 +1606,6 @@ def test_automap_body(body, meta, expected, warnings, caplog):
             },
             {
                 "browserHtml": True,
-                "httpResponseHeaders": True,
             },
             ["unnecessarily defines"],
         ),
@@ -1662,13 +1649,7 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
     "default_params,meta,expected,warnings",
     [
         (
-            {"screenshot": True, "httpResponseHeaders": True},
             {"browserHtml": True},
-            {"browserHtml": True, "httpResponseHeaders": True, "screenshot": True},
-            [],
-        ),
-        (
-            {"browserHtml": True, "httpResponseHeaders": False},
             {"screenshot": True, "browserHtml": False},
             {"screenshot": True},
             [],

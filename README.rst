@@ -341,6 +341,49 @@ parameters are chosen as follows by default:
 
 -   ``httpResponseBody`` and ``httpResponseHeaders`` are set to ``True``.
 
+    This is subject to change without prior notice in future versions of
+    scrapy-zyte-api, so please account for the following:
+
+    -   If you are requesting a binary resource, such as a PDF file or an
+        image file, set ``httpResponseBody`` to ``True`` explicitly in your
+        requests:
+
+        .. code-block:: python
+
+            Request(
+                url="https://toscrape.com/img/zyte.png",
+                meta={
+                    "zyte_api": {
+                        "zyte_api_automap": {"httpResponseBody": True},
+                    }
+                },
+            )
+
+        In the future, we may stop setting ``httpResponseBody`` to ``True`` by
+        default, and instead use a different, new Zyte API parameter that only
+        works for non-binary responses (e.g. HMTL, JSON, plain text).
+
+    -   If you need to access response headers, be it through
+        ``response.headers`` or through
+        ``response.raw_zyte_api["httpResponseHeaders"]``, set
+        ``httpResponseHeaders`` to ``True`` explicitly in your requests:
+
+        .. code-block:: python
+
+            Request(
+                url="https://toscrape.com/",
+                meta={
+                    "zyte_api": {
+                        "zyte_api_automap": {"httpResponseHeaders": True},
+                    }
+                },
+            )
+
+        At the moment we request response headers because some response headers
+        are necessary to properly decode the response body as text. In the
+        future, Zyte API may be able to handle this decoding automatically, so
+        we would stop setting ``httpResponseHeaders`` to ``True`` by default.
+
 -   ``Request.url`` becomes ``url``, same as in requests with manually-defined
     parameters.
 
@@ -379,24 +422,19 @@ following parameters:
 You may set the ``zyte_api_automap`` key in
 `Request.meta <https://docs.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta>`_
 to a ``dict`` of Zyte API parameters to extend or override choices made by
-automated request parameter mapping. Some parameters modify the result of
-automated request parameter mapping as a side effect:
+automated request parameter mapping.
 
--   Setting ``browserHtml`` or ``screenshot`` to ``True`` unsets
-    ``httpResponseBody``, and makes ``Request.headers`` become
-    ``requestHeaders`` instead of ``customHttpRequestHeaders``.
-
--   Setting ``screenshot`` to ``True`` without also setting ``browserHtml`` to
-    ``True`` unsets ``httpResponseHeaders``.
-
-For example, the following Scrapy request:
+Setting ``browserHtml`` or ``screenshot`` to ``True`` unsets
+``httpResponseBody`` and ``httpResponseHeaders``, and makes ``Request.headers``
+become ``requestHeaders`` instead of ``customHttpRequestHeaders``. For example,
+the following Scrapy request:
 
 .. code-block:: python
 
     Request(
         url="https://quotes.toscrape.com",
         headers={"Referer": "https://example.com/"},
-        meta={"zyte_api_automap": {"screenshot": True}},
+        meta={"zyte_api_automap": {"browserHtml": True}},
     )
 
 Results in a request to the Zyte API data extraction endpoint with the
@@ -405,7 +443,7 @@ following parameters:
 .. code-block:: javascript
 
     {
-        "screenshot": true,
+        "browserHtml": true,
         "url": "https://quotes.toscrape.com",
         "requestHeaders": {"referer": "https://example.com/"},
     }

@@ -151,13 +151,6 @@ def _set_http_response_body_from_request(
         api_params.get(k) for k in ("httpResponseBody", "browserHtml", "screenshot")
     ):
         api_params.setdefault("httpResponseBody", True)
-    elif api_params.get("httpResponseBody") is True and not any(
-        api_params.get(k) for k in ("browserHtml", "screenshot")
-    ):
-        logger.warning(
-            "You do not need to set httpResponseBody to True if neither "
-            "browserHtml nor screenshot are set to True."
-        )
     elif api_params.get("httpResponseBody") is False:
         logger.warning(
             f"Request {request} unnecessarily defines the Zyte API "
@@ -174,18 +167,7 @@ def _set_http_response_headers_from_request(
     default_params: Dict[str, Any],
     meta_params: Dict[str, Any],
 ):
-    if any(api_params.get(k) for k in ("httpResponseBody", "browserHtml")):
-        if api_params.get("httpResponseHeaders") is True and not (
-            default_params.get("httpResponseHeaders") is True
-            and "httpResponseHeaders" not in meta_params
-        ):
-            logger.error(default_params)
-            logger.warning(
-                "You do not need to set httpResponseHeaders to True if "
-                "you set httpResponseBody or browserHtml to True. Note "
-                "that httpResponseBody is set to True automatically if "
-                "neither browserHtml nor screenshot are set to True."
-            )
+    if api_params.get("httpResponseBody"):
         api_params.setdefault("httpResponseHeaders", True)
     elif (
         api_params.get("httpResponseHeaders") is False
