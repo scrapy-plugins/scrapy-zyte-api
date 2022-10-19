@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager, contextmanager
 from os import environ
 from typing import Optional
 
+from scrapy.exceptions import NotConfigured
 from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
@@ -29,15 +30,19 @@ async def make_handler(settings: dict, api_url: Optional[str] = None):
     if api_url is not None:
         settings["ZYTE_API_URL"] = api_url
     crawler = get_crawler(settings_dict=settings)
-    handler = create_instance(
-        ScrapyZyteAPIDownloadHandler,
-        settings=None,
-        crawler=crawler,
-    )
+    try:
+        handler = create_instance(
+            ScrapyZyteAPIDownloadHandler,
+            settings=None,
+            crawler=crawler,
+        )
+    except NotConfigured:  # i.e. ZYTE_API_ENABLED=False
+        handler = None
     try:
         yield handler
     finally:
-        await handler._close()  # NOQA
+        if handler is not None:
+            await handler._close()  # NOQA
 
 
 @contextmanager

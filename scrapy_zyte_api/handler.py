@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Generator, Optional, Union
+from typing import Generator, Optional, Union
 
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
@@ -16,9 +16,48 @@ from zyte_api.aio.errors import RequestError
 from zyte_api.apikey import NoApiKey
 from zyte_api.constants import API_URL
 
+from ._params import _get_api_params
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 
 logger = logging.getLogger(__name__)
+
+
+def _load_default_params(settings, setting):
+    params = settings.getdict(setting)
+    for param in list(params):
+        if params[param] is not None:
+            continue
+        logger.warning(
+            f"Parameter {param!r} in the {setting} setting is None. Default "
+            f"parameters should never be None."
+        )
+        params.pop(param)
+    return params
+
+
+def _load_skip_headers(settings):
+    return {
+        header.strip().lower().encode()
+        for header in settings.getlist(
+            "ZYTE_API_SKIP_HEADERS",
+            ["Cookie", "User-Agent"],
+        )
+    }
+
+
+def _load_browser_headers(settings):
+    browser_headers = settings.getdict(
+        "ZYTE_API_BROWSER_HEADERS",
+        {"Referer": "referer"},
+    )
+    return {k.strip().lower().encode(): v for k, v in browser_headers.items()}
+
+
+def _load_retry_policy(settings):
+    policy = settings.get("ZYTE_API_RETRY_POLICY")
+    if policy:
+        policy = load_object(policy)
+    return policy
 
 
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
@@ -26,6 +65,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self, settings: Settings, crawler: Crawler, client: AsyncClient = None
     ):
         super().__init__(settings=settings, crawler=crawler)
+        if not settings.getbool("ZYTE_API_ENABLED", True):
+            raise NotConfigured
         if not client:
             try:
                 client = AsyncClient(
@@ -51,40 +92,31 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
         self._stats = crawler.stats
-        self._job_id = crawler.settings.get("JOB")
-        self._zyte_api_default_params = settings.getdict("ZYTE_API_DEFAULT_PARAMS")
         self._session = create_session(connection_pool_size=self._client.n_conn)
-        self._retry_policy = settings.get("ZYTE_API_RETRY_POLICY")
-        if self._retry_policy:
-            self._retry_policy = load_object(self._retry_policy)
+
+        self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
+        self._browser_headers = _load_browser_headers(settings)
+        self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
+        self._job_id = crawler.settings.get("JOB")
+        self._retry_policy = _load_retry_policy(settings)
+        self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
+        self._skip_headers = _load_skip_headers(settings)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
-        api_params = self._prepare_api_params(request)
-        if api_params:
+        api_params = _get_api_params(
+            request,
+            default_params=self._default_params,
+            transparent_mode=self._transparent_mode,
+            automap_params=self._automap_params,
+            skip_headers=self._skip_headers,
+            browser_headers=self._browser_headers,
+            job_id=self._job_id,
+        )
+        if api_params is not None:
             return deferred_from_coro(
                 self._download_request(api_params, request, spider)
             )
         return super().download_request(request, spider)
-
-    def _prepare_api_params(self, request: Request) -> Optional[dict]:
-        meta_params = request.meta.get("zyte_api")
-        if not meta_params and meta_params != {}:
-            return None
-
-        if meta_params is True:
-            meta_params = {}
-
-        api_params: Dict[str, Any] = self._zyte_api_default_params or {}
-        try:
-            api_params.update(meta_params)
-        except (ValueError, TypeError):
-            logger.error(
-                f"'zyte_api' parameters in the request meta should be "
-                f"provided as dictionary, got {type(request.meta.get('zyte_api'))} "
-                f"instead. ({request})."
-            )
-            raise
-        return api_params
 
     def _update_stats(self):
         prefix = "scrapy-zyte-api"
@@ -136,8 +168,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
         # Define url by default
         api_data = {**{"url": request.url}, **api_params}
-        if self._job_id is not None:
-            api_data["jobId"] = self._job_id
         retrying = request.meta.get("zyte_api_retry_policy")
         if retrying:
             retrying = load_object(retrying)

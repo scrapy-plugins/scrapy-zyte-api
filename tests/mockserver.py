@@ -60,11 +60,7 @@ class DefaultResource(LeafResource):
             return json.dumps(response_data).encode()
         response_data["url"] = request_data["url"]
 
-        if request_data.get("jobId") is not None:
-            html = f"<html>{request_data['jobId']}</html>"
-        else:
-            html = "<html><body>Hello<h1>World!</h1></body></html>"
-
+        html = "<html><body>Hello<h1>World!</h1></body></html>"
         if "browserHtml" in request_data:
             if "httpResponseBody" in request_data:
                 request.setResponseCode(422)
@@ -77,11 +73,21 @@ class DefaultResource(LeafResource):
                     }
                 ).encode()
             response_data["browserHtml"] = html
-        elif "httpResponseBody" in request_data:
-            base64_html = b64encode(html.encode()).decode()
-            response_data["httpResponseBody"] = base64_html
+        if "httpResponseBody" in request_data:
+            headers = request_data.get("customHttpRequestHeaders", [])
+            for header in headers:
+                if header["name"].strip().lower() == "accept":
+                    accept = header["value"]
+                    break
+            else:
+                accept = None
+            if accept == "application/octet-stream":
+                body = b64encode(b"\x00").decode()
+            else:
+                body = b64encode(html.encode()).decode()
+            response_data["httpResponseBody"] = body
 
-        if "httpResponseHeaders" in request_data:
+        if request_data.get("httpResponseHeaders") is True:
             response_data["httpResponseHeaders"] = [
                 {"name": "test_header", "value": "test_value"}
             ]
@@ -148,10 +154,7 @@ class MockServer:
     async def make_handler(self, settings: dict = None):
         settings = settings or {}
         async with make_handler(settings, self.urljoin("/")) as handler:
-            try:
-                yield handler
-            finally:
-                await handler._close()  # NOQA
+            yield handler
 
 
 def main():

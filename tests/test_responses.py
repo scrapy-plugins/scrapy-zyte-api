@@ -13,6 +13,7 @@ from scrapy_zyte_api.responses import (
 from scrapy_zyte_api.utils import _RESPONSE_HAS_IP_ADDRESS, _RESPONSE_HAS_PROTOCOL
 
 PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
+PAGE_CONTENT_2 = "<html><body>Ceci n’est pas une pipe</body></html>"
 URL = "https://example.com"
 
 
@@ -43,7 +44,20 @@ def raw_api_response_body():
     }
 
 
-EXPECTED_HEADERS = {b"Content-Type": [b"text/html"], b"Content-Length": [b"44"]}
+def raw_api_response_mixed():
+    return {
+        "url": URL,
+        "browserHtml": PAGE_CONTENT,
+        "httpResponseBody": b64encode(PAGE_CONTENT_2.encode("utf-8")),
+        "echoData": {"some_value": "here"},
+        "httpResponseHeaders": [
+            {"name": "Content-Type", "value": "text/html"},
+            {"name": "Content-Length", "value": len(PAGE_CONTENT_2)},
+        ],
+        "statusCode": 200,
+    }
+
+
 EXPECTED_BODY = PAGE_CONTENT.encode("utf-8")
 
 
@@ -72,19 +86,24 @@ def test_init(api_response, cls):
 
 
 @pytest.mark.parametrize(
-    "api_response,cls",
+    "api_response,cls,content_length",
     [
-        (raw_api_response_browser, ZyteAPITextResponse),
-        (raw_api_response_body, ZyteAPIResponse),
+        (raw_api_response_browser, ZyteAPITextResponse, 44),
+        (raw_api_response_body, ZyteAPIResponse, 44),
+        (raw_api_response_mixed, ZyteAPITextResponse, 49),
     ],
 )
-def test_text_from_api_response(api_response, cls):
+def test_text_from_api_response(api_response, cls, content_length):
     response = cls.from_api_response(api_response())
     assert response.raw_api_response == api_response()
 
     assert response.url == URL
     assert response.status == 200
-    assert response.headers == EXPECTED_HEADERS
+    expected_headers = {
+        b"Content-Type": [b"text/html"],
+        b"Content-Length": [str(content_length).encode()],
+    }
+    assert response.headers == expected_headers
     assert response.body == EXPECTED_BODY
     assert response.flags == ["zyte-api"]
     assert response.request is None
