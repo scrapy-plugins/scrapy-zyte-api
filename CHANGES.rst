@@ -1,6 +1,22 @@
 Changes
 =======
 
+0.6.0 (to be released)
+----------------------
+
+* Add a ``ZYTE_API_TRANSPARENT_MODE`` setting, ``False`` by default, which can
+  be set to ``True`` to make all requests use Zyte API by default, with request
+  parameters being automatically mapped to Zyte API parameters.
+* Add a Request meta key, ``zyte_api_automap``, that can be used to enable
+  automated request parameter mapping for specific requests, or to modify the
+  outcome of automated request parameter mapping for specific requests.
+* Add a ``ZYTE_API_AUTOMAP_PARAMS`` setting, which is a counterpart for
+  ``ZYTE_API_DEFAULT_PARAMS`` that applies to requests where automated request
+  parameter mapping is enabled.
+* Add a ``ZYTE_API_ENABLED`` setting, ``True`` by default, which can be used to
+  disable this plugin.
+* Document how Zyte API responses are mapped to Scrapy response subclasses.
+
 0.5.1 (2022-09-20)
 ------------------
 
