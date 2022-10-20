@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.6.0 (to be released)
-----------------------
+0.6.0 (2022-10-20)
+------------------
 
 * Add a ``ZYTE_API_TRANSPARENT_MODE`` setting, ``False`` by default, which can
   be set to ``True`` to make all requests use Zyte API by default, with request

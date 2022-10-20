@@ -101,6 +101,8 @@ Using transparent mode
 Set the ``ZYTE_API_TRANSPARENT_MODE`` `Scrapy setting`_ to ``True`` to handle
 Scrapy requests as follows:
 
+.. _Scrapy setting: https://docs.scrapy.org/en/latest/topics/settings.html
+
 -   By default, requests are sent through Zyte API with automatically-mapped
     parameters. See **Sending requests with automatically-mapped parameters**
     below for details about automatic request parameter mapping.
@@ -449,7 +451,7 @@ following parameters:
     }
 
 When mapping headers, headers not supported by Zyte API are excluded from the
-mapping by default. Use the following `Scrapy settings`_` to change which
+mapping by default. Use the following `Scrapy settings`_ to change which
 headers are included or excluded from header mapping:
 
 .. _Scrapy settings: https://docs.scrapy.org/en/latest/topics/settings.html
