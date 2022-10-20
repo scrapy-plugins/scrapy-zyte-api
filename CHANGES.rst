@@ -13,6 +13,8 @@ Changes
 * Add a ``ZYTE_API_AUTOMAP_PARAMS`` setting, which is a counterpart for
   ``ZYTE_API_DEFAULT_PARAMS`` that applies to requests where automated request
   parameter mapping is enabled.
+* Add the ``ZYTE_API_SKIP_HEADERS`` and ``ZYTE_API_BROWSER_HEADERS`` settings
+  to control the automatic mapping of request headers.
 * Add a ``ZYTE_API_ENABLED`` setting, ``True`` by default, which can be used to
   disable this plugin.
 * Document how Zyte API responses are mapped to Scrapy response subclasses.
