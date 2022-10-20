@@ -107,7 +107,7 @@ Scrapy requests as follows:
     parameters. See **Sending requests with automatically-mapped parameters**
     below for details about automatic request parameter mapping.
 
-    You do not need to set the ``zyte-api-automap`` request meta key to
+    You do not need to set the ``zyte_api_automap`` request meta key to
     ``True``, but you can set it to a dictionary to extend your Zyte API
     request parameters.
 
