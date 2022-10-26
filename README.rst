@@ -48,17 +48,23 @@ in the ``settings.py`` of your Scrapy project.
 
 You also need to set the ``ZYTE_API_KEY``.
 
-Lastly, make sure to `install the asyncio-based Twisted reactor
+Make sure to `install the asyncio-based Twisted reactor
 <https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor>`_
 in the ``settings.py`` file as well.
+
+If you are using Scrapy 2.7 or later, also set the
+``REQUEST_FINGERPRINTER_CLASS`` setting to
+``"scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"`` to make `request
+fingerprinting <https://docs.scrapy.org/en/latest/topics/request-response.html#request-fingerprints>`_
+take Zyte API parameters into account.
 
 Here's an example of the things needed inside a Scrapy project's ``settings.py`` file:
 
 .. code-block:: python
 
     DOWNLOAD_HANDLERS = {
-        "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
-        "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler"
+        "http": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
+        "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler"
     }
 
     # Having the following in the env var would also work.
@@ -66,8 +72,16 @@ Here's an example of the things needed inside a Scrapy project's ``settings.py``
 
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
+    # Only on Scrapy 2.7 or later:
+    REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
+
 The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 ``False`` to disable this plugin.
+
+If you had a value for the ``REQUEST_FINGERPRINTER_CLASS`` previously set,
+assign that value to the ``ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS``
+setting to maintain your previous request fingerprinting behavior for requests
+that are not sent through Zyte API.
 
 
 Usage
@@ -615,3 +629,41 @@ Stats
 
 Stats from python-zyte-api_ are exposed as Scrapy stats with the
 ``scrapy-zyte-api`` prefix.
+
+
+Request fingerprinting
+======================
+
+If you set the ``REQUEST_FINGERPRINTER_CLASS`` setting to
+``"scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"``, `request
+fingerprinting <https://docs.scrapy.org/en/latest/topics/request-response.html#request-fingerprints>`_
+behaves as follows:
+
+-   Requests sent through Zyte API get a fingerprint based on the following
+    Zyte API parameters:
+
+    -   ``url`` (`canonicalized <https://w3lib.readthedocs.io/en/latest/w3lib.html#w3lib.url.canonicalize_url>`)
+
+    -   Request attribute parameters (``httpRequestBody``,
+        ``httpRequestMethod``)
+
+    -   Output parameters (``browserHtml``, ``httpResponseBody``,
+        ``httpResponseHeaders``, ``screenshot``)
+
+    -   Rendering option parameters (``actions``, ``javascript``,
+        ``screenshotOptions``)
+
+    -   ``geolocation``
+
+    The following Zyte API parameters are *not* taken into account for request
+    fingerprinting:
+
+    -   Request header parameters (``customHttpRequestHeaders``,
+        ``requestHeaders``)
+
+    -   Metadata parameters (``echoData``, ``jobId``)
+
+-   Request not sent through Zyte API get a fingerprint using the request
+    fingerprinter class defined in the
+    ``ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS`` setting, which shares
+    default value with the ``REQUEST_FINGERPRINTER_CLASS`` Scrapy setting.

@@ -422,4 +422,37 @@ def _get_api_params(
     if job_id is not None:
         api_params["jobId"] = job_id
 
+    api_params["url"] = request.url
+
     return api_params
+
+
+def _load_default_params(settings, setting):
+    params = settings.getdict(setting)
+    for param in list(params):
+        if params[param] is not None:
+            continue
+        logger.warning(
+            f"Parameter {param!r} in the {setting} setting is None. Default "
+            f"parameters should never be None."
+        )
+        params.pop(param)
+    return params
+
+
+def _load_skip_headers(settings):
+    return {
+        header.strip().lower().encode()
+        for header in settings.getlist(
+            "ZYTE_API_SKIP_HEADERS",
+            ["Cookie", "User-Agent"],
+        )
+    }
+
+
+def _load_browser_headers(settings):
+    browser_headers = settings.getdict(
+        "ZYTE_API_BROWSER_HEADERS",
+        {"Referer": "referer"},
+    )
+    return {k.strip().lower().encode(): v for k, v in browser_headers.items()}
