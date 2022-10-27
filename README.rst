@@ -663,7 +663,7 @@ behaves as follows:
 
     -   Metadata parameters (``echoData``, ``jobId``)
 
--   Request not sent through Zyte API get a fingerprint using the request
+-   Requests not sent through Zyte API get a fingerprint using the request
     fingerprinter class defined in the
     ``ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS`` setting, which shares
     default value with the ``REQUEST_FINGERPRINTER_CLASS`` Scrapy setting.
