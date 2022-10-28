@@ -642,7 +642,7 @@ behaves as follows:
 -   Requests sent through Zyte API get a fingerprint based on the following
     Zyte API parameters:
 
-    -   ``url`` (`canonicalized <https://w3lib.readthedocs.io/en/latest/w3lib.html#w3lib.url.canonicalize_url>`)
+    -   ``url`` (`canonicalized <https://w3lib.readthedocs.io/en/latest/w3lib.html#w3lib.url.canonicalize_url>`_)
 
     -   Request attribute parameters (``httpRequestBody``,
         ``httpRequestMethod``)
