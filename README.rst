@@ -57,8 +57,10 @@ To enable this plugin:
     Scrapy setting to
     ``"twisted.internet.asyncioreactor.AsyncioSelectorReactor"``.
 
--   Set `your Zyte API key`_ as either the ``ZYTE_API_KEY`` Scrapy setting or
-    as an environment variable of the same name.
+-   Set `your Zyte API key
+    <https://docs.zyte.com/zyte-api/usage/general.html#authorization>`_ as
+    either the ``ZYTE_API_KEY`` Scrapy setting or as an environment variable of
+    the same name.
 
 For example, in the ``settings.py`` file of your Scrapy project:
 
