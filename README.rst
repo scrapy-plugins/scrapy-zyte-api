@@ -641,6 +641,10 @@ for Zyte API requests based on the following Zyte API parameters:
 
 -   ``url`` (`canonicalized <https://w3lib.readthedocs.io/en/latest/w3lib.html#w3lib.url.canonicalize_url>`_)
 
+    URL canonicalization keeps the URL fragment, if any, if
+    ``httpResponseBody`` is not enabled, or if ``browserHtml`` or
+    ``screenshot`` are enabled.
+
 -   Request attribute parameters (``httpRequestBody``,
     ``httpRequestMethod``)
 
@@ -687,39 +691,25 @@ different requests as being the same.
 
 To avoid most issues, use automated request parameter mapping, either through
 transparent mode or setting ``zyte_api_automap`` to ``True`` in
-``Request.meta``, and then use ``Request`` properties attributes instead of
+``Request.meta``, and then use ``Request`` attributes instead of
 ``Request.meta`` as much as possible. Unlike ``Request.meta``, ``Request``
 attributes do affect request fingerprints in Scrapy 2.6.3 and earlier.
 
 For requests that must have the same ``Request`` attributes but should still
-be considered different, such as requests for the same URL with different
-``actions``, you can set ``dont_filter`` to ``True`` on ``Request.meta`` to
+be considered different, such as browser-based requests with different URL
+fragments, you can set ``dont_filter`` to ``True`` on ``Request.meta`` to
 prevent the duplicate filter of Scrapy to filter any of them out. For example:
 
 .. code-block:: python
 
     yield Request(
-        "https://toscrape.com",
-        meta={
-            "zyte_api": {
-                "browserHtml": True,
-                "actions": [
-                    {"action": "click", "selector": "#button1"},
-                ],
-            },
-        },
+        "https://toscrape.com#1",
+        meta={"zyte_api_automap": {"browserHtml": True}},
         dont_filter=True,
     )
     yield Request(
-        "https://toscrape.com",
-        meta={
-            "zyte_api": {
-                "browserHtml": True,
-                "actions": [
-                    {"action": "click", "selector": "#button2"},
-                ],
-            },
-        },
+        "https://toscrape.com#2",
+        meta={"zyte_api_automap": {"browserHtml": True}},
         dont_filter=True,
     )
 

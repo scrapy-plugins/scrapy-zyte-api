@@ -281,9 +281,89 @@ def test_url(url1, url2, match):
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
-    request1 = Request(url1, meta={"zyte_api": True})
+    request1 = Request(url1, meta={"zyte_api_automap": True})
     fingerprint1 = fingerprinter.fingerprint(request1)
-    request2 = Request(url2, meta={"zyte_api": True})
+    request2 = Request(url2, meta={"zyte_api_automap": True})
+    fingerprint2 = fingerprinter.fingerprint(request2)
+    if match:
+        assert fingerprint1 == fingerprint2
+    else:
+        assert fingerprint1 != fingerprint2
+
+
+@pytest.mark.parametrize(
+    "params,match",
+    (
+        (
+            {"httpResponseBody": True},
+            True,
+        ),
+        (
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            True,
+        ),
+        (
+            {"unknownMainOutput": True, "httpResponseBody": True},
+            True,
+        ),
+        (
+            {"httpResponseBody": True, "browserHtml": False},
+            True,
+        ),
+        (
+            {"httpResponseBody": True, "screenshot": False},
+            True,
+        ),
+        (
+            {},
+            False,
+        ),
+        (
+            {"httpResponseBody": False},
+            False,
+        ),
+        (
+            {"httpResponseHeaders": True},
+            False,
+        ),
+        (
+            {"browserHtml": True},
+            False,
+        ),
+        (
+            {"screenshot": True},
+            False,
+        ),
+        (
+            {"browserHtml": True, "screenshot": True},
+            False,
+        ),
+        (
+            {"browserHtml": True, "httpResponseBody": True},
+            False,
+        ),
+        (
+            {"httpResponseBody": True, "screenshot": True},
+            False,
+        ),
+        (
+            {"browserHtml": True, "httpResponseBody": True, "screenshot": True},
+            False,
+        ),
+        (
+            {"unknownMainOutput": True},
+            False,
+        ),
+    ),
+)
+def test_url_fragments(params, match):
+    crawler = get_crawler()
+    fingerprinter = create_instance(
+        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
+    )
+    request1 = Request("https://toscrape.com#1", meta={"zyte_api": params})
+    fingerprint1 = fingerprinter.fingerprint(request1)
+    request2 = Request("https://toscrape.com#2", meta={"zyte_api": params})
     fingerprint2 = fingerprinter.fingerprint(request2)
     if match:
         assert fingerprint1 == fingerprint2

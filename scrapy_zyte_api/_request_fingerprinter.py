@@ -72,7 +72,14 @@ else:
                 job_id=None,
             )
             if api_params is not None:
-                api_params["url"] = canonicalize_url(api_params["url"])
+                has_no_body = api_params.get("httpResponseBody", False) is False
+                is_browser_request = any(
+                    api_params.get(key, False) for key in ("browserHtml", "screenshot")
+                )
+                keep_fragments = has_no_body or is_browser_request
+                api_params["url"] = canonicalize_url(
+                    api_params["url"], keep_fragments=keep_fragments
+                )
                 for key in self._skip_keys:
                     api_params.pop(key, None)
                 fingerprint_json = json.dumps(api_params, sort_keys=True)
