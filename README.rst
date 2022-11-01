@@ -629,9 +629,10 @@ later generate unique `request fingerprints
 <https://docs.scrapy.org/en/latest/topics/request-response.html#request-fingerprints>`_
 for Zyte API requests based on some of their parameters.
 
-For example, a request for ``browserHtml`` and a request for ``screenshot`` are
-considered different requests. Similarly, requests with different ``actions``
-are also considered different requests.
+For example, a request for ``browserHtml`` and a request for ``screenshot``
+with the same target URL are considered different requests. Similarly, requests
+with the same target URL but different ``actions`` are also considered
+different requests.
 
 Zyte API parameters that affect request fingerprinting
 ------------------------------------------------------
@@ -641,9 +642,9 @@ for Zyte API requests based on the following Zyte API parameters:
 
 -   ``url`` (`canonicalized <https://w3lib.readthedocs.io/en/latest/w3lib.html#w3lib.url.canonicalize_url>`_)
 
-    URL canonicalization keeps the URL fragment, if any, if
-    ``httpResponseBody`` is not enabled, or if ``browserHtml`` or
-    ``screenshot`` are enabled.
+    For URLs that include a URL fragment, like ``https://example.com#foo``, URL
+    canonicalization keeps the URL fragment if ``httpResponseBody`` is not
+    enabled, or if ``browserHtml`` or ``screenshot`` are enabled.
 
 -   Request attribute parameters (``httpRequestBody``,
     ``httpRequestMethod``)

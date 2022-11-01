@@ -195,8 +195,8 @@ def test_metadata():
     request2 = Request("https://example.com", meta={"zyte_api": True})
 
     fingerprint1 = job_fingerprinter.fingerprint(request1)
-    fingerprint2 = no_job_fingerprinter.fingerprint(request2)
-    fingerprint3 = job_fingerprinter.fingerprint(request1)
+    fingerprint2 = job_fingerprinter.fingerprint(request2)
+    fingerprint3 = no_job_fingerprinter.fingerprint(request1)
     fingerprint4 = no_job_fingerprinter.fingerprint(request2)
 
     assert fingerprint1 == fingerprint2
@@ -260,9 +260,9 @@ def test_only_end_parameters_matter():
             True,
         ),
         (
-            "https://example.com/?a=1&b=2",
-            "https://example.com/?b=2&a=1",
-            True,
+            "https://example.com/a",
+            "https://example.com/b",
+            False,
         ),
         (
             "https://example.com/?1",
@@ -270,8 +270,23 @@ def test_only_end_parameters_matter():
             False,
         ),
         (
-            "https://example.com/#1",
-            "https://example.com/#2",
+            "https://example.com/?a=1&b=2",
+            "https://example.com/?b=2&a=1",
+            True,
+        ),
+        (
+            "https://example.com",
+            "https://example.com#",
+            True,
+        ),
+        (
+            "https://example.com#",
+            "https://example.com#1",
+            True,
+        ),
+        (
+            "https://example.com#1",
+            "https://example.com#2",
             True,
         ),
     ),
