@@ -683,19 +683,20 @@ By default, requests that do not go through Zyte API use the default request
 fingerprinter class of the installed Scrapy version.
 
 
-Request fingerprinting on Scrapy 2.6.3 and earlier
---------------------------------------------------
+Request fingerprinting before Scrapy 2.7
+----------------------------------------
 
-If you use Scrapy 2.6.3 or earlier, Zyte API parameters are not taken into
-account for request fingerprinting. This can cause some Scrapy components, like
-the filter of duplicate requests or the HTTP cache extension, to interpret 2
-different requests as being the same.
+If you a Scrapy version older than Scrapy 2.7, Zyte API parameters are not
+taken into account for request fingerprinting. This can cause some Scrapy
+components, like the filter of duplicate requests or the HTTP cache extension,
+to interpret 2 different requests as being the same.
 
 To avoid most issues, use automated request parameter mapping, either through
 transparent mode or setting ``zyte_api_automap`` to ``True`` in
 ``Request.meta``, and then use ``Request`` attributes instead of
 ``Request.meta`` as much as possible. Unlike ``Request.meta``, ``Request``
-attributes do affect request fingerprints in Scrapy 2.6.3 and earlier.
+attributes do affect request fingerprints in Scrapy versions older than Scrapy
+2.7.
 
 For requests that must have the same ``Request`` attributes but should still
 be considered different, such as browser-based requests with different URL
