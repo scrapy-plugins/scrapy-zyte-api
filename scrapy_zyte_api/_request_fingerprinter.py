@@ -59,6 +59,14 @@ else:
                 "requestHeaders",
             )
 
+        def _keep_fragments(self, api_params):
+            has_body = api_params.get("httpResponseBody", False)
+            has_headers = api_params.get("httpResponseHeaders", False)
+            is_browser_request = any(
+                api_params.get(key, False) for key in ("browserHtml", "screenshot")
+            )
+            return not (has_body or has_headers) or is_browser_request
+
         def fingerprint(self, request):
             if request in self._cache:
                 return self._cache[request]
@@ -72,14 +80,9 @@ else:
                 job_id=None,
             )
             if api_params is not None:
-                has_body = api_params.get("httpResponseBody", False)
-                has_headers = api_params.get("httpResponseHeaders", False)
-                is_browser_request = any(
-                    api_params.get(key, False) for key in ("browserHtml", "screenshot")
-                )
-                keep_fragments = not (has_body or has_headers) or is_browser_request
                 api_params["url"] = canonicalize_url(
-                    api_params["url"], keep_fragments=keep_fragments
+                    api_params["url"],
+                    keep_fragments=self._keep_fragments(api_params),
                 )
                 for key in self._skip_keys:
                     api_params.pop(key, None)
