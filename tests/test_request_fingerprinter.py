@@ -306,68 +306,97 @@ def test_url(url1, url2, match):
         assert fingerprint1 != fingerprint2
 
 
+def merge_dicts(*dicts):
+    return {k: v for d in dicts for k, v in d.items()}
+
+
 @pytest.mark.parametrize(
     "params,match",
     (
-        (
-            {"httpResponseBody": True},
-            True,
+        # As long as browserHtml or screenshot are True, different fragments
+        # make for different fingerprints, regardless of other parameters.
+        *(
+            (
+                merge_dicts(body, headers, unknown, browser),
+                False,
+            )
+            for body in (
+                {},
+                {"httpResponseBody": False},
+                {"httpResponseBody": True},
+            )
+            for headers in (
+                {},
+                {"httpResponseHeaders": False},
+                {"httpResponseHeaders": True},
+            )
+            for unknown in (
+                {},
+                {"unknown": False},
+                {"unknown": True},
+            )
+            for browser in (
+                {"browserHtml": True},
+                {"screenshot": True},
+                {"browserHtml": True, "screenshot": False},
+                {"browserHtml": False, "screenshot": True},
+                {"browserHtml": True, "screenshot": True},
+            )
         ),
-        (
-            {"httpResponseBody": True, "httpResponseHeaders": True},
-            True,
+        # If neither browserHtml not screenshot are enabled, but neither
+        # httpResponseBody nor httpResponseHeaders are enabled either,
+        # different fragments also make for different fingerprints.
+        *(
+            (
+                merge_dicts(body, headers, unknown, browser),
+                False,
+            )
+            for body in (
+                {},
+                {"httpResponseBody": False},
+            )
+            for headers in (
+                {},
+                {"httpResponseHeaders": False},
+            )
+            for unknown in (
+                {},
+                {"unknown": False},
+                {"unknown": True},
+            )
+            for browser in (
+                {},
+                {"browserHtml": False},
+                {"screenshot": False},
+                {"browserHtml": False, "screenshot": False},
+            )
         ),
-        (
-            {"unknownMainOutput": True, "httpResponseBody": True},
-            True,
-        ),
-        (
-            {"httpResponseBody": True, "browserHtml": False},
-            True,
-        ),
-        (
-            {"httpResponseBody": True, "screenshot": False},
-            True,
-        ),
-        (
-            {},
-            False,
-        ),
-        (
-            {"httpResponseBody": False},
-            False,
-        ),
-        (
-            {"httpResponseHeaders": True},
-            False,
-        ),
-        (
-            {"browserHtml": True},
-            False,
-        ),
-        (
-            {"screenshot": True},
-            False,
-        ),
-        (
-            {"browserHtml": True, "screenshot": True},
-            False,
-        ),
-        (
-            {"browserHtml": True, "httpResponseBody": True},
-            False,
-        ),
-        (
-            {"httpResponseBody": True, "screenshot": True},
-            False,
-        ),
-        (
-            {"browserHtml": True, "httpResponseBody": True, "screenshot": True},
-            False,
-        ),
-        (
-            {"unknownMainOutput": True},
-            False,
+        # If neither browserHtml not screenshot are enabled, and at least one
+        # of httpResponseBody and httpResponseHeaders is enabled, different
+        # fragments do *not* make for different fingerprints.
+        *(
+            (
+                merge_dicts(http, unknown, browser),
+                True,
+            )
+            for http in (
+                {"httpResponseBody": True},
+                {"httpResponseHeaders": True},
+                {"httpResponseBody": True, "httpResponseHeaders": False},
+                {"httpResponseBody": False, "httpResponseHeaders": True},
+                {"httpResponseBody": True, "httpResponseHeaders": True},
+            )
+            for unknown in (
+                {},
+                {"unknown": False},
+                {"unknown": True},
+            )
+            for browser in (
+                {},
+                {"browserHtml": False},
+                {"screenshot": False},
+                {"browserHtml": False, "screenshot": False},
+            )
         ),
     ),
 )

@@ -72,11 +72,12 @@ else:
                 job_id=None,
             )
             if api_params is not None:
-                has_no_body = api_params.get("httpResponseBody", False) is False
+                has_body = api_params.get("httpResponseBody", False)
+                has_headers = api_params.get("httpResponseHeaders", False)
                 is_browser_request = any(
                     api_params.get(key, False) for key in ("browserHtml", "screenshot")
                 )
-                keep_fragments = has_no_body or is_browser_request
+                keep_fragments = not (has_body or has_headers) or is_browser_request
                 api_params["url"] = canonicalize_url(
                     api_params["url"], keep_fragments=keep_fragments
                 )
