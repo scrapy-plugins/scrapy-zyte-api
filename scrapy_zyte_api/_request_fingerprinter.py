@@ -60,12 +60,9 @@ else:
             )
 
         def _keep_fragments(self, api_params):
-            has_body = api_params.get("httpResponseBody", False)
-            has_headers = api_params.get("httpResponseHeaders", False)
-            is_browser_request = any(
+            return any(
                 api_params.get(key, False) for key in ("browserHtml", "screenshot")
             )
-            return not (has_body or has_headers) or is_browser_request
 
         def fingerprint(self, request):
             if request in self._cache:

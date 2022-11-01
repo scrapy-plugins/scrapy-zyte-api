@@ -643,9 +643,8 @@ for Zyte API requests based on the following Zyte API parameters:
 -   ``url`` (`canonicalized <https://w3lib.readthedocs.io/en/latest/w3lib.html#w3lib.url.canonicalize_url>`_)
 
     For URLs that include a URL fragment, like ``https://example.com#foo``, URL
-    canonicalization keeps the URL fragment if neither ``httpResponseBody`` nor
-    ``httpResponseBody`` are enabled, or if ``browserHtml`` or ``screenshot``
-    are enabled.
+    canonicalization keeps the URL fragment if ``browserHtml`` or
+    ``screenshot`` are enabled.
 
 -   Request attribute parameters (``httpRequestBody``,
     ``httpRequestMethod``)

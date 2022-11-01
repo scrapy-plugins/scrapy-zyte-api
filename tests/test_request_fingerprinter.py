@@ -343,48 +343,22 @@ def merge_dicts(*dicts):
                 {"browserHtml": True, "screenshot": True},
             )
         ),
-        # If neither browserHtml not screenshot are enabled, but neither
-        # httpResponseBody nor httpResponseHeaders are enabled either,
-        # different fragments also make for different fingerprints.
+        # If neither browserHtml nor screenshot are enabled, different
+        # fragments do *not* make for different fingerprints.
         *(
             (
                 merge_dicts(body, headers, unknown, browser),
-                False,
+                True,
             )
             for body in (
                 {},
                 {"httpResponseBody": False},
+                {"httpResponseBody": True},
             )
             for headers in (
                 {},
                 {"httpResponseHeaders": False},
-            )
-            for unknown in (
-                {},
-                {"unknown": False},
-                {"unknown": True},
-            )
-            for browser in (
-                {},
-                {"browserHtml": False},
-                {"screenshot": False},
-                {"browserHtml": False, "screenshot": False},
-            )
-        ),
-        # If neither browserHtml not screenshot are enabled, and at least one
-        # of httpResponseBody and httpResponseHeaders is enabled, different
-        # fragments do *not* make for different fingerprints.
-        *(
-            (
-                merge_dicts(http, unknown, browser),
-                True,
-            )
-            for http in (
-                {"httpResponseBody": True},
                 {"httpResponseHeaders": True},
-                {"httpResponseBody": True, "httpResponseHeaders": False},
-                {"httpResponseBody": False, "httpResponseHeaders": True},
-                {"httpResponseBody": True, "httpResponseHeaders": True},
             )
             for unknown in (
                 {},
