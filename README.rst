@@ -685,7 +685,7 @@ fingerprinter class of the installed Scrapy version.
 Request fingerprinting before Scrapy 2.7
 ----------------------------------------
 
-If you a Scrapy version older than Scrapy 2.7, Zyte API parameters are not
+If you have a Scrapy version older than Scrapy 2.7, Zyte API parameters are not
 taken into account for request fingerprinting. This can cause some Scrapy
 components, like the filter of duplicate requests or the HTTP cache extension,
 to interpret 2 different requests as being the same.
