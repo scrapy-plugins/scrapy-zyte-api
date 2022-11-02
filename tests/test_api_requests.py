@@ -431,7 +431,10 @@ def test_transparent_mode_toggling(setting, meta, expected):
         with pytest.raises(expected):
             func()
     else:
-        assert func() == expected
+        api_params = func()
+        if api_params is not None:
+            api_params.pop("url")
+        assert api_params == expected
 
 
 @pytest.mark.parametrize("meta", [None, 0, "", b"", [], ()])
@@ -574,6 +577,7 @@ def test_default_params_merging(
         )
     for key in ignore_keys:
         api_params.pop(key)
+    api_params.pop("url")
     assert api_params == expected
     if warnings:
         for warning in warnings:
@@ -641,6 +645,7 @@ def _test_automap(global_kwargs, request_kwargs, meta, expected, warnings, caplo
                 "transparent_mode": True,
             },
         )
+    api_params.pop("url")
     assert api_params == expected
     if warnings:
         for warning in warnings:
@@ -1671,6 +1676,7 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
                 "automap_params": default_params,
             },
         )
+    api_params.pop("url")
     assert api_params == expected
     if warnings:
         for warning in warnings:

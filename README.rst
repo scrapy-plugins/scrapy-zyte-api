@@ -42,29 +42,37 @@ Installation
 Configuration
 =============
 
-Replace the default ``http`` and ``https`` in Scrapy's
-`DOWNLOAD_HANDLERS <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-DOWNLOAD_HANDLERS>`_
-in the ``settings.py`` of your Scrapy project.
+To enable this plugin:
 
-You also need to set the ``ZYTE_API_KEY``.
+-   Set the ``http`` and ``https`` keys in the `DOWNLOAD_HANDLERS
+    <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-DOWNLOAD_HANDLERS>`_
+    Scrapy setting to ``"scrapy_zyte_api.ScrapyZyteAPIDownloadHandler"``.
 
-Lastly, make sure to `install the asyncio-based Twisted reactor
-<https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor>`_
-in the ``settings.py`` file as well.
+-   Set the `REQUEST_FINGERPRINTER_CLASS
+    <https://docs.scrapy.org/en/latest/topics/request-response.html#request-fingerprinter-class>`
+    Scrapy setting to ``"scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"``.
 
-Here's an example of the things needed inside a Scrapy project's ``settings.py`` file:
+-   Set the `TWISTED_REACTOR
+    <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-TWISTED_REACTOR>`_
+    Scrapy setting to
+    ``"twisted.internet.asyncioreactor.AsyncioSelectorReactor"``.
+
+-   Set `your Zyte API key
+    <https://docs.zyte.com/zyte-api/usage/general.html#authorization>`_ as
+    either the ``ZYTE_API_KEY`` Scrapy setting or as an environment variable of
+    the same name.
+
+For example, in the ``settings.py`` file of your Scrapy project:
 
 .. code-block:: python
 
     DOWNLOAD_HANDLERS = {
-        "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
-        "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler"
+        "http": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
+        "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
     }
-
-    # Having the following in the env var would also work.
-    ZYTE_API_KEY = "<your API key>"
-
+    REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+    ZYTE_API_KEY = "YOUR_API_KEY"
 
 The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 ``False`` to disable this plugin.
@@ -89,10 +97,6 @@ You can send requests through Zyte API in one of the following ways:
 
 Zyte API response parameters are mapped into Scrapy response parameters where
 possible. See **Response mapping** below for details.
-
-If multiple requests target the same URL with different Zyte API parameters,
-pass ``dont_filter=True`` to ``Request`` to prevent the duplicate request
-filter of Scrapy from dropping all but the first request.
 
 
 Using transparent mode
@@ -615,3 +619,101 @@ Stats
 
 Stats from python-zyte-api_ are exposed as Scrapy stats with the
 ``scrapy-zyte-api`` prefix.
+
+
+Request fingerprinting
+======================
+
+The request fingerprinter class of this plugin ensures that Scrapy 2.7 and
+later generate unique `request fingerprints
+<https://docs.scrapy.org/en/latest/topics/request-response.html#request-fingerprints>`_
+for Zyte API requests based on some of their parameters.
+
+For example, a request for ``browserHtml`` and a request for ``screenshot``
+with the same target URL are considered different requests. Similarly, requests
+with the same target URL but different ``actions`` are also considered
+different requests.
+
+Zyte API parameters that affect request fingerprinting
+------------------------------------------------------
+
+The request fingerprinter class of this plugin generates request fingerprints
+for Zyte API requests based on the following Zyte API parameters:
+
+-   ``url`` (`canonicalized <https://w3lib.readthedocs.io/en/latest/w3lib.html#w3lib.url.canonicalize_url>`_)
+
+    For URLs that include a URL fragment, like ``https://example.com#foo``, URL
+    canonicalization keeps the URL fragment if ``browserHtml`` or
+    ``screenshot`` are enabled.
+
+-   Request attribute parameters (``httpRequestBody``,
+    ``httpRequestMethod``)
+
+-   Output parameters (``browserHtml``, ``httpResponseBody``,
+    ``httpResponseHeaders``, ``screenshot``)
+
+-   Rendering option parameters (``actions``, ``javascript``,
+    ``screenshotOptions``)
+
+-   ``geolocation``
+
+The following Zyte API parameters are *not* taken into account for request
+fingerprinting:
+
+-   Request header parameters (``customHttpRequestHeaders``,
+    ``requestHeaders``)
+
+-   Metadata parameters (``echoData``, ``jobId``)
+
+
+Changing the fingerprinting of non-Zyte-API requests
+----------------------------------------------------
+
+You can assign a request fingerprinter class to the
+``ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS`` Scrapy setting to configure
+a custom request fingerprinter class to use for requests that do not go through
+Zyte API:
+
+.. code-block:: python
+
+    ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS = "custom.RequestFingerprinter"
+
+By default, requests that do not go through Zyte API use the default request
+fingerprinter class of the installed Scrapy version.
+
+
+Request fingerprinting before Scrapy 2.7
+----------------------------------------
+
+If you have a Scrapy version older than Scrapy 2.7, Zyte API parameters are not
+taken into account for request fingerprinting. This can cause some Scrapy
+components, like the filter of duplicate requests or the HTTP cache extension,
+to interpret 2 different requests as being the same.
+
+To avoid most issues, use automated request parameter mapping, either through
+transparent mode or setting ``zyte_api_automap`` to ``True`` in
+``Request.meta``, and then use ``Request`` attributes instead of
+``Request.meta`` as much as possible. Unlike ``Request.meta``, ``Request``
+attributes do affect request fingerprints in Scrapy versions older than Scrapy
+2.7.
+
+For requests that must have the same ``Request`` attributes but should still
+be considered different, such as browser-based requests with different URL
+fragments, you can set ``dont_filter`` to ``True`` on ``Request.meta`` to
+prevent the duplicate filter of Scrapy to filter any of them out. For example:
+
+.. code-block:: python
+
+    yield Request(
+        "https://toscrape.com#1",
+        meta={"zyte_api_automap": {"browserHtml": True}},
+        dont_filter=True,
+    )
+    yield Request(
+        "https://toscrape.com#2",
+        meta={"zyte_api_automap": {"browserHtml": True}},
+        dont_filter=True,
+    )
+
+Note, however, that for other Scrapy components, like the HTTP cache
+extensions, these 2 requests would still be considered identical.
