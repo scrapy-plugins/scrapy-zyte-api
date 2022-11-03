@@ -48,8 +48,13 @@ To enable this plugin:
     <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-DOWNLOAD_HANDLERS>`_
     Scrapy setting to ``"scrapy_zyte_api.ScrapyZyteAPIDownloadHandler"``.
 
+-   Add ``"scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"`` to the
+    `DOWNLOADER_MIDDLEWARES
+    <https://docs.scrapy.org/en/latest/topics/settings.html#downloader-middlewares>`_
+    Scrapy setting with any value, e.g. ``1000``.
+
 -   Set the `REQUEST_FINGERPRINTER_CLASS
-    <https://docs.scrapy.org/en/latest/topics/request-response.html#request-fingerprinter-class>`
+    <https://docs.scrapy.org/en/latest/topics/request-response.html#request-fingerprinter-class>`_
     Scrapy setting to ``"scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"``.
 
 -   Set the `TWISTED_REACTOR
@@ -69,6 +74,9 @@ For example, in the ``settings.py`` file of your Scrapy project:
     DOWNLOAD_HANDLERS = {
         "http": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
         "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
+    }
+    DOWNLOADER_MIDDLEWARES = {
+        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
     }
     REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
