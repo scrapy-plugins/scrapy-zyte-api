@@ -15,7 +15,14 @@ from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 
-from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET, make_handler, set_env
+from . import (
+    DEFAULT_CLIENT_CONCURRENCY,
+    SETTINGS,
+    UNSET,
+    fresh_client_cache,
+    make_handler,
+    set_env,
+)
 
 
 @pytest.mark.parametrize(
@@ -113,21 +120,22 @@ def test_api_key(env_var, setting, expected):
     if setting is not UNSET:
         settings["ZYTE_API_KEY"] = setting
     with set_env(**env):
-        crawler = get_crawler(settings_dict=settings)
+        with fresh_client_cache():
+            crawler = get_crawler(settings_dict=settings)
 
-        def build_hander():
-            return create_instance(
-                ScrapyZyteAPIDownloadHandler,
-                settings=None,
-                crawler=crawler,
-            )
+            def build_hander():
+                return create_instance(
+                    ScrapyZyteAPIDownloadHandler,
+                    settings=None,
+                    crawler=crawler,
+                )
 
-        if isclass(expected) and issubclass(expected, Exception):
-            with pytest.raises(expected):
+            if isclass(expected) and issubclass(expected, Exception):
+                with pytest.raises(expected):
+                    handler = build_hander()
+            else:
                 handler = build_hander()
-        else:
-            handler = build_hander()
-            assert handler._client.api_key == expected
+                assert handler._client.api_key == expected
 
 
 @pytest.mark.parametrize(
@@ -240,47 +248,63 @@ async def test_retry_policy(
 
 @ensureDeferred
 async def test_stats(mockserver):
-    async with make_handler({}, mockserver.urljoin("/")) as handler:
-        scrapy_stats = handler._stats
-        assert scrapy_stats.get_stats() == {}
+    with fresh_client_cache():
+        async with make_handler({}, mockserver.urljoin("/")) as handler:
+            scrapy_stats = handler._stats
+            assert scrapy_stats.get_stats() == {}
 
-        meta = {"zyte_api": {"foo": "bar"}}
-        request = Request("https://example.com", meta=meta)
-        await handler.download_request(request, None)
+            meta = {"zyte_api": {"foo": "bar"}}
+            request = Request("https://example.com", meta=meta)
+            await handler.download_request(request, None)
 
-        assert set(scrapy_stats.get_stats()) == {
-            f"scrapy-zyte-api/{stat}"
-            for stat in (
-                "429",
-                "attempts",
-                "error_ratio",
-                "errors",
-                "fatal_errors",
-                "mean_connection_seconds",
-                "mean_response_seconds",
-                "processed",
-                "status_codes/200",
-                "success_ratio",
-                "success",
-                "throttle_ratio",
-            )
-        }
-        for suffix, value in (
-            ("429", 0),
-            ("attempts", 1),
-            ("error_ratio", 0.0),
-            ("errors", 0),
-            ("fatal_errors", 0),
-            ("processed", 1),
-            ("status_codes/200", 1),
-            ("success_ratio", 1.0),
-            ("success", 1),
-            ("throttle_ratio", 0.0),
-        ):
-            stat = f"scrapy-zyte-api/{suffix}"
-            assert scrapy_stats.get_value(stat) == value
-        for name in ("connection", "response"):
-            stat = f"scrapy-zyte-api/mean_{name}_seconds"
-            value = scrapy_stats.get_value(stat)
-            assert isinstance(value, float)
-            assert value > 0.0
+            assert set(scrapy_stats.get_stats()) == {
+                f"scrapy-zyte-api/{stat}"
+                for stat in (
+                    "429",
+                    "attempts",
+                    "error_ratio",
+                    "errors",
+                    "fatal_errors",
+                    "mean_connection_seconds",
+                    "mean_response_seconds",
+                    "processed",
+                    "status_codes/200",
+                    "success_ratio",
+                    "success",
+                    "throttle_ratio",
+                )
+            }
+            for suffix, value in (
+                ("429", 0),
+                ("attempts", 1),
+                ("error_ratio", 0.0),
+                ("errors", 0),
+                ("fatal_errors", 0),
+                ("processed", 1),
+                ("status_codes/200", 1),
+                ("success_ratio", 1.0),
+                ("success", 1),
+                ("throttle_ratio", 0.0),
+            ):
+                stat = f"scrapy-zyte-api/{suffix}"
+                assert scrapy_stats.get_value(stat) == value
+            for name in ("connection", "response"):
+                stat = f"scrapy-zyte-api/mean_{name}_seconds"
+                value = scrapy_stats.get_value(stat)
+                assert isinstance(value, float)
+                assert value > 0.0
+
+
+def test_single_client():
+    """Make sure that the same Zyte API client is used by both download
+    handlers."""
+    crawler = get_crawler(settings_dict=SETTINGS)
+    handler1 = ScrapyZyteAPIDownloadHandler(
+        settings=crawler.settings,
+        crawler=crawler,
+    )
+    handler2 = ScrapyZyteAPIDownloadHandler(
+        settings=crawler.settings,
+        crawler=crawler,
+    )
+    assert handler1._client == handler2._client
