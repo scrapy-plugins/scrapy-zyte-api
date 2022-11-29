@@ -23,7 +23,7 @@ class ZyteAPIMixin:
         "content-encoding"
     }
 
-    def __init__(self, *args, raw_api_response: Dict = None, **kwargs):
+    def __init__(self, *args, raw_api_response: Optional[Dict] = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._raw_api_response = raw_api_response
         if not _RESPONSE_HAS_ATTRIBUTES:
@@ -118,8 +118,15 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
         )
 
 
+_IMMUTABLE_JSON = Union[None, str, int, float, bool]
+_JSON = Union[
+    None, str, int, float, bool, List["_JSON"], Dict[_IMMUTABLE_JSON, "_JSON"]
+]
+_API_RESPONSE = Dict[str, _JSON]
+
+
 def _process_response(
-    api_response: Dict[str, Union[List[Dict], str]], request: Request
+    api_response: _API_RESPONSE, request: Request
 ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
     """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
     this returns either a ``ZyteAPITextResponse`` or ``ZyteAPIResponse`` depending

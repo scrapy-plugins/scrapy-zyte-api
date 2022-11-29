@@ -1,5 +1,3 @@
-from typing import Set
-
 from ._params import _ParamParser
 
 
@@ -13,7 +11,6 @@ class ScrapyZyteAPIDownloaderMiddleware:
 
     def __init__(self, crawler) -> None:
         self._param_parser = _ParamParser(crawler.settings)
-        self._handled_slots: Set[str] = set()
         self._crawler = crawler
 
     def process_request(self, request, spider):
@@ -25,8 +22,5 @@ class ScrapyZyteAPIDownloaderMiddleware:
         if not slot_id.startswith(self._slot_prefix):
             slot_id = f"{self._slot_prefix}{slot_id}"
             request.meta["download_slot"] = slot_id
-        if slot_id in self._handled_slots:
-            return
         _, slot = downloader._get_slot(request, spider)
         slot.delay = 0
-        self._handled_slots.add(slot_id)

@@ -43,13 +43,14 @@ async def test_downloader_middleware():
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == 0
 
-    # The slot delay is only set to 0 once per slot, so it is still possible to
-    # change it from custom code if desired.
+    # The slot delay is set to 0 every time a request for the slot is
+    # processed, so even if it gets changed later on somehow, the downloader
+    # middleware will reset it to 0 again the next time it processes a request.
     slot.delay = 10
     request = Request("https://example.com", meta={"zyte_api": {}})
     assert middleware.process_request(request, spider) is None
     assert request.meta["download_slot"] == "zyte-api@example.com"
     _, slot = crawler.engine.downloader._get_slot(request, spider)
-    assert slot.delay == 10
+    assert slot.delay == 0
 
     await crawler.stop()
