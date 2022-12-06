@@ -6,6 +6,7 @@ from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
 
 from scrapy_zyte_api.responses import (
+    _API_RESPONSE,
     ZyteAPIResponse,
     ZyteAPITextResponse,
     _process_response,
@@ -205,7 +206,10 @@ def test__process_response_no_body():
     """The _process_response() function should handle missing 'browserHtml' or
     'httpResponseBody'.
     """
-    api_response = {"url": "https://example.com", "product": {"name": "shoes"}}
+    api_response: _API_RESPONSE = {
+        "url": "https://example.com",
+        "product": {"name": "shoes"},
+    }
 
     resp = _process_response(api_response, Request(api_response["url"]))
 
@@ -367,9 +371,9 @@ def test__process_response_non_text():
     """Non-textual responses like images, files, etc. won't have access to the
     css/xpath selectors.
     """
-    api_response = {
+    api_response: _API_RESPONSE = {
         "url": "https://example.com/sprite.gif",
-        "httpResponseBody": b"",
+        "httpResponseBody": "",
         "httpResponseHeaders": [
             {
                 "name": "Content-Type",
@@ -431,4 +435,5 @@ def test_status_code(base_kwargs_func, kwargs, expected_status_code):
     del base_api_response["statusCode"]
     api_response = {**base_api_response, **kwargs}
     response = _process_response(api_response, Request(api_response["url"]))
+    assert response is not None
     assert response.status == expected_status_code
