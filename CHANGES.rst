@@ -1,10 +1,10 @@
 Changes
 =======
 
-0.7.0 (TBD)
------------
+0.7.0 (2022-12-09)
+------------------
 
-To upgrade, you need to set the following in your Scrapy project settings:
+When upgrading, you should set the following in your Scrapy settings:
 
 .. code-block:: python
 
@@ -19,7 +19,7 @@ To upgrade, you need to set the following in your Scrapy project settings:
 
 * It now supports Scrapy 2.7's new ``REQUEST_FINGERPRINTER_CLASS`` which ensures
   that Zyte API requests are properly fingerprinted. This addresses the issue
-  where Scrapy marks POST requests as duplicate if it points to the same URL
+  where Scrapy marks POST requests as duplicate if they point to the same URL
   despite having different request bodies. As a workaround, users were marking
   their requests with ``dont_filter=True`` to prevent such dupe filtering.
 
