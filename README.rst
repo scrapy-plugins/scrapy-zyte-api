@@ -243,9 +243,7 @@ For example:
             yield scrapy.Request(
                 url="https://quotes.toscrape.com/",
                 meta={
-                    "zyte_api": {
-                        "zyte_api_automap": True,
-                    }
+                    "zyte_api_automap": True,
                 },
             )
 
