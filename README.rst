@@ -365,9 +365,7 @@ parameters are chosen as follows by default:
             Request(
                 url="https://toscrape.com/img/zyte.png",
                 meta={
-                    "zyte_api": {
-                        "zyte_api_automap": {"httpResponseBody": True},
-                    }
+                    "zyte_api_automap": {"httpResponseBody": True},
                 },
             )
 
@@ -385,9 +383,7 @@ parameters are chosen as follows by default:
             Request(
                 url="https://toscrape.com/",
                 meta={
-                    "zyte_api": {
-                        "zyte_api_automap": {"httpResponseHeaders": True},
-                    }
+                    "zyte_api_automap": {"httpResponseHeaders": True},
                 },
             )
 
