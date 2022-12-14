@@ -287,7 +287,7 @@ possible:
     same request, and both parameters were present, ``browserHtml`` would be
     the one mapped into ``response.text`` and ``response.body``.
 
-Both response classes have a ``raw_zyte_api`` attribute that contains a
+Both response classes have a ``raw_api_response`` attribute that contains a
 ``dict`` with the complete, raw response from Zyte API, where you can find all
 Zyte API response parameters, including those that are not mapped into other
 response class atttributes.
@@ -375,7 +375,7 @@ parameters are chosen as follows by default:
 
     -   If you need to access response headers, be it through
         ``response.headers`` or through
-        ``response.raw_zyte_api["httpResponseHeaders"]``, set
+        ``response.raw_api_response["httpResponseHeaders"]``, set
         ``httpResponseHeaders`` to ``True`` explicitly in your requests:
 
         .. code-block:: python
