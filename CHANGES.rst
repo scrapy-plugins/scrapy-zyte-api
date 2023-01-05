@@ -1,6 +1,46 @@
 Changes
 =======
 
+0.7.0 (2022-12-09)
+------------------
+
+When upgrading, you should set the following in your Scrapy settings:
+
+.. code-block:: python
+
+  DOWNLOADER_MIDDLEWARES = {
+      "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+  }
+  # only applicable for Scrapy 2.7+
+  REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
+
+* Fixes the issue where scrapy-zyte-api is slow when Scrapy Cloud has Autothrottle
+  Addon enabled. The new ``ScrapyZyteAPIDownloaderMiddleware`` fixes this.
+
+* It now supports Scrapy 2.7's new ``REQUEST_FINGERPRINTER_CLASS`` which ensures
+  that Zyte API requests are properly fingerprinted. This addresses the issue
+  where Scrapy marks POST requests as duplicate if they point to the same URL
+  despite having different request bodies. As a workaround, users were marking
+  their requests with ``dont_filter=True`` to prevent such dupe filtering.
+
+  For users having ``scrapy >= 2.7``, you can simply update your Scrapy settings
+  to have ``REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"``.
+
+  If your Scrapy project performs other requests aside from Zyte API, you can set
+  ``ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS = "custom.RequestFingerprinter"``
+  to allow custom fingerprinting. By default, the default Scrapy request
+  fingerprinter is used for non-Zyte API requests.
+
+  For users having ``scrapy < 2.7``, check the following link to see different
+  ways on handling the duplicate request issue:
+  https://github.com/scrapy-plugins/scrapy-zyte-api#request-fingerprinting-before-scrapy-27.
+
+  More information about the request fingerprinting topic can be found in
+  https://github.com/scrapy-plugins/scrapy-zyte-api#request-fingerprinting.
+
+* Various improvements to docs and tests.
+
+
 0.6.0 (2022-10-20)
 ------------------
 

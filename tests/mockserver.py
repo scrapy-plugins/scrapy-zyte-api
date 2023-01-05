@@ -7,13 +7,17 @@ from base64 import b64encode
 from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
+from typing import Dict, Optional
 
 from pytest_twisted import ensureDeferred
 from scrapy import Request
 from twisted.internet import reactor
+from twisted.internet.defer import Deferred
 from twisted.internet.task import deferLater
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET, Site
+
+from scrapy_zyte_api.responses import _API_RESPONSE
 
 from . import make_handler
 
@@ -41,7 +45,8 @@ class LeafResource(Resource):
             d.addErrback(lambda _: None)
             d.cancel()
 
-        d = deferLater(reactor, delay, f, *a, **kw)
+        # Typing issues: https://github.com/twisted/twisted/issues/9909
+        d: Deferred = deferLater(reactor, delay, f, *a, **kw)  # type: ignore[arg-type]
         request.notifyFinish().addErrback(_cancelrequest)
         return d
 
@@ -54,7 +59,7 @@ class DefaultResource(LeafResource):
             [b"application/json"],
         )
 
-        response_data = {}
+        response_data: _API_RESPONSE = {}
         if "url" not in request_data:
             request.setResponseCode(400)
             return json.dumps(response_data).encode()
@@ -139,10 +144,12 @@ class MockServer:
             ],
             stdout=PIPE,
         )
+        assert self.proc.stdout is not None
         self.proc.stdout.readline()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        assert self.proc is not None
         self.proc.kill()
         self.proc.wait()
         time.sleep(0.2)
@@ -151,7 +158,7 @@ class MockServer:
         return self.root_url + path
 
     @asynccontextmanager
-    async def make_handler(self, settings: dict = None):
+    async def make_handler(self, settings: Optional[Dict] = None):
         settings = settings or {}
         async with make_handler(settings, self.urljoin("/")) as handler:
             yield handler
@@ -165,7 +172,8 @@ def main():
     module_name, name = args.resource.rsplit(".", 1)
     sys.path.append(".")
     resource = getattr(import_module(module_name), name)()
-    http_port = reactor.listenTCP(args.port, Site(resource))
+    # Typing issue: https://github.com/twisted/twisted/issues/9909
+    http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[attr-defined]
 
     def print_listening():
         host = http_port.getHost()
@@ -175,8 +183,9 @@ def main():
             )
         )
 
-    reactor.callWhenRunning(print_listening)
-    reactor.run()
+    # Typing issue: https://github.com/twisted/twisted/issues/9909
+    reactor.callWhenRunning(print_listening)  # type: ignore[attr-defined]
+    reactor.run()  # type: ignore[attr-defined]
 
 
 if __name__ == "__main__":

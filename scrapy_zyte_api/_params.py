@@ -456,3 +456,24 @@ def _load_browser_headers(settings):
         {"Referer": "referer"},
     )
     return {k.strip().lower().encode(): v for k, v in browser_headers.items()}
+
+
+class _ParamParser:
+    def __init__(self, settings):
+        self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
+        self._browser_headers = _load_browser_headers(settings)
+        self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
+        self._job_id = settings.get("JOB")
+        self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
+        self._skip_headers = _load_skip_headers(settings)
+
+    def parse(self, request):
+        return _get_api_params(
+            request,
+            default_params=self._default_params,
+            transparent_mode=self._transparent_mode,
+            automap_params=self._automap_params,
+            skip_headers=self._skip_headers,
+            browser_headers=self._browser_headers,
+            job_id=self._job_id,
+        )

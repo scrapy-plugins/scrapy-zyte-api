@@ -16,12 +16,7 @@ from zyte_api.aio.errors import RequestError
 from zyte_api.apikey import NoApiKey
 from zyte_api.constants import API_URL
 
-from ._params import (
-    _get_api_params,
-    _load_browser_headers,
-    _load_default_params,
-    _load_skip_headers,
-)
+from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 
 logger = logging.getLogger(__name__)
@@ -77,27 +72,13 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
+        self._param_parser = _ParamParser(settings)
+        self._retry_policy = _load_retry_policy(settings)
         self._stats = crawler.stats
         self._session = create_session(connection_pool_size=self._client.n_conn)
 
-        self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
-        self._browser_headers = _load_browser_headers(settings)
-        self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
-        self._job_id = crawler.settings.get("JOB")
-        self._retry_policy = _load_retry_policy(settings)
-        self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
-        self._skip_headers = _load_skip_headers(settings)
-
     def download_request(self, request: Request, spider: Spider) -> Deferred:
-        api_params = _get_api_params(
-            request,
-            default_params=self._default_params,
-            transparent_mode=self._transparent_mode,
-            automap_params=self._automap_params,
-            skip_headers=self._skip_headers,
-            browser_headers=self._browser_headers,
-            job_id=self._job_id,
-        )
+        api_params = self._param_parser.parse(request)
         if api_params is not None:
             return deferred_from_coro(
                 self._download_request(api_params, request, spider)
