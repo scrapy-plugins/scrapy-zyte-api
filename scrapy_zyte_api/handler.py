@@ -39,6 +39,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         if not hasattr(crawler, "zyte_api_client"):
             if not client:
                 client = self._build_client(settings)
+            # We keep the client in the crawler object to prevent multiple,
+            # duplicate clients with the same settings to be used.
+            # https://github.com/scrapy-plugins/scrapy-zyte-api/issues/58
             crawler.zyte_api_client = client
         self._client: AsyncClient = crawler.zyte_api_client
         logger.info("Using a Zyte API key starting with %r", self._client.api_key[:7])
