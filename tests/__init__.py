@@ -7,7 +7,7 @@ from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
 
-from scrapy_zyte_api.handler import _CLIENT_CACHE, ScrapyZyteAPIDownloadHandler
+from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 
 _API_KEY = "a"
 
@@ -54,14 +54,3 @@ def set_env(**env_vars):
     finally:
         environ.clear()
         environ.update(old_environ)
-
-
-@contextmanager
-def fresh_client_cache():
-    old_cache = dict(_CLIENT_CACHE)
-    _CLIENT_CACHE.clear()
-    try:
-        yield
-    finally:
-        _CLIENT_CACHE.clear()
-        _CLIENT_CACHE.update(old_cache)

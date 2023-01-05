@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Generator, Optional, Tuple, Union
+from typing import Generator, Optional, Union
 
 from scrapy import Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
@@ -29,9 +29,6 @@ def _load_retry_policy(settings):
     return policy
 
 
-_CLIENT_CACHE: Dict[Tuple[Optional[str], str, int], AsyncClient] = {}
-
-
 class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def __init__(
         self, settings: Settings, crawler: Crawler, client: AsyncClient = None
@@ -39,26 +36,19 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         super().__init__(settings=settings, crawler=crawler)
         if not settings.getbool("ZYTE_API_ENABLED", True):
             raise NotConfigured
-        if not client:
-            client_key = (
-                settings.get("ZYTE_API_KEY") or None,
-                settings.get("ZYTE_API_URL") or API_URL,
-                settings.getint("CONCURRENT_REQUESTS"),
-            )
-            if client_key in _CLIENT_CACHE:
-                client = _CLIENT_CACHE[client_key]
-            else:
+        if not hasattr(crawler, "zyte_api_client"):
+            if not client:
                 try:
                     client = AsyncClient(
-                        # To allow users to have a key defined in Scrapy settings
-                        # and in a environment variable, and be able to cause the
-                        # environment variable to be used instead of the setting by
-                        # overriding the setting on the command-line to be an empty
-                        # string, we do not support setting empty string keys
-                        # through settings.
-                        api_key=client_key[0],
-                        api_url=client_key[1],
-                        n_conn=client_key[2],
+                        # To allow users to have a key defined in Scrapy
+                        # settings and in a environment variable, and be able
+                        # to cause the environment variable to be used instead
+                        # of the setting by overriding the setting on the
+                        # command-line to be an empty string, we do not support
+                        # setting empty string keys through settings.
+                        api_key=settings.get("ZYTE_API_KEY") or None,
+                        api_url=settings.get("ZYTE_API_URL") or API_URL,
+                        n_conn=settings.getint("CONCURRENT_REQUESTS"),
                     )
                 except NoApiKey:
                     logger.warning(
@@ -66,8 +56,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                         "in order for ScrapyZyteAPIDownloadHandler to work."
                     )
                     raise NotConfigured
-                _CLIENT_CACHE[client_key] = client
-        self._client: AsyncClient = client
+            crawler.zyte_api_client = client
+        self._client: AsyncClient = crawler.zyte_api_client
         logger.info("Using a Zyte API key starting with %r", self._client.api_key[:7])
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
