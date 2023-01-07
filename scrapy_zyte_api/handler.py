@@ -1,4 +1,6 @@
+import json
 import logging
+from copy import deepcopy
 from typing import Generator, Optional, Union
 
 from scrapy import Spider
@@ -20,6 +22,24 @@ from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 
 logger = logging.getLogger(__name__)
+
+
+def _truncate(obj, limit):
+    if isinstance(obj, dict):
+        for key in list(obj):
+            value = obj[key]
+            if isinstance(value, str):
+                if len(value) > limit:
+                    obj[key] = value[: limit - 1] + "…"
+            elif isinstance(value, (list, dict)):
+                _truncate(value, limit)
+    elif isinstance(obj, list):
+        for index, value in enumerate(obj):
+            if isinstance(value, str):
+                if len(value) > limit:
+                    obj[index] = value[: limit - 1] + "…"
+            elif isinstance(value, (list, dict)):
+                _truncate(value, limit)
 
 
 def _load_retry_policy(settings):
@@ -64,6 +84,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._retry_policy = _load_retry_policy(settings)
         self._stats = crawler.stats
         self._session = create_session(connection_pool_size=self._client.n_conn)
+        self._must_log_request = settings.getbool("ZYTE_API_LOG_REQUESTS", False)
+        self._truncate_limit = settings.getint("ZYTE_API_LOG_REQUESTS_TRUNCATE", 64)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._param_parser.parse(request)
@@ -127,6 +149,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             retrying = load_object(retrying)
         else:
             retrying = self._retry_policy
+        self._log_request(api_params)
         try:
             api_response = await self._client.request_raw(
                 api_params,
@@ -149,6 +172,19 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             self._update_stats()
 
         return _process_response(api_response, request)
+
+    def _log_request(self, params):
+        if not self._must_log_request:
+            return
+        params = self._truncate_params(params)
+        logger.debug(f"Sending Zyte API extract request: {json.dumps(params)}")
+
+    def _truncate_params(self, params):
+        if self._truncate_limit == 0:
+            return params
+        params = deepcopy(params)
+        _truncate(params, self._truncate_limit)
+        return params
 
     @inlineCallbacks
     def close(self) -> Generator:

@@ -1,4 +1,7 @@
+import json
+import re
 import sys
+from copy import deepcopy
 from inspect import isclass
 from typing import Any, Dict
 from unittest import mock
@@ -284,3 +287,115 @@ async def test_stats(mockserver):
             value = scrapy_stats.get_value(stat)
             assert isinstance(value, float)
             assert value > 0.0
+
+
+@ensureDeferred
+@pytest.mark.parametrize(
+    "settings,enabled",
+    [
+        ({}, False),
+        ({"ZYTE_API_LOG_REQUESTS": False}, False),
+        ({"ZYTE_API_LOG_REQUESTS": True}, True),
+    ],
+)
+async def test_log_request_toggle(
+    settings: Dict[str, Any],
+    enabled: bool,
+    mockserver,
+):
+    async with make_handler(settings, mockserver.urljoin("/")) as handler:
+        meta = {"zyte_api": {"foo": "bar"}}
+        request = Request("https://example.com", meta=meta)
+        with mock.patch("scrapy_zyte_api.handler.logger") as logger:
+            await handler.download_request(request, None)
+        if enabled:
+            logger.debug.assert_called()
+        else:
+            logger.debug.assert_not_called()
+
+
+@ensureDeferred
+@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
+@pytest.mark.parametrize(
+    "settings,short_str,long_str,truncated_str",
+    [
+        ({}, "a" * 64, "a" * 65, "a" * 63 + "…"),
+        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 0}, "a" * 64, "a" * 65, "a" * 65),
+        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 1}, "a", "aa", "…"),
+        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 2}, "aa", "aaa", "a…"),
+    ],
+)
+async def test_log_request_truncate(
+    settings: Dict[str, Any],
+    short_str: str,
+    long_str: str,
+    truncated_str: str,
+    mockserver,
+):
+    settings["ZYTE_API_LOG_REQUESTS"] = True
+    input_params = {
+        "short": short_str,
+        "long": long_str,
+        "list": [
+            short_str,
+            long_str,
+            {
+                "short": short_str,
+                "long": long_str,
+            },
+        ],
+        "dict": {
+            "short": short_str,
+            "long": long_str,
+            "list": [
+                short_str,
+                long_str,
+            ],
+        },
+    }
+    expected_logged_params = {
+        "short": short_str,
+        "long": truncated_str,
+        "list": [
+            short_str,
+            truncated_str,
+            {
+                "short": short_str,
+                "long": truncated_str,
+            },
+        ],
+        "dict": {
+            "short": short_str,
+            "long": truncated_str,
+            "list": [
+                short_str,
+                truncated_str,
+            ],
+        },
+    }
+    expected_api_params = deepcopy(input_params)
+    async with make_handler(settings, mockserver.urljoin("/")) as handler:
+        meta = {"zyte_api": input_params}
+        request = Request("https://example.com", meta=meta)
+        unmocked_client = handler._client
+        handler._client = mock.AsyncMock(unmocked_client)
+        handler._client.request_raw.return_value = {
+            "browserHtml": "",
+            "url": "",
+        }
+        with mock.patch("scrapy_zyte_api.handler.logger") as logger:
+            await handler.download_request(request, None)
+
+        # Check that the logged params are truncated.
+        logged_message = logger.debug.call_args[0][0]
+        logged_params_json_match = re.search(r"\{.*", logged_message)
+        assert logged_params_json_match is not None
+        logged_params_json = logged_params_json_match[0]
+        logged_params = json.loads(logged_params_json)
+        del logged_params["url"]
+        assert logged_params == expected_logged_params
+
+        # Check that the actual params are *not* truncated.
+        actual_api_params = handler._client.request_raw.call_args[0][0]
+        del actual_api_params["url"]
+        assert actual_api_params == expected_api_params

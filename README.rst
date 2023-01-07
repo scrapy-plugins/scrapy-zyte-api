@@ -719,3 +719,18 @@ prevent the duplicate filter of Scrapy to filter any of them out. For example:
 
 Note, however, that for other Scrapy components, like the HTTP cache
 extensions, these 2 requests would still be considered identical.
+
+
+Logging request parameters
+==========================
+
+Set the ``ZYTE_API_LOG_REQUESTS`` setting to ``True`` to enable the logging of
+debug messages that indicate the JSON object sent on every extract request to
+Zyte API.
+
+For example::
+
+   Sending Zyte API extract request: {"url": "https://example.com", "httpResponseBody": true}
+
+The ``ZYTE_API_LOG_REQUESTS_TRUNCATE``, 64 by default, determines the maximum
+length of any string value in the logged JSON object, excluding object keys.
