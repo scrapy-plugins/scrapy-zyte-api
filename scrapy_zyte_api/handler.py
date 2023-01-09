@@ -26,8 +26,7 @@ logger = logging.getLogger(__name__)
 
 def _truncate(obj, limit):
     if isinstance(obj, dict):
-        for key in list(obj):
-            value = obj[key]
+        for key, value in obj.items():
             if isinstance(value, str):
                 if len(value) > limit:
                     obj[key] = value[: limit - 1] + "…"
