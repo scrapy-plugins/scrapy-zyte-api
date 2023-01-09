@@ -733,4 +733,5 @@ For example::
    Sending Zyte API extract request: {"url": "https://example.com", "httpResponseBody": true}
 
 The ``ZYTE_API_LOG_REQUESTS_TRUNCATE``, 64 by default, determines the maximum
-length of any string value in the logged JSON object, excluding object keys.
+length of any string value in the logged JSON object, excluding object keys. To
+disable truncation, set it to 0.

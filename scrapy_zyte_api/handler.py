@@ -85,6 +85,12 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._session = create_session(connection_pool_size=self._client.n_conn)
         self._must_log_request = settings.getbool("ZYTE_API_LOG_REQUESTS", False)
         self._truncate_limit = settings.getint("ZYTE_API_LOG_REQUESTS_TRUNCATE", 64)
+        if self._truncate_limit < 0:
+            raise ValueError(
+                f"The value of the ZYTE_API_LOG_REQUESTS_TRUNCATE setting "
+                f"({self._truncate_limit}) is invalid. It must be 0 or a "
+                f"positive integer."
+            )
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._param_parser.parse(request)

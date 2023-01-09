@@ -399,3 +399,18 @@ async def test_log_request_truncate(
         actual_api_params = handler._client.request_raw.call_args[0][0]
         del actual_api_params["url"]
         assert actual_api_params == expected_api_params
+
+
+def test_log_request_truncate_negative():
+    settings: Dict[str, Any] = {
+        **SETTINGS,
+        "ZYTE_API_LOG_REQUESTS": True,
+        "ZYTE_API_LOG_REQUESTS_TRUNCATE": -1,
+    }
+    crawler = get_crawler(settings_dict=settings)
+    with pytest.raises(ValueError):
+        create_instance(
+            ScrapyZyteAPIDownloadHandler,
+            settings=None,
+            crawler=crawler,
+        )
