@@ -24,19 +24,23 @@ from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 logger = logging.getLogger(__name__)
 
 
+def _truncate_str(obj, index, text, limit):
+    if len(text) <= limit:
+        return
+    obj[index] = text[: limit - 1] + "…"
+
+
 def _truncate(obj, limit):
     if isinstance(obj, dict):
         for key, value in obj.items():
             if isinstance(value, str):
-                if len(value) > limit:
-                    obj[key] = value[: limit - 1] + "…"
+                _truncate_str(obj, key, value, limit)
             elif isinstance(value, (list, dict)):
                 _truncate(value, limit)
     elif isinstance(obj, list):
         for index, value in enumerate(obj):
             if isinstance(value, str):
-                if len(value) > limit:
-                    obj[index] = value[: limit - 1] + "…"
+                _truncate_str(obj, index, value, limit)
             elif isinstance(value, (list, dict)):
                 _truncate(value, limit)
 
