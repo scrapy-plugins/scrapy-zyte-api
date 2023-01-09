@@ -284,3 +284,18 @@ async def test_stats(mockserver):
             value = scrapy_stats.get_value(stat)
             assert isinstance(value, float)
             assert value > 0.0
+
+
+def test_single_client():
+    """Make sure that the same Zyte API client is used by both download
+    handlers."""
+    crawler = get_crawler(settings_dict=SETTINGS)
+    handler1 = ScrapyZyteAPIDownloadHandler(
+        settings=crawler.settings,
+        crawler=crawler,
+    )
+    handler2 = ScrapyZyteAPIDownloadHandler(
+        settings=crawler.settings,
+        crawler=crawler,
+    )
+    assert handler1._client is handler2._client
