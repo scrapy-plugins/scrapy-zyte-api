@@ -298,4 +298,4 @@ def test_single_client():
         settings=crawler.settings,
         crawler=crawler,
     )
-    assert handler1._client == handler2._client
+    assert handler1._client is handler2._client
