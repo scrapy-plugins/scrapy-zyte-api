@@ -416,10 +416,11 @@ async def test_log_request_truncate(
         assert actual_api_params == expected_api_params
 
 
-def test_log_request_truncate_negative():
+@pytest.mark.parametrize("enabled", [True, False])
+def test_log_request_truncate_negative(enabled):
     settings: Dict[str, Any] = {
         **SETTINGS,
-        "ZYTE_API_LOG_REQUESTS": True,
+        "ZYTE_API_LOG_REQUESTS": enabled,
         "ZYTE_API_LOG_REQUESTS_TRUNCATE": -1,
     }
     crawler = get_crawler(settings_dict=settings)
