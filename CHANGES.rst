@@ -1,6 +1,18 @@
 Changes
 =======
 
+0.7.1 (to be released)
+----------------------
+
+* It is now possible to log the parameters of requests sent. See **Logging
+  request parameters** in the README for more information.
+
+* Stats for HTTP and HTTPS traffic used to be kept separate, and only one of
+  those sets of stats would be reported. This is fixed now.
+
+* Fixed some code examples and references in the README.
+
+
 0.7.0 (2022-12-09)
 ------------------
 
