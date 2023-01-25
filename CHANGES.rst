@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.7.1 (to be released)
-----------------------
+0.7.1 (2023-01-25)
+------------------
 
 * It is now possible to `log the parameters of requests sent`_.
 
