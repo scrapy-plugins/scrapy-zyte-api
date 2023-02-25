@@ -251,6 +251,7 @@ DEFAULT_PARAMS: Dict[str, Any] = {}
 TRANSPARENT_MODE = False
 SKIP_HEADERS = {b"cookie", b"user-agent"}
 JOB_ID = None
+COOKIES_ENABLED = True
 GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
     "transparent_mode": TRANSPARENT_MODE,
@@ -258,6 +259,7 @@ GET_API_PARAMS_KWARGS = {
     "skip_headers": SKIP_HEADERS,
     "browser_headers": BROWSER_HEADERS,
     "job_id": JOB_ID,
+    "cookies_enabled": COOKIES_ENABLED,
 }
 
 
@@ -274,6 +276,7 @@ async def test_params_parser_input_default(mockserver):
 async def test_param_parser_input_custom(mockserver):
     settings = {
         "JOB": "1/2/3",
+        "COOKIES_ENABLED": False,
         "ZYTE_API_AUTOMAP_PARAMS": {"c": "d"},
         "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
         "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
@@ -284,6 +287,7 @@ async def test_param_parser_input_custom(mockserver):
         parser = handler._param_parser
         assert parser._automap_params == {"c": "d"}
         assert parser._browser_headers == {b"b": "b"}
+        assert parser._cookies_enabled is False
         assert parser._default_params == {"a": "b"}
         assert parser._job_id == "1/2/3"
         assert parser._skip_headers == {b"a"}
@@ -498,12 +502,23 @@ async def test_default_params_none(mockserver, caplog):
     [
         ({}, {}, {}, []),
         ({}, {"b": 2}, {"b": 2}, []),
-        ({}, {"b": None}, {}, ["does not define such a parameter"]),
+        ({}, {"b": None}, {}, ["parameter b is None"]),
         ({"a": 1}, {}, {"a": 1}, []),
         ({"a": 1}, {"b": 2}, {"a": 1, "b": 2}, []),
-        ({"a": 1}, {"b": None}, {"a": 1}, ["does not define such a parameter"]),
+        ({"a": 1}, {"b": None}, {"a": 1}, ["parameter b is None"]),
         ({"a": 1}, {"a": 2}, {"a": 2}, []),
         ({"a": 1}, {"a": None}, {}, []),
+        ({"a": {"b": 1}}, {}, {"a": {"b": 1}}, []),
+        ({"a": {"b": 1}}, {"a": {"c": 1}}, {"a": {"b": 1, "c": 1}}, []),
+        (
+            {"a": {"b": 1}},
+            {"a": {"c": None}},
+            {"a": {"b": 1}},
+            ["parameter a.c is None"],
+        ),
+        ({"a": {"b": 1}}, {"a": {"b": 2}}, {"a": {"b": 2}}, []),
+        ({"a": {"b": 1}}, {"a": {"b": None}}, {}, []),
+        ({"a": {"b": 1, "c": 1}}, {"a": {"b": None}}, {"a": {"c": 1}}, []),
     ],
 )
 @pytest.mark.parametrize(
@@ -1718,17 +1733,50 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 ),
             )
         ),
+        # requestCookies, if set manually, prevents automatic mapping.
+        (
+            {},
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {
+                "experimental": {
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MAXIMAL,
+                },
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MAXIMAL,
+                },
+            },
+        ),
+        # Mapping multiple cookies works.
+        (
+            {},
+            {"a": "b", "c": "d"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": [
+                        {"name": "a", "value": "b", "domain": ""},
+                        {"name": "c", "value": "d", "domain": ""},
+                    ],
+                },
+            },
+        ),
+        # TODO: Handle the scenario of a browser request, which on the server side
+        # could involve multiple requests for different domains. The current
+        # implementation lets the Scrapy cookie middleware set the right cookies
+        # into the Cookie header, but those are limited to cookies relevant for the
+        # target URL. In browser requests, we should include all jar cookies,
+        # regardless of domain, and let Zyte API include the right ones on each
+        # URL. Also, depending on how redirects are handled for non-browser
+        # requests, this may also apply to those.
     ],
-    # TODO: Cover scenarios involving default params.
-    # TODO: Cover scenarios involving multiple cookies.
-    # TODO: Handle the scenario of a browser request, which on the server side
-    # could involve multiple requests for different domains. The current
-    # implementation lets the Scrapy cookie middleware set the right cookies
-    # into the Cookie header, but those are limited to cookies relevant for the
-    # target URL. In browser requests, we should include all jar cookies,
-    # regardless of domain, and let Zyte API include the right ones on each
-    # URL. Also, depending on how redirects are handled for non-browser
-    # requests, this may also apply to those.
 )
 def test_automap_cookies(settings, cookies, meta, expected, caplog):
     _test_automap(settings, {"cookies": cookies}, meta, expected, [], caplog)
@@ -1875,6 +1923,26 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
                 "experimental": {
                     "responseCookies": True,
                 },
+            },
+            [],
+        ),
+        (
+            {
+                "experimental": {
+                    "responseCookies": False,
+                }
+            },
+            {
+                "experimental": {
+                    "responseCookies": True,
+                },
+            },
+            {
+                "experimental": {
+                    "responseCookies": True,
+                },
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
             },
             [],
         ),

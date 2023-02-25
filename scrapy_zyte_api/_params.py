@@ -1,7 +1,7 @@
 from base64 import b64decode, b64encode
 from copy import copy
 from logging import getLogger
-from typing import Any, Dict, Iterable, Mapping, Optional, Set
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
 from warnings import warn
 
 from scrapy import Request
@@ -392,21 +392,33 @@ def _merge_params(
     param: str,
     setting: str,
     request: Request,
+    context: Optional[List[str]] = None,
 ):
     params = copy(default_params)
     meta_params = copy(meta_params)
+    context = context or []
     for k in list(meta_params):
-        if meta_params[k] is not None:
+        if isinstance(meta_params[k], dict):
+            meta_params[k] = _merge_params(
+                default_params=params.get(k, {}),
+                meta_params=meta_params[k],
+                param=param,
+                setting=setting,
+                request=request,
+                context=context + [k],
+            )
+        if meta_params[k] not in (None, {}):
             continue
         meta_params.pop(k)
         if k in params:
             params.pop(k)
         else:
+            qual_param = ".".join(context + [k])
             logger.warning(
-                f"In request {request} {param!r} parameter {k} is None, "
-                f"which is a value reserved to unset parameters defined in "
-                f"the {setting} setting, but the setting does not define such "
-                f"a parameter."
+                f"In request {request} {param!r} parameter {qual_param} is "
+                f"None, which is a value reserved to unset parameters defined "
+                f"in the {setting} setting, but the setting does not define "
+                f"such a parameter."
             )
     params.update(meta_params)
     return params
@@ -527,11 +539,12 @@ def _get_api_params(
 def _load_default_params(settings, setting):
     params = settings.getdict(setting)
     for param in list(params):
-        if params[param] is not None:
+        if params[param] not in (None, {}):
             continue
         logger.warning(
-            f"Parameter {param!r} in the {setting} setting is None. Default "
-            f"parameters should never be None."
+            f"Parameter {param!r} in the {setting} setting is "
+            f"{params[param]!r}. Default parameters should never be "
+            f"{params[param]!r}."
         )
         params.pop(param)
     return params
