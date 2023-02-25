@@ -275,7 +275,8 @@ possible:
 
 -   ``statusCode`` becomes ``response.status``.
 
--   ``httpResponseHeaders`` becomes ``response.headers``.
+-   ``httpResponseHeaders`` and ``experimental.responseCookies`` become
+    ``response.headers``.
 
 -   ``browserHtml`` and ``httpResponseBody`` are mapped into both
     ``response.text`` (``str``) and ``response.body`` (``bytes``).
@@ -351,6 +352,29 @@ mode (see **Using transparent mode** above) or for a specific request (see
 **Sending requests with automatically-mapped parameters** above), Zyte API
 parameters are chosen as follows by default:
 
+-   ``Request.url`` becomes ``url``, same as in requests with manually-defined
+    parameters.
+
+-   If ``Request.method`` is something other than ``"GET"``, it becomes
+    ``httpRequestMethod``.
+
+-   ``Request.headers`` become ``customHttpRequestHeaders``.
+
+-   ``Request.body`` becomes ``httpRequestBody``.
+
+-   If the ``COOKIES_ENABLED`` Scrapy setting is ``True`` (default):
+
+    -   ``experimental.responseCookies`` is set to ``True`` .
+
+    -   ``Request.cookies`` becomes ``experimental.requestCookies``.
+
+        .. note:: Technically, ``Request.headers["Cookie"]`` becomes
+                  ``experimental.requestCookies``, but at the moment the Scrapy
+                  cookies downloader middleware sets
+                  ``Request.headers["Cookie"]`` based on ``Request.cookies``,
+                  overwritting any ``Cookie`` header. See `#192
+                  <https://github.com/scrapy/scrapy/issues/1992>`__.
+
 -   ``httpResponseBody`` and ``httpResponseHeaders`` are set to ``True``.
 
     This is subject to change without prior notice in future versions of
@@ -392,16 +416,6 @@ parameters are chosen as follows by default:
         future, Zyte API may be able to handle this decoding automatically, so
         we would stop setting ``httpResponseHeaders`` to ``True`` by default.
 
--   ``Request.url`` becomes ``url``, same as in requests with manually-defined
-    parameters.
-
--   If ``Request.method`` is something other than ``"GET"``, it becomes
-    ``httpRequestMethod``.
-
--   ``Request.headers`` become ``customHttpRequestHeaders``.
-
--   ``Request.body`` becomes ``httpRequestBody``.
-
 For example, the following Scrapy request:
 
 .. code-block:: python
@@ -411,6 +425,7 @@ For example, the following Scrapy request:
         url="https://httpbin.org/anything",
         headers={"Content-Type": "application/json"},
         body=b'{"foo": "bar"}',
+        cookies={"a": "b"},
     )
 
 Results in a request to the Zyte API data extraction endpoint with the
@@ -419,12 +434,27 @@ following parameters:
 .. code-block:: javascript
 
     {
+        "customHttpRequestHeaders": [
+            {
+                "name": "Content-Type",
+                "value": "application/json"
+            }
+        ],
+        "experimental": {
+            "requestCookies": [
+                {
+                    "name": "a",
+                    "value": "b",
+                    "domain": ""
+                }
+            ],
+            "responseCookies": true
+        },
         "httpResponseBody": true,
         "httpResponseHeaders": true,
-        "url": "https://httpbin.org/anything",
+        "httpRequestBody": "eyJmb28iOiAiYmFyIn0=",
         "httpRequestMethod": "POST",
-        "customHttpRequestHeaders": [{"name": "Content-Type", "value": "application/json"}],
-        "httpRequestBody": "eyJmb28iOiAiYmFyIn0="
+        "url": "https://httpbin.org/anything"
     }
 
 You may set the ``zyte_api_automap`` key in
@@ -452,8 +482,11 @@ following parameters:
 
     {
         "browserHtml": true,
-        "url": "https://quotes.toscrape.com",
+        "experimental": {
+            "responseCookies": true
+        },
         "requestHeaders": {"referer": "https://example.com/"},
+        "url": "https://quotes.toscrape.com"
     }
 
 When mapping headers, headers not supported by Zyte API are excluded from the
@@ -467,7 +500,7 @@ headers are included or excluded from header mapping:
 
     .. code-block:: python
 
-       ["Cookie", "User-Agent"]
+       ["User-Agent"]
 
 -   ``ZYTE_API_BROWSER_HEADERS`` determines headers that *can* be mapped as
     ``requestHeaders``. It is a ``dict``, where keys are header names and
@@ -666,6 +699,8 @@ fingerprinting:
     ``requestHeaders``)
 
 -   Metadata parameters (``echoData``, ``jobId``)
+
+-   Experimental parameters (``experimental``)
 
 
 Changing the fingerprinting of non-Zyte-API requests

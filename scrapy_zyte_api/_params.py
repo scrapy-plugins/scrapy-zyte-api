@@ -1,10 +1,12 @@
 from base64 import b64decode, b64encode
 from copy import copy
 from logging import getLogger
-from typing import Any, Dict, Mapping, Optional, Set
+from typing import Any, Dict, Iterable, Mapping, Optional, Set
 from warnings import warn
 
 from scrapy import Request
+from scrapy.http import Response
+from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 
@@ -53,7 +55,10 @@ def _map_custom_http_request_headers(
         header_parameter="customHttpRequestHeaders",
     ):
         if lowercase_k in skip_headers:
-            if lowercase_k != b"user-agent" or decoded_v != DEFAULT_USER_AGENT:
+            if not (
+                lowercase_k == b"cookie"
+                or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
+            ):
                 logger.warning(
                     f"Request {request} defines header {k}, which "
                     f"cannot be mapped into the Zyte API "
@@ -89,6 +94,7 @@ def _map_request_headers(
                 lowercase_k == b"accept-language"
                 and decoded_v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
             )
+            or lowercase_k == b"cookie"
             or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
         ):
             logger.warning(
@@ -183,6 +189,87 @@ def _set_http_response_headers_from_request(
         api_params.pop("httpResponseHeaders")
 
 
+def _set_http_response_cookies_from_request(
+    *,
+    api_params: Dict[str, Any],
+):
+    api_params.setdefault("experimental", {})
+    api_params["experimental"].setdefault("responseCookies", True)
+    if api_params["experimental"]["responseCookies"] is False:
+        del api_params["experimental"]["responseCookies"]
+
+
+# Copied from CookieMiddleware.
+def _format_cookie(cookie, request):
+    decoded = {}
+    for key in ("name", "value", "path", "domain"):
+        if cookie.get(key) is None:
+            if key in ("name", "value"):
+                msg = f"Invalid cookie found in request {request}: {cookie} ('{key}' is missing)"
+                logger.warning(msg)
+                return
+            continue
+        if isinstance(cookie[key], (bool, float, int, str)):
+            decoded[key] = str(cookie[key])
+        else:
+            try:
+                decoded[key] = cookie[key].decode("utf8")
+            except UnicodeDecodeError:
+                logger.warning(
+                    "Non UTF-8 encoded cookie found in request %s: %s",
+                    request,
+                    cookie,
+                )
+                decoded[key] = cookie[key].decode("latin1", errors="replace")
+
+    cookie_str = f"{decoded.pop('name')}={decoded.pop('value')}"
+    for key, value in decoded.items():  # path, domain
+        cookie_str += f"; {key.capitalize()}={value}"
+    return cookie_str
+
+
+# Copied from CookieMiddleware.
+def _get_request_cookies(request):
+    if not request.cookies:
+        return []
+    if isinstance(request.cookies, dict):
+        cookies = ({"name": k, "value": v} for k, v in request.cookies.items())
+    else:
+        cookies = request.cookies
+    formatted: Iterable[str] = filter(
+        None, (_format_cookie(c, request) for c in cookies)
+    )
+    response = Response(request.url, headers={"Set-Cookie": formatted})
+    result = CookieJar().make_cookies(response, request)
+    return result
+
+
+def _set_http_request_cookies_from_request(
+    *,
+    api_params: Dict[str, Any],
+    request: Request,
+):
+    api_params.setdefault("experimental", {})
+    if "requestCookies" in api_params["experimental"]:
+        if api_params["experimental"]["requestCookies"] is False:
+            del api_params["experimental"]["requestCookies"]
+        return
+    output_cookies = []
+    for input_cookie in _get_request_cookies(request):
+        output_cookie = {
+            "name": input_cookie.name,
+            "value": input_cookie.value,
+            "domain": (
+                input_cookie.domain[1:] if input_cookie.domain_specified else ""
+            ),
+        }
+        if input_cookie.path_specified:
+            output_cookie["path"] = input_cookie.path
+        output_cookies.append(output_cookie)
+    if output_cookies:
+        api_params["experimental"]["requestCookies"] = output_cookies
+
+
 def _set_http_request_method_from_request(
     *,
     api_params: Dict[str, Any],
@@ -254,6 +341,7 @@ def _update_api_params_from_request(
     meta_params: Dict[str, Any],
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
+    cookies_enabled: bool,
 ):
     _set_http_response_body_from_request(api_params=api_params, request=request)
     _set_http_response_headers_from_request(
@@ -269,6 +357,11 @@ def _update_api_params_from_request(
         browser_headers=browser_headers,
     )
     _set_http_request_body_from_request(api_params=api_params, request=request)
+    if cookies_enabled:
+        _set_http_response_cookies_from_request(api_params=api_params)
+        _set_http_request_cookies_from_request(api_params=api_params, request=request)
+        if not api_params["experimental"]:
+            del api_params["experimental"]
     _unset_unneeded_api_params(
         api_params=api_params, request=request, default_params=default_params
     )
@@ -358,6 +451,7 @@ def _get_automap_params(
     default_params: Dict[str, Any],
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
+    cookies_enabled: bool,
 ):
     meta_params = request.meta.get("zyte_api_automap", default_enabled)
     if meta_params is False:
@@ -384,6 +478,7 @@ def _get_automap_params(
         meta_params=meta_params,
         skip_headers=skip_headers,
         browser_headers=browser_headers,
+        cookies_enabled=cookies_enabled,
     )
 
     return params
@@ -398,6 +493,7 @@ def _get_api_params(
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
     job_id: Optional[str],
+    cookies_enabled: bool,
 ) -> Optional[dict]:
     """Returns a dictionary of API parameters that must be sent to Zyte API for
     the specified request, or None if the request should not be sent through
@@ -410,6 +506,7 @@ def _get_api_params(
             default_params=automap_params,
             skip_headers=skip_headers,
             browser_headers=browser_headers,
+            cookies_enabled=cookies_enabled,
         )
         if api_params is None:
             return None
@@ -466,6 +563,7 @@ class _ParamParser:
         self._job_id = settings.get("JOB")
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._skip_headers = _load_skip_headers(settings)
+        self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
 
     def parse(self, request):
         return _get_api_params(
@@ -476,4 +574,5 @@ class _ParamParser:
             skip_headers=self._skip_headers,
             browser_headers=self._browser_headers,
             job_id=self._job_id,
+            cookies_enabled=self._cookies_enabled,
         )

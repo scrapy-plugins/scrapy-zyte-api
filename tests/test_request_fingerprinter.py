@@ -228,7 +228,15 @@ def test_only_end_parameters_matter():
 
     raw_request = Request(
         "https://example.com",
-        meta={"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": True}},
+        meta={
+            "zyte_api": {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                },
+            }
+        },
     )
     fingerprint3 = transparent_fingerprinter.fingerprint(raw_request)
     fingerprint4 = default_fingerprinter.fingerprint(raw_request)

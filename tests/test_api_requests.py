@@ -11,10 +11,12 @@ import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
-from scrapy.exceptions import CloseSpider
+from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
+from scrapy.exceptions import CloseSpider, NotConfigured
 from scrapy.http import Response, TextResponse
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
+from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
 from zyte_api.aio.errors import RequestError
@@ -322,6 +324,7 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
 DEFAULT_AUTOMAP_PARAMS: Dict[str, Any] = {
     "httpResponseBody": True,
     "httpResponseHeaders": True,
+    "experimental": {"responseCookies": True},
 }
 
 
@@ -510,7 +513,7 @@ async def test_default_params_none(mockserver, caplog):
         (
             "ZYTE_API_AUTOMAP_PARAMS",
             "zyte_api_automap",
-            {"httpResponseBody", "httpResponseHeaders"},
+            {"httpResponseBody", "httpResponseHeaders", "experimental"},
         ),
     ],
 )
@@ -596,6 +599,17 @@ def _test_automap(settings, request_kwargs, meta, expected, warnings, caplog):
     request.meta["zyte_api_automap"] = meta
     settings = {**settings, "ZYTE_API_TRANSPARENT_MODE": True}
     crawler = get_crawler(settings_dict=settings)
+    if "cookies" in request_kwargs:
+        try:
+            cookie_middleware = create_instance(
+                CookiesMiddleware,
+                settings=crawler.settings,
+                crawler=crawler,
+            )
+        except NotConfigured:
+            pass
+        else:
+            cookie_middleware.process_request(request, spider=None)
     param_parser = _ParamParser(crawler.settings)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
@@ -675,6 +689,12 @@ def _test_automap(settings, request_kwargs, meta, expected, warnings, caplog):
     ],
 )
 def test_automap_main_outputs(meta, expected, warnings, caplog):
+    expected = {
+        "experimental": {
+            "responseCookies": True,
+        },
+        **expected,
+    }
     _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
@@ -802,6 +822,12 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
     ],
 )
 def test_automap_header_output(meta, expected, warnings, caplog):
+    expected = {
+        "experimental": {
+            "responseCookies": True,
+        },
+        **expected,
+    }
     _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
@@ -908,6 +934,12 @@ def test_automap_header_output(meta, expected, warnings, caplog):
     ],
 )
 def test_automap_method(method, meta, expected, warnings, caplog):
+    expected = {
+        "experimental": {
+            "responseCookies": True,
+        },
+        **expected,
+    }
     _test_automap({}, {"method": method}, meta, expected, warnings, caplog)
 
 
@@ -1321,15 +1353,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         # dropped with a warning.
         # If all headers are unsupported, the header parameter is not even set.
         (
-            {"Cookie": "a=b"},
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
-        (
             {"a": "b"},
             {"browserHtml": True},
             {
@@ -1338,15 +1361,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             ["cannot be mapped"],
         ),
         # Headers with an empty string as value are not silently ignored.
-        (
-            {"Cookie": ""},
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
         (
             {"a": ""},
             {"browserHtml": True},
@@ -1431,6 +1445,12 @@ def test_automap_method(method, meta, expected, warnings, caplog):
     ],
 )
 def test_automap_headers(headers, meta, expected, warnings, caplog):
+    expected = {
+        "experimental": {
+            "responseCookies": True,
+        },
+        **expected,
+    }
     _test_automap({}, {"headers": headers}, meta, expected, warnings, caplog)
 
 
@@ -1442,10 +1462,9 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
         # in the future.
         (
             {
-                "ZYTE_API_SKIP_HEADERS": ["Cookie"],
+                "ZYTE_API_SKIP_HEADERS": [],
             },
             {
-                "Cookie": "",
                 "User-Agent": "",
             },
             {},
@@ -1456,9 +1475,7 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
                     {"name": "User-Agent", "value": ""},
                 ],
             },
-            [
-                "defines header b'Cookie', which cannot be mapped",
-            ],
+            [],
         ),
         # You may update the ZYTE_API_BROWSER_HEADERS setting to extend support
         # for new fields that the requestHeaders parameter may support in the
@@ -1481,7 +1498,240 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
     ],
 )
 def test_automap_header_settings(settings, headers, meta, expected, warnings, caplog):
+    expected = {
+        "experimental": {
+            "responseCookies": True,
+        },
+        **expected,
+    }
     _test_automap(settings, {"headers": headers}, meta, expected, warnings, caplog)
+
+
+REQUEST_INPUT_COOKIES_EMPTY: Dict[str, str] = {}
+REQUEST_INPUT_COOKIES_MINIMAL_DICT = {"a": "b"}
+REQUEST_INPUT_COOKIES_MINIMAL_LIST = [{"name": "a", "value": "b"}]
+REQUEST_INPUT_COOKIES_MAXIMAL = [
+    {"name": "c", "value": "d", "domain": "example.com", "path": "/"}
+]
+# TODO: Find out how to define an output cookie that works for the URL domain
+# but not for a subdomain.
+REQUEST_OUTPUT_COOKIES_MINIMAL = [{"name": "a", "value": "b", "domain": ""}]
+REQUEST_OUTPUT_COOKIES_MAXIMAL = [
+    {"name": "c", "value": "d", "domain": "example.com", "path": "/"}
+]
+
+
+@pytest.mark.parametrize(
+    "settings,cookies,meta,expected",
+    [
+        # Cookies, both for requests and for responses, are enabled based on
+        # COOKIES_ENABLED (default: True).
+        (
+            {
+                "COOKIES_ENABLED": False,
+            },
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+        ),
+        (
+            {
+                "COOKIES_ENABLED": False,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {"responseCookies": True},
+            },
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                },
+            },
+        ),
+        # Cookies can be disabled setting the corresponding Zyte API parameter
+        # to False.
+        (
+            {},
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {
+                "experimental": {
+                    "responseCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {
+                "experimental": {
+                    "requestCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {"responseCookies": True},
+            },
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {
+                "experimental": {
+                    "responseCookies": False,
+                    "requestCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {
+                "experimental": {
+                    "responseCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                },
+            },
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {
+                "experimental": {
+                    "requestCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {"responseCookies": True},
+            },
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {
+                "experimental": {
+                    "responseCookies": False,
+                    "requestCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+        ),
+        # Cookies work for browser requests as well.
+        (
+            {},
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                },
+            },
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {
+                "screenshot": True,
+            },
+            {
+                "screenshot": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                },
+            },
+        ),
+        # Cookies are mapped correctly, both with minimum and maximum cookie
+        # parameters.
+        *(
+            (
+                {},
+                input,
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "experimental": {
+                        "responseCookies": True,
+                        "requestCookies": output,
+                    },
+                },
+            )
+            for input, output in (
+                (
+                    REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                    REQUEST_OUTPUT_COOKIES_MINIMAL,
+                ),
+                (
+                    REQUEST_INPUT_COOKIES_MINIMAL_LIST,
+                    REQUEST_OUTPUT_COOKIES_MINIMAL,
+                ),
+                (
+                    REQUEST_INPUT_COOKIES_MAXIMAL,
+                    REQUEST_OUTPUT_COOKIES_MAXIMAL,
+                ),
+            )
+        ),
+    ],
+    # TODO: Cover scenarios involving default params.
+    # TODO: Cover scenarios involving multiple cookies.
+    # TODO: Handle the scenario of a browser request, which on the server side
+    # could involve multiple requests for different domains. The current
+    # implementation lets the Scrapy cookie middleware set the right cookies
+    # into the Cookie header, but those are limited to cookies relevant for the
+    # target URL. In browser requests, we should include all jar cookies,
+    # regardless of domain, and let Zyte API include the right ones on each
+    # URL. Also, depending on how redirects are handled for non-browser
+    # requests, this may also apply to those.
+)
+def test_automap_cookies(settings, cookies, meta, expected, caplog):
+    _test_automap(settings, {"cookies": cookies}, meta, expected, [], caplog)
 
 
 @pytest.mark.parametrize(
@@ -1547,6 +1797,12 @@ def test_automap_header_settings(settings, headers, meta, expected, warnings, ca
     ],
 )
 def test_automap_body(body, meta, expected, warnings, caplog):
+    expected = {
+        "experimental": {
+            "responseCookies": True,
+        },
+        **expected,
+    }
     _test_automap({}, {"body": body}, meta, expected, warnings, caplog)
 
 
@@ -1599,6 +1855,12 @@ def test_automap_body(body, meta, expected, warnings, caplog):
     ],
 )
 def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
+    expected = {
+        "experimental": {
+            "responseCookies": True,
+        },
+        **expected,
+    }
     _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
@@ -1608,7 +1870,12 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
         (
             {"browserHtml": True},
             {"screenshot": True, "browserHtml": False},
-            {"screenshot": True},
+            {
+                "screenshot": True,
+                "experimental": {
+                    "responseCookies": True,
+                },
+            },
             [],
         ),
     ],
