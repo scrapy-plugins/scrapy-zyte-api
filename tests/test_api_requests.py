@@ -1528,11 +1528,9 @@ REQUEST_INPUT_COOKIES_MINIMAL_LIST = [{"name": "a", "value": "b"}]
 REQUEST_INPUT_COOKIES_MAXIMAL = [
     {"name": "c", "value": "d", "domain": "example.com", "path": "/"}
 ]
-# TODO: Find out how to define an output cookie that works for the URL domain
-# but not for a subdomain.
-REQUEST_OUTPUT_COOKIES_MINIMAL = [{"name": "a", "value": "b", "domain": ""}]
+REQUEST_OUTPUT_COOKIES_MINIMAL = [{"name": "a", "value": "b", "domain": "example.com"}]
 REQUEST_OUTPUT_COOKIES_MAXIMAL = [
-    {"name": "c", "value": "d", "domain": "example.com", "path": "/"}
+    {"name": "c", "value": "d", "domain": ".example.com", "path": "/"}
 ]
 
 
@@ -1762,8 +1760,8 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "experimental": {
                     "responseCookies": True,
                     "requestCookies": [
-                        {"name": "a", "value": "b", "domain": ""},
-                        {"name": "c", "value": "d", "domain": ""},
+                        {"name": "a", "value": "b", "domain": "example.com"},
+                        {"name": "c", "value": "d", "domain": "example.com"},
                     ],
                 },
             },

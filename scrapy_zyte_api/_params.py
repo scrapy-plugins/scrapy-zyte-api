@@ -259,9 +259,7 @@ def _set_http_request_cookies_from_request(
         output_cookie = {
             "name": input_cookie.name,
             "value": input_cookie.value,
-            "domain": (
-                input_cookie.domain[1:] if input_cookie.domain_specified else ""
-            ),
+            "domain": input_cookie.domain,
         }
         if input_cookie.path_specified:
             output_cookie["path"] = input_cookie.path
