@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Mapping, Optional, Set
 from warnings import warn
 
 from scrapy import Request
-from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
 from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
@@ -588,7 +587,10 @@ class _ParamParser:
         self._skip_headers = _load_skip_headers(settings)
         self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
         self._cookie_mw_cls = load_object(
-            settings.get("ZYTE_API_COOKIE_MIDDLEWARE", CookiesMiddleware)
+            settings.get(
+                "ZYTE_API_COOKIE_MIDDLEWARE",
+                "scrapy.downloadermiddlewares.cookies.CookiesMiddleware",
+            )
         )
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 20)
         self._crawler = crawler
