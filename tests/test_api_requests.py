@@ -3,7 +3,7 @@ from asyncio import iscoroutine
 from copy import copy
 from functools import partial
 from inspect import isclass
-from typing import Any, Dict
+from typing import Any, Dict, List
 from unittest import mock
 from unittest.mock import patch
 
@@ -1784,7 +1784,7 @@ def test_automap_cookies(settings, cookies, meta, expected, caplog):
     _test_automap(settings, {"cookies": cookies}, meta, expected, [], caplog)
 
 
-def test_automap_cookies_jar():
+def test_automap_cookie_jar():
     """Test that cookies from the right jar are used."""
     request1 = Request(
         url="https://example.com/1", meta={"cookiejar": "a"}, cookies={"z": "y"}
@@ -1825,6 +1825,111 @@ def test_automap_cookies_jar():
     ]
 
     # TODO: Check that it works with browserHtml as well.
+
+
+def test_automap_cookie_limit(caplog):
+    settings = {"ZYTE_API_MAX_COOKIES": 1, "ZYTE_API_TRANSPARENT_MODE": True}
+    crawler = get_crawler(settings)
+    cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+    param_parser = _ParamParser(crawler)
+    cookiejar = 0
+
+    # Verify that request with 1 cookie works as expected.
+    metas: List[Dict] = [
+        {},
+        {"zyte_api_automap": {"browserHtml": True}},
+    ]
+    for meta in metas:
+        request = Request(
+            url="https://example.com/1",
+            meta={**meta, "cookiejar": cookiejar},
+            cookies={"z": "y"},
+        )
+        cookiejar += 1
+        cookie_middleware.process_request(request, spider=None)
+        with caplog.at_level("WARNING"):
+            api_params = param_parser.parse(request)
+        assert api_params["experimental"]["requestCookies"] == [
+            {"name": "z", "value": "y", "domain": "example.com"}
+        ]
+        assert not caplog.records
+        caplog.clear()
+
+    # Verify that requests with 2 cookies results in no mapping and a warning.
+    for meta in metas:
+        request = Request(
+            url="https://example.com/1",
+            meta={**meta, "cookiejar": cookiejar},
+            cookies={"z": "y", "x": "w"},
+        )
+        cookiejar += 1
+        cookie_middleware.process_request(request, spider=None)
+        with caplog.at_level("WARNING"):
+            api_params = param_parser.parse(request)
+        assert "requestCookies" not in api_params["experimental"]
+        assert "would get 2 cookies" in caplog.text
+        assert "limited to 1 cookies" in caplog.text
+        caplog.clear()
+
+    # Verify that 1 cookie in the cookie jar and 1 cookie in the request count
+    # as 2 cookies, resulting in no mapping and a warning.
+    pre_request = Request(
+        url="https://example.com/1", meta={"cookiejar": cookiejar}, cookies={"z": "y"}
+    )
+    cookie_middleware.process_request(pre_request, spider=None)
+    for meta in metas:
+        request = Request(
+            url="https://example.com/1",
+            meta={**meta, "cookiejar": cookiejar},
+            cookies={"x": "w"},
+        )
+        cookie_middleware.process_request(request, spider=None)
+        with caplog.at_level("WARNING"):
+            api_params = param_parser.parse(request)
+        assert "requestCookies" not in api_params["experimental"]
+        assert "would get 2 cookies" in caplog.text
+        assert "limited to 1 cookies" in caplog.text
+        caplog.clear()
+    cookiejar += 1
+
+    # Vefify that, for browserless requests, unrelated cookies do not count for
+    # the limit.
+    pre_request = Request(
+        url="https://other.example/1", meta={"cookiejar": cookiejar}, cookies={"z": "y"}
+    )
+    cookie_middleware.process_request(pre_request, spider=None)
+    request = Request(
+        url="https://example.com/1", meta={"cookiejar": cookiejar}, cookies={"x": "w"}
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "x", "value": "w", "domain": "example.com"}
+    ]
+    assert not caplog.records
+    caplog.clear()
+
+    # Vefify that, for browserful requests, unrelated cookies do count for the
+    # limit.
+    pre_request = Request(
+        url="https://other.example/1", meta={"cookiejar": cookiejar}, cookies={"z": "y"}
+    )
+    cookie_middleware.process_request(pre_request, spider=None)
+    request = Request(
+        url="https://example.com/1",
+        meta={"cookiejar": cookiejar, "zyte_api_automap": {"browserHtml": True}},
+        cookies={"x": "w"},
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert "requestCookies" not in api_params["experimental"]
+    assert "would get 2 cookies" in caplog.text
+    assert "limited to 1 cookies" in caplog.text
+    caplog.clear()
 
 
 # TODO: Respect dont_merge_cookies.

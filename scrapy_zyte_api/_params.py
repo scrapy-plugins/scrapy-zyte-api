@@ -234,8 +234,6 @@ def _set_http_request_cookies_from_request(
                 "more than %(max)r request cookies, update the "
                 "ZYTE_API_MAX_COOKIES setting accordingly."
             ),
-            # TODO: Add tests for this scenario (19 cookies, 20 cookies, both
-            # browserless and browserful).
             {
                 "request": request,
                 "count": input_cookie_count,
