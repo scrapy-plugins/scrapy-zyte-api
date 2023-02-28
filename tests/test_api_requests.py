@@ -1,7 +1,9 @@
 import sys
 from asyncio import iscoroutine
+from collections import defaultdict
 from copy import copy
 from functools import partial
+from http.cookiejar import Cookie
 from inspect import isclass
 from typing import Any, Dict, List
 from unittest import mock
@@ -14,6 +16,7 @@ from scrapy import Request, Spider
 from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response, TextResponse
+from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from twisted.internet.defer import Deferred
@@ -1930,6 +1933,59 @@ def test_automap_cookie_limit(caplog):
     assert "would get 2 cookies" in caplog.text
     assert "limited to 1 cookies" in caplog.text
     caplog.clear()
+
+
+class CustomCookieJar(CookieJar):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.jar.set_cookie(
+            Cookie(
+                1,
+                "z",
+                "y",
+                None,
+                False,
+                "example.com",
+                True,
+                False,
+                "/",
+                False,
+                False,
+                None,
+                False,
+                None,
+                None,
+                {},
+            )
+        )
+
+
+class CustomCookieMiddleware(CookiesMiddleware):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.jars = defaultdict(CustomCookieJar)
+
+
+def test_automap_custom_cookie_middleware():
+    mw_cls = CustomCookieMiddleware
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_API_COOKIE_MIDDLEWARE": f"{mw_cls.__module__}.{mw_cls.__qualname__}",
+        "DOWNLOADER_MIDDLEWARES": {
+            "scrapy.downloadermiddlewares.cookies.CookiesMiddleware": None,
+            f"{mw_cls.__module__}.{mw_cls.__qualname__}": 700,
+        },
+    }
+    crawler = get_crawler(settings)
+    cookie_middleware = get_downloader_middleware(crawler, mw_cls)
+    param_parser = _ParamParser(crawler)
+
+    request = Request(url="https://example.com/1")
+    cookie_middleware.process_request(request, spider=None)
+    api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "z", "value": "y", "domain": "example.com"}
+    ]
 
 
 # TODO: Respect dont_merge_cookies.

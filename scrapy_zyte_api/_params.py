@@ -583,7 +583,6 @@ class _ParamParser:
                 "scrapy.downloadermiddlewares.cookies.CookiesMiddleware",
             )
         )
-        # TODO: Add a test to verify that the setting above makes a difference.
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 20)
         self._crawler = crawler
 

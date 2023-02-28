@@ -384,6 +384,13 @@ parameters are chosen as follows by default:
         dict. Alternatively, if Zyte API starts supporting more than 20 request
         cookies, update the ``ZYTE_API_MAX_COOKIES`` setting accordingly.
 
+        If you are using a custom downloader middleware to handle request
+        cookiejars, you can point the ``ZYTE_API_COOKIE_MIDDLEWARE`` setting to
+        its import path to make scrapy-zyte-api work with it. The downloader
+        middleware is expected to have a ``jars`` property with the same
+        signature as in the built-in Scrapy downloader middleware for cookie
+        handling.
+
 -   ``httpResponseBody`` and ``httpResponseHeaders`` are set to ``True``.
 
     This is subject to change without prior notice in future versions of
