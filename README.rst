@@ -366,14 +366,23 @@ parameters are chosen as follows by default:
 
     -   ``experimental.responseCookies`` is set to ``True`` .
 
-    -   ``Request.cookies`` becomes ``experimental.requestCookies``.
+    -   Cookies from the request `cookie jar`_ become
+        ``experimental.requestCookies``.
 
-        .. note:: Technically, ``Request.headers["Cookie"]`` becomes
-                  ``experimental.requestCookies``, but at the moment the Scrapy
-                  cookies downloader middleware sets
-                  ``Request.headers["Cookie"]`` based on ``Request.cookies``,
-                  overwritting any ``Cookie`` header. See `#192
-                  <https://github.com/scrapy/scrapy/issues/1992>`__.
+        .. _cookie jar: https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#std-reqmeta-cookiejar
+
+        For requests *not* involving ``browserHtml`` or ``screenshot``, only
+        cookies fit for the target URL are set. In other requests, all cookies
+        from the cookie jar are set, regardless of their cookie domain. This is
+        because requests involving browser rendering could trigger additional
+        requests to other domains.
+
+        If the cookies to be set exceed the limit defined in the
+        ``ZYTE_API_MAX_COOKIES`` setting (20 by default), a warning is logged,
+        and no cookies are set at all for the target request. To silence this
+        warning, set ``experimental.requestCookies`` manually, e.g. to an empty
+        dict. Alternatively, if Zyte API starts supporting more than 20 request
+        cookies, update the ``ZYTE_API_MAX_COOKIES`` setting accordingly.
 
 -   ``httpResponseBody`` and ``httpResponseHeaders`` are set to ``True``.
 

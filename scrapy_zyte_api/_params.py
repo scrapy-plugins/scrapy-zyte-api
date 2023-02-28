@@ -228,19 +228,12 @@ def _set_http_request_cookies_from_request(
                 "Request %(request)r would get %(count)r cookies, but request "
                 "cookie automatic mapping is limited to %(max)r cookies "
                 "(see the ZYTE_API_MAX_COOKIES setting). No cookie has been "
-                "added to this request. To silence this warning, disable "
-                "cookie mapping for this request. Alternatively, set request "
-                "cookies manually through Zyte API request metadata or, if "
-                "you believe Zyte API now supports more than %(max)r request "
-                "cookies, update the ZYTE_API_MAX_COOKIES setting accordingly."
+                "added to this request. To silence this warning, set the "
+                "experimental.requestCookies Zyte API parameter, e.g. to an "
+                "empty dict. Alternatively, if Zyte API starts supporting "
+                "more than %(max)r request cookies, update the "
+                "ZYTE_API_MAX_COOKIES setting accordingly."
             ),
-            # TODO: Make sure it is clear in the docs how to disable cookie
-            # mapping for a request.
-            # TODO: Make sure the setting mentioned above is covered in the
-            # docs.
-            # TODO: Make sure that the documentation covers how browser
-            # requests get the whole cookiejar mapped and why, and cover how
-            # to set different cookie jars per request.
             # TODO: Add tests for this scenario (19 cookies, 20 cookies, both
             # browserless and browserful).
             {
@@ -592,6 +585,7 @@ class _ParamParser:
                 "scrapy.downloadermiddlewares.cookies.CookiesMiddleware",
             )
         )
+        # TODO: Add a test to verify that the setting above makes a difference.
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 20)
         self._crawler = crawler
 

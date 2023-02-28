@@ -256,6 +256,8 @@ TRANSPARENT_MODE = False
 SKIP_HEADERS = {b"cookie", b"user-agent"}
 JOB_ID = None
 COOKIES_ENABLED = True
+COOKIE_MIDDLEWARE_CLASS = CookiesMiddleware
+MAX_COOKIES = 20
 GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
     "transparent_mode": TRANSPARENT_MODE,
@@ -264,6 +266,8 @@ GET_API_PARAMS_KWARGS = {
     "browser_headers": BROWSER_HEADERS,
     "job_id": JOB_ID,
     "cookies_enabled": COOKIES_ENABLED,
+    "max_cookies": MAX_COOKIES,
+    "cookie_mw_cls": COOKIE_MIDDLEWARE_CLASS,
 }
 
 
@@ -276,6 +280,10 @@ async def test_params_parser_input_default(mockserver):
             assert actual == expected
 
 
+class M:
+    pass
+
+
 @ensureDeferred
 async def test_param_parser_input_custom(mockserver):
     settings = {
@@ -284,16 +292,20 @@ async def test_param_parser_input_custom(mockserver):
         "ZYTE_API_AUTOMAP_PARAMS": {"c": "d"},
         "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
         "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
+        "ZYTE_API_MAX_COOKIES": 1,
         "ZYTE_API_SKIP_HEADERS": {"A"},
         "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_API_COOKIE_MIDDLEWARE": f"{M.__module__}.{M.__qualname__}",
     }
     async with mockserver.make_handler(settings) as handler:
         parser = handler._param_parser
         assert parser._automap_params == {"c": "d"}
         assert parser._browser_headers == {b"b": "b"}
+        assert parser._cookie_mw_cls == M
         assert parser._cookies_enabled is False
         assert parser._default_params == {"a": "b"}
         assert parser._job_id == "1/2/3"
+        assert parser._max_cookies == 1
         assert parser._skip_headers == {b"a"}
         assert parser._transparent_mode is True
 
