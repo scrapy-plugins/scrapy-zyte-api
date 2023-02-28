@@ -12,18 +12,21 @@ from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
-from scrapy.exceptions import CloseSpider, NotConfigured
+from scrapy.exceptions import CloseSpider
 from scrapy.http import Response, TextResponse
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
-from scrapy.utils.misc import create_instance
-from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
 from zyte_api.aio.errors import RequestError
 
 from scrapy_zyte_api.handler import _ParamParser
 
-from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS
+from . import (
+    DEFAULT_CLIENT_CONCURRENCY,
+    SETTINGS,
+    get_crawler,
+    get_downloader_middleware,
+)
 from .mockserver import DelayedResource, MockServer, produce_request_response
 
 
@@ -232,13 +235,14 @@ async def test_higher_concurrency():
                 raise CloseSpider
 
         crawler = get_crawler(
-            TestSpider,
             {
                 **SETTINGS,
                 "CONCURRENT_REQUESTS": concurrency,
                 "CONCURRENT_REQUESTS_PER_DOMAIN": concurrency,
                 "ZYTE_API_URL": server.urljoin("/"),
             },
+            TestSpider,
+            setup_engine=False,
         )
         await crawler.crawl()
 
@@ -412,8 +416,8 @@ def test_transparent_mode_toggling(setting, meta, expected):
     """
     request = Request(url="https://example.com", meta=meta)
     settings = {"ZYTE_API_TRANSPARENT_MODE": setting}
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    crawler = get_crawler(settings)
+    param_parser = _ParamParser(crawler)
     func = partial(param_parser.parse, request)
     if isclass(expected):
         with pytest.raises(expected):
@@ -433,7 +437,7 @@ def test_api_disabling_deprecated(meta):
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
     crawler = get_crawler()
-    param_parser = _ParamParser(crawler.settings)
+    param_parser = _ParamParser(crawler)
     with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
         api_params = param_parser.parse(request)
     assert api_params is None
@@ -447,7 +451,7 @@ def test_bad_meta_type(key, value):
     :exc:`ValueError` exception."""
     request = Request(url="https://example.com", meta={key: value})
     crawler = get_crawler()
-    param_parser = _ParamParser(crawler.settings)
+    param_parser = _ParamParser(crawler)
     with pytest.raises(ValueError):
         param_parser.parse(request)
 
@@ -465,8 +469,8 @@ async def test_job_id(meta, mockserver):
     """
     request = Request(url="https://example.com", meta={meta: True})
     settings = {"JOB": "1/2/3"}
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    crawler = get_crawler(settings)
+    param_parser = _ParamParser(crawler)
     api_params = param_parser.parse(request)
     assert api_params["jobId"] == "1/2/3"
 
@@ -550,8 +554,8 @@ def test_default_params_merging(
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
     settings = {setting_key: setting}
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    crawler = get_crawler(settings)
+    param_parser = _ParamParser(crawler)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     for key in ignore_keys:
@@ -603,8 +607,8 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
     request.meta[meta_key] = meta
     default_params = copy(setting)
     settings = {setting_key: setting}
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    crawler = get_crawler(settings)
+    param_parser = _ParamParser(crawler)
     param_parser.parse(request)
     assert default_params == setting
 
@@ -613,19 +617,15 @@ def _test_automap(settings, request_kwargs, meta, expected, warnings, caplog):
     request = Request(url="https://example.com", **request_kwargs)
     request.meta["zyte_api_automap"] = meta
     settings = {**settings, "ZYTE_API_TRANSPARENT_MODE": True}
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(settings)
     if "cookies" in request_kwargs:
         try:
-            cookie_middleware = create_instance(
-                CookiesMiddleware,
-                settings=crawler.settings,
-                crawler=crawler,
-            )
-        except NotConfigured:
+            cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+        except ValueError:
             pass
         else:
             cookie_middleware.process_request(request, spider=None)
-    param_parser = _ParamParser(crawler.settings)
+    param_parser = _ParamParser(crawler)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     api_params.pop("url")
@@ -1766,18 +1766,85 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 },
             },
         ),
-        # TODO: Handle the scenario of a browser request, which on the server side
-        # could involve multiple requests for different domains. The current
-        # implementation lets the Scrapy cookie middleware set the right cookies
-        # into the Cookie header, but those are limited to cookies relevant for the
-        # target URL. In browser requests, we should include all jar cookies,
-        # regardless of domain, and let Zyte API include the right ones on each
-        # URL. Also, depending on how redirects are handled for non-browser
-        # requests, this may also apply to those.
     ],
 )
 def test_automap_cookies(settings, cookies, meta, expected, caplog):
     _test_automap(settings, {"cookies": cookies}, meta, expected, [], caplog)
+
+
+def test_automap_cookies_jar():
+    """Test that cookies from the right jar are used."""
+    request1 = Request(
+        url="https://example.com/1", meta={"cookiejar": "a"}, cookies={"z": "y"}
+    )
+    request2 = Request(url="https://example.com/2", meta={"cookiejar": "b"})
+    request3 = Request(
+        url="https://example.com/3", meta={"cookiejar": "a"}, cookies={"x": "w"}
+    )
+    request4 = Request(url="https://example.com/4", meta={"cookiejar": "a"})
+    settings = {"ZYTE_API_TRANSPARENT_MODE": True}
+    crawler = get_crawler(settings)
+    cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+    param_parser = _ParamParser(crawler)
+
+    cookie_middleware.process_request(request1, spider=None)
+    api_params = param_parser.parse(request1)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "z", "value": "y", "domain": "example.com"}
+    ]
+
+    cookie_middleware.process_request(request2, spider=None)
+    api_params = param_parser.parse(request2)
+    assert "requestCookies" not in api_params["experimental"]
+
+    cookie_middleware.process_request(request3, spider=None)
+
+    api_params = param_parser.parse(request3)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "x", "value": "w", "domain": "example.com"},
+        {"name": "z", "value": "y", "domain": "example.com"},
+    ]
+
+    cookie_middleware.process_request(request4, spider=None)
+    api_params = param_parser.parse(request4)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "x", "value": "w", "domain": "example.com"},
+        {"name": "z", "value": "y", "domain": "example.com"},
+    ]
+
+    # TODO: Check that it works with browserHtml as well.
+
+
+# TODO: Respect dont_merge_cookies.
+
+# TODO: Add a setting to indicate to Zyte API which class is used for Cookie
+# handling.
+# TODO: Add a setting to allow configuring the maximum number of request
+# cookies that can be added through automated mapping. Default: 20. If a
+# request would get more cookies automatically, a warning is logged and no
+# cookies are added to the corresponding request.
+
+
+def test_automap_cookies_browser():
+    """When browser rendering is used, all cookie jar cookies are included,
+    regardless of their domain, so that they can be used in follow-up requests
+    sent during browser rendering."""
+    # Start from a cookiejar with an existing cookie for a.example.
+
+    # Send a browserful request to c.example, with a cookie for b.example, and
+    # ensure that it includes the cookies for a.example and b.example.
+
+    # Have the response set a cookie for a.example, c.example, and d.example.
+
+    # Send a second browserful requests to e.example, and ensure that cookies
+    # for all other examples are included.
+
+    # Send a browserless request to a.example and make sure that only the
+    # a.example cookies are included.
+
+
+# TODO: Handle the request cookie limit on Zyte API (20 cookies) when using
+# automatic mapping?
 
 
 @pytest.mark.parametrize(
@@ -1956,8 +2023,8 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
         "ZYTE_API_AUTOMAP_PARAMS": default_params,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    crawler = get_crawler(settings)
+    param_parser = _ParamParser(crawler)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     api_params.pop("url")

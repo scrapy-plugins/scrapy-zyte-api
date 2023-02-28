@@ -8,9 +8,10 @@ if Version(SCRAPY_VERSION) < Version("2.7"):
 from scrapy import Request
 from scrapy.settings.default_settings import REQUEST_FINGERPRINTER_CLASS
 from scrapy.utils.misc import create_instance, load_object
-from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
+
+from . import get_crawler
 
 
 def test_cache():
@@ -31,7 +32,7 @@ def test_fallback_custom():
     settings = {
         "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS": CustomFingerprinter,
     }
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(settings)
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
@@ -181,7 +182,7 @@ def test_known_fingerprints(url, params, fingerprint):
 
 def test_metadata():
     settings = {"JOB": "1/2/3"}
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(settings)
     job_fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
@@ -212,7 +213,7 @@ def test_only_end_parameters_matter():
     settings = {
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(settings)
     transparent_fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )

@@ -71,7 +71,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
-        self._param_parser = _ParamParser(settings)
+        self._param_parser = _ParamParser(crawler)
         self._retry_policy = _load_retry_policy(settings)
         self._stats = crawler.stats
         self._session = create_session(connection_pool_size=self._client.n_conn)

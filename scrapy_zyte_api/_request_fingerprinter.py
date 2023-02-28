@@ -35,7 +35,7 @@ else:
                 crawler=crawler,
             )
             self._cache: "WeakKeyDictionary[Request, bytes]" = WeakKeyDictionary()
-            self._param_parser = _ParamParser(settings)
+            self._param_parser = _ParamParser(crawler)
             self._skip_keys = (
                 "customHttpRequestHeaders",
                 "echoData",

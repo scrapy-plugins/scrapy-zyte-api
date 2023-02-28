@@ -1,14 +1,18 @@
 from base64 import b64decode, b64encode
 from copy import copy
+from functools import lru_cache
 from logging import getLogger
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
+from typing import Any, Dict, List, Mapping, Optional, Set
 from warnings import warn
 
 from scrapy import Request
-from scrapy.http import Response
+from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
 from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
+from scrapy.utils.misc import load_object
+
+from ._cookies import _get_all_cookies, _get_request_cookies
 
 logger = getLogger(__name__)
 
@@ -199,55 +203,12 @@ def _set_http_response_cookies_from_request(
         del api_params["experimental"]["responseCookies"]
 
 
-# Copied from CookieMiddleware.
-def _format_cookie(cookie, request):
-    decoded = {}
-    for key in ("name", "value", "path", "domain"):
-        if cookie.get(key) is None:
-            if key in ("name", "value"):
-                msg = f"Invalid cookie found in request {request}: {cookie} ('{key}' is missing)"
-                logger.warning(msg)
-                return
-            continue
-        if isinstance(cookie[key], (bool, float, int, str)):
-            decoded[key] = str(cookie[key])
-        else:
-            try:
-                decoded[key] = cookie[key].decode("utf8")
-            except UnicodeDecodeError:
-                logger.warning(
-                    "Non UTF-8 encoded cookie found in request %s: %s",
-                    request,
-                    cookie,
-                )
-                decoded[key] = cookie[key].decode("latin1", errors="replace")
-
-    cookie_str = f"{decoded.pop('name')}={decoded.pop('value')}"
-    for key, value in decoded.items():  # path, domain
-        cookie_str += f"; {key.capitalize()}={value}"
-    return cookie_str
-
-
-# Copied from CookieMiddleware.
-def _get_request_cookies(request):
-    if not request.cookies:
-        return []
-    if isinstance(request.cookies, dict):
-        cookies = ({"name": k, "value": v} for k, v in request.cookies.items())
-    else:
-        cookies = request.cookies
-    formatted: Iterable[str] = filter(
-        None, (_format_cookie(c, request) for c in cookies)
-    )
-    response = Response(request.url, headers={"Set-Cookie": formatted})
-    result = CookieJar().make_cookies(response, request)
-    return result
-
-
 def _set_http_request_cookies_from_request(
     *,
     api_params: Dict[str, Any],
     request: Request,
+    cookie_jars: Dict[Any, CookieJar],
+    max_cookies: int,
 ):
     api_params.setdefault("experimental", {})
     if "requestCookies" in api_params["experimental"]:
@@ -255,7 +216,42 @@ def _set_http_request_cookies_from_request(
             del api_params["experimental"]["requestCookies"]
         return
     output_cookies = []
-    for input_cookie in _get_request_cookies(request):
+    jar_id = request.meta.get("cookiejar")
+    cookie_jar = cookie_jars.get(jar_id)
+    if api_params.get("browserHtml") or api_params.get("screenshot"):
+        input_cookies = _get_all_cookies(cookie_jar)
+    else:
+        input_cookies = _get_request_cookies(cookie_jar, request)
+    input_cookie_count = len(input_cookies)
+    if input_cookie_count > max_cookies:
+        logger.warning(
+            (
+                "Request %(request)r would get %(count)r cookies, but request "
+                "cookie automatic mapping is limited to %(max)r cookies "
+                "(see the ZYTE_API_MAX_COOKIES setting). No cookie has been "
+                "added to this request. To silence this warning, disable "
+                "cookie mapping for this request. Alternatively, set request "
+                "cookies manually through Zyte API request metadata or, if "
+                "you believe Zyte API now supports more than %(max)r request "
+                "cookies, update the ZYTE_API_MAX_COOKIES setting accordingly."
+            ),
+            # TODO: Make sure it is clear in the docs how to disable cookie
+            # mapping for a request.
+            # TODO: Make sure the setting mentioned above is covered in the
+            # docs.
+            # TODO: Make sure that the documentation covers how browser
+            # requests get the whole cookiejar mapped and why, and cover how
+            # to set different cookie jars per request.
+            # TODO: Add tests for this scenario (19 cookies, 20 cookies, both
+            # browserless and browserful).
+            {
+                "request": request,
+                "count": input_cookie_count,
+                "max": max_cookies,
+            },
+        )
+        return
+    for input_cookie in input_cookies:
         output_cookie = {
             "name": input_cookie.name,
             "value": input_cookie.value,
@@ -340,6 +336,8 @@ def _update_api_params_from_request(
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
     cookies_enabled: bool,
+    cookie_jars: Dict[Any, CookieJar],
+    max_cookies: int,
 ):
     _set_http_response_body_from_request(api_params=api_params, request=request)
     _set_http_response_headers_from_request(
@@ -357,7 +355,12 @@ def _update_api_params_from_request(
     _set_http_request_body_from_request(api_params=api_params, request=request)
     if cookies_enabled:
         _set_http_response_cookies_from_request(api_params=api_params)
-        _set_http_request_cookies_from_request(api_params=api_params, request=request)
+        _set_http_request_cookies_from_request(
+            api_params=api_params,
+            request=request,
+            cookie_jars=cookie_jars,
+            max_cookies=max_cookies,
+        )
         if not api_params["experimental"]:
             del api_params["experimental"]
     _unset_unneeded_api_params(
@@ -462,6 +465,8 @@ def _get_automap_params(
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
     cookies_enabled: bool,
+    cookie_jars: Dict[Any, CookieJar],
+    max_cookies: int,
 ):
     meta_params = request.meta.get("zyte_api_automap", default_enabled)
     if meta_params is False:
@@ -489,6 +494,8 @@ def _get_automap_params(
         skip_headers=skip_headers,
         browser_headers=browser_headers,
         cookies_enabled=cookies_enabled,
+        cookie_jars=cookie_jars,
+        max_cookies=max_cookies,
     )
 
     return params
@@ -504,6 +511,8 @@ def _get_api_params(
     browser_headers: Dict[str, str],
     job_id: Optional[str],
     cookies_enabled: bool,
+    cookie_jars: Dict[Any, CookieJar],
+    max_cookies: int,
 ) -> Optional[dict]:
     """Returns a dictionary of API parameters that must be sent to Zyte API for
     the specified request, or None if the request should not be sent through
@@ -517,6 +526,8 @@ def _get_api_params(
             skip_headers=skip_headers,
             browser_headers=browser_headers,
             cookies_enabled=cookies_enabled,
+            cookie_jars=cookie_jars,
+            max_cookies=max_cookies,
         )
         if api_params is None:
             return None
@@ -567,7 +578,8 @@ def _load_browser_headers(settings):
 
 
 class _ParamParser:
-    def __init__(self, settings):
+    def __init__(self, crawler):
+        settings = crawler.settings
         self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
         self._browser_headers = _load_browser_headers(settings)
         self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
@@ -575,6 +587,28 @@ class _ParamParser:
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._skip_headers = _load_skip_headers(settings)
         self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
+        self._cookie_mw_cls = load_object(
+            settings.get("ZYTE_API_COOKIE_MIDDLEWARE", CookiesMiddleware)
+        )
+        self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 20)
+        self._crawler = crawler
+
+    @lru_cache()
+    def _get_cookie_jars(self):
+        if not self._cookies_enabled:
+            return None
+        for middleware in self._crawler.engine.downloader.middleware.middlewares:
+            if isinstance(middleware, self._cookie_mw_cls):
+                return middleware.jars
+        middleware_path = (
+            f"{self._cookie_mw_cls.__module__}.{self._cookie_mw_cls.__qualname__}"
+        )
+        raise RuntimeError(
+            f"Could not fine a configured downloader middleware that is an "
+            f"instance of {middleware_path} (see ZYTE_API_COOKIE_MIDDLEWARE)."
+        )
+        # TODO: Cover ZYTE_API_COOKIE_MIDDLEWARE in the docs.
+        # TODO: Test that caching here works.
 
     def parse(self, request):
         return _get_api_params(
@@ -586,4 +620,6 @@ class _ParamParser:
             browser_headers=self._browser_headers,
             job_id=self._job_id,
             cookies_enabled=self._cookies_enabled,
+            cookie_jars=self._get_cookie_jars(),
+            max_cookies=self._max_cookies,
         )
