@@ -1787,16 +1787,23 @@ def test_automap_cookies(settings, cookies, meta, expected, caplog):
     _test_automap(settings, {"cookies": cookies}, meta, expected, [], caplog)
 
 
-def test_automap_cookie_jar():
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {},
+        {"zyte_api_automap": {"browserHtml": True}},
+    ],
+)
+def test_automap_cookie_jar(meta):
     """Test that cookies from the right jar are used."""
     request1 = Request(
-        url="https://example.com/1", meta={"cookiejar": "a"}, cookies={"z": "y"}
+        url="https://example.com/1", meta={**meta, "cookiejar": "a"}, cookies={"z": "y"}
     )
-    request2 = Request(url="https://example.com/2", meta={"cookiejar": "b"})
+    request2 = Request(url="https://example.com/2", meta={**meta, "cookiejar": "b"})
     request3 = Request(
-        url="https://example.com/3", meta={"cookiejar": "a"}, cookies={"x": "w"}
+        url="https://example.com/3", meta={**meta, "cookiejar": "a"}, cookies={"x": "w"}
     )
-    request4 = Request(url="https://example.com/4", meta={"cookiejar": "a"})
+    request4 = Request(url="https://example.com/4", meta={**meta, "cookiejar": "a"})
     settings = {"ZYTE_API_TRANSPARENT_MODE": True}
     crawler = get_crawler(settings)
     cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
@@ -1826,8 +1833,6 @@ def test_automap_cookie_jar():
         {"name": "x", "value": "w", "domain": "example.com"},
         {"name": "z", "value": "y", "domain": "example.com"},
     ]
-
-    # TODO: Check that it works with browserHtml as well.
 
 
 def test_automap_cookie_limit(caplog):
@@ -1990,13 +1995,6 @@ def test_automap_custom_cookie_middleware():
 
 # TODO: Respect dont_merge_cookies.
 
-# TODO: Add a setting to indicate to Zyte API which class is used for Cookie
-# handling.
-# TODO: Add a setting to allow configuring the maximum number of request
-# cookies that can be added through automated mapping. Default: 20. If a
-# request would get more cookies automatically, a warning is logged and no
-# cookies are added to the corresponding request.
-
 
 def test_automap_cookies_browser():
     """When browser rendering is used, all cookie jar cookies are included,
@@ -2015,9 +2013,7 @@ def test_automap_cookies_browser():
     # Send a browserless request to a.example and make sure that only the
     # a.example cookies are included.
 
-
-# TODO: Handle the request cookie limit on Zyte API (20 cookies) when using
-# automatic mapping?
+    # TODO: Implement
 
 
 @pytest.mark.parametrize(

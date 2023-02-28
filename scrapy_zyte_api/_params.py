@@ -597,11 +597,9 @@ class _ParamParser:
             f"{self._cookie_mw_cls.__module__}.{self._cookie_mw_cls.__qualname__}"
         )
         raise RuntimeError(
-            f"Could not fine a configured downloader middleware that is an "
+            f"Could not find a configured downloader middleware that is an "
             f"instance of {middleware_path} (see ZYTE_API_COOKIE_MIDDLEWARE)."
         )
-        # TODO: Cover ZYTE_API_COOKIE_MIDDLEWARE in the docs.
-        # TODO: Test that caching here works.
 
     def parse(self, request):
         return _get_api_params(
