@@ -368,7 +368,7 @@ parameters are chosen as follows by default:
     .. _COOKIES_ENABLED: https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#std-setting-COOKIES_ENABLED
     .. _dont_merge_cookies: https://docs.scrapy.org/en/latest/topics/request-response.html#std-reqmeta-dont_merge_cookies
 
-    -   ``experimental.responseCookies`` is set to ``True`` .
+    -   ``experimental.responseCookies`` is set to ``True``.
 
     -   Cookies from the request `cookie jar`_ become
         ``experimental.requestCookies``.
