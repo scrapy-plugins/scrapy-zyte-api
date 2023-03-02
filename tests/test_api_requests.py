@@ -2113,15 +2113,6 @@ def test_automap_custom_cookie_middleware():
     ]
 
 
-# TODO: Check that cookies from domains different from the response URL are
-# added to the cookiejar nonetheless.
-
-# TODO: Replace the current max-cookie approach with the one we use for mixing
-# httpResponseBody and browserHtml: let things play out, let the API return an
-# error, and cover in the docs the fact that this issue exists and how to
-# address it.
-
-
 @pytest.mark.parametrize(
     "body,meta,expected,warnings",
     [
