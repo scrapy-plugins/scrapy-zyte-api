@@ -11,7 +11,7 @@ from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from scrapy.utils.misc import load_object
 
-from ._cookies import _get_all_cookies, _get_request_cookies
+from ._cookies import _get_all_cookies
 
 logger = getLogger(__name__)
 
@@ -215,12 +215,7 @@ def _set_http_request_cookies_from_request(
             del api_params["experimental"]["requestCookies"]
         return
     output_cookies = []
-    jar_id = request.meta.get("cookiejar")
-    cookie_jar = cookie_jars.get(jar_id)
-    if api_params.get("browserHtml") or api_params.get("screenshot"):
-        input_cookies = _get_all_cookies(cookie_jar)
-    else:
-        input_cookies = _get_request_cookies(cookie_jar, request)
+    input_cookies = _get_all_cookies(request, cookie_jars)
     input_cookie_count = len(input_cookies)
     if input_cookie_count > max_cookies:
         logger.warning(

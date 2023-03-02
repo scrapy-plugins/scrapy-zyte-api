@@ -1881,16 +1881,19 @@ def test_automap_cookie_limit(caplog):
 
     # Verify that 1 cookie in the cookie jar and 1 cookie in the request count
     # as 2 cookies, resulting in no mapping and a warning.
-    pre_request = Request(
-        url="https://example.com/1", meta={"cookiejar": cookiejar}, cookies={"z": "y"}
-    )
-    cookie_middleware.process_request(pre_request, spider=None)
     for meta in metas:
+        pre_request = Request(
+            url="https://example.com/1",
+            meta={"cookiejar": cookiejar},
+            cookies={"z": "y"},
+        )
+        cookie_middleware.process_request(pre_request, spider=None)
         request = Request(
             url="https://example.com/1",
             meta={**meta, "cookiejar": cookiejar},
             cookies={"x": "w"},
         )
+        cookiejar += 1
         cookie_middleware.process_request(request, spider=None)
         with caplog.at_level("WARNING"):
             api_params = param_parser.parse(request)
@@ -1898,46 +1901,28 @@ def test_automap_cookie_limit(caplog):
         assert "would get 2 cookies" in caplog.text
         assert "limited to 1 cookies" in caplog.text
         caplog.clear()
-    cookiejar += 1
 
-    # Vefify that, for browserless requests, unrelated cookies do not count for
-    # the limit.
-    pre_request = Request(
-        url="https://other.example/1", meta={"cookiejar": cookiejar}, cookies={"z": "y"}
-    )
-    cookie_middleware.process_request(pre_request, spider=None)
-    request = Request(
-        url="https://example.com/1", meta={"cookiejar": cookiejar}, cookies={"x": "w"}
-    )
-    cookiejar += 1
-    cookie_middleware.process_request(request, spider=None)
-    with caplog.at_level("WARNING"):
-        api_params = param_parser.parse(request)
-    assert api_params["experimental"]["requestCookies"] == [
-        {"name": "x", "value": "w", "domain": "example.com"}
-    ]
-    assert not caplog.records
-    caplog.clear()
-
-    # Vefify that, for browserful requests, unrelated cookies do count for the
-    # limit.
-    pre_request = Request(
-        url="https://other.example/1", meta={"cookiejar": cookiejar}, cookies={"z": "y"}
-    )
-    cookie_middleware.process_request(pre_request, spider=None)
-    request = Request(
-        url="https://example.com/1",
-        meta={"cookiejar": cookiejar, "zyte_api_automap": {"browserHtml": True}},
-        cookies={"x": "w"},
-    )
-    cookiejar += 1
-    cookie_middleware.process_request(request, spider=None)
-    with caplog.at_level("WARNING"):
-        api_params = param_parser.parse(request)
-    assert "requestCookies" not in api_params["experimental"]
-    assert "would get 2 cookies" in caplog.text
-    assert "limited to 1 cookies" in caplog.text
-    caplog.clear()
+    # Vefify that unrelated cookies count for the limit.
+    for meta in metas:
+        pre_request = Request(
+            url="https://other.example/1",
+            meta={"cookiejar": cookiejar},
+            cookies={"z": "y"},
+        )
+        cookie_middleware.process_request(pre_request, spider=None)
+        request = Request(
+            url="https://example.com/1",
+            meta={**meta, "cookiejar": cookiejar},
+            cookies={"x": "w"},
+        )
+        cookiejar += 1
+        cookie_middleware.process_request(request, spider=None)
+        with caplog.at_level("WARNING"):
+            api_params = param_parser.parse(request)
+        assert "requestCookies" not in api_params["experimental"]
+        assert "would get 2 cookies" in caplog.text
+        assert "limited to 1 cookies" in caplog.text
+        caplog.clear()
 
 
 class CustomCookieJar(CookieJar):
