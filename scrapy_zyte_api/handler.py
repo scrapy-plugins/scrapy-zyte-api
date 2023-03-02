@@ -92,6 +92,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"positive integer."
             )
         crawler.signals.connect(self.engine_started, signal=signals.engine_started)
+        if not hasattr(self, "_crawler"):  # Scrapy 2.1 and earlier
+            self._crawler = crawler
 
     def engine_started(self):
         if not self._cookies_enabled:
