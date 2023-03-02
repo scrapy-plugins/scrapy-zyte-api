@@ -1550,7 +1550,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
 
 
 @pytest.mark.parametrize(
-    "settings,cookies,meta,expected",
+    "settings,cookies,meta,params,expected",
     [
         # Cookies, both for requests and for responses, are enabled based on
         # COOKIES_ENABLED (default: True).
@@ -1559,6 +1559,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "COOKIES_ENABLED": False,
             },
             REQUEST_INPUT_COOKIES_EMPTY,
+            {},
             {},
             {
                 "httpResponseBody": True,
@@ -1571,6 +1572,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
             },
             REQUEST_INPUT_COOKIES_MINIMAL_DICT,
             {},
+            {},
             {
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
@@ -1579,6 +1581,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_EMPTY,
+            {},
             {},
             {
                 "httpResponseBody": True,
@@ -1589,6 +1592,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
             {},
             {
                 "httpResponseBody": True,
@@ -1599,11 +1603,37 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 },
             },
         ),
+        # dont_merge_cookies=True on request metadata disables cookies.
+        (
+            {},
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {
+                "dont_merge_cookies": True,
+            },
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {
+                "dont_merge_cookies": True,
+            },
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+        ),
         # Cookies can be disabled setting the corresponding Zyte API parameter
         # to False.
         (
             {},
             REQUEST_INPUT_COOKIES_EMPTY,
+            {},
             {
                 "experimental": {
                     "responseCookies": False,
@@ -1617,6 +1647,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_EMPTY,
+            {},
             {
                 "experimental": {
                     "requestCookies": False,
@@ -1631,6 +1662,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_EMPTY,
+            {},
             {
                 "experimental": {
                     "responseCookies": False,
@@ -1645,6 +1677,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
             {
                 "experimental": {
                     "responseCookies": False,
@@ -1661,6 +1694,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
             {
                 "experimental": {
                     "requestCookies": False,
@@ -1675,6 +1709,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
             {
                 "experimental": {
                     "responseCookies": False,
@@ -1690,6 +1725,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
             {
                 "browserHtml": True,
             },
@@ -1704,6 +1740,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
             {
                 "screenshot": True,
             },
@@ -1721,6 +1758,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
             (
                 {},
                 input,
+                {},
                 {},
                 {
                     "httpResponseBody": True,
@@ -1750,6 +1788,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         (
             {},
             REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
             {
                 "experimental": {
                     "requestCookies": REQUEST_OUTPUT_COOKIES_MAXIMAL,
@@ -1769,6 +1808,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
             {},
             {"a": "b", "c": "d"},
             {},
+            {},
             {
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
@@ -1783,8 +1823,10 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         ),
     ],
 )
-def test_automap_cookies(settings, cookies, meta, expected, caplog):
-    _test_automap(settings, {"cookies": cookies}, meta, expected, [], caplog)
+def test_automap_cookies(settings, cookies, meta, params, expected, caplog):
+    _test_automap(
+        settings, {"cookies": cookies, "meta": meta}, params, expected, [], caplog
+    )
 
 
 @pytest.mark.parametrize(
@@ -1978,9 +2020,6 @@ def test_automap_custom_cookie_middleware():
     ]
 
 
-# TODO: Respect dont_merge_cookies.
-
-
 def test_automap_cookies_browser():
     """When browser rendering is used, all cookie jar cookies are included,
     regardless of their domain, so that they can be used in follow-up requests
@@ -1999,6 +2038,15 @@ def test_automap_cookies_browser():
     # a.example cookies are included.
 
     # TODO: Implement
+
+
+# TODO: Check that cookies from domains different from the response URL are
+# added to the cookiejar nonetheless.
+
+# TODO: Replace the current max-cookie approach with the one we use for mixing
+# httpResponseBody and browserHtml: let things play out, let the API return an
+# error, and cover in the docs the fact that this issue exists and how to
+# address it.
 
 
 @pytest.mark.parametrize(

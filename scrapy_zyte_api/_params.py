@@ -597,6 +597,8 @@ class _ParamParser:
         )
 
     def parse(self, request):
+        dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
+        cookies_enabled = self._cookies_enabled and not dont_merge_cookies
         return _get_api_params(
             request,
             default_params=self._default_params,
@@ -605,7 +607,7 @@ class _ParamParser:
             skip_headers=self._skip_headers,
             browser_headers=self._browser_headers,
             job_id=self._job_id,
-            cookies_enabled=self._cookies_enabled,
+            cookies_enabled=cookies_enabled,
             cookie_jars=self._get_cookie_jars(),
             max_cookies=self._max_cookies,
         )
