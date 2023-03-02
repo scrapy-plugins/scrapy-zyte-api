@@ -4,8 +4,6 @@ from typing import Optional
 
 from scrapy import Spider
 from scrapy.crawler import Crawler
-from scrapy.exceptions import NotConfigured
-from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler as _get_crawler
 from zyte_api.aio.client import AsyncClient
 
@@ -19,6 +17,7 @@ SETTINGS = {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
     },
+    "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "ZYTE_API_KEY": _API_KEY,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
 }
@@ -45,20 +44,19 @@ def get_downloader_middleware(crawler, cls):
     raise ValueError(f"Cannot find downloader middleware {class_path}")
 
 
+def get_download_handler(crawler, schema):
+    return crawler.engine.downloader.handlers._get_handler(schema)
+
+
 @asynccontextmanager
 async def make_handler(settings: dict, api_url: Optional[str] = None):
-    settings = settings or {}
-    settings["ZYTE_API_KEY"] = "a"
+    settings = {**SETTINGS, **settings}
     if api_url is not None:
         settings["ZYTE_API_URL"] = api_url
     crawler = get_crawler(settings)
-    try:
-        handler = create_instance(
-            ScrapyZyteAPIDownloadHandler,
-            settings=None,
-            crawler=crawler,
-        )
-    except NotConfigured:  # i.e. ZYTE_API_ENABLED=False
+    handler = get_download_handler(crawler, "https")
+    if not isinstance(handler, ScrapyZyteAPIDownloadHandler):
+        # i.e. ZYTE_API_ENABLED=False
         handler = None
     try:
         yield handler
@@ -88,3 +86,7 @@ def setup_crawler_engine(crawler: Crawler):
     crawler.crawling = True
     crawler.spider = crawler._create_spider()
     crawler.engine = crawler._create_engine()
+
+    handler = get_download_handler(crawler, "https")
+    if hasattr(handler, "engine_started"):
+        handler.engine_started()

@@ -5,7 +5,7 @@ from copy import copy
 from functools import partial
 from http.cookiejar import Cookie
 from inspect import isclass
-from typing import Any, Dict, List
+from typing import Any, Dict
 from unittest import mock
 from unittest.mock import patch
 
@@ -23,11 +23,13 @@ from twisted.internet.defer import Deferred
 from zyte_api.aio.errors import RequestError
 
 from scrapy_zyte_api.handler import _ParamParser
+from scrapy_zyte_api.responses import _process_response
 
 from . import (
     DEFAULT_CLIENT_CONCURRENCY,
     SETTINGS,
     get_crawler,
+    get_download_handler,
     get_downloader_middleware,
 )
 from .mockserver import DelayedResource, MockServer, produce_request_response
@@ -259,7 +261,6 @@ TRANSPARENT_MODE = False
 SKIP_HEADERS = {b"cookie", b"user-agent"}
 JOB_ID = None
 COOKIES_ENABLED = True
-COOKIE_MIDDLEWARE_CLASS = CookiesMiddleware
 MAX_COOKIES = 20
 GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
@@ -270,7 +271,6 @@ GET_API_PARAMS_KWARGS = {
     "job_id": JOB_ID,
     "cookies_enabled": COOKIES_ENABLED,
     "max_cookies": MAX_COOKIES,
-    "cookie_mw_cls": COOKIE_MIDDLEWARE_CLASS,
 }
 
 
@@ -281,10 +281,6 @@ async def test_params_parser_input_default(mockserver):
             actual = getattr(handler._param_parser, f"_{key}")
             expected = GET_API_PARAMS_KWARGS[key]
             assert actual == expected
-
-
-class M:
-    pass
 
 
 @ensureDeferred
@@ -298,13 +294,11 @@ async def test_param_parser_input_custom(mockserver):
         "ZYTE_API_MAX_COOKIES": 1,
         "ZYTE_API_SKIP_HEADERS": {"A"},
         "ZYTE_API_TRANSPARENT_MODE": True,
-        "ZYTE_API_COOKIE_MIDDLEWARE": f"{M.__module__}.{M.__qualname__}",
     }
     async with mockserver.make_handler(settings) as handler:
         parser = handler._param_parser
         assert parser._automap_params == {"c": "d"}
         assert parser._browser_headers == {b"b": "b"}
-        assert parser._cookie_mw_cls == M
         assert parser._cookies_enabled is False
         assert parser._default_params == {"a": "b"}
         assert parser._job_id == "1/2/3"
@@ -430,9 +424,10 @@ def test_transparent_mode_toggling(setting, meta, expected):
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com", meta=meta)
-    settings = {"ZYTE_API_TRANSPARENT_MODE": setting}
+    settings = {**SETTINGS, "ZYTE_API_TRANSPARENT_MODE": setting}
     crawler = get_crawler(settings)
-    param_parser = _ParamParser(crawler)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     func = partial(param_parser.parse, request)
     if isclass(expected):
         with pytest.raises(expected):
@@ -483,9 +478,10 @@ async def test_job_id(meta, mockserver):
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com", meta={meta: True})
-    settings = {"JOB": "1/2/3"}
+    settings: Dict[str, Any] = {**SETTINGS, "JOB": "1/2/3"}
     crawler = get_crawler(settings)
-    param_parser = _ParamParser(crawler)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     api_params = param_parser.parse(request)
     assert api_params["jobId"] == "1/2/3"
 
@@ -568,9 +564,10 @@ def test_default_params_merging(
     """
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
-    settings = {setting_key: setting}
+    settings = {**SETTINGS, setting_key: setting}
     crawler = get_crawler(settings)
-    param_parser = _ParamParser(crawler)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     for key in ignore_keys:
@@ -621,9 +618,10 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
     default_params = copy(setting)
-    settings = {setting_key: setting}
+    settings = {**SETTINGS, setting_key: setting}
     crawler = get_crawler(settings)
-    param_parser = _ParamParser(crawler)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     param_parser.parse(request)
     assert default_params == setting
 
@@ -631,7 +629,7 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
 def _test_automap(settings, request_kwargs, meta, expected, warnings, caplog):
     request = Request(url="https://example.com", **request_kwargs)
     request.meta["zyte_api_automap"] = meta
-    settings = {**settings, "ZYTE_API_TRANSPARENT_MODE": True}
+    settings = {**SETTINGS, **settings, "ZYTE_API_TRANSPARENT_MODE": True}
     crawler = get_crawler(settings)
     if "cookies" in request_kwargs:
         try:
@@ -640,7 +638,8 @@ def _test_automap(settings, request_kwargs, meta, expected, warnings, caplog):
             pass
         else:
             cookie_middleware.process_request(request, spider=None)
-    param_parser = _ParamParser(crawler)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     api_params.pop("url")
@@ -1836,6 +1835,93 @@ def test_automap_cookies(settings, cookies, meta, params, expected, caplog):
         {"zyte_api_automap": {"browserHtml": True}},
     ],
 )
+def test_automap_all_cookies(meta):
+    """Because of scenarios like cross-domain redirects and browser rendering,
+    Zyte API requests should include all cookie jar cookies, regardless of
+    the target URL domain."""
+    settings: Dict[str, Any] = {**SETTINGS, "ZYTE_API_TRANSPARENT_MODE": True}
+    crawler = get_crawler(settings)
+    cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+
+    # Start from a cookiejar with an existing cookie for a.example.
+    pre_request = Request(
+        url="https://a.example",
+        meta=meta,
+        cookies={"a": "b"},
+    )
+    cookie_middleware.process_request(pre_request, spider=None)
+
+    # Send a request to c.example, with a cookie for b.example, and ensure that
+    # it includes the cookies for a.example and b.example.
+    request1 = Request(
+        url="https://c.example",
+        meta=meta,
+        cookies=[
+            {
+                "name": "c",
+                "value": "d",
+                "domain": "b.example",
+            },
+        ],
+    )
+    cookie_middleware.process_request(request1, spider=None)
+    api_params = param_parser.parse(request1)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "a", "value": "b", "domain": "a.example"},
+        # https://github.com/scrapy/scrapy/issues/5841
+        # {"name": "c", "value": "d", "domain": "b.example"},
+    ]
+
+    # Have the response set a cookie for c.example and d.example.
+    api_response: Dict[str, Any] = {
+        "url": "https://c.example",
+        "httpResponseBody": "",
+        "statusCode": 200,
+        "experimental": {
+            "responseCookies": [
+                {
+                    "name": "e",
+                    "value": "f",
+                    "domain": ".c.example",
+                },
+                {
+                    "name": "g",
+                    "value": "h",
+                    "domain": ".d.example",
+                },
+            ],
+        },
+    }
+    assert handler._cookie_jars is not None  # typing
+    response = _process_response(api_response, request1, handler._cookie_jars)
+    cookie_middleware.process_response(request1, response, spider=None)
+
+    # Send a second request to e.example, and ensure that cookies
+    # for all other domains are included.
+    request2 = Request(
+        url="https://e.example",
+        meta=meta,
+    )
+    cookie_middleware.process_request(request2, spider=None)
+    api_params = param_parser.parse(request2)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "e", "value": "f", "domain": ".c.example"},
+        {"name": "g", "value": "h", "domain": ".d.example"},
+        {"name": "a", "value": "b", "domain": "a.example"},
+        # https://github.com/scrapy/scrapy/issues/5841
+        # {"name": "c", "value": "d", "domain": "b.example"},
+    ]
+
+
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {},
+        {"zyte_api_automap": {"browserHtml": True}},
+    ],
+)
 def test_automap_cookie_jar(meta):
     """Test that cookies from the right jar are used."""
     request1 = Request(
@@ -1846,10 +1932,11 @@ def test_automap_cookie_jar(meta):
         url="https://example.com/3", meta={**meta, "cookiejar": "a"}, cookies={"x": "w"}
     )
     request4 = Request(url="https://example.com/4", meta={**meta, "cookiejar": "a"})
-    settings = {"ZYTE_API_TRANSPARENT_MODE": True}
+    settings: Dict[str, Any] = {**SETTINGS, "ZYTE_API_TRANSPARENT_MODE": True}
     crawler = get_crawler(settings)
     cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
-    param_parser = _ParamParser(crawler)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
 
     cookie_middleware.process_request(request1, spider=None)
     api_params = param_parser.parse(request1)
@@ -1877,94 +1964,98 @@ def test_automap_cookie_jar(meta):
     ]
 
 
-def test_automap_cookie_limit(caplog):
-    settings = {"ZYTE_API_MAX_COOKIES": 1, "ZYTE_API_TRANSPARENT_MODE": True}
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {},
+        {"zyte_api_automap": {"browserHtml": True}},
+    ],
+)
+def test_automap_cookie_limit(meta, caplog):
+    settings: Dict[str, Any] = {
+        **SETTINGS,
+        "ZYTE_API_MAX_COOKIES": 1,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
     crawler = get_crawler(settings)
     cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
-    param_parser = _ParamParser(crawler)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     cookiejar = 0
 
     # Verify that request with 1 cookie works as expected.
-    metas: List[Dict] = [
-        {},
-        {"zyte_api_automap": {"browserHtml": True}},
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"z": "y"},
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "z", "value": "y", "domain": "example.com"}
     ]
-    for meta in metas:
-        request = Request(
-            url="https://example.com/1",
-            meta={**meta, "cookiejar": cookiejar},
-            cookies={"z": "y"},
-        )
-        cookiejar += 1
-        cookie_middleware.process_request(request, spider=None)
-        with caplog.at_level("WARNING"):
-            api_params = param_parser.parse(request)
-        assert api_params["experimental"]["requestCookies"] == [
-            {"name": "z", "value": "y", "domain": "example.com"}
-        ]
-        assert not caplog.records
-        caplog.clear()
+    assert not caplog.records
+    caplog.clear()
 
     # Verify that requests with 2 cookies results in no mapping and a warning.
-    for meta in metas:
-        request = Request(
-            url="https://example.com/1",
-            meta={**meta, "cookiejar": cookiejar},
-            cookies={"z": "y", "x": "w"},
-        )
-        cookiejar += 1
-        cookie_middleware.process_request(request, spider=None)
-        with caplog.at_level("WARNING"):
-            api_params = param_parser.parse(request)
-        assert "requestCookies" not in api_params["experimental"]
-        assert "would get 2 cookies" in caplog.text
-        assert "limited to 1 cookies" in caplog.text
-        caplog.clear()
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"z": "y", "x": "w"},
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert "requestCookies" not in api_params["experimental"]
+    assert "would get 2 cookies" in caplog.text
+    assert "limited to 1 cookies" in caplog.text
+    caplog.clear()
 
     # Verify that 1 cookie in the cookie jar and 1 cookie in the request count
     # as 2 cookies, resulting in no mapping and a warning.
-    for meta in metas:
-        pre_request = Request(
-            url="https://example.com/1",
-            meta={"cookiejar": cookiejar},
-            cookies={"z": "y"},
-        )
-        cookie_middleware.process_request(pre_request, spider=None)
-        request = Request(
-            url="https://example.com/1",
-            meta={**meta, "cookiejar": cookiejar},
-            cookies={"x": "w"},
-        )
-        cookiejar += 1
-        cookie_middleware.process_request(request, spider=None)
-        with caplog.at_level("WARNING"):
-            api_params = param_parser.parse(request)
-        assert "requestCookies" not in api_params["experimental"]
-        assert "would get 2 cookies" in caplog.text
-        assert "limited to 1 cookies" in caplog.text
-        caplog.clear()
+    pre_request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"z": "y"},
+    )
+    cookie_middleware.process_request(pre_request, spider=None)
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"x": "w"},
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert "requestCookies" not in api_params["experimental"]
+    assert "would get 2 cookies" in caplog.text
+    assert "limited to 1 cookies" in caplog.text
+    caplog.clear()
 
     # Vefify that unrelated cookies count for the limit.
-    for meta in metas:
-        pre_request = Request(
-            url="https://other.example/1",
-            meta={"cookiejar": cookiejar},
-            cookies={"z": "y"},
-        )
-        cookie_middleware.process_request(pre_request, spider=None)
-        request = Request(
-            url="https://example.com/1",
-            meta={**meta, "cookiejar": cookiejar},
-            cookies={"x": "w"},
-        )
-        cookiejar += 1
-        cookie_middleware.process_request(request, spider=None)
-        with caplog.at_level("WARNING"):
-            api_params = param_parser.parse(request)
-        assert "requestCookies" not in api_params["experimental"]
-        assert "would get 2 cookies" in caplog.text
-        assert "limited to 1 cookies" in caplog.text
-        caplog.clear()
+    pre_request = Request(
+        url="https://other.example/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"z": "y"},
+    )
+    cookie_middleware.process_request(pre_request, spider=None)
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"x": "w"},
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert "requestCookies" not in api_params["experimental"]
+    assert "would get 2 cookies" in caplog.text
+    assert "limited to 1 cookies" in caplog.text
+    caplog.clear()
 
 
 class CustomCookieJar(CookieJar):
@@ -2001,6 +2092,7 @@ class CustomCookieMiddleware(CookiesMiddleware):
 def test_automap_custom_cookie_middleware():
     mw_cls = CustomCookieMiddleware
     settings = {
+        **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_COOKIE_MIDDLEWARE": f"{mw_cls.__module__}.{mw_cls.__qualname__}",
         "DOWNLOADER_MIDDLEWARES": {
@@ -2010,7 +2102,8 @@ def test_automap_custom_cookie_middleware():
     }
     crawler = get_crawler(settings)
     cookie_middleware = get_downloader_middleware(crawler, mw_cls)
-    param_parser = _ParamParser(crawler)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
 
     request = Request(url="https://example.com/1")
     cookie_middleware.process_request(request, spider=None)
@@ -2018,26 +2111,6 @@ def test_automap_custom_cookie_middleware():
     assert api_params["experimental"]["requestCookies"] == [
         {"name": "z", "value": "y", "domain": "example.com"}
     ]
-
-
-def test_automap_cookies_browser():
-    """When browser rendering is used, all cookie jar cookies are included,
-    regardless of their domain, so that they can be used in follow-up requests
-    sent during browser rendering."""
-    # Start from a cookiejar with an existing cookie for a.example.
-
-    # Send a browserful request to c.example, with a cookie for b.example, and
-    # ensure that it includes the cookies for a.example and b.example.
-
-    # Have the response set a cookie for a.example, c.example, and d.example.
-
-    # Send a second browserful requests to e.example, and ensure that cookies
-    # for all other examples are included.
-
-    # Send a browserless request to a.example and make sure that only the
-    # a.example cookies are included.
-
-    # TODO: Implement
 
 
 # TODO: Check that cookies from domains different from the response URL are
@@ -2222,11 +2295,13 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
     request = Request(url="https://example.com")
     request.meta["zyte_api_automap"] = meta
     settings = {
+        **SETTINGS,
         "ZYTE_API_AUTOMAP_PARAMS": default_params,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
     crawler = get_crawler(settings)
-    param_parser = _ParamParser(crawler)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     api_params.pop("url")

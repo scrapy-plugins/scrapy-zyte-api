@@ -4,8 +4,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from scrapy import Request
 from scrapy.http import Response, TextResponse
+from scrapy.http.cookies import CookieJar
 from scrapy.responsetypes import responsetypes
 
+from scrapy_zyte_api._cookies import _process_cookies
 from scrapy_zyte_api.utils import (
     _RESPONSE_HAS_ATTRIBUTES,
     _RESPONSE_HAS_IP_ADDRESS,
@@ -160,7 +162,7 @@ _API_RESPONSE = Dict[str, _JSON]
 
 
 def _process_response(
-    api_response: _API_RESPONSE, request: Request
+    api_response: _API_RESPONSE, request: Request, cookie_jars: Dict[Any, CookieJar]
 ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
     """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
     this returns either a ``ZyteAPITextResponse`` or ``ZyteAPIResponse`` depending
@@ -172,6 +174,8 @@ def _process_response(
     # will be addressed in the future. Reference:
     # - https://github.com/scrapy-plugins/scrapy-zyte-api/pull/10#issuecomment-1131406460
     # For now, at least one of them should be present.
+
+    _process_cookies(api_response, request, cookie_jars)
 
     if api_response.get("browserHtml"):
         # Using TextResponse because browserHtml always returns a browser-rendered page

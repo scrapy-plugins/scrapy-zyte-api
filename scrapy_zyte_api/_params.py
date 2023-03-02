@@ -1,6 +1,5 @@
 from base64 import b64decode, b64encode
 from copy import copy
-from functools import lru_cache
 from logging import getLogger
 from typing import Any, Dict, List, Mapping, Optional, Set
 from warnings import warn
@@ -9,7 +8,6 @@ from scrapy import Request
 from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
-from scrapy.utils.misc import load_object
 
 from ._cookies import _get_all_cookies
 
@@ -321,7 +319,7 @@ def _update_api_params_from_request(
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
     cookies_enabled: bool,
-    cookie_jars: Dict[Any, CookieJar],
+    cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
 ):
     _set_http_response_body_from_request(api_params=api_params, request=request)
@@ -339,6 +337,7 @@ def _update_api_params_from_request(
     )
     _set_http_request_body_from_request(api_params=api_params, request=request)
     if cookies_enabled:
+        assert cookie_jars is not None  # typing
         _set_http_response_cookies_from_request(api_params=api_params)
         _set_http_request_cookies_from_request(
             api_params=api_params,
@@ -450,7 +449,7 @@ def _get_automap_params(
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
     cookies_enabled: bool,
-    cookie_jars: Dict[Any, CookieJar],
+    cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
 ):
     meta_params = request.meta.get("zyte_api_automap", default_enabled)
@@ -496,7 +495,7 @@ def _get_api_params(
     browser_headers: Dict[str, str],
     job_id: Optional[str],
     cookies_enabled: bool,
-    cookie_jars: Dict[Any, CookieJar],
+    cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
 ) -> Optional[dict]:
     """Returns a dictionary of API parameters that must be sent to Zyte API for
@@ -563,7 +562,7 @@ def _load_browser_headers(settings):
 
 
 class _ParamParser:
-    def __init__(self, crawler):
+    def __init__(self, crawler, cookies_enabled=None):
         settings = crawler.settings
         self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
         self._browser_headers = _load_browser_headers(settings)
@@ -571,30 +570,14 @@ class _ParamParser:
         self._job_id = settings.get("JOB")
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._skip_headers = _load_skip_headers(settings)
-        self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
-        self._cookie_mw_cls = load_object(
-            settings.get(
-                "ZYTE_API_COOKIE_MIDDLEWARE",
-                "scrapy.downloadermiddlewares.cookies.CookiesMiddleware",
-            )
+        self._cookies_enabled = (
+            cookies_enabled
+            if cookies_enabled is not None
+            else settings.getbool("COOKIES_ENABLED")
         )
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 20)
         self._crawler = crawler
-
-    @lru_cache()
-    def _get_cookie_jars(self):
-        if not self._cookies_enabled:
-            return None
-        for middleware in self._crawler.engine.downloader.middleware.middlewares:
-            if isinstance(middleware, self._cookie_mw_cls):
-                return middleware.jars
-        middleware_path = (
-            f"{self._cookie_mw_cls.__module__}.{self._cookie_mw_cls.__qualname__}"
-        )
-        raise RuntimeError(
-            f"Could not find a configured downloader middleware that is an "
-            f"instance of {middleware_path} (see ZYTE_API_COOKIE_MIDDLEWARE)."
-        )
+        self._cookie_jars = None
 
     def parse(self, request):
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
@@ -608,6 +591,6 @@ class _ParamParser:
             browser_headers=self._browser_headers,
             job_id=self._job_id,
             cookies_enabled=cookies_enabled,
-            cookie_jars=self._get_cookie_jars(),
+            cookie_jars=self._cookie_jars,
             max_cookies=self._max_cookies,
         )
