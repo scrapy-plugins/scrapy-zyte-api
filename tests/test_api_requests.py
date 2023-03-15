@@ -22,6 +22,7 @@ from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from twisted.internet.defer import Deferred
 from zyte_api.aio.errors import RequestError
 
+from scrapy_zyte_api._cookies import _get_cookie_jar
 from scrapy_zyte_api.handler import _ParamParser
 from scrapy_zyte_api.responses import _process_response
 
@@ -625,7 +626,9 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
     assert default_params == setting
 
 
-def _test_automap(settings, request_kwargs, meta, expected, warnings, caplog):
+def _test_automap(
+    settings, request_kwargs, meta, expected, warnings, caplog, cookie_jar=None
+):
     request = Request(url="https://example.com", **request_kwargs)
     request.meta["zyte_api_automap"] = meta
     settings = {**SETTINGS, **settings, "ZYTE_API_TRANSPARENT_MODE": True}
@@ -637,6 +640,29 @@ def _test_automap(settings, request_kwargs, meta, expected, warnings, caplog):
             pass
         else:
             cookie_middleware.process_request(request, spider=None)
+            if cookie_jar:
+                _cookie_jar = _get_cookie_jar(request, cookie_middleware.jars)
+                for cookie in cookie_jar:
+                    _cookie = Cookie(
+                        version=1,
+                        name=cookie["name"],
+                        value=cookie["value"],
+                        port=None,
+                        port_specified=False,
+                        domain=cookie["domain"],
+                        domain_specified=True,
+                        domain_initial_dot=cookie["domain"].startswith("."),
+                        path=cookie.get("path", "/"),
+                        path_specified="path" in cookie,
+                        secure=cookie.get("secure", False),
+                        expires=cookie.get("expires", None),
+                        discard=False,
+                        comment=None,
+                        comment_url=None,
+                        rest={},
+                    )
+                    _cookie_jar.set_cookie(_cookie)
+
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
@@ -1518,7 +1544,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
 
 
 @pytest.mark.parametrize(
-    "settings,cookies,meta,params,expected,warnings",
+    "settings,cookies,meta,params,expected,warnings,cookie_jar",
     [
         # Cookies, both for requests and for responses, are enabled based on
         # both ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED (default: False) and
@@ -1539,6 +1565,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     if cast(Dict, settings).get("COOKIES_ENABLED", True)
                     else []
                 ),
+                [],
             )
             for input_cookies, run_time_warnings in (
                 (
@@ -1602,6 +1629,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     },
                 },
                 [],
+                [],
             )
             for input_cookies, output_cookies in (
                 (
@@ -1643,6 +1671,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     },
                 },
                 [],
+                [],
             )
             for settings in (
                 {},
@@ -1666,6 +1695,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "httpResponseHeaders": True,
             },
             [],
+            [],
         ),
         (
             {
@@ -1681,6 +1711,37 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "httpResponseHeaders": True,
             },
             [],
+            [],
+        ),
+        # Do not warn about request cookies not being mapped if
+        # dont_merge_cookies=True is set on request metadata.
+        *(
+            (
+                settings,
+                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                {
+                    "dont_merge_cookies": True,
+                },
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                },
+                [],
+                [
+                    {
+                        "name": "foo",
+                        "value": "bar",
+                        "domain": "example.com",
+                    }
+                ],
+            )
+            for settings in (
+                {},
+                {
+                    "COOKIES_ENABLED": True,
+                },
+            )
         ),
         # Cookies can be disabled setting the corresponding Zyte API parameter
         # to False.
@@ -1700,6 +1761,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "httpResponseHeaders": True,
             },
             [],
+            [],
         ),
         (
             {
@@ -1718,6 +1780,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "experimental": {"responseCookies": True},
             },
             [],
+            [],
         ),
         (
             {
@@ -1735,6 +1798,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
+            [],
             [],
         ),
         (
@@ -1756,6 +1820,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 },
             },
             [],
+            [],
         ),
         (
             {
@@ -1774,6 +1839,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "experimental": {"responseCookies": True},
             },
             [],
+            [],
         ),
         (
             {
@@ -1791,6 +1857,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
+            [],
             [],
         ),
         # Cookies work for browser requests as well.
@@ -1811,6 +1878,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 },
             },
             [],
+            [],
         ),
         (
             {
@@ -1828,6 +1896,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
                 },
             },
+            [],
             [],
         ),
         # Cookies are mapped correctly, both with minimum and maximum cookie
@@ -1848,6 +1917,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         "requestCookies": output,
                     },
                 },
+                [],
                 [],
             )
             for input, output in (
@@ -1886,6 +1956,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 },
             },
             [],
+            [],
         ),
         # Mapping multiple cookies works.
         (
@@ -1907,12 +1978,21 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 },
             },
             [],
+            [],
         ),
     ],
 )
-def test_automap_cookies(settings, cookies, meta, params, expected, warnings, caplog):
+def test_automap_cookies(
+    settings, cookies, meta, params, expected, warnings, cookie_jar, caplog
+):
     _test_automap(
-        settings, {"cookies": cookies, "meta": meta}, params, expected, warnings, caplog
+        settings,
+        {"cookies": cookies, "meta": meta},
+        params,
+        expected,
+        warnings,
+        caplog,
+        cookie_jar=cookie_jar,
     )
 
 

@@ -602,7 +602,7 @@ class _ParamParser:
             cookie_jars=self._cookie_jars,
             max_cookies=self._max_cookies,
         )
-        if self._warn_on_cookies:
+        if not dont_merge_cookies and self._warn_on_cookies:
             self._handle_warn_on_cookies(request, params)
         return params
 
