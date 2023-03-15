@@ -362,8 +362,9 @@ parameters are chosen as follows by default:
 
 -   ``Request.body`` becomes ``httpRequestBody``.
 
--   If the COOKIES_ENABLED_ Scrapy setting is ``True`` (default), and unless
-    request metadata sets dont_merge_cookies_ to ``True`` as well:
+-   If the ``ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED`` Scrapy setting is
+    ``True``, the COOKIES_ENABLED_ Scrapy setting is ``True`` (default), and
+    provided request metadata does not set dont_merge_cookies_ to ``True``:
 
     .. _COOKIES_ENABLED: https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#std-setting-COOKIES_ENABLED
     .. _dont_merge_cookies: https://docs.scrapy.org/en/latest/topics/request-response.html#std-reqmeta-dont_merge_cookies
@@ -381,11 +382,12 @@ parameters are chosen as follows by default:
         during browser rendering).
 
         If the cookies to be set exceed the limit defined in the
-        ``ZYTE_API_MAX_COOKIES`` setting (20 by default), a warning is logged,
+        ``ZYTE_API_MAX_COOKIES`` setting (100 by default), a warning is logged,
         and no cookies are set at all for the target request. To silence this
         warning, set ``experimental.requestCookies`` manually, e.g. to an empty
-        dict. Alternatively, if Zyte API starts supporting more than 20 request
-        cookies, update the ``ZYTE_API_MAX_COOKIES`` setting accordingly.
+        dict. Alternatively, if Zyte API starts supporting more than 100
+        request cookies, update the ``ZYTE_API_MAX_COOKIES`` setting
+        accordingly.
 
         If you are using a custom downloader middleware to handle request
         cookiejars, you can point the ``ZYTE_API_COOKIE_MIDDLEWARE`` setting to

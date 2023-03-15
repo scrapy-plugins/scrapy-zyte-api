@@ -570,19 +570,27 @@ class _ParamParser:
         self._job_id = settings.get("JOB")
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._skip_headers = _load_skip_headers(settings)
-        self._cookies_enabled = (
-            cookies_enabled
-            if cookies_enabled is not None
-            else settings.getbool("COOKIES_ENABLED")
-        )
-        self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 20)
+        self._warn_on_cookies = False
+        if cookies_enabled is not None:
+            self._cookies_enabled = cookies_enabled
+        elif settings.getbool("ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED") is True:
+            self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
+            if not self._cookies_enabled:
+                logger.warning(
+                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is True, but it "
+                    "will have no effect because COOKIES_ENABLED is False."
+                )
+        else:
+            self._cookies_enabled = False
+            self._warn_on_cookies = settings.getbool("COOKIES_ENABLED")
+        self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 100)
         self._crawler = crawler
         self._cookie_jars = None
 
     def parse(self, request):
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
         cookies_enabled = self._cookies_enabled and not dont_merge_cookies
-        return _get_api_params(
+        params = _get_api_params(
             request,
             default_params=self._default_params,
             transparent_mode=self._transparent_mode,
@@ -594,3 +602,31 @@ class _ParamParser:
             cookie_jars=self._cookie_jars,
             max_cookies=self._max_cookies,
         )
+        if self._warn_on_cookies:
+            self._handle_warn_on_cookies(request, params)
+        return params
+
+    def _handle_warn_on_cookies(self, request, params):
+        if params and params.get("experimental", {}).get("requestCookies") is not None:
+            return
+        if self._cookie_jars is None:
+            return
+        input_cookies = _get_all_cookies(request, self._cookie_jars)
+        if len(input_cookies) <= 0:
+            return
+        logger.warning(
+            (
+                "Cookies are enabled for request %(request)r, and there are "
+                "cookies in the cookiejar, but "
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is False, so automatic "
+                "mapping will not map cookies for this or any other request. "
+                "To silence this warning, disable cookies for all requests "
+                "that use automated mapping, either with the "
+                "COOKIES_ENABLED setting or with the dont_merge_cookies "
+                "request metadata key."
+            ),
+            {
+                "request": request,
+            },
+        )
+        self._warn_on_cookies = False
