@@ -2,7 +2,7 @@ from base64 import b64decode
 from typing import Dict, List, Optional, Tuple, Union
 
 from scrapy import Request
-from scrapy.http import Response, TextResponse
+from scrapy.http import Response, TextResponse, HtmlResponse
 from scrapy.responsetypes import responsetypes
 
 from scrapy_zyte_api.utils import (
@@ -70,7 +70,7 @@ class ZyteAPIMixin:
         }
 
 
-class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
+class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
         """Alternative constructor to instantiate the response from the raw
