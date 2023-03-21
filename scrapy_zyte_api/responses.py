@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from scrapy import Request
-from scrapy.http import Response, TextResponse
+from scrapy.http import HtmlResponse, Response, TextResponse
 from scrapy.http.cookies import CookieJar
 from scrapy.responsetypes import responsetypes
 
@@ -106,7 +106,7 @@ class ZyteAPIMixin:
         return result
 
 
-class ZyteAPITextResponse(ZyteAPIMixin, TextResponse):
+class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
     @classmethod
     def from_api_response(cls, api_response: Dict, *, request: Request = None):
         """Alternative constructor to instantiate the response from the raw
