@@ -220,12 +220,13 @@ def _set_http_request_cookies_from_request(
             (
                 "Request %(request)r would get %(count)r cookies, but request "
                 "cookie automatic mapping is limited to %(max)r cookies "
-                "(see the ZYTE_API_MAX_COOKIES setting). No cookie has been "
-                "added to this request. To silence this warning, set the "
-                "experimental.requestCookies Zyte API parameter, e.g. to an "
-                "empty dict. Alternatively, if Zyte API starts supporting "
-                "more than %(max)r request cookies, update the "
-                "ZYTE_API_MAX_COOKIES setting accordingly."
+                "(see the ZYTE_API_MAX_COOKIES setting), so only %(max)r "
+                "cookies have been added to this request. To silence this "
+                "warning, set the request cookies manually through the "
+                "experimental.requestCookies Zyte API parameter instead. "
+                "Alternatively, if Zyte API starts supporting more than "
+                "%(max)r request cookies, update the ZYTE_API_MAX_COOKIES "
+                "setting accordingly."
             ),
             {
                 "request": request,
@@ -233,7 +234,7 @@ def _set_http_request_cookies_from_request(
                 "max": max_cookies,
             },
         )
-        return
+        input_cookies = input_cookies[:max_cookies]
     for input_cookie in input_cookies:
         output_cookie = {
             "name": input_cookie.name,
