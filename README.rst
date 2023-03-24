@@ -383,11 +383,11 @@ parameters are chosen as follows by default:
 
         If the cookies to be set exceed the limit defined in the
         ``ZYTE_API_MAX_COOKIES`` setting (100 by default), a warning is logged,
-        and no cookies are set at all for the target request. To silence this
-        warning, set ``experimental.requestCookies`` manually, e.g. to an empty
-        dict. Alternatively, if Zyte API starts supporting more than 100
-        request cookies, update the ``ZYTE_API_MAX_COOKIES`` setting
-        accordingly.
+        and only as many cookies as the limit allows are set for the target
+        request. To silence this warning, set ``experimental.requestCookies``
+        manually, e.g. to an empty dict. Alternatively, if Zyte API starts
+        supporting more than 100 request cookies, update the
+        ``ZYTE_API_MAX_COOKIES`` setting accordingly.
 
         If you are using a custom downloader middleware to handle request
         cookiejars, you can point the ``ZYTE_API_COOKIE_MIDDLEWARE`` setting to
