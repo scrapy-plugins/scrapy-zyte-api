@@ -1,10 +1,13 @@
 from base64 import b64decode
-from typing import Dict, List, Optional, Tuple, Union
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from scrapy import Request
-from scrapy.http import Response, TextResponse, HtmlResponse
+from scrapy.http import HtmlResponse, Response, TextResponse
+from scrapy.http.cookies import CookieJar
 from scrapy.responsetypes import responsetypes
 
+from scrapy_zyte_api._cookies import _process_cookies
 from scrapy_zyte_api.utils import (
     _RESPONSE_HAS_ATTRIBUTES,
     _RESPONSE_HAS_IP_ADDRESS,
@@ -59,15 +62,48 @@ class ZyteAPIMixin:
         """
         return self._raw_api_response
 
+    @staticmethod
+    def _response_cookie_to_header_value(cookie):
+        result = f"{cookie['name']}={cookie['value']}; Domain={cookie['domain']}"
+        path = cookie.get("path")
+        if path is not None:
+            result += f"; Path={path}"
+        expires = cookie.get("expires")
+        if expires is not None:
+            expires_date = datetime.utcfromtimestamp(expires)
+            expires_date_string = expires_date.strftime("%a, %d %b %Y %H:%M:%S GMT")
+            result += f"; Expires={expires_date_string}"
+        if cookie.get("httpOnly"):
+            result += "; HttpOnly"
+        if cookie.get("secure"):
+            result += "; Secure"
+        same_site = cookie.get("sameSite")
+        if same_site is not None:
+            result += f"; SameSite={same_site}"
+        return result
+
     @classmethod
-    def _prepare_headers(cls, init_headers: Optional[List[Dict[str, str]]]):
-        if not init_headers:
-            return None
-        return {
-            h["name"]: h["value"]
-            for h in init_headers
-            if h["name"].lower() not in cls.REMOVE_HEADERS
-        }
+    def _prepare_headers(cls, api_response: Dict[str, Any]):
+        result: Dict[str, List[str]] = {}
+        input_headers: Optional[List[Dict[str, str]]] = api_response.get(
+            "httpResponseHeaders"
+        )
+        if input_headers:
+            result = {
+                h["name"]: [h["value"]]
+                for h in input_headers
+                if h["name"].lower() not in cls.REMOVE_HEADERS
+            }
+        input_cookies: Optional[List[Dict[str, str]]] = api_response.get(
+            "experimental", {}
+        ).get("responseCookies")
+        if input_cookies:
+            result["Set-Cookie"] = []
+            for cookie in input_cookies:
+                result["Set-Cookie"].append(
+                    cls._response_cookie_to_header_value(cookie)
+                )
+        return result
 
 
 class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
@@ -92,7 +128,7 @@ class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
             encoding=encoding,
             request=request,
             flags=["zyte-api"],
-            headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
+            headers=cls._prepare_headers(api_response),
             raw_api_response=api_response,
         )
 
@@ -113,7 +149,7 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
             body=b64decode(api_response.get("httpResponseBody") or ""),
             request=request,
             flags=["zyte-api"],
-            headers=cls._prepare_headers(api_response.get("httpResponseHeaders")),
+            headers=cls._prepare_headers(api_response),
             raw_api_response=api_response,
         )
 
@@ -126,7 +162,7 @@ _API_RESPONSE = Dict[str, _JSON]
 
 
 def _process_response(
-    api_response: _API_RESPONSE, request: Request
+    api_response: _API_RESPONSE, request: Request, cookie_jars: Dict[Any, CookieJar]
 ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
     """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
     this returns either a ``ZyteAPITextResponse`` or ``ZyteAPIResponse`` depending
@@ -138,6 +174,8 @@ def _process_response(
     # will be addressed in the future. Reference:
     # - https://github.com/scrapy-plugins/scrapy-zyte-api/pull/10#issuecomment-1131406460
     # For now, at least one of them should be present.
+
+    _process_cookies(api_response, request, cookie_jars)
 
     if api_response.get("browserHtml"):
         # Using TextResponse because browserHtml always returns a browser-rendered page

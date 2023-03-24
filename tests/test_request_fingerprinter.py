@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 import pytest
 from packaging.version import Version
 from scrapy import __version__ as SCRAPY_VERSION
@@ -6,11 +8,11 @@ if Version(SCRAPY_VERSION) < Version("2.7"):
     pytest.skip("Skipping tests for Scrapy ≥ 2.7", allow_module_level=True)
 
 from scrapy import Request
-from scrapy.settings.default_settings import REQUEST_FINGERPRINTER_CLASS
-from scrapy.utils.misc import create_instance, load_object
-from scrapy.utils.test import get_crawler
+from scrapy.utils.misc import create_instance
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
+
+from . import SETTINGS, get_crawler
 
 
 def test_cache():
@@ -31,7 +33,7 @@ def test_fallback_custom():
     settings = {
         "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS": CustomFingerprinter,
     }
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(settings)
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
@@ -42,15 +44,12 @@ def test_fallback_custom():
 
 
 def test_fallback_default():
-    crawler = get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
+    crawler = get_crawler(SETTINGS)
+    fingerprinter = crawler.request_fingerprinter
+    fallback_fingerprinter = (
+        crawler.request_fingerprinter._fallback_request_fingerprinter
     )
-    fallback_fingerprinter = create_instance(
-        load_object(REQUEST_FINGERPRINTER_CLASS),
-        settings=crawler.settings,
-        crawler=crawler,
-    )
+
     request = Request("https://example.com")
     new_fingerprint = fingerprinter.fingerprint(request)
     old_fingerprint = fallback_fingerprinter.fingerprint(request)
@@ -181,7 +180,7 @@ def test_known_fingerprints(url, params, fingerprint):
 
 def test_metadata():
     settings = {"JOB": "1/2/3"}
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(settings)
     job_fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
@@ -209,18 +208,15 @@ def test_only_end_parameters_matter():
     parameters, that the fingerprint is the same if the parameters actually
     sent to Zyte API are the same."""
 
-    settings = {
+    settings: Dict[str, Any] = {
+        **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings_dict=settings)
-    transparent_fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    crawler = get_crawler(settings)
+    transparent_fingerprinter = crawler.request_fingerprinter
 
-    crawler = get_crawler()
-    default_fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    crawler = get_crawler(SETTINGS)
+    default_fingerprinter = crawler.request_fingerprinter
 
     request = Request("https://example.com")
     fingerprint1 = transparent_fingerprinter.fingerprint(request)
@@ -228,7 +224,15 @@ def test_only_end_parameters_matter():
 
     raw_request = Request(
         "https://example.com",
-        meta={"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": True}},
+        meta={
+            "zyte_api": {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                },
+            }
+        },
     )
     fingerprint3 = transparent_fingerprinter.fingerprint(raw_request)
     fingerprint4 = default_fingerprinter.fingerprint(raw_request)

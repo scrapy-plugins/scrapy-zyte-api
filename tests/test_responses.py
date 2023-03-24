@@ -1,21 +1,53 @@
 from base64 import b64encode
+from collections import defaultdict
+from functools import partial
 
 import pytest
 from scrapy import Request
 from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
+from scrapy.http.cookies import CookieJar
 
 from scrapy_zyte_api.responses import (
     _API_RESPONSE,
     ZyteAPIResponse,
     ZyteAPITextResponse,
-    _process_response,
 )
+from scrapy_zyte_api.responses import _process_response as _unwrapped_process_response
 from scrapy_zyte_api.utils import _RESPONSE_HAS_IP_ADDRESS, _RESPONSE_HAS_PROTOCOL
 
 PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
 PAGE_CONTENT_2 = "<html><body>Ceci n’est pas une pipe</body></html>"
 URL = "https://example.com"
+
+
+INPUT_COOKIES = [
+    {
+        "name": "a",
+        "value": "b",
+        "domain": ".example.com",
+        "path": "/",
+        "expires": 1679893056,
+        "httpOnly": True,
+        "secure": True,
+    },
+]
+OUTPUT_COOKIE_HEADERS = {
+    b"Set-Cookie": [
+        (
+            b"a=b; "
+            b"Domain=.example.com; "
+            b"Path=/; "
+            b"Expires=Mon, 27 Mar 2023 04:57:36 GMT; "
+            b"HttpOnly; "
+            b"Secure"
+        )
+    ]
+}
+
+_process_response = partial(
+    _unwrapped_process_response, cookie_jars=defaultdict(CookieJar)
+)
 
 
 def raw_api_response_browser():
@@ -29,6 +61,9 @@ def raw_api_response_browser():
             {"name": "Content-Length", "value": len(PAGE_CONTENT)},
         ],
         "statusCode": 200,
+        "experimental": {
+            "responseCookies": INPUT_COOKIES,
+        },
     }
 
 
@@ -42,6 +77,9 @@ def raw_api_response_body():
             {"name": "Content-Length", "value": len(PAGE_CONTENT)},
         ],
         "statusCode": 200,
+        "experimental": {
+            "responseCookies": INPUT_COOKIES,
+        },
     }
 
 
@@ -56,6 +94,9 @@ def raw_api_response_mixed():
             {"name": "Content-Length", "value": len(PAGE_CONTENT_2)},
         ],
         "statusCode": 200,
+        "experimental": {
+            "responseCookies": INPUT_COOKIES,
+        },
     }
 
 
@@ -103,6 +144,7 @@ def test_text_from_api_response(api_response, cls, content_length):
     expected_headers = {
         b"Content-Type": [b"text/html"],
         b"Content-Length": [str(content_length).encode()],
+        **OUTPUT_COOKIE_HEADERS,
     }
     assert response.headers == expected_headers
     assert response.body == EXPECTED_BODY
@@ -184,7 +226,7 @@ def test_response_headers_removal(api_response, cls):
     """Headers like 'Content-Encoding' should be removed later in the response
     instance returned to Scrapy.
 
-    However, it should still be present inside 'raw_api_response.headers'.
+    However, they should still be present inside 'raw_api_response.headers'.
     """
     additional_headers = [
         {"name": "Content-Encoding", "value": "gzip"},
@@ -195,7 +237,10 @@ def test_response_headers_removal(api_response, cls):
 
     response = cls.from_api_response(raw_response)
 
-    assert response.headers == {b"X-Some-Other-Value": [b"123"]}
+    assert response.headers == {
+        b"X-Some-Other-Value": [b"123"],
+        **OUTPUT_COOKIE_HEADERS,
+    }
     assert (
         response.raw_api_response["httpResponseHeaders"]
         == raw_response["httpResponseHeaders"]

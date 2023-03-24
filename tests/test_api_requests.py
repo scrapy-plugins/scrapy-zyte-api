@@ -1,9 +1,11 @@
 import sys
 from asyncio import iscoroutine
+from collections import defaultdict
 from copy import copy
 from functools import partial
+from http.cookiejar import Cookie
 from inspect import isclass
-from typing import Any, Dict
+from typing import Any, Dict, cast
 from unittest import mock
 from unittest.mock import patch
 
@@ -11,17 +13,26 @@ import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
+from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response, TextResponse
+from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
-from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred
 from zyte_api.aio.errors import RequestError
 
+from scrapy_zyte_api._cookies import _get_cookie_jar
 from scrapy_zyte_api.handler import _ParamParser
+from scrapy_zyte_api.responses import _process_response
 
-from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS
+from . import (
+    DEFAULT_CLIENT_CONCURRENCY,
+    SETTINGS,
+    get_crawler,
+    get_download_handler,
+    get_downloader_middleware,
+)
 from .mockserver import DelayedResource, MockServer, produce_request_response
 
 
@@ -230,13 +241,14 @@ async def test_higher_concurrency():
                 raise CloseSpider
 
         crawler = get_crawler(
-            TestSpider,
             {
                 **SETTINGS,
                 "CONCURRENT_REQUESTS": concurrency,
                 "CONCURRENT_REQUESTS_PER_DOMAIN": concurrency,
                 "ZYTE_API_URL": server.urljoin("/"),
             },
+            TestSpider,
+            setup_engine=False,
         )
         await crawler.crawl()
 
@@ -249,6 +261,8 @@ DEFAULT_PARAMS: Dict[str, Any] = {}
 TRANSPARENT_MODE = False
 SKIP_HEADERS = {b"cookie", b"user-agent"}
 JOB_ID = None
+COOKIES_ENABLED = False
+MAX_COOKIES = 100
 GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
     "transparent_mode": TRANSPARENT_MODE,
@@ -256,6 +270,8 @@ GET_API_PARAMS_KWARGS = {
     "skip_headers": SKIP_HEADERS,
     "browser_headers": BROWSER_HEADERS,
     "job_id": JOB_ID,
+    "cookies_enabled": COOKIES_ENABLED,
+    "max_cookies": MAX_COOKIES,
 }
 
 
@@ -265,16 +281,18 @@ async def test_params_parser_input_default(mockserver):
         for key in GET_API_PARAMS_KWARGS:
             actual = getattr(handler._param_parser, f"_{key}")
             expected = GET_API_PARAMS_KWARGS[key]
-            assert actual == expected
+            assert actual == expected, key
 
 
 @ensureDeferred
 async def test_param_parser_input_custom(mockserver):
     settings = {
         "JOB": "1/2/3",
+        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_AUTOMAP_PARAMS": {"c": "d"},
         "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
         "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
+        "ZYTE_API_MAX_COOKIES": 1,
         "ZYTE_API_SKIP_HEADERS": {"A"},
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -282,8 +300,10 @@ async def test_param_parser_input_custom(mockserver):
         parser = handler._param_parser
         assert parser._automap_params == {"c": "d"}
         assert parser._browser_headers == {b"b": "b"}
+        assert parser._cookies_enabled is True
         assert parser._default_params == {"a": "b"}
         assert parser._job_id == "1/2/3"
+        assert parser._max_cookies == 1
         assert parser._skip_headers == {b"a"}
         assert parser._transparent_mode is True
 
@@ -404,9 +424,10 @@ def test_transparent_mode_toggling(setting, meta, expected):
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com", meta=meta)
-    settings = {"ZYTE_API_TRANSPARENT_MODE": setting}
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    settings = {**SETTINGS, "ZYTE_API_TRANSPARENT_MODE": setting}
+    crawler = get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     func = partial(param_parser.parse, request)
     if isclass(expected):
         with pytest.raises(expected):
@@ -426,7 +447,7 @@ def test_api_disabling_deprecated(meta):
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
     crawler = get_crawler()
-    param_parser = _ParamParser(crawler.settings)
+    param_parser = _ParamParser(crawler)
     with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
         api_params = param_parser.parse(request)
     assert api_params is None
@@ -440,7 +461,7 @@ def test_bad_meta_type(key, value):
     :exc:`ValueError` exception."""
     request = Request(url="https://example.com", meta={key: value})
     crawler = get_crawler()
-    param_parser = _ParamParser(crawler.settings)
+    param_parser = _ParamParser(crawler)
     with pytest.raises(ValueError):
         param_parser.parse(request)
 
@@ -457,9 +478,10 @@ async def test_job_id(meta, mockserver):
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com", meta={meta: True})
-    settings = {"JOB": "1/2/3"}
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    settings: Dict[str, Any] = {**SETTINGS, "JOB": "1/2/3"}
+    crawler = get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     api_params = param_parser.parse(request)
     assert api_params["jobId"] == "1/2/3"
 
@@ -495,12 +517,23 @@ async def test_default_params_none(mockserver, caplog):
     [
         ({}, {}, {}, []),
         ({}, {"b": 2}, {"b": 2}, []),
-        ({}, {"b": None}, {}, ["does not define such a parameter"]),
+        ({}, {"b": None}, {}, ["parameter b is None"]),
         ({"a": 1}, {}, {"a": 1}, []),
         ({"a": 1}, {"b": 2}, {"a": 1, "b": 2}, []),
-        ({"a": 1}, {"b": None}, {"a": 1}, ["does not define such a parameter"]),
+        ({"a": 1}, {"b": None}, {"a": 1}, ["parameter b is None"]),
         ({"a": 1}, {"a": 2}, {"a": 2}, []),
         ({"a": 1}, {"a": None}, {}, []),
+        ({"a": {"b": 1}}, {}, {"a": {"b": 1}}, []),
+        ({"a": {"b": 1}}, {"a": {"c": 1}}, {"a": {"b": 1, "c": 1}}, []),
+        (
+            {"a": {"b": 1}},
+            {"a": {"c": None}},
+            {"a": {"b": 1}},
+            ["parameter a.c is None"],
+        ),
+        ({"a": {"b": 1}}, {"a": {"b": 2}}, {"a": {"b": 2}}, []),
+        ({"a": {"b": 1}}, {"a": {"b": None}}, {}, []),
+        ({"a": {"b": 1, "c": 1}}, {"a": {"b": None}}, {"a": {"c": 1}}, []),
     ],
 )
 @pytest.mark.parametrize(
@@ -531,9 +564,10 @@ def test_default_params_merging(
     """
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
-    settings = {setting_key: setting}
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    settings = {**SETTINGS, setting_key: setting}
+    crawler = get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     for key in ignore_keys:
@@ -584,19 +618,53 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
     default_params = copy(setting)
-    settings = {setting_key: setting}
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    settings = {**SETTINGS, setting_key: setting}
+    crawler = get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     param_parser.parse(request)
     assert default_params == setting
 
 
-def _test_automap(settings, request_kwargs, meta, expected, warnings, caplog):
+def _test_automap(
+    settings, request_kwargs, meta, expected, warnings, caplog, cookie_jar=None
+):
     request = Request(url="https://example.com", **request_kwargs)
     request.meta["zyte_api_automap"] = meta
-    settings = {**settings, "ZYTE_API_TRANSPARENT_MODE": True}
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    settings = {**SETTINGS, **settings, "ZYTE_API_TRANSPARENT_MODE": True}
+    crawler = get_crawler(settings)
+    if "cookies" in request_kwargs:
+        try:
+            cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+        except ValueError:
+            pass
+        else:
+            cookie_middleware.process_request(request, spider=None)
+            if cookie_jar:
+                _cookie_jar = _get_cookie_jar(request, cookie_middleware.jars)
+                for cookie in cookie_jar:
+                    _cookie = Cookie(
+                        version=1,
+                        name=cookie["name"],
+                        value=cookie["value"],
+                        port=None,
+                        port_specified=False,
+                        domain=cookie["domain"],
+                        domain_specified=True,
+                        domain_initial_dot=cookie["domain"].startswith("."),
+                        path=cookie.get("path", "/"),
+                        path_specified="path" in cookie,
+                        secure=cookie.get("secure", False),
+                        expires=cookie.get("expires", None),
+                        discard=False,
+                        comment=None,
+                        comment_url=None,
+                        rest={},
+                    )
+                    _cookie_jar.set_cookie(_cookie)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     api_params.pop("url")
@@ -1321,15 +1389,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         # dropped with a warning.
         # If all headers are unsupported, the header parameter is not even set.
         (
-            {"Cookie": "a=b"},
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
-        (
             {"a": "b"},
             {"browserHtml": True},
             {
@@ -1338,15 +1397,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             ["cannot be mapped"],
         ),
         # Headers with an empty string as value are not silently ignored.
-        (
-            {"Cookie": ""},
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["cannot be mapped"],
-        ),
         (
             {"a": ""},
             {"browserHtml": True},
@@ -1442,10 +1492,9 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
         # in the future.
         (
             {
-                "ZYTE_API_SKIP_HEADERS": ["Cookie"],
+                "ZYTE_API_SKIP_HEADERS": [],
             },
             {
-                "Cookie": "",
                 "User-Agent": "",
             },
             {},
@@ -1456,9 +1505,7 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
                     {"name": "User-Agent", "value": ""},
                 ],
             },
-            [
-                "defines header b'Cookie', which cannot be mapped",
-            ],
+            [],
         ),
         # You may update the ZYTE_API_BROWSER_HEADERS setting to extend support
         # for new fields that the requestHeaders parameter may support in the
@@ -1482,6 +1529,773 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
 )
 def test_automap_header_settings(settings, headers, meta, expected, warnings, caplog):
     _test_automap(settings, {"headers": headers}, meta, expected, warnings, caplog)
+
+
+REQUEST_INPUT_COOKIES_EMPTY: Dict[str, str] = {}
+REQUEST_INPUT_COOKIES_MINIMAL_DICT = {"a": "b"}
+REQUEST_INPUT_COOKIES_MINIMAL_LIST = [{"name": "a", "value": "b"}]
+REQUEST_INPUT_COOKIES_MAXIMAL = [
+    {"name": "c", "value": "d", "domain": "example.com", "path": "/"}
+]
+REQUEST_OUTPUT_COOKIES_MINIMAL = [{"name": "a", "value": "b", "domain": "example.com"}]
+REQUEST_OUTPUT_COOKIES_MAXIMAL = [
+    {"name": "c", "value": "d", "domain": ".example.com", "path": "/"}
+]
+
+
+@pytest.mark.parametrize(
+    "settings,cookies,meta,params,expected,warnings,cookie_jar",
+    [
+        # Cookies, both for requests and for responses, are enabled based on
+        # both ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED (default: False) and
+        # COOKIES_ENABLED (default: True).
+        *(
+            (
+                settings,
+                input_cookies,
+                {},
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                },
+                setup_warnings
+                or (
+                    run_time_warnings
+                    if cast(Dict, settings).get("COOKIES_ENABLED", True)
+                    else []
+                ),
+                [],
+            )
+            for input_cookies, run_time_warnings in (
+                (
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    [],
+                ),
+                (
+                    REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                    [
+                        "there are cookies in the cookiejar, but ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is False",
+                    ],
+                ),
+            )
+            for settings, setup_warnings in (
+                (
+                    {},
+                    [],
+                ),
+                (
+                    {
+                        "COOKIES_ENABLED": True,
+                    },
+                    [],
+                ),
+                (
+                    {
+                        "COOKIES_ENABLED": False,
+                    },
+                    [],
+                ),
+                (
+                    {
+                        "COOKIES_ENABLED": False,
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    [
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is True, but it will have no effect because COOKIES_ENABLED is False.",
+                    ],
+                ),
+                (
+                    {
+                        "COOKIES_ENABLED": False,
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": False,
+                    },
+                    [],
+                ),
+            )
+        ),
+        *(
+            (
+                settings,
+                input_cookies,
+                {},
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "experimental": {
+                        "responseCookies": True,
+                        **cast(Dict, output_cookies),
+                    },
+                },
+                [],
+                [],
+            )
+            for input_cookies, output_cookies in (
+                (
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {},
+                ),
+                (
+                    REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                    {"requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL},
+                ),
+            )
+            for settings in (
+                {
+                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                },
+                {
+                    "COOKIES_ENABLED": True,
+                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                },
+            )
+        ),
+        # Do not warn about request cookies not being mapped if cookies are
+        # manually set.
+        *(
+            (
+                settings,
+                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                {},
+                {
+                    "experimental": {
+                        "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                    }
+                },
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "experimental": {
+                        "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                    },
+                },
+                [],
+                [],
+            )
+            for settings in (
+                {},
+                {
+                    "COOKIES_ENABLED": True,
+                },
+            )
+        ),
+        # dont_merge_cookies=True on request metadata disables cookies.
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {
+                "dont_merge_cookies": True,
+            },
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+            [],
+        ),
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {
+                "dont_merge_cookies": True,
+            },
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+            [],
+        ),
+        # Do not warn about request cookies not being mapped if
+        # dont_merge_cookies=True is set on request metadata.
+        *(
+            (
+                settings,
+                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                {
+                    "dont_merge_cookies": True,
+                },
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                },
+                [],
+                [
+                    {
+                        "name": "foo",
+                        "value": "bar",
+                        "domain": "example.com",
+                    }
+                ],
+            )
+            for settings in (
+                {},
+                {
+                    "COOKIES_ENABLED": True,
+                },
+            )
+        ),
+        # Cookies can be disabled setting the corresponding Zyte API parameter
+        # to False.
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {},
+            {
+                "experimental": {
+                    "responseCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+            [],
+        ),
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {},
+            {
+                "experimental": {
+                    "requestCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {"responseCookies": True},
+            },
+            [],
+            [],
+        ),
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {},
+            {
+                "experimental": {
+                    "responseCookies": False,
+                    "requestCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+            [],
+        ),
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "experimental": {
+                    "responseCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                },
+            },
+            [],
+            [],
+        ),
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "experimental": {
+                    "requestCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {"responseCookies": True},
+            },
+            [],
+            [],
+        ),
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "experimental": {
+                    "responseCookies": False,
+                    "requestCookies": False,
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+            [],
+        ),
+        # Cookies work for browser requests as well.
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                },
+            },
+            [],
+            [],
+        ),
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "screenshot": True,
+            },
+            {
+                "screenshot": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                },
+            },
+            [],
+            [],
+        ),
+        # Cookies are mapped correctly, both with minimum and maximum cookie
+        # parameters.
+        *(
+            (
+                {
+                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                },
+                input,
+                {},
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "experimental": {
+                        "responseCookies": True,
+                        "requestCookies": output,
+                    },
+                },
+                [],
+                [],
+            )
+            for input, output in (
+                (
+                    REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                    REQUEST_OUTPUT_COOKIES_MINIMAL,
+                ),
+                (
+                    REQUEST_INPUT_COOKIES_MINIMAL_LIST,
+                    REQUEST_OUTPUT_COOKIES_MINIMAL,
+                ),
+                (
+                    REQUEST_INPUT_COOKIES_MAXIMAL,
+                    REQUEST_OUTPUT_COOKIES_MAXIMAL,
+                ),
+            )
+        ),
+        # requestCookies, if set manually, prevents automatic mapping.
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "experimental": {
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MAXIMAL,
+                },
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MAXIMAL,
+                },
+            },
+            [],
+            [],
+        ),
+        # Mapping multiple cookies works.
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            {"a": "b", "c": "d"},
+            {},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": [
+                        {"name": "a", "value": "b", "domain": "example.com"},
+                        {"name": "c", "value": "d", "domain": "example.com"},
+                    ],
+                },
+            },
+            [],
+            [],
+        ),
+    ],
+)
+def test_automap_cookies(
+    settings, cookies, meta, params, expected, warnings, cookie_jar, caplog
+):
+    _test_automap(
+        settings,
+        {"cookies": cookies, "meta": meta},
+        params,
+        expected,
+        warnings,
+        caplog,
+        cookie_jar=cookie_jar,
+    )
+
+
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {},
+        {"zyte_api_automap": {"browserHtml": True}},
+    ],
+)
+def test_automap_all_cookies(meta):
+    """Because of scenarios like cross-domain redirects and browser rendering,
+    Zyte API requests should include all cookie jar cookies, regardless of
+    the target URL domain."""
+    settings: Dict[str, Any] = {
+        **SETTINGS,
+        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+
+    # Start from a cookiejar with an existing cookie for a.example.
+    pre_request = Request(
+        url="https://a.example",
+        meta=meta,
+        cookies={"a": "b"},
+    )
+    cookie_middleware.process_request(pre_request, spider=None)
+
+    # Send a request to c.example, with a cookie for b.example, and ensure that
+    # it includes the cookies for a.example and b.example.
+    request1 = Request(
+        url="https://c.example",
+        meta=meta,
+        cookies=[
+            {
+                "name": "c",
+                "value": "d",
+                "domain": "b.example",
+            },
+        ],
+    )
+    cookie_middleware.process_request(request1, spider=None)
+    api_params = param_parser.parse(request1)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "a", "value": "b", "domain": "a.example"},
+        # https://github.com/scrapy/scrapy/issues/5841
+        # {"name": "c", "value": "d", "domain": "b.example"},
+    ]
+
+    # Have the response set a cookie for c.example and d.example.
+    api_response: Dict[str, Any] = {
+        "url": "https://c.example",
+        "httpResponseBody": "",
+        "statusCode": 200,
+        "experimental": {
+            "responseCookies": [
+                {
+                    "name": "e",
+                    "value": "f",
+                    "domain": ".c.example",
+                },
+                {
+                    "name": "g",
+                    "value": "h",
+                    "domain": ".d.example",
+                },
+            ],
+        },
+    }
+    assert handler._cookie_jars is not None  # typing
+    response = _process_response(api_response, request1, handler._cookie_jars)
+    cookie_middleware.process_response(request1, response, spider=None)
+
+    # Send a second request to e.example, and ensure that cookies
+    # for all other domains are included.
+    request2 = Request(
+        url="https://e.example",
+        meta=meta,
+    )
+    cookie_middleware.process_request(request2, spider=None)
+    api_params = param_parser.parse(request2)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "e", "value": "f", "domain": ".c.example"},
+        {"name": "g", "value": "h", "domain": ".d.example"},
+        {"name": "a", "value": "b", "domain": "a.example"},
+        # https://github.com/scrapy/scrapy/issues/5841
+        # {"name": "c", "value": "d", "domain": "b.example"},
+    ]
+
+
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {},
+        {"zyte_api_automap": {"browserHtml": True}},
+    ],
+)
+def test_automap_cookie_jar(meta):
+    """Test that cookies from the right jar are used."""
+    request1 = Request(
+        url="https://example.com/1", meta={**meta, "cookiejar": "a"}, cookies={"z": "y"}
+    )
+    request2 = Request(url="https://example.com/2", meta={**meta, "cookiejar": "b"})
+    request3 = Request(
+        url="https://example.com/3", meta={**meta, "cookiejar": "a"}, cookies={"x": "w"}
+    )
+    request4 = Request(url="https://example.com/4", meta={**meta, "cookiejar": "a"})
+    settings: Dict[str, Any] = {
+        **SETTINGS,
+        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+
+    cookie_middleware.process_request(request1, spider=None)
+    api_params = param_parser.parse(request1)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "z", "value": "y", "domain": "example.com"}
+    ]
+
+    cookie_middleware.process_request(request2, spider=None)
+    api_params = param_parser.parse(request2)
+    assert "requestCookies" not in api_params["experimental"]
+
+    cookie_middleware.process_request(request3, spider=None)
+
+    api_params = param_parser.parse(request3)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "x", "value": "w", "domain": "example.com"},
+        {"name": "z", "value": "y", "domain": "example.com"},
+    ]
+
+    cookie_middleware.process_request(request4, spider=None)
+    api_params = param_parser.parse(request4)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "x", "value": "w", "domain": "example.com"},
+        {"name": "z", "value": "y", "domain": "example.com"},
+    ]
+
+
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {},
+        {"zyte_api_automap": {"browserHtml": True}},
+    ],
+)
+def test_automap_cookie_limit(meta, caplog):
+    settings: Dict[str, Any] = {
+        **SETTINGS,
+        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+        "ZYTE_API_MAX_COOKIES": 1,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    cookiejar = 0
+
+    # Verify that request with 1 cookie works as expected.
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"z": "y"},
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "z", "value": "y", "domain": "example.com"}
+    ]
+    assert not caplog.records
+    caplog.clear()
+
+    # Verify that requests with 2 cookies results in only 1 cookie set and a
+    # warning.
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"z": "y", "x": "w"},
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "x", "value": "w", "domain": "example.com"}
+    ]
+    assert "would get 2 cookies" in caplog.text
+    assert "limited to 1 cookies" in caplog.text
+    caplog.clear()
+
+    # Verify that 1 cookie in the cookie jar and 1 cookie in the request count
+    # as 2 cookies, resulting in only 1 cookie set and a warning.
+    pre_request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"z": "y"},
+    )
+    cookie_middleware.process_request(pre_request, spider=None)
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"x": "w"},
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "x", "value": "w", "domain": "example.com"}
+    ]
+    assert "would get 2 cookies" in caplog.text
+    assert "limited to 1 cookies" in caplog.text
+    caplog.clear()
+
+    # Vefify that unrelated-domain cookies count for the limit.
+    pre_request = Request(
+        url="https://other.example/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"z": "y"},
+    )
+    cookie_middleware.process_request(pre_request, spider=None)
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"x": "w"},
+    )
+    cookiejar += 1
+    cookie_middleware.process_request(request, spider=None)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "x", "value": "w", "domain": "example.com"}
+    ]
+    assert "would get 2 cookies" in caplog.text
+    assert "limited to 1 cookies" in caplog.text
+    caplog.clear()
+
+
+class CustomCookieJar(CookieJar):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.jar.set_cookie(
+            Cookie(
+                1,
+                "z",
+                "y",
+                None,
+                False,
+                "example.com",
+                True,
+                False,
+                "/",
+                False,
+                False,
+                None,
+                False,
+                None,
+                None,
+                {},
+            )
+        )
+
+
+class CustomCookieMiddleware(CookiesMiddleware):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.jars = defaultdict(CustomCookieJar)
+
+
+def test_automap_custom_cookie_middleware():
+    mw_cls = CustomCookieMiddleware
+    settings = {
+        **SETTINGS,
+        "DOWNLOADER_MIDDLEWARES": {
+            "scrapy.downloadermiddlewares.cookies.CookiesMiddleware": None,
+            f"{mw_cls.__module__}.{mw_cls.__qualname__}": 700,
+        },
+        "ZYTE_API_COOKIE_MIDDLEWARE": f"{mw_cls.__module__}.{mw_cls.__qualname__}",
+        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    cookie_middleware = get_downloader_middleware(crawler, mw_cls)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+
+    request = Request(url="https://example.com/1")
+    cookie_middleware.process_request(request, spider=None)
+    api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "z", "value": "y", "domain": "example.com"}
+    ]
 
 
 @pytest.mark.parametrize(
@@ -1608,7 +2422,18 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
         (
             {"browserHtml": True},
             {"screenshot": True, "browserHtml": False},
-            {"screenshot": True},
+            {
+                "screenshot": True,
+            },
+            [],
+        ),
+        (
+            {},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
             [],
         ),
     ],
@@ -1620,11 +2445,13 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
     request = Request(url="https://example.com")
     request.meta["zyte_api_automap"] = meta
     settings = {
+        **SETTINGS,
         "ZYTE_API_AUTOMAP_PARAMS": default_params,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings_dict=settings)
-    param_parser = _ParamParser(crawler.settings)
+    crawler = get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     api_params.pop("url")

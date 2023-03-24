@@ -1,12 +1,15 @@
 from base64 import b64decode, b64encode
 from copy import copy
 from logging import getLogger
-from typing import Any, Dict, Mapping, Optional, Set
+from typing import Any, Dict, List, Mapping, Optional, Set
 from warnings import warn
 
 from scrapy import Request
+from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
+
+from ._cookies import _get_all_cookies
 
 logger = getLogger(__name__)
 
@@ -53,7 +56,10 @@ def _map_custom_http_request_headers(
         header_parameter="customHttpRequestHeaders",
     ):
         if lowercase_k in skip_headers:
-            if lowercase_k != b"user-agent" or decoded_v != DEFAULT_USER_AGENT:
+            if not (
+                lowercase_k == b"cookie"
+                or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
+            ):
                 logger.warning(
                     f"Request {request} defines header {k}, which "
                     f"cannot be mapped into the Zyte API "
@@ -89,6 +95,7 @@ def _map_request_headers(
                 lowercase_k == b"accept-language"
                 and decoded_v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
             )
+            or lowercase_k == b"cookie"
             or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
         ):
             logger.warning(
@@ -183,6 +190,64 @@ def _set_http_response_headers_from_request(
         api_params.pop("httpResponseHeaders")
 
 
+def _set_http_response_cookies_from_request(
+    *,
+    api_params: Dict[str, Any],
+):
+    api_params.setdefault("experimental", {})
+    api_params["experimental"].setdefault("responseCookies", True)
+    if api_params["experimental"]["responseCookies"] is False:
+        del api_params["experimental"]["responseCookies"]
+
+
+def _set_http_request_cookies_from_request(
+    *,
+    api_params: Dict[str, Any],
+    request: Request,
+    cookie_jars: Dict[Any, CookieJar],
+    max_cookies: int,
+):
+    api_params.setdefault("experimental", {})
+    if "requestCookies" in api_params["experimental"]:
+        if api_params["experimental"]["requestCookies"] is False:
+            del api_params["experimental"]["requestCookies"]
+        return
+    output_cookies = []
+    input_cookies = _get_all_cookies(request, cookie_jars)
+    input_cookie_count = len(input_cookies)
+    if input_cookie_count > max_cookies:
+        logger.warning(
+            (
+                "Request %(request)r would get %(count)r cookies, but request "
+                "cookie automatic mapping is limited to %(max)r cookies "
+                "(see the ZYTE_API_MAX_COOKIES setting), so only %(max)r "
+                "cookies have been added to this request. To silence this "
+                "warning, set the request cookies manually through the "
+                "experimental.requestCookies Zyte API parameter instead. "
+                "Alternatively, if Zyte API starts supporting more than "
+                "%(max)r request cookies, update the ZYTE_API_MAX_COOKIES "
+                "setting accordingly."
+            ),
+            {
+                "request": request,
+                "count": input_cookie_count,
+                "max": max_cookies,
+            },
+        )
+        input_cookies = input_cookies[:max_cookies]
+    for input_cookie in input_cookies:
+        output_cookie = {
+            "name": input_cookie.name,
+            "value": input_cookie.value,
+            "domain": input_cookie.domain,
+        }
+        if input_cookie.path_specified:
+            output_cookie["path"] = input_cookie.path
+        output_cookies.append(output_cookie)
+    if output_cookies:
+        api_params["experimental"]["requestCookies"] = output_cookies
+
+
 def _set_http_request_method_from_request(
     *,
     api_params: Dict[str, Any],
@@ -254,6 +319,9 @@ def _update_api_params_from_request(
     meta_params: Dict[str, Any],
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
+    cookies_enabled: bool,
+    cookie_jars: Optional[Dict[Any, CookieJar]],
+    max_cookies: int,
 ):
     _set_http_response_body_from_request(api_params=api_params, request=request)
     _set_http_response_headers_from_request(
@@ -269,6 +337,17 @@ def _update_api_params_from_request(
         browser_headers=browser_headers,
     )
     _set_http_request_body_from_request(api_params=api_params, request=request)
+    if cookies_enabled:
+        assert cookie_jars is not None  # typing
+        _set_http_response_cookies_from_request(api_params=api_params)
+        _set_http_request_cookies_from_request(
+            api_params=api_params,
+            request=request,
+            cookie_jars=cookie_jars,
+            max_cookies=max_cookies,
+        )
+        if not api_params["experimental"]:
+            del api_params["experimental"]
     _unset_unneeded_api_params(
         api_params=api_params, request=request, default_params=default_params
     )
@@ -299,21 +378,33 @@ def _merge_params(
     param: str,
     setting: str,
     request: Request,
+    context: Optional[List[str]] = None,
 ):
     params = copy(default_params)
     meta_params = copy(meta_params)
+    context = context or []
     for k in list(meta_params):
-        if meta_params[k] is not None:
+        if isinstance(meta_params[k], dict):
+            meta_params[k] = _merge_params(
+                default_params=params.get(k, {}),
+                meta_params=meta_params[k],
+                param=param,
+                setting=setting,
+                request=request,
+                context=context + [k],
+            )
+        if meta_params[k] not in (None, {}):
             continue
         meta_params.pop(k)
         if k in params:
             params.pop(k)
         else:
+            qual_param = ".".join(context + [k])
             logger.warning(
-                f"In request {request} {param!r} parameter {k} is None, "
-                f"which is a value reserved to unset parameters defined in "
-                f"the {setting} setting, but the setting does not define such "
-                f"a parameter."
+                f"In request {request} {param!r} parameter {qual_param} is "
+                f"None, which is a value reserved to unset parameters defined "
+                f"in the {setting} setting, but the setting does not define "
+                f"such a parameter."
             )
     params.update(meta_params)
     return params
@@ -358,6 +449,9 @@ def _get_automap_params(
     default_params: Dict[str, Any],
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
+    cookies_enabled: bool,
+    cookie_jars: Optional[Dict[Any, CookieJar]],
+    max_cookies: int,
 ):
     meta_params = request.meta.get("zyte_api_automap", default_enabled)
     if meta_params is False:
@@ -384,6 +478,9 @@ def _get_automap_params(
         meta_params=meta_params,
         skip_headers=skip_headers,
         browser_headers=browser_headers,
+        cookies_enabled=cookies_enabled,
+        cookie_jars=cookie_jars,
+        max_cookies=max_cookies,
     )
 
     return params
@@ -398,6 +495,9 @@ def _get_api_params(
     skip_headers: Set[str],
     browser_headers: Dict[str, str],
     job_id: Optional[str],
+    cookies_enabled: bool,
+    cookie_jars: Optional[Dict[Any, CookieJar]],
+    max_cookies: int,
 ) -> Optional[dict]:
     """Returns a dictionary of API parameters that must be sent to Zyte API for
     the specified request, or None if the request should not be sent through
@@ -410,6 +510,9 @@ def _get_api_params(
             default_params=automap_params,
             skip_headers=skip_headers,
             browser_headers=browser_headers,
+            cookies_enabled=cookies_enabled,
+            cookie_jars=cookie_jars,
+            max_cookies=max_cookies,
         )
         if api_params is None:
             return None
@@ -430,11 +533,12 @@ def _get_api_params(
 def _load_default_params(settings, setting):
     params = settings.getdict(setting)
     for param in list(params):
-        if params[param] is not None:
+        if params[param] not in (None, {}):
             continue
         logger.warning(
-            f"Parameter {param!r} in the {setting} setting is None. Default "
-            f"parameters should never be None."
+            f"Parameter {param!r} in the {setting} setting is "
+            f"{params[param]!r}. Default parameters should never be "
+            f"{params[param]!r}."
         )
         params.pop(param)
     return params
@@ -459,16 +563,35 @@ def _load_browser_headers(settings):
 
 
 class _ParamParser:
-    def __init__(self, settings):
+    def __init__(self, crawler, cookies_enabled=None):
+        settings = crawler.settings
         self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
         self._browser_headers = _load_browser_headers(settings)
         self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
         self._job_id = settings.get("JOB")
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._skip_headers = _load_skip_headers(settings)
+        self._warn_on_cookies = False
+        if cookies_enabled is not None:
+            self._cookies_enabled = cookies_enabled
+        elif settings.getbool("ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED") is True:
+            self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
+            if not self._cookies_enabled:
+                logger.warning(
+                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is True, but it "
+                    "will have no effect because COOKIES_ENABLED is False."
+                )
+        else:
+            self._cookies_enabled = False
+            self._warn_on_cookies = settings.getbool("COOKIES_ENABLED")
+        self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 100)
+        self._crawler = crawler
+        self._cookie_jars = None
 
     def parse(self, request):
-        return _get_api_params(
+        dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
+        cookies_enabled = self._cookies_enabled and not dont_merge_cookies
+        params = _get_api_params(
             request,
             default_params=self._default_params,
             transparent_mode=self._transparent_mode,
@@ -476,4 +599,35 @@ class _ParamParser:
             skip_headers=self._skip_headers,
             browser_headers=self._browser_headers,
             job_id=self._job_id,
+            cookies_enabled=cookies_enabled,
+            cookie_jars=self._cookie_jars,
+            max_cookies=self._max_cookies,
         )
+        if not dont_merge_cookies and self._warn_on_cookies:
+            self._handle_warn_on_cookies(request, params)
+        return params
+
+    def _handle_warn_on_cookies(self, request, params):
+        if params and params.get("experimental", {}).get("requestCookies") is not None:
+            return
+        if self._cookie_jars is None:
+            return
+        input_cookies = _get_all_cookies(request, self._cookie_jars)
+        if len(input_cookies) <= 0:
+            return
+        logger.warning(
+            (
+                "Cookies are enabled for request %(request)r, and there are "
+                "cookies in the cookiejar, but "
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is False, so automatic "
+                "mapping will not map cookies for this or any other request. "
+                "To silence this warning, disable cookies for all requests "
+                "that use automated mapping, either with the "
+                "COOKIES_ENABLED setting or with the dont_merge_cookies "
+                "request metadata key."
+            ),
+            {
+                "request": request,
+            },
+        )
+        self._warn_on_cookies = False

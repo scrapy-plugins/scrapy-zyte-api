@@ -19,7 +19,7 @@ from twisted.web.server import NOT_DONE_YET, Site
 
 from scrapy_zyte_api.responses import _API_RESPONSE
 
-from . import make_handler
+from . import SETTINGS, make_handler
 
 
 def get_ephemeral_port():
@@ -30,6 +30,7 @@ def get_ephemeral_port():
 
 @ensureDeferred
 async def produce_request_response(mockserver, meta, settings=None):
+    settings = settings if settings is not None else {**SETTINGS}
     async with mockserver.make_handler(settings) as handler:
         req = Request(mockserver.urljoin("/"), meta=meta)
         resp = await handler.download_request(req, None)

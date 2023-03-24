@@ -3,7 +3,7 @@ import logging
 from copy import deepcopy
 from typing import Generator, Optional, Union
 
-from scrapy import Spider
+from scrapy import Spider, signals
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
@@ -71,7 +71,15 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
-        self._param_parser = _ParamParser(settings)
+        self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
+        self._cookie_jars = None
+        self._cookie_mw_cls = load_object(
+            settings.get(
+                "ZYTE_API_COOKIE_MIDDLEWARE",
+                "scrapy.downloadermiddlewares.cookies.CookiesMiddleware",
+            )
+        )
+        self._param_parser = _ParamParser(crawler)
         self._retry_policy = _load_retry_policy(settings)
         self._stats = crawler.stats
         self._session = create_session(connection_pool_size=self._client.n_conn)
@@ -83,6 +91,25 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"({self._truncate_limit}) is invalid. It must be 0 or a "
                 f"positive integer."
             )
+        crawler.signals.connect(self.engine_started, signal=signals.engine_started)
+        if not hasattr(self, "_crawler"):  # Scrapy 2.1 and earlier
+            self._crawler = crawler
+
+    def engine_started(self):
+        if not self._cookies_enabled:
+            return
+        for middleware in self._crawler.engine.downloader.middleware.middlewares:
+            if isinstance(middleware, self._cookie_mw_cls):
+                self._cookie_jars = middleware.jars
+                self._param_parser._cookie_jars = self._cookie_jars
+                return
+        middleware_path = (
+            f"{self._cookie_mw_cls.__module__}.{self._cookie_mw_cls.__qualname__}"
+        )
+        raise RuntimeError(
+            f"Could not find a configured downloader middleware that is an "
+            f"instance of {middleware_path} (see ZYTE_API_COOKIE_MIDDLEWARE)."
+        )
 
     @staticmethod
     def _build_client(settings):
@@ -189,7 +216,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         finally:
             self._update_stats()
 
-        return _process_response(api_response, request)
+        assert self._cookie_jars is not None  # typing
+        return _process_response(api_response, request, self._cookie_jars)
 
     def _log_request(self, params):
         if not self._must_log_request:

@@ -35,12 +35,13 @@ else:
                 crawler=crawler,
             )
             self._cache: "WeakKeyDictionary[Request, bytes]" = WeakKeyDictionary()
-            self._param_parser = _ParamParser(settings)
+            self._param_parser = _ParamParser(crawler, cookies_enabled=False)
             self._skip_keys = (
                 "customHttpRequestHeaders",
                 "echoData",
                 "jobId",
                 "requestHeaders",
+                "experimental",
             )
 
         def _keep_fragments(self, api_params):
