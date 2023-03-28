@@ -1,6 +1,28 @@
 Changes
 =======
 
+0.8.0 (to be released)
+----------------------
+
+* Added experimental cookie support:
+
+  * The ``experimental.responseCookies`` response parameter is now mapped to
+    the response headers as ``Set-Cookie`` headers, as well as added to the
+    cookiejar of the request.
+
+  * A new boolean setting, ``ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED``, can be
+    set to ``True`` to enable automated mapping of cookies from a request
+    cookiejar into the ``experimental.requestCookies`` Zyte API parameter.
+
+* ``ZyteAPITextResponse`` is now a subclass of ``HtmlResponse``, so that the
+  ``open_in_browser`` function of Scrapy uses the ``.html`` extension for Zyte
+  API responses.
+
+  While not ideal, this is much better than the previous behavior, where the
+  ``.html`` extension was *never* used for Zyte API responses.
+
+* ``ScrapyZyteAPIDownloaderMiddleware`` now also supports non-string slot IDs.
+
 0.7.1 (2023-01-25)
 ------------------
 
