@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.8.0 (to be released)
-----------------------
+0.8.0 (2023-03-28)
+------------------
 
 * Added experimental cookie support:
 
