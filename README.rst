@@ -278,6 +278,8 @@ possible:
 -   ``httpResponseHeaders`` and ``experimental.responseCookies`` become
     ``response.headers``.
 
+-   ``experimental.responseCookies`` is also mapped into the request cookiejar.
+
 -   ``browserHtml`` and ``httpResponseBody`` are mapped into both
     ``response.text`` (``str``) and ``response.body`` (``bytes``).
 
