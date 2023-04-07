@@ -31,7 +31,7 @@ def _process_cookies(
             value=response_cookie["value"],
             port=None,
             port_specified=False,
-            domain=response_cookie.get("domain"),
+            domain=response_cookie.get("domain", ""),
             domain_specified="domain" in response_cookie,
             domain_initial_dot=response_cookie.get("domain", "").startswith("."),
             path=response_cookie.get("path", "/"),
