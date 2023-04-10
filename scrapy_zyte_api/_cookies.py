@@ -1,5 +1,5 @@
 from http.cookiejar import Cookie
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from scrapy.http import Request
 from scrapy.http.cookies import CookieJar
@@ -11,8 +11,12 @@ def _get_cookie_jar(request: Request, cookie_jars: Dict[Any, CookieJar]) -> Cook
 
 
 def _process_cookies(
-    api_response: Dict[str, Any], request: Request, cookie_jars: Dict[Any, CookieJar]
+    api_response: Dict[str, Any],
+    request: Request,
+    cookie_jars: Optional[Dict[Any, CookieJar]],
 ):
+    if not cookie_jars:
+        return
     response_cookies = api_response.get("experimental", {}).get("responseCookies")
     if not response_cookies:
         return

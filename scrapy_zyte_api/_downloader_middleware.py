@@ -2,7 +2,6 @@ from ._params import _ParamParser
 
 
 class ScrapyZyteAPIDownloaderMiddleware:
-
     _slot_prefix = "zyte-api@"
 
     @classmethod
