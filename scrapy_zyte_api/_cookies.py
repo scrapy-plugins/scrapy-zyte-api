@@ -19,7 +19,7 @@ def _get_cookie_domain(cookie, url):
     if domain:
         return domain
     raise ValueError(
-        f"Got a cookie without a domain from URL {url} which has no domain " f"either."
+        f"Got a cookie without a domain from URL {url} which has no domain either."
     )
 
 
