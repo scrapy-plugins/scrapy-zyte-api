@@ -18,7 +18,6 @@ _DEFAULT_ENCODING = "utf-8"
 
 
 class ZyteAPIMixin:
-
     REMOVE_HEADERS = {
         # Zyte API already decompresses the HTTP Response Body. Scrapy's
         # HttpCompressionMiddleware will error out when it attempts to
@@ -165,7 +164,9 @@ _API_RESPONSE = Dict[str, _JSON]
 
 
 def _process_response(
-    api_response: _API_RESPONSE, request: Request, cookie_jars: Dict[Any, CookieJar]
+    api_response: _API_RESPONSE,
+    request: Request,
+    cookie_jars: Optional[Dict[Any, CookieJar]],
 ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
     """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
     this returns either a ``ZyteAPITextResponse`` or ``ZyteAPIResponse`` depending

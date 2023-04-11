@@ -216,7 +216,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         finally:
             self._update_stats()
 
-        assert self._cookie_jars is not None  # typing
         return _process_response(api_response, request, self._cookie_jars)
 
     def _log_request(self, params):
