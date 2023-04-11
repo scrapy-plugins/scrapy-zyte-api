@@ -31,6 +31,10 @@ INPUT_COOKIES = [
         "httpOnly": True,
         "secure": True,
     },
+    {
+        "name": "c",
+        "value": "d",
+    },
 ]
 OUTPUT_COOKIE_HEADERS = {
     b"Set-Cookie": [
@@ -41,7 +45,8 @@ OUTPUT_COOKIE_HEADERS = {
             b"Expires=Mon, 27 Mar 2023 04:57:36 GMT; "
             b"HttpOnly; "
             b"Secure"
-        )
+        ),
+        (b"c=d"),
     ]
 }
 

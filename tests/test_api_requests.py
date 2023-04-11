@@ -649,9 +649,9 @@ def _test_automap(
                         value=cookie["value"],
                         port=None,
                         port_specified=False,
-                        domain=cookie["domain"],
-                        domain_specified=True,
-                        domain_initial_dot=cookie["domain"].startswith("."),
+                        domain=cookie.get("domain"),
+                        domain_specified="domain" in cookie,
+                        domain_initial_dot=cookie.get("domain", "").startswith("."),
                         path=cookie.get("path", "/"),
                         path_specified="path" in cookie,
                         secure=cookie.get("secure", False),
@@ -2046,7 +2046,8 @@ def test_automap_all_cookies(meta):
         # {"name": "c", "value": "d", "domain": "b.example"},
     ]
 
-    # Have the response set a cookie for c.example and d.example.
+    # Have the response set 2 cookies for c.example, with and without a domain,
+    # and a cookie for  and d.example.
     api_response: Dict[str, Any] = {
         "url": "https://c.example",
         "httpResponseBody": "",
@@ -2061,6 +2062,10 @@ def test_automap_all_cookies(meta):
                 {
                     "name": "g",
                     "value": "h",
+                },
+                {
+                    "name": "i",
+                    "value": "j",
                     "domain": ".d.example",
                 },
             ],
@@ -2080,8 +2085,9 @@ def test_automap_all_cookies(meta):
     api_params = param_parser.parse(request2)
     assert api_params["experimental"]["requestCookies"] == [
         {"name": "e", "value": "f", "domain": ".c.example"},
-        {"name": "g", "value": "h", "domain": ".d.example"},
+        {"name": "i", "value": "j", "domain": ".d.example"},
         {"name": "a", "value": "b", "domain": "a.example"},
+        {"name": "g", "value": "h", "domain": "c.example"},
         # https://github.com/scrapy/scrapy/issues/5841
         # {"name": "c", "value": "d", "domain": "b.example"},
     ]

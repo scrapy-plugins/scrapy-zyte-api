@@ -1,5 +1,6 @@
 from http.cookiejar import Cookie
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from scrapy.http import Request
 from scrapy.http.cookies import CookieJar
@@ -8,6 +9,18 @@ from scrapy.http.cookies import CookieJar
 def _get_cookie_jar(request: Request, cookie_jars: Dict[Any, CookieJar]) -> CookieJar:
     jar_id = request.meta.get("cookiejar")
     return cookie_jars[jar_id]
+
+
+def _get_cookie_domain(cookie, url):
+    domain = cookie.get("domain")
+    if domain:
+        return domain
+    domain = urlparse(url).hostname
+    if domain:
+        return domain
+    raise ValueError(
+        f"Got a cookie without a domain from URL {url} which has no domain " f"either."
+    )
 
 
 def _process_cookies(
@@ -35,7 +48,7 @@ def _process_cookies(
             value=response_cookie["value"],
             port=None,
             port_specified=False,
-            domain=response_cookie.get("domain", ""),
+            domain=_get_cookie_domain(response_cookie, api_response["url"]),
             domain_specified="domain" in response_cookie,
             domain_initial_dot=response_cookie.get("domain", "").startswith("."),
             path=response_cookie.get("path", "/"),
