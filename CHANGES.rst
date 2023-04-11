@@ -1,6 +1,16 @@
 Changes
 =======
 
+0.8.1 (to be released)
+----------------------
+
+* Fixed an ``AssertionError`` when cookies are disabled.
+
+* Added links to the README to improve navigation from GitHub.
+
+* Added a license file (BSD-3-Clause).
+
+
 0.8.0 (2023-03-28)
 ------------------
 
