@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.8.1 (to be released)
-----------------------
+0.8.1 (2023-04-13)
+------------------
 
 * Fixed an ``AssertionError`` when cookies are disabled.
 
