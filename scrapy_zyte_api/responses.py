@@ -63,7 +63,10 @@ class ZyteAPIMixin:
 
     @staticmethod
     def _response_cookie_to_header_value(cookie):
-        result = f"{cookie['name']}={cookie['value']}; Domain={cookie['domain']}"
+        result = f"{cookie['name']}={cookie['value']}"
+        domain = cookie.get("domain")
+        if domain:
+            result += f"; Domain={cookie['domain']}"
         path = cookie.get("path")
         if path is not None:
             result += f"; Path={path}"
