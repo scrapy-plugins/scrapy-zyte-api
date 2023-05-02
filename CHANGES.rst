@@ -6,6 +6,8 @@ Changes
 
 * Fixed the handling of response cookies without a domain.
 
+* CI fixes
+
 
 0.8.1 (2023-04-13)
 ------------------
