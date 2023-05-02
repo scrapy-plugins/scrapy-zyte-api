@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.8.2 (to be released)
-----------------------
+0.8.2 (2023-05-02)
+------------------
 
 * Fixed the handling of response cookies without a domain.
 
