@@ -58,7 +58,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     ):
         super().__init__(settings=settings, crawler=crawler)
         if not settings.getbool("ZYTE_API_ENABLED", True):
-            raise NotConfigured
+            raise NotConfigured(
+                "Zyte API is disabled. Set ZYTE_API_ENABLED to True to enable it."
+            )
         if not hasattr(crawler, "zyte_api_client"):
             if not client:
                 client = self._build_client(settings)
@@ -130,7 +132,9 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 "'ZYTE_API_KEY' must be set in the spider settings or env var "
                 "in order for ScrapyZyteAPIDownloadHandler to work."
             )
-            raise NotConfigured
+            raise NotConfigured(
+                "Zyte API key is not set. Set ZYTE_API_KEY to your API key."
+            )
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._param_parser.parse(request)
