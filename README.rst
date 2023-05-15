@@ -780,9 +780,9 @@ extensions, these 2 requests would still be considered identical.
 Logging request parameters
 ==========================
 
-Set the ``ZYTE_API_LOG_REQUESTS`` setting to ``True`` to enable the logging of
-debug messages that indicate the JSON object sent on every extract request to
-Zyte API.
+Set the ``ZYTE_API_LOG_REQUESTS`` setting to ``True`` and the ``LOG_LEVEL``
+setting to ``"DEBUG"`` to enable the logging of debug messages that indicate
+the JSON object sent on every extract request to Zyte API.
 
 For example::
 
