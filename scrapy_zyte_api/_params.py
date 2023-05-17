@@ -13,10 +13,16 @@ from ._cookies import _get_all_cookies
 
 logger = getLogger(__name__)
 
-_DEFAULT_API_PARAMS = {
-    "browserHtml": False,
-    "screenshot": False,
+_EXTRACT_KEYS = {
+    "article",
+    "articleList",
+    "articleNavigation",
+    "product",
+    "productList",
+    "productNavigation",
 }
+_BROWSER_KEYS = _EXTRACT_KEYS | {"browserHtml", "screenshot"}
+_DEFAULT_API_PARAMS = {key: False for key in _BROWSER_KEYS}
 
 
 def _iter_headers(
@@ -133,10 +139,7 @@ def _set_request_headers_from_request(
         api_params.pop("customHttpRequestHeaders")
 
     if (
-        (
-            not response_body
-            or any(api_params.get(k) for k in ("browserHtml", "screenshot"))
-        )
+        (not response_body or any(api_params.get(k) for k in _BROWSER_KEYS))
         and request_headers is not False
         or request_headers is True
     ):
@@ -154,9 +157,7 @@ def _set_http_response_body_from_request(
     api_params: Dict[str, Any],
     request: Request,
 ):
-    if not any(
-        api_params.get(k) for k in ("httpResponseBody", "browserHtml", "screenshot")
-    ):
+    if not any(api_params.get(k) for k in _BROWSER_KEYS):
         api_params.setdefault("httpResponseBody", True)
     elif api_params.get("httpResponseBody") is False:
         logger.warning(

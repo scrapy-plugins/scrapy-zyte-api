@@ -484,10 +484,10 @@ You may set the ``zyte_api_automap`` key in
 to a ``dict`` of Zyte API parameters to extend or override choices made by
 automated request parameter mapping.
 
-Setting ``browserHtml`` or ``screenshot`` to ``True`` unsets
-``httpResponseBody`` and ``httpResponseHeaders``, and makes ``Request.headers``
-become ``requestHeaders`` instead of ``customHttpRequestHeaders``. For example,
-the following Scrapy request:
+Enabling ``browserHtml``, ``screenshot``, or an automatic extraction property,
+unsets ``httpResponseBody`` and ``httpResponseHeaders``, and makes
+``Request.headers`` become ``requestHeaders`` instead of
+``customHttpRequestHeaders``. For example, the following Scrapy request:
 
 .. code-block:: python
 
