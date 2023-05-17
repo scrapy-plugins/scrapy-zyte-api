@@ -1,6 +1,20 @@
 Changes
 =======
 
+0.8.3 (to be released)
+----------------------
+
+* Made Python 3.11 support official.
+
+* Added support for the upcoming automatic extraction feature of Zyte API.
+
+* Included a descriptive message in the exception that triggers when the
+  download handler cannot be initialized.
+
+* Clarified that ``LOG_LEVEL`` must be ``DEBUG`` for ``ZYTE_API_LOG_REQUESTS``
+  messages to be visible.
+
+
 0.8.2 (2023-05-02)
 ------------------
 
