@@ -484,10 +484,10 @@ You may set the ``zyte_api_automap`` key in
 to a ``dict`` of Zyte API parameters to extend or override choices made by
 automated request parameter mapping.
 
-Setting ``browserHtml`` or ``screenshot`` to ``True`` unsets
-``httpResponseBody`` and ``httpResponseHeaders``, and makes ``Request.headers``
-become ``requestHeaders`` instead of ``customHttpRequestHeaders``. For example,
-the following Scrapy request:
+Enabling ``browserHtml``, ``screenshot``, or an automatic extraction property,
+unsets ``httpResponseBody`` and ``httpResponseHeaders``, and makes
+``Request.headers`` become ``requestHeaders`` instead of
+``customHttpRequestHeaders``. For example, the following Scrapy request:
 
 .. code-block:: python
 
@@ -780,9 +780,9 @@ extensions, these 2 requests would still be considered identical.
 Logging request parameters
 ==========================
 
-Set the ``ZYTE_API_LOG_REQUESTS`` setting to ``True`` to enable the logging of
-debug messages that indicate the JSON object sent on every extract request to
-Zyte API.
+Set the ``ZYTE_API_LOG_REQUESTS`` setting to ``True`` and the ``LOG_LEVEL``
+setting to ``"DEBUG"`` to enable the logging of debug messages that indicate
+the JSON object sent on every extract request to Zyte API.
 
 For example::
 

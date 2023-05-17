@@ -23,6 +23,7 @@ from twisted.internet.defer import Deferred
 from zyte_api.aio.errors import RequestError
 
 from scrapy_zyte_api._cookies import _get_cookie_jar
+from scrapy_zyte_api._params import _EXTRACT_KEYS
 from scrapy_zyte_api.handler import _ParamParser
 from scrapy_zyte_api.responses import _process_response
 
@@ -34,6 +35,9 @@ from . import (
     get_downloader_middleware,
 )
 from .mockserver import DelayedResource, MockServer, produce_request_response
+
+# Pick one of the automatic extraction keys for testing purposes.
+EXTRACT_KEY = next(iter(_EXTRACT_KEYS))
 
 
 @pytest.mark.parametrize(
@@ -712,6 +716,11 @@ def _test_automap(
             [],
         ),
         (
+            {EXTRACT_KEY: True},
+            {EXTRACT_KEY: True},
+            [],
+        ),
+        (
             {"browserHtml": True, "screenshot": True},
             {"browserHtml": True, "screenshot": True},
             [],
@@ -768,6 +777,11 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
         (
             {"screenshot": True, "httpResponseHeaders": True},
             {"screenshot": True, "httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {EXTRACT_KEY: True, "httpResponseHeaders": True},
+            {EXTRACT_KEY: True, "httpResponseHeaders": True},
             [],
         ),
         (
@@ -856,6 +870,11 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
         (
             {"screenshot": True, "httpResponseHeaders": False},
             {"screenshot": True},
+            ["do not need to set httpResponseHeaders to False"],
+        ),
+        (
+            {EXTRACT_KEY: True, "httpResponseHeaders": False},
+            {EXTRACT_KEY: True},
             ["do not need to set httpResponseHeaders to False"],
         ),
         (
@@ -973,6 +992,15 @@ def test_automap_header_output(meta, expected, warnings, caplog):
             },
             [],
         ),
+        (
+            "POST",
+            {EXTRACT_KEY: True},
+            {
+                EXTRACT_KEY: True,
+                "httpRequestMethod": "POST",
+            },
+            [],
+        ),
     ],
 )
 def test_automap_method(method, meta, expected, warnings, caplog):
@@ -996,8 +1024,8 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
-        # If browserHtml or screenshot are True, Request.headers are mapped as
-        # requestHeaders.
+        # If browserHtml, screenshot, or automatic extraction properties are
+        # True, Request.headers are mapped as requestHeaders.
         (
             {"Referer": "a"},
             {"browserHtml": True},
@@ -1016,9 +1044,19 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
-        # If both httpResponseBody and browserHtml (or screenshot, or both) are
-        # True, implicitly or explicitly, Request.headers are mapped both as
-        # customHttpRequestHeaders and as requestHeaders.
+        (
+            {"Referer": "a"},
+            {EXTRACT_KEY: True},
+            {
+                "requestHeaders": {"referer": "a"},
+                EXTRACT_KEY: True,
+            },
+            [],
+        ),
+        # If both httpResponseBody and browserHtml (or screenshot, or both, or
+        # automatic extraction properties) are True, implicitly or explicitly,
+        # Request.headers are mapped both as customHttpRequestHeaders and as
+        # requestHeaders.
         (
             {"Referer": "a"},
             {"browserHtml": True, "httpResponseBody": True},
@@ -1044,6 +1082,20 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "httpResponseHeaders": True,
                 "requestHeaders": {"referer": "a"},
                 "screenshot": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {EXTRACT_KEY: True, "httpResponseBody": True},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "requestHeaders": {"referer": "a"},
+                EXTRACT_KEY: True,
             },
             [],
         ),
@@ -1230,9 +1282,27 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         ),
         (
             {"Referer": None},
+            {EXTRACT_KEY: True},
+            {
+                EXTRACT_KEY: True,
+            },
+            [],
+        ),
+        (
+            {"Referer": None},
             {"screenshot": True, "httpResponseBody": True},
             {
                 "screenshot": True,
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": None},
+            {EXTRACT_KEY: True, "httpResponseBody": True},
+            {
+                EXTRACT_KEY: True,
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
@@ -1860,7 +1930,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
             [],
             [],
         ),
-        # Cookies work for browser requests as well.
+        # Cookies work for browser and automatic extraction requests as well.
         (
             {
                 "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
@@ -1891,6 +1961,25 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
             },
             {
                 "screenshot": True,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                },
+            },
+            [],
+            [],
+        ),
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                EXTRACT_KEY: True,
+            },
+            {
+                EXTRACT_KEY: True,
                 "experimental": {
                     "responseCookies": True,
                     "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
@@ -2364,6 +2453,15 @@ def test_automap_custom_cookie_middleware():
             },
             [],
         ),
+        (
+            "a",
+            {EXTRACT_KEY: True},
+            {
+                "httpRequestBody": "YQ==",
+                EXTRACT_KEY: True,
+            },
+            [],
+        ),
     ],
 )
 def test_automap_body(body, meta, expected, warnings, caplog):
@@ -2373,9 +2471,10 @@ def test_automap_body(body, meta, expected, warnings, caplog):
 @pytest.mark.parametrize(
     "meta,expected,warnings",
     [
-        # When httpResponseBody, browserHtml, screenshot, or
-        # httpResponseHeaders, are unnecessarily set to False, they are not
-        # defined in the parameters sent to Zyte API, and a warning is logged.
+        # When httpResponseBody, browserHtml, screenshot, automatic extraction
+        # properties, or httpResponseHeaders, are unnecessarily set to False,
+        # they are not defined in the parameters sent to Zyte API, and a
+        # warning is logged.
         (
             {
                 "browserHtml": True,
@@ -2413,6 +2512,26 @@ def test_automap_body(body, meta, expected, warnings, caplog):
             },
             {
                 "screenshot": True,
+            },
+            ["do not need to set httpResponseHeaders to False"],
+        ),
+        (
+            {
+                EXTRACT_KEY: False,
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["unnecessarily defines"],
+        ),
+        (
+            {
+                "httpResponseHeaders": False,
+                EXTRACT_KEY: True,
+            },
+            {
+                EXTRACT_KEY: True,
             },
             ["do not need to set httpResponseHeaders to False"],
         ),
