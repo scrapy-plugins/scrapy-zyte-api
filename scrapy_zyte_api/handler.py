@@ -133,8 +133,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 "in order for ScrapyZyteAPIDownloadHandler to work."
             )
             raise NotConfigured(
-                "Your Zyte API key is not set. Set ZYTE_API_KEY to your API "
-                "key."
+                "Your Zyte API key is not set. Set ZYTE_API_KEY to your API " "key."
             )
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:

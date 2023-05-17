@@ -32,6 +32,7 @@ jobs:
         - python-version: '3.8'
         - python-version: '3.9'
         - python-version: '3.10'
+        - python-version: '3.11'
 
     steps:
     - uses: actions/checkout@v2
@@ -55,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10"]
+        python-version: ["3.11"]
         tox-job: ["mypy", "flake8", "twine-check"]
 
     steps:
