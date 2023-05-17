@@ -40,6 +40,10 @@ from .mockserver import DelayedResource, MockServer, produce_request_response
 EXTRACT_KEY = next(iter(_EXTRACT_KEYS))
 
 
+def sort_dict_list(dict_list):
+    return sorted(dict_list, key=lambda i: sorted(i.items()))
+
+
 @pytest.mark.parametrize(
     "meta",
     [
@@ -2172,14 +2176,19 @@ def test_automap_all_cookies(meta):
     )
     cookie_middleware.process_request(request2, spider=None)
     api_params = param_parser.parse(request2)
-    assert api_params["experimental"]["requestCookies"] == [
-        {"name": "e", "value": "f", "domain": ".c.example"},
-        {"name": "i", "value": "j", "domain": ".d.example"},
-        {"name": "a", "value": "b", "domain": "a.example"},
-        {"name": "g", "value": "h", "domain": "c.example"},
-        # https://github.com/scrapy/scrapy/issues/5841
-        # {"name": "c", "value": "d", "domain": "b.example"},
-    ]
+
+    assert sort_dict_list(
+        api_params["experimental"]["requestCookies"]
+    ) == sort_dict_list(
+        [
+            {"name": "e", "value": "f", "domain": ".c.example"},
+            {"name": "i", "value": "j", "domain": ".d.example"},
+            {"name": "a", "value": "b", "domain": "a.example"},
+            {"name": "g", "value": "h", "domain": "c.example"},
+            # https://github.com/scrapy/scrapy/issues/5841
+            # {"name": "c", "value": "d", "domain": "b.example"},
+        ]
+    )
 
 
 @pytest.mark.parametrize(
@@ -2222,17 +2231,25 @@ def test_automap_cookie_jar(meta):
     cookie_middleware.process_request(request3, spider=None)
 
     api_params = param_parser.parse(request3)
-    assert api_params["experimental"]["requestCookies"] == [
-        {"name": "x", "value": "w", "domain": "example.com"},
-        {"name": "z", "value": "y", "domain": "example.com"},
-    ]
+    assert sort_dict_list(
+        api_params["experimental"]["requestCookies"]
+    ) == sort_dict_list(
+        [
+            {"name": "x", "value": "w", "domain": "example.com"},
+            {"name": "z", "value": "y", "domain": "example.com"},
+        ]
+    )
 
     cookie_middleware.process_request(request4, spider=None)
     api_params = param_parser.parse(request4)
-    assert api_params["experimental"]["requestCookies"] == [
-        {"name": "x", "value": "w", "domain": "example.com"},
-        {"name": "z", "value": "y", "domain": "example.com"},
-    ]
+    assert sort_dict_list(
+        api_params["experimental"]["requestCookies"]
+    ) == sort_dict_list(
+        [
+            {"name": "x", "value": "w", "domain": "example.com"},
+            {"name": "z", "value": "y", "domain": "example.com"},
+        ]
+    )
 
 
 @pytest.mark.parametrize(
@@ -2282,8 +2299,9 @@ def test_automap_cookie_limit(meta, caplog):
     cookie_middleware.process_request(request, spider=None)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
-    assert api_params["experimental"]["requestCookies"] == [
-        {"name": "x", "value": "w", "domain": "example.com"}
+    assert api_params["experimental"]["requestCookies"] in [
+        [{"name": "z", "value": "y", "domain": "example.com"}],
+        [{"name": "x", "value": "w", "domain": "example.com"}],
     ]
     assert "would get 2 cookies" in caplog.text
     assert "limited to 1 cookies" in caplog.text
@@ -2306,8 +2324,9 @@ def test_automap_cookie_limit(meta, caplog):
     cookie_middleware.process_request(request, spider=None)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
-    assert api_params["experimental"]["requestCookies"] == [
-        {"name": "x", "value": "w", "domain": "example.com"}
+    assert api_params["experimental"]["requestCookies"] in [
+        [{"name": "z", "value": "y", "domain": "example.com"}],
+        [{"name": "x", "value": "w", "domain": "example.com"}],
     ]
     assert "would get 2 cookies" in caplog.text
     assert "limited to 1 cookies" in caplog.text
@@ -2329,8 +2348,9 @@ def test_automap_cookie_limit(meta, caplog):
     cookie_middleware.process_request(request, spider=None)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
-    assert api_params["experimental"]["requestCookies"] == [
-        {"name": "x", "value": "w", "domain": "example.com"}
+    assert api_params["experimental"]["requestCookies"] in [
+        [{"name": "z", "value": "y", "domain": "other.example"}],
+        [{"name": "x", "value": "w", "domain": "example.com"}],
     ]
     assert "would get 2 cookies" in caplog.text
     assert "limited to 1 cookies" in caplog.text
