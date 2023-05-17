@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.8.3 (to be released)
-----------------------
+0.8.3 (2023-05-17)
+------------------
 
 * Made Python 3.11 support official.
 
