@@ -7,7 +7,7 @@ from scrapy_zyte_api import ScrapyZyteAPIDownloaderMiddleware
 
 
 @ensureDeferred
-async def test_downloader_middleware():
+async def test_autothrottle_handling():
     crawler = get_crawler()
     await crawler.crawl("a")
     spider = crawler.spider
@@ -54,3 +54,21 @@ async def test_downloader_middleware():
     assert slot.delay == 0
 
     await crawler.stop()
+
+
+@ensureDeferred
+async def test_cookies():
+    """Make sure that the downloader middleware does not crash on Zyte API
+    requests with cookies."""
+    settings = {"ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True}
+    crawler = get_crawler(settings_dict=settings)
+    await crawler.crawl("a")
+    spider = crawler.spider
+    middleware = create_instance(
+        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
+    )
+    request = Request(
+        "https://example.com", cookies={"a": "b"}, meta={"zyte_api_automap": True}
+    )
+    assert middleware.process_request(request, spider) is None
+    assert request.meta["download_slot"] == "zyte-api@example.com"

@@ -9,7 +9,7 @@ class ScrapyZyteAPIDownloaderMiddleware:
         return cls(crawler)
 
     def __init__(self, crawler) -> None:
-        self._param_parser = _ParamParser(crawler)
+        self._param_parser = _ParamParser(crawler, cookies_enabled=False)
         self._crawler = crawler
 
     def process_request(self, request, spider):
