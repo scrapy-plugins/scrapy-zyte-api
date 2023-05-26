@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.8.4 (to be released)
-----------------------
+0.8.4 (2023-05-26)
+------------------
 
 * Fixed an exception raised by the downloader middleware when cookies were
   enabled.
