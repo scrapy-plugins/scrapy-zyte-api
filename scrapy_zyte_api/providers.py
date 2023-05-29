@@ -2,7 +2,6 @@ from typing import Any, Callable, Sequence, Set
 
 from scrapy import Request
 from scrapy.crawler import Crawler
-from scrapy.http import Response
 from scrapy.http.request import NO_CALLBACK  # requires Scrapy >= 2.8
 from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import PageObjectInputProvider
@@ -18,7 +17,7 @@ class ZyteApiProvider(PageObjectInputProvider):
     provided_classes = {BrowserResponse, Product}
 
     async def __call__(
-        self, to_provide: Set[Callable], response: Response, crawler: Crawler
+        self, to_provide: Set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
 
@@ -29,7 +28,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         if Product in to_provide:
             zyte_api_meta["product"] = True
         request = Request(
-            url=response.url,
+            url=request.url,
             meta={
                 "zyte_api": zyte_api_meta,
             },
