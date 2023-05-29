@@ -13,7 +13,9 @@ setuptools.setup(
     install_requires=[
         "packaging>=14.0",
         "scrapy>=2.0.1",
+        "scrapy-poet>=0.9.0",
         "zyte-api>=0.4.0",
+        "zyte-common-items",
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
