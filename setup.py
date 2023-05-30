@@ -14,6 +14,7 @@ setuptools.setup(
         "packaging>=14.0",
         "scrapy>=2.0.1",
         "scrapy-poet>=0.9.0",
+        "web-poet>=0.13.0",
         "zyte-api>=0.4.0",
         "zyte-common-items",
     ],

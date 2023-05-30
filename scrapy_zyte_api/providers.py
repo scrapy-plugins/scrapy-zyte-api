@@ -5,7 +5,7 @@ from scrapy.crawler import Crawler
 from scrapy.http.request import NO_CALLBACK  # requires Scrapy >= 2.8
 from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import PageObjectInputProvider
-from web_poet import BrowserResponse  # requires web-poet > 0.12.0
+from web_poet import BrowserResponse
 from zyte_common_items import Product
 
 from scrapy_zyte_api.responses import ZyteAPITextResponse
