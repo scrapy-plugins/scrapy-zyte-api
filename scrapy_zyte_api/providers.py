@@ -2,13 +2,18 @@ from typing import Any, Callable, Sequence, Set
 
 from scrapy import Request
 from scrapy.crawler import Crawler
-from scrapy.http.request import NO_CALLBACK  # requires Scrapy >= 2.8
 from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import PageObjectInputProvider
 from web_poet import BrowserResponse
 from zyte_common_items import Product
 
 from scrapy_zyte_api.responses import ZyteAPITextResponse
+
+try:
+    # requires Scrapy >= 2.8
+    from scrapy.http.request import NO_CALLBACK
+except ImportError:
+    NO_CALLBACK = None
 
 
 class ZyteApiProvider(PageObjectInputProvider):
