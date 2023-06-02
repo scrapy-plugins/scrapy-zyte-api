@@ -630,13 +630,31 @@ When setting a retry policy through request meta, you can assign the
 itself or its import path string. If you need your requests to be serializable,
 however, you may also need to use the import path string.
 
-For example, to also retry HTTP 521 errors the same as HTTP 520 errors, you can
-subclass RetryFactory_ as follows:
+For example, to increase the maximum number of retries to 10 before dropping
+the API request, you can subclass RetryFactory_ as follows:
 
 .. code-block:: python
 
     # project/retry_policies.py
-    from tenacity import retry_if_exception, RetryCallState
+    from tenacity import stop_after_attempt
+    from zyte_api.aio.retry import RetryFactory
+
+    class CustomRetryFactory(RetryFactory):
+        temporary_download_error_stop = stop_after_attempt(10)
+
+    CUSTOM_RETRY_POLICY = CustomRetryFactory().build()
+
+    # project/settings.py
+    ZYTE_API_RETRY_POLICY = "project.retry_policies.CUSTOM_RETRY_POLICY"
+
+
+To extend this retry policy, so it will also retry HTTP 521 errors, the same
+as HTTP 520 errors, you can implement:
+
+.. code-block:: python
+
+    # project/retry_policies.py
+    from tenacity import retry_if_exception, RetryCallState, stop_after_attempt
     from zyte_api.aio.errors import RequestError
     from zyte_api.aio.retry import RetryFactory
 
@@ -649,6 +667,7 @@ subclass RetryFactory_ as follows:
             RetryFactory.retry_condition
             | retry_if_exception(is_http_521)
         )
+        temporary_download_error_stop = stop_after_attempt(10)
 
         def wait(self, retry_state: RetryCallState) -> float:
             if is_http_521(retry_state.outcome.exception()):
