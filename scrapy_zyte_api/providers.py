@@ -49,6 +49,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             results.append(
                 BrowserResponse(
                     url=api_response.url,
+                    status=api_response.status,
                     html=api_response.raw_api_response["browserHtml"],
                 )
             )
