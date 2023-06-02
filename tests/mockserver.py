@@ -98,6 +98,14 @@ class DefaultResource(LeafResource):
                 {"name": "test_header", "value": "test_value"}
             ]
 
+        if request_data.get("product") is True:
+            response_data["product"] = {
+                "url": response_data["url"],
+                "name": "Product name",
+                "price": "10",
+                "currency": "USD",
+            }
+
         return json.dumps(response_data).encode()
 
 
