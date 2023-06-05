@@ -791,3 +791,39 @@ For example::
 The ``ZYTE_API_LOG_REQUESTS_TRUNCATE``, 64 by default, determines the maximum
 length of any string value in the logged JSON object, excluding object keys. To
 disable truncation, set it to 0.
+
+
+scrapy-poet integration
+=======================
+
+``scrapy-zyte-api`` includes a `scrapy-poet provider`_ that you can use to get
+data from Zyte API in page objects. Enable it in the Scrapy settings::
+
+    SCRAPY_POET_PROVIDERS = {
+        ZyteApiProvider: 500,
+    }
+
+Request some supported dependencies in the callback::
+
+    @attrs.define
+    class ProductPage(BasePage):
+        response: BrowserResponse
+        product: Product
+
+
+    class ZyteApiSpider(scrapy.Spider):
+        ...
+
+        def parse_page(self, response: DummyResponse, page: ProductPage):
+            ...
+
+The currently supported dependencies are:
+
+* ``web_poet.BrowserResponse``
+* ``zyte_common_items.Product``
+
+The provider will make a request to Zyte API using the ``ZYTE_API_KEY`` and
+``ZYTE_API_URL`` settings. It will ignore the transparent mode and parameter
+mapping settings.
+
+.. _scrapy-poet provider: https://scrapy-poet.readthedocs.io/en/stable/providers.html
