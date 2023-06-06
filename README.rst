@@ -601,6 +601,10 @@ ROBOTSTXT_OBEY_ is ``True``, or those for sitemaps when using a `sitemap
 spider`_. Certain parameters, like ``browserHtml`` or ``screenshot``, are not
 meant to be used for every single request.
 
+If the ``zyte_api_default_params`` request meta key is set to ``False``, the
+values of the ``ZYTE_API_DEFAULT_PARAMS``, ``ZYTE_API_AUTOMAP_PARAMS`` and
+``ZYTE_API_TRANSPARENT_MODE`` settings for this request are ignored.
+
 .. _ROBOTSTXT_OBEY: https://docs.scrapy.org/en/latest/topics/settings.html#robotstxt-obey
 .. _sitemap spider: https://docs.scrapy.org/en/latest/topics/spiders.html#sitemapspider
 

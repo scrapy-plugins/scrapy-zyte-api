@@ -36,6 +36,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             url=request.url,
             meta={
                 "zyte_api": zyte_api_meta,
+                "zyte_api_default_params": False,
             },
             dont_filter=True,
             callback=NO_CALLBACK,

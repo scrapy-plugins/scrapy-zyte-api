@@ -2606,3 +2606,45 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
             assert warning in caplog.text
     else:
         assert not caplog.records
+
+
+@pytest.mark.parametrize(
+    "transparent_mode,default_params,automap_params",
+    [
+        (
+            False,
+            {"screenshot": True},
+            {"browserHtml": True},
+        ),
+        (
+            True,
+            {"screenshot": True},
+            {"browserHtml": True},
+        ),
+        (
+            False,
+            {},
+            {},
+        ),
+        (
+            True,
+            {},
+            {},
+        ),
+    ],
+)
+def test_default_params_false(transparent_mode, default_params, automap_params):
+    """If zyte_api_default_params=False is passed, default params are ignored."""
+    request = Request(url="https://example.com")
+    request.meta["zyte_api_default_params"] = False
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_TRANSPARENT_MODE": transparent_mode,
+        "ZYTE_API_DEFAULT_PARAMS": default_params,
+        "ZYTE_API_AUTOMAP_PARAMS": automap_params,
+    }
+    crawler = get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert api_params is None
