@@ -803,7 +803,7 @@ data from Zyte API in page objects. Enable it in the Scrapy settings::
         ZyteApiProvider: 500,
     }
 
-Request some supported dependencies in the callback::
+Request some supported dependencies in the page object::
 
     @attrs.define
     class ProductPage(BasePage):
@@ -817,6 +817,18 @@ Request some supported dependencies in the callback::
         def parse_page(self, response: DummyResponse, page: ProductPage):
             ...
 
+Or request them directly in the callback::
+
+    class ZyteApiSpider(scrapy.Spider):
+        ...
+
+        def parse_page(self,
+                       response: DummyResponse,
+                       browser_response: BrowserResponse,
+                       product: Product,
+                       ):
+            ...
+
 The currently supported dependencies are:
 
 * ``web_poet.BrowserResponse``
@@ -825,5 +837,11 @@ The currently supported dependencies are:
 The provider will make a request to Zyte API using the ``ZYTE_API_KEY`` and
 ``ZYTE_API_URL`` settings. It will ignore the transparent mode and parameter
 mapping settings.
+
+Note that the built-in ``scrapy_poet.page_input_providers.ItemProvider`` has a
+priority of 1000, so when you have page objects producing
+``zyte_common_items.Product`` items you should use higher values for
+``ZyteApiProvider`` if you want these items to come from these page objects,
+and lower values if you want them to come from Zyte API.
 
 .. _scrapy-poet provider: https://scrapy-poet.readthedocs.io/en/stable/providers.html
