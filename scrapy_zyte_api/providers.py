@@ -38,7 +38,6 @@ class ZyteApiProvider(PageObjectInputProvider):
                 "zyte_api": zyte_api_meta,
                 "zyte_api_default_params": False,
             },
-            dont_filter=True,
             callback=NO_CALLBACK,
         )
         api_response: ZyteAPITextResponse = await maybe_deferred_to_future(
