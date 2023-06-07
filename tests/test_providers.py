@@ -25,9 +25,9 @@ class ZyteAPISpider(Spider):
     url: str
 
     def start_requests(self):
-        yield Request(self.url)
+        yield Request(self.url, callback=self.parse_)
 
-    def parse(self, response: DummyResponse, page: ProductPage):
+    def parse_(self, response: DummyResponse, page: ProductPage):
         yield {
             "html": page.response.html,
             "product": page.product,
