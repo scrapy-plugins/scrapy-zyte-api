@@ -68,7 +68,7 @@ class MyPage(ItemPage[MyItem]):
 
     @field
     def url(self) -> str:
-        return self.response.url
+        return str(self.response.url)
 
 
 class ItemDepSpider(ZyteAPISpider):
