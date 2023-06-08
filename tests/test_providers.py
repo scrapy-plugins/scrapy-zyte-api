@@ -83,7 +83,7 @@ class ItemDepSpider(ZyteAPISpider):
 @ensureDeferred
 async def test_itemprovider_requests(mockserver, monkeypatch, caplog):
     port = get_ephemeral_port()
-    handle_urls(f"127.0.1.1:{port}")(MyPage)
+    handle_urls(f"{mockserver.host}:{port}")(MyPage)
 
     call_count = 0
     real_call = ZyteApiProvider.__call__

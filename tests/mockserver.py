@@ -136,9 +136,9 @@ class MockServer:
         resource = resource or DefaultResource
         self.resource = "{}.{}".format(resource.__module__, resource.__name__)
         self.proc = None
-        host = socket.gethostbyname(socket.gethostname())
+        self.host = socket.gethostbyname(socket.gethostname())
         self.port = port or get_ephemeral_port()
-        self.root_url = "http://%s:%d" % (host, self.port)
+        self.root_url = "http://%s:%d" % (self.host, self.port)
 
     def __enter__(self):
         self.proc = Popen(
