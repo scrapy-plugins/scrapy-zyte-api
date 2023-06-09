@@ -601,6 +601,9 @@ ROBOTSTXT_OBEY_ is ``True``, or those for sitemaps when using a `sitemap
 spider`_. Certain parameters, like ``browserHtml`` or ``screenshot``, are not
 meant to be used for every single request.
 
+If the ``zyte_api_default_params`` request meta key is set to ``False``, the
+value of the ``ZYTE_API_DEFAULT_PARAMS`` setting for this request is ignored.
+
 .. _ROBOTSTXT_OBEY: https://docs.scrapy.org/en/latest/topics/settings.html#robotstxt-obey
 .. _sitemap spider: https://docs.scrapy.org/en/latest/topics/spiders.html#sitemapspider
 
@@ -791,3 +794,57 @@ For example::
 The ``ZYTE_API_LOG_REQUESTS_TRUNCATE``, 64 by default, determines the maximum
 length of any string value in the logged JSON object, excluding object keys. To
 disable truncation, set it to 0.
+
+
+scrapy-poet integration
+=======================
+
+``scrapy-zyte-api`` includes a `scrapy-poet provider`_ that you can use to get
+data from Zyte API in page objects. Enable it in the Scrapy settings::
+
+    SCRAPY_POET_PROVIDERS = {
+        ZyteApiProvider: 1100,
+    }
+
+Request some supported dependencies in the page object::
+
+    @attrs.define
+    class ProductPage(BasePage):
+        response: BrowserResponse
+        product: Product
+
+
+    class ZyteApiSpider(scrapy.Spider):
+        ...
+
+        def parse_page(self, response: DummyResponse, page: ProductPage):
+            ...
+
+Or request them directly in the callback::
+
+    class ZyteApiSpider(scrapy.Spider):
+        ...
+
+        def parse_page(self,
+                       response: DummyResponse,
+                       browser_response: BrowserResponse,
+                       product: Product,
+                       ):
+            ...
+
+The currently supported dependencies are:
+
+* ``web_poet.BrowserResponse``
+* ``zyte_common_items.Product``
+
+The provider will make a request to Zyte API using the ``ZYTE_API_KEY`` and
+``ZYTE_API_URL`` settings. It will ignore the transparent mode and parameter
+mapping settings.
+
+Note that the built-in ``scrapy_poet.page_input_providers.ItemProvider`` has a
+priority of 1000, so when you have page objects producing
+``zyte_common_items.Product`` items you should use higher values for
+``ZyteApiProvider`` if you want these items to come from these page objects,
+and lower values if you want them to come from Zyte API.
+
+.. _scrapy-poet provider: https://scrapy-poet.readthedocs.io/en/stable/providers.html

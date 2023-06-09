@@ -52,8 +52,16 @@ class LeafResource(Resource):
         return d
 
 
-class DefaultResource(LeafResource):
+class DefaultResource(Resource):
+    request_count = 0
+
+    def getChild(self, path, request):
+        if path == b"count":
+            return RequestCountResource()
+        return self
+
     def render_POST(self, request):
+        DefaultResource.request_count += 1
         request_data = json.loads(request.content.read())
         request.responseHeaders.setRawHeaders(
             b"Content-Type",
@@ -98,7 +106,20 @@ class DefaultResource(LeafResource):
                 {"name": "test_header", "value": "test_value"}
             ]
 
+        if request_data.get("product") is True:
+            response_data["product"] = {
+                "url": response_data["url"],
+                "name": "Product name",
+                "price": "10",
+                "currency": "USD",
+            }
+
         return json.dumps(response_data).encode()
+
+
+class RequestCountResource(LeafResource):
+    def render_GET(self, request):
+        return str(DefaultResource.request_count).encode()
 
 
 class DelayedResource(LeafResource):
@@ -128,9 +149,9 @@ class MockServer:
         resource = resource or DefaultResource
         self.resource = "{}.{}".format(resource.__module__, resource.__name__)
         self.proc = None
-        host = socket.gethostbyname(socket.gethostname())
+        self.host = socket.gethostbyname(socket.gethostname())
         self.port = port or get_ephemeral_port()
-        self.root_url = "http://%s:%d" % (host, self.port)
+        self.root_url = "http://%s:%d" % (self.host, self.port)
 
     def __enter__(self):
         self.proc = Popen(

@@ -11,9 +11,12 @@ setuptools.setup(
     url="https://github.com/scrapy-plugins/scrapy-zyte-api",
     packages=["scrapy_zyte_api"],
     install_requires=[
-        "packaging>=14.0",
+        "packaging>=20.0",
         "scrapy>=2.0.1",
+        "scrapy-poet>=0.9.0",
+        "web-poet>=0.13.0",
         "zyte-api>=0.4.0",
+        "zyte-common-items",
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
