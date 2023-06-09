@@ -1,16 +1,15 @@
-from typing import Any, Callable, Sequence, Set
-
 import attrs
 import pytest
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
-from scrapy.crawler import Crawler
 from scrapy_poet import DummyResponse
 from scrapy_poet.utils.testing import (
     HtmlResource,
     crawl_single_item,
     create_scrapy_settings,
 )
+from twisted.internet import reactor
+from twisted.web.client import Agent, readBody
 from web_poet import BrowserResponse, ItemPage, field, handle_urls
 from zyte_common_items import BasePage, Product
 
@@ -81,29 +80,21 @@ class ItemDepSpider(ZyteAPISpider):
 
 @pytest.mark.xfail(reason="Not implemented yet", raises=AssertionError, strict=True)
 @ensureDeferred
-async def test_itemprovider_requests(mockserver, monkeypatch, caplog):
+async def test_itemprovider_requests(mockserver):
     port = get_ephemeral_port()
     handle_urls(f"{mockserver.host}:{port}")(MyPage)
-
-    call_count = 0
-    real_call = ZyteApiProvider.__call__
-
-    async def wrapped_call(
-        self, to_provide: Set[Callable], request: Request, crawler: Crawler
-    ) -> Sequence[Any]:
-        nonlocal call_count
-        call_count += 1
-        return await real_call(self, to_provide, request, crawler)
 
     settings = create_scrapy_settings(None)
     settings.update(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
-    monkeypatch.setattr(ZyteApiProvider, "__call__", wrapped_call)
     item, url, _ = await crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
-    monkeypatch.undo()
+    count_resp = await Agent(reactor).request(
+        b"GET", mockserver.urljoin("/count").encode()
+    )
+    call_count = int((await readBody(count_resp)).decode())
     assert call_count == 1
     assert "my_item" in item
     assert "product" in item

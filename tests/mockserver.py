@@ -52,8 +52,16 @@ class LeafResource(Resource):
         return d
 
 
-class DefaultResource(LeafResource):
+class DefaultResource(Resource):
+    request_count = 0
+
+    def getChild(self, path, request):
+        if path == b"count":
+            return RequestCountResource()
+        return self
+
     def render_POST(self, request):
+        DefaultResource.request_count += 1
         request_data = json.loads(request.content.read())
         request.responseHeaders.setRawHeaders(
             b"Content-Type",
@@ -107,6 +115,11 @@ class DefaultResource(LeafResource):
             }
 
         return json.dumps(response_data).encode()
+
+
+class RequestCountResource(LeafResource):
+    def render_GET(self, request):
+        return str(DefaultResource.request_count).encode()
 
 
 class DelayedResource(LeafResource):
