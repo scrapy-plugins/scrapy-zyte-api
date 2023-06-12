@@ -1,6 +1,27 @@
 Changes
 =======
 
+0.9.0 (YYYY-MM-DD)
+------------------
+
+* New and updated requirements:
+
+  * packaging >= 20.0
+  * scrapy-poet >= 0.9.0
+  * web-poet >= 0.13.0
+  * zyte-common-items
+
+* Added a scrapy-poet provider for Zyte API. Currently supported data types:
+
+  * ``web_poet.BrowserHtml``
+  * ``web_poet.BrowserResponse``
+  * ``zyte_common_items.Product``
+
+* Added a ``zyte_api_default_params`` request meta key which allows users to
+  ignore the ``ZYTE_API_DEFAULT_PARAMS`` setting for individual requests.
+
+* CI fixes.
+
 0.8.4 (2023-05-26)
 ------------------
 
