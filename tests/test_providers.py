@@ -10,7 +10,7 @@ from scrapy_poet.utils.testing import (
 )
 from twisted.internet import reactor
 from twisted.web.client import Agent, readBody
-from web_poet import BrowserResponse, ItemPage, field, handle_urls
+from web_poet import BrowserHtml, BrowserResponse, ItemPage, field, handle_urls
 from zyte_common_items import BasePage, Product
 
 from scrapy_zyte_api.providers import ZyteApiProvider
@@ -21,6 +21,7 @@ from .mockserver import get_ephemeral_port
 
 @attrs.define
 class ProductPage(BasePage):
+    html: BrowserHtml
     response: BrowserResponse
     product: Product
 
@@ -33,7 +34,8 @@ class ZyteAPISpider(Spider):
 
     def parse_(self, response: DummyResponse, page: ProductPage):
         yield {
-            "html": page.response.html,
+            "html": page.html,
+            "response_html": page.response.html,
             "product": page.product,
         }
 
@@ -46,6 +48,7 @@ async def test_provider(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     item, url, _ = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
     assert item["html"] == "<html><body>Hello<h1>World!</h1></body></html>"
+    assert item["response_html"] == "<html><body>Hello<h1>World!</h1></body></html>"
     assert item["product"] == Product.from_dict(
         dict(
             url=url,
@@ -78,6 +81,7 @@ class ItemDepSpider(ZyteAPISpider):
         }
 
 
+# https://github.com/scrapy-plugins/scrapy-zyte-api/issues/91
 @pytest.mark.xfail(reason="Not implemented yet", raises=AssertionError, strict=True)
 @ensureDeferred
 async def test_itemprovider_requests(mockserver):

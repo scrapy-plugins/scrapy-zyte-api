@@ -834,6 +834,7 @@ Or request them directly in the callback::
 
 The currently supported dependencies are:
 
+* ``web_poet.BrowserHtml``
 * ``web_poet.BrowserResponse``
 * ``zyte_common_items.Product``
 
@@ -846,5 +847,12 @@ priority of 1000, so when you have page objects producing
 ``zyte_common_items.Product`` items you should use higher values for
 ``ZyteApiProvider`` if you want these items to come from these page objects,
 and lower values if you want them to come from Zyte API.
+
+Currently, when ``ItemProvider`` is used together with ``ZyteApiProvider``,
+it may make more requests than is optimal: the normal Scrapy response will be
+always requested even when using a ``DummyResponse`` annotation, and in some
+dependency combinations two Zyte API requests will be made for the same page.
+We are planning to solve these problems in the future releases of
+``scrapy-poet`` and ``scrapy-zyte-api``.
 
 .. _scrapy-poet provider: https://scrapy-poet.readthedocs.io/en/stable/providers.html
