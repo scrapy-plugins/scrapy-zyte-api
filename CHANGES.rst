@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.9.0 (YYYY-MM-DD)
+0.9.0 (2023-06-13)
 ------------------
 
 * New and updated requirements:
