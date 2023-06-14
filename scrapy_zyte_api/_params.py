@@ -1,6 +1,7 @@
 from base64 import b64decode, b64encode
 from copy import copy
 from logging import getLogger
+from os import environ
 from typing import Any, Dict, List, Mapping, Optional, Set
 from warnings import warn
 
@@ -569,7 +570,7 @@ class _ParamParser:
         self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
         self._browser_headers = _load_browser_headers(settings)
         self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
-        self._job_id = settings.get("JOB")
+        self._job_id = environ.get("SHUB_JOBKEY", None)
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._skip_headers = _load_skip_headers(settings)
         self._warn_on_cookies = False
