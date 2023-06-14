@@ -33,6 +33,7 @@ from . import (
     get_crawler,
     get_download_handler,
     get_downloader_middleware,
+    set_env,
 )
 from .mockserver import DelayedResource, MockServer, produce_request_response
 
@@ -295,7 +296,6 @@ async def test_params_parser_input_default(mockserver):
 @ensureDeferred
 async def test_param_parser_input_custom(mockserver):
     settings = {
-        "JOB": "1/2/3",
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_AUTOMAP_PARAMS": {"c": "d"},
         "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
@@ -310,7 +310,6 @@ async def test_param_parser_input_custom(mockserver):
         assert parser._browser_headers == {b"b": "b"}
         assert parser._cookies_enabled is True
         assert parser._default_params == {"a": "b"}
-        assert parser._job_id == "1/2/3"
         assert parser._max_cookies == 1
         assert parser._skip_headers == {b"a"}
         assert parser._transparent_mode is True
@@ -477,20 +476,20 @@ def test_bad_meta_type(key, value):
 @pytest.mark.parametrize("meta", ["zyte_api", "zyte_api_automap"])
 @ensureDeferred
 async def test_job_id(meta, mockserver):
-    """Test how the value of the ``JOB`` setting is included as ``jobId`` among
-    the parameters sent to Zyte API, both with manually-defined parameters and
-    with automatically-mapped parameters.
+    """Test how the value of the ``SHUB_JOBKEY`` environment variable is
+    included as ``jobId`` among the parameters sent to Zyte API, both with
+    manually-defined parameters and with automatically-mapped parameters.
 
     Note that :func:`test_param_parser_input_custom` already tests how the
     ``JOB`` setting is mapped to the corresponding
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com", meta={meta: True})
-    settings: Dict[str, Any] = {**SETTINGS, "JOB": "1/2/3"}
-    crawler = get_crawler(settings)
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
+    with set_env(SHUB_JOBKEY="1/2/3"):
+        crawler = get_crawler(SETTINGS)
+        handler = get_download_handler(crawler, "https")
+        param_parser = handler._param_parser
+        api_params = param_parser.parse(request)
     assert api_params["jobId"] == "1/2/3"
 
 
