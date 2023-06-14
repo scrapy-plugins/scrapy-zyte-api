@@ -592,10 +592,11 @@ class _ParamParser:
 
     def parse(self, request):
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
+        use_default_params = request.meta.get("zyte_api_default_params", True)
         cookies_enabled = self._cookies_enabled and not dont_merge_cookies
         params = _get_api_params(
             request,
-            default_params=self._default_params,
+            default_params=self._default_params if use_default_params else {},
             transparent_mode=self._transparent_mode,
             automap_params=self._automap_params,
             skip_headers=self._skip_headers,
