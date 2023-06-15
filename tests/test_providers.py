@@ -73,32 +73,94 @@ class MyPage(ItemPage[MyItem]):
         return str(self.response.url)
 
 
-class ItemDepSpider(ZyteAPISpider):
-    def parse_(self, response: DummyResponse, product: Product, my_item: MyItem):  # type: ignore[override]
-        yield {
-            "product": product,
-            "my_item": my_item,
-        }
-
-
-# https://github.com/scrapy-plugins/scrapy-zyte-api/issues/91
-@pytest.mark.xfail(reason="Not implemented yet", raises=AssertionError, strict=True)
 @ensureDeferred
-async def test_itemprovider_requests(mockserver):
+async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
+    class ItemDepSpider(ZyteAPISpider):
+        def parse_(  # type: ignore[override]
+            self,
+            response: DummyResponse,
+            browser_response: BrowserResponse,
+            product: Product,
+        ):
+            yield {
+                "product": product,
+                "browser_response": browser_response,
+            }
+
     port = get_ephemeral_port()
-    handle_urls(f"{mockserver.host}:{port}")(MyPage)
+    handle_urls(f"{fresh_mockserver.host}:{port}")(MyPage)
 
     settings = create_scrapy_settings(None)
     settings.update(SETTINGS)
-    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
     item, url, _ = await crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
     count_resp = await Agent(reactor).request(
-        b"GET", mockserver.urljoin("/count").encode()
+        b"GET", fresh_mockserver.urljoin("/count").encode()
+    )
+    call_count = int((await readBody(count_resp)).decode())
+    assert call_count == 1
+    assert "browser_response" in item
+    assert "product" in item
+
+
+# https://github.com/scrapy-plugins/scrapy-zyte-api/issues/91
+@pytest.mark.xfail(reason="Not implemented yet", raises=AssertionError, strict=True)
+@ensureDeferred
+async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
+    class ItemDepSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, product: Product, my_item: MyItem):  # type: ignore[override]
+            yield {
+                "product": product,
+                "my_item": my_item,
+            }
+
+    port = get_ephemeral_port()
+    handle_urls(f"{fresh_mockserver.host}:{port}")(MyPage)
+
+    settings = create_scrapy_settings(None)
+    settings.update(SETTINGS)
+    settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
+    item, url, _ = await crawl_single_item(
+        ItemDepSpider, HtmlResource, settings, port=port
+    )
+    count_resp = await Agent(reactor).request(
+        b"GET", fresh_mockserver.urljoin("/count").encode()
     )
     call_count = int((await readBody(count_resp)).decode())
     assert call_count == 1
     assert "my_item" in item
     assert "product" in item
+
+
+@ensureDeferred
+async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mockserver):
+    class ItemDepSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, product: Product, browser_response: BrowserResponse, my_item: MyItem):  # type: ignore[override]
+            yield {
+                "product": product,
+                "my_item": my_item,
+                "browser_response": browser_response,
+            }
+
+    port = get_ephemeral_port()
+    handle_urls(f"{fresh_mockserver.host}:{port}")(MyPage)
+
+    settings = create_scrapy_settings(None)
+    settings.update(SETTINGS)
+    settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1}
+    item, url, _ = await crawl_single_item(
+        ItemDepSpider, HtmlResource, settings, port=port
+    )
+    count_resp = await Agent(reactor).request(
+        b"GET", fresh_mockserver.urljoin("/count").encode()
+    )
+    call_count = int((await readBody(count_resp)).decode())
+    assert call_count == 1
+    assert "my_item" in item
+    assert "product" in item
+    assert "browser_response" in item
