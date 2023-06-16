@@ -1,4 +1,5 @@
-from typing import Any, Callable, List, Sequence, Set
+from typing import Any, Callable, Dict, List, Sequence, Set, Type
+from weakref import WeakKeyDictionary
 
 from scrapy import Request
 from scrapy.crawler import Crawler
@@ -21,11 +22,29 @@ class ZyteApiProvider(PageObjectInputProvider):
 
     provided_classes = {BrowserResponse, BrowserHtml, Product}
 
+    def __init__(self, injector):
+        super().__init__(injector)
+        self._cached_instances: WeakKeyDictionary[Request, Dict] = WeakKeyDictionary()
+
+    def update_cache(self, request: Request, mapping: Dict[Type, Any]) -> None:
+        if request not in self._cached_instances:
+            self._cached_instances[request] = {}
+        self._cached_instances[request].update(mapping)
+
     async def __call__(
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
         # TODO what if ``response`` is already from Zyte API and contains something we need
+        results: List[Any] = []
+
+        for cls in list(to_provide):
+            item = self._cached_instances.get(request, {}).get(cls)
+            if item:
+                results.append(item)
+                to_provide.remove(cls)
+        if not to_provide:
+            return results
 
         html_requested = BrowserResponse in to_provide or BrowserHtml in to_provide
         item_keywords = {Product: "product"}
@@ -36,7 +55,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         for item_type, kw in item_keywords.items():
             if item_type in to_provide:
                 zyte_api_meta[kw] = True
-        request = Request(
+        api_request = Request(
             url=request.url,
             meta={
                 "zyte_api": zyte_api_meta,
@@ -45,26 +64,28 @@ class ZyteApiProvider(PageObjectInputProvider):
             callback=NO_CALLBACK,
         )
         api_response: ZyteAPITextResponse = await maybe_deferred_to_future(
-            crawler.engine.download(request)
+            crawler.engine.download(api_request)
         )
 
         assert api_response.raw_api_response
-        results: List[Any] = []
         if html_requested:
             html = BrowserHtml(api_response.raw_api_response["browserHtml"])
         else:
             html = None
         if BrowserHtml in to_provide:
             results.append(html)
+            self.update_cache(request, {BrowserHtml: html})
         if BrowserResponse in to_provide:
-            results.append(
-                BrowserResponse(
-                    url=api_response.url,
-                    status=api_response.status,
-                    html=html,
-                )
+            response = BrowserResponse(
+                url=api_response.url,
+                status=api_response.status,
+                html=html,
             )
+            results.append(response)
+            self.update_cache(request, {BrowserResponse: response})
         for item_type, kw in item_keywords.items():
             if item_type in to_provide:
-                results.append(item_type.from_dict(api_response.raw_api_response[kw]))
+                item = item_type.from_dict(api_response.raw_api_response[kw])
+                results.append(item)
+                self.update_cache(request, {item_type: item})
         return results
