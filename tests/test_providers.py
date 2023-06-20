@@ -1,5 +1,4 @@
 import attrs
-import pytest
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy_poet import DummyResponse
@@ -106,8 +105,6 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     assert "product" in item
 
 
-# https://github.com/scrapy-plugins/scrapy-zyte-api/issues/91
-@pytest.mark.xfail(reason="Not implemented yet", raises=AssertionError, strict=True)
 @ensureDeferred
 async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):
