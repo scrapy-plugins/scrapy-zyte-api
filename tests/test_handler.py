@@ -430,3 +430,12 @@ def test_log_request_truncate_negative(enabled):
             settings=None,
             crawler=crawler,
         )
+
+
+@ensureDeferred
+async def test_addon(mockserver):
+    async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
+        meta = {"zyte_api": {"foo": "bar"}}
+        request = Request("https://example.com", meta=meta)
+        await handler.download_request(request, None)
+        assert handler._stats.get_value("scrapy-zyte-api/success") == 1

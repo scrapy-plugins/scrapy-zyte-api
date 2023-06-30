@@ -1,18 +1,19 @@
 from contextlib import asynccontextmanager, contextmanager
 from os import environ
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from scrapy import Spider
 from scrapy.crawler import Crawler
 from scrapy.utils.test import get_crawler as _get_crawler
 from zyte_api.aio.client import AsyncClient
 
+from scrapy_zyte_api.addon import ScrapyZyteAPIAddon
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 
 _API_KEY = "a"
 
 DEFAULT_CLIENT_CONCURRENCY = AsyncClient(api_key=_API_KEY).n_conn
-SETTINGS = {
+SETTINGS: Dict[str, Any] = {
     "DOWNLOAD_HANDLERS": {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
@@ -20,6 +21,12 @@ SETTINGS = {
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "ZYTE_API_KEY": _API_KEY,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+}
+SETTINGS_ADDON: Dict[str, Any] = {
+    "ADDONS": {
+        ScrapyZyteAPIAddon: 1,
+    },
+    "ZYTE_API_KEY": _API_KEY,
 }
 UNSET = object()
 
@@ -49,8 +56,10 @@ def get_download_handler(crawler, schema):
 
 
 @asynccontextmanager
-async def make_handler(settings: dict, api_url: Optional[str] = None):
-    settings = {**SETTINGS, **settings}
+async def make_handler(
+    settings: Dict[str, Any], api_url: Optional[str] = None, *, use_addon: bool = False
+):
+    settings = {**(SETTINGS if not use_addon else SETTINGS_ADDON), **settings}
     if api_url is not None:
         settings["ZYTE_API_URL"] = api_url
     crawler = get_crawler(settings)

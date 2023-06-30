@@ -42,7 +42,12 @@ Installation
 Configuration
 =============
 
-To enable this plugin:
+To enable this plugin, if your Scrapy version supports addons:
+
+-   Add ``"scrapy_zyte_api.ScrapyZyteAPIAddon"`` to the ``ADDONS`` setting with
+    any priority.
+
+Otherwise:
 
 -   Set the ``http`` and ``https`` keys in the `DOWNLOAD_HANDLERS
     <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-DOWNLOAD_HANDLERS>`_
@@ -62,12 +67,23 @@ To enable this plugin:
     Scrapy setting to
     ``"twisted.internet.asyncioreactor.AsyncioSelectorReactor"``.
 
+In both cases:
+
 -   Set `your Zyte API key
     <https://docs.zyte.com/zyte-api/usage/general.html#authorization>`_ as
     either the ``ZYTE_API_KEY`` Scrapy setting or as an environment variable of
     the same name.
 
 For example, in the ``settings.py`` file of your Scrapy project:
+
+.. code-block:: python
+
+    ADDONS = {
+        "scrapy_zyte_api.ScrapyZyteAPIAddon": 1,
+    }
+    ZYTE_API_KEY = "YOUR_API_KEY"
+
+or::
 
 .. code-block:: python
 
