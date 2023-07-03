@@ -18,7 +18,14 @@ from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 
-from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET, make_handler, set_env
+from . import (
+    DEFAULT_CLIENT_CONCURRENCY,
+    SETTINGS,
+    SETTINGS_ADDON,
+    UNSET,
+    make_handler,
+    set_env,
+)
 
 
 @pytest.mark.parametrize(
@@ -439,3 +446,18 @@ async def test_addon(mockserver):
         request = Request("https://example.com", meta=meta)
         await handler.download_request(request, None)
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
+
+
+@ensureDeferred
+async def test_addon_check_settings():
+    settings: Dict[str, Any]
+    with pytest.raises(
+        ValueError, match="The 'http' value in the 'DOWNLOAD_HANDLERS' setting is set"
+    ):
+        settings = {**SETTINGS_ADDON, "DOWNLOAD_HANDLERS": {"http": "foo"}}
+        get_crawler(settings_dict=settings)
+    with pytest.raises(
+        ValueError, match="The 'REQUEST_FINGERPRINTER_CLASS' setting is set"
+    ):
+        settings = {**SETTINGS_ADDON, "REQUEST_FINGERPRINTER_CLASS": "foo"}
+        get_crawler(settings_dict=settings)
