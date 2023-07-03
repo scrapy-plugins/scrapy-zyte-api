@@ -101,6 +101,9 @@ or:
 The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 ``False`` to disable this plugin.
 
+If the Scrapy addon is enabled, the ``ZYTE_API_TRANSPARENT_MODE`` setting is
+enabled by default and can be disabled manually.
+
 
 Usage
 =====

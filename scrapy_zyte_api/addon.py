@@ -48,3 +48,4 @@ class Addon:
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
             "addon",
         )
+        settings.set("ZYTE_API_TRANSPARENT_MODE", True, "addon")

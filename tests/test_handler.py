@@ -442,8 +442,22 @@ def test_log_request_truncate_negative(enabled):
 @ensureDeferred
 async def test_addon(mockserver):
     async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
+        request = Request("https://example.com")
+        await handler.download_request(request, None)
+        assert handler._stats.get_value("scrapy-zyte-api/success") == 1
+
+
+@ensureDeferred
+async def test_addon_disable_transparent(mockserver):
+    async with make_handler(
+        {"ZYTE_API_TRANSPARENT_MODE": False}, mockserver.urljoin("/"), use_addon=True
+    ) as handler:
+        request = Request("https://toscrape.com")
+        await handler.download_request(request, None)
+        assert handler._stats.get_value("scrapy-zyte-api/success") is None
+
         meta = {"zyte_api": {"foo": "bar"}}
-        request = Request("https://example.com", meta=meta)
+        request = Request("https://toscrape.com", meta=meta)
         await handler.download_request(request, None)
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
