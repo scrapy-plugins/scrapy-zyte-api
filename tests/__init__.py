@@ -7,7 +7,7 @@ from scrapy.crawler import Crawler
 from scrapy.utils.test import get_crawler as _get_crawler
 from zyte_api.aio.client import AsyncClient
 
-from scrapy_zyte_api.addon import ScrapyZyteAPIAddon
+from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 
 _API_KEY = "a"
@@ -24,7 +24,7 @@ SETTINGS: Dict[str, Any] = {
 }
 SETTINGS_ADDON: Dict[str, Any] = {
     "ADDONS": {
-        ScrapyZyteAPIAddon: 1,
+        Addon: 1,
     },
     "ZYTE_API_KEY": _API_KEY,
 }

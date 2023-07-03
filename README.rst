@@ -44,8 +44,8 @@ Configuration
 
 To enable this plugin, if your Scrapy version supports addons:
 
--   Add ``"scrapy_zyte_api.ScrapyZyteAPIAddon"`` to the ``ADDONS`` setting with
-    any priority.
+-   Add ``"scrapy_zyte_api.Addon"`` to the ``ADDONS`` setting with any
+    priority.
 
 Otherwise:
 
@@ -79,11 +79,11 @@ For example, in the ``settings.py`` file of your Scrapy project:
 .. code-block:: python
 
     ADDONS = {
-        "scrapy_zyte_api.ScrapyZyteAPIAddon": 1,
+        "scrapy_zyte_api.Addon": 1,
     }
     ZYTE_API_KEY = "YOUR_API_KEY"
 
-or::
+or:
 
 .. code-block:: python
 

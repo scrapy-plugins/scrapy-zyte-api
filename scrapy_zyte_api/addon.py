@@ -5,7 +5,7 @@ from scrapy.settings import BaseSettings
 from scrapy_zyte_api import ScrapyZyteAPIDownloaderMiddleware
 
 
-class ScrapyZyteAPIAddon:
+class Addon:
     @staticmethod
     def _check_settings(settings: BaseSettings) -> Optional[str]:
         if (

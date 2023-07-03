@@ -7,5 +7,5 @@ if _NEEDS_EARLY_REACTOR:
 
 from ._downloader_middleware import ScrapyZyteAPIDownloaderMiddleware  # NOQA
 from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter  # NOQA
-from .addon import ScrapyZyteAPIAddon  # NOQA
+from .addon import Addon  # NOQA
 from .handler import ScrapyZyteAPIDownloadHandler  # NOQA
