@@ -7,7 +7,6 @@ from http.cookiejar import Cookie
 from inspect import isclass
 from typing import Any, Dict, cast
 from unittest import mock
-from unittest.mock import patch
 
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
@@ -332,18 +331,16 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
     async with mockserver.make_handler() as handler:
         handler._param_parser = mock.Mock()
         handler._param_parser.parse = mock.Mock(return_value=output)
-        patch_path = "scrapy_zyte_api.handler.super"
-        with patch(patch_path) as super:
-            handler._download_request = mock.AsyncMock(side_effect=RuntimeError)
-            super_mock = mock.Mock()
-            super_mock.download_request = mock.AsyncMock(side_effect=RuntimeError)
-            super.return_value = super_mock
-            with pytest.raises(RuntimeError):
-                await handler.download_request(request, None)
+        handler._download_request = mock.AsyncMock(side_effect=RuntimeError)
+        handler.fallback_handler.download_request = mock.AsyncMock(
+            side_effect=RuntimeError
+        )
+        with pytest.raises(RuntimeError):
+            await handler.download_request(request, None)
     if uses_zyte_api:
         handler._download_request.assert_called()
     else:
-        super_mock.download_request.assert_called()
+        handler.fallback_handler.download_request.assert_called()
 
 
 DEFAULT_AUTOMAP_PARAMS: Dict[str, Any] = {

@@ -4,13 +4,12 @@ from copy import deepcopy
 from typing import Generator, Optional, Union
 
 from scrapy import Spider, signals
-from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
-from scrapy.utils.misc import load_object
+from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.client import AsyncClient, create_session
@@ -52,15 +51,20 @@ def _load_retry_policy(settings):
     return policy
 
 
-class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
+class ScrapyZyteAPIDownloadHandler:
+    lazy = False
+
     def __init__(
         self, settings: Settings, crawler: Crawler, client: AsyncClient = None
     ):
-        super().__init__(settings=settings, crawler=crawler)
         if not settings.getbool("ZYTE_API_ENABLED", True):
             raise NotConfigured(
                 "Zyte API is disabled. Set ZYTE_API_ENABLED to True to enable it."
             )
+        dhcls = load_object("scrapy.core.downloader.handlers.http.HTTPDownloadHandler")
+        self.fallback_handler = create_instance(
+            dhcls, settings=settings, crawler=crawler
+        )
         if not hasattr(crawler, "zyte_api_client"):
             if not client:
                 client = self._build_client(settings)
@@ -94,8 +98,11 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"positive integer."
             )
         crawler.signals.connect(self.engine_started, signal=signals.engine_started)
-        if not hasattr(self, "_crawler"):  # Scrapy 2.1 and earlier
-            self._crawler = crawler
+        self._crawler = crawler
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler.settings, crawler)
 
     def engine_started(self):
         if not self._cookies_enabled:
@@ -142,7 +149,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             return deferred_from_coro(
                 self._download_request(api_params, request, spider)
             )
-        return super().download_request(request, spider)
+        return self.fallback_handler.download_request(request, spider)
 
     def _update_stats(self):
         prefix = "scrapy-zyte-api"
@@ -237,7 +244,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
 
     @inlineCallbacks
     def close(self) -> Generator:
-        yield super().close()
+        yield self.fallback_handler.close()
         yield deferred_from_coro(self._close())
 
     async def _close(self) -> None:  # NOQA
