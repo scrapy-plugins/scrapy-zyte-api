@@ -332,7 +332,8 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
         handler._param_parser = mock.Mock()
         handler._param_parser.parse = mock.Mock(return_value=output)
         handler._download_request = mock.AsyncMock(side_effect=RuntimeError)
-        handler.fallback_handler.download_request = mock.AsyncMock(
+        handler._fallback_handler = mock.Mock()
+        handler._fallback_handler.download_request = mock.AsyncMock(
             side_effect=RuntimeError
         )
         with pytest.raises(RuntimeError):
@@ -340,7 +341,7 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
     if uses_zyte_api:
         handler._download_request.assert_called()
     else:
-        handler.fallback_handler.download_request.assert_called()
+        handler._fallback_handler.download_request.assert_called()
 
 
 DEFAULT_AUTOMAP_PARAMS: Dict[str, Any] = {
