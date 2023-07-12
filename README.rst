@@ -43,6 +43,40 @@ Installation
     pip install scrapy-zyte-api
 
 
+Quick start
+===========
+
+Get a `Zyte API`_ key, and add it to your project settings.py:
+
+.. code-block:: python
+
+    ZYTE_API_KEY = "YOUR_API_KEY"
+
+Instead of adding API key to setting.py you can also set
+``ZYTE_API_KEY`` environment variable.
+
+Then, set up the scrapy-zyte-api integration:
+
+.. code-block:: python
+
+    DOWNLOAD_HANDLERS = {
+        "http": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
+        "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
+    }
+    DOWNLOADER_MIDDLEWARES = {
+        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+    }
+    REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
+    TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+
+By default, scrapy-zyte-api doesn't change the spider behavior.
+To switch your spider to use Zyte API for all requests,
+set the following option:
+
+.. code-block:: python
+
+    ZYTE_API_TRANSPARENT_MODE = True
+
 Configuration
 =============
 
@@ -71,24 +105,17 @@ To enable this plugin:
     either the ``ZYTE_API_KEY`` Scrapy setting or as an environment variable of
     the same name.
 
-For example, in the ``settings.py`` file of your Scrapy project:
-
-.. code-block:: python
-
-    DOWNLOAD_HANDLERS = {
-        "http": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
-        "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
-    }
-    DOWNLOADER_MIDDLEWARES = {
-        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
-    }
-    REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
-    TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
-    ZYTE_API_KEY = "YOUR_API_KEY"
-
 The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 ``False`` to disable this plugin.
 
+If you want to use scrapy-poet integration, add a provider to
+``SCRAPY_POET_PROVIDERS`` (see `scrapy-poet integration`_):
+
+.. code-block:: python
+
+    SCRAPY_POET_PROVIDERS = {
+        "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
+    }
 
 Usage
 =====
@@ -817,7 +844,6 @@ For example::
 The ``ZYTE_API_LOG_REQUESTS_TRUNCATE``, 64 by default, determines the maximum
 length of any string value in the logged JSON object, excluding object keys. To
 disable truncation, set it to 0.
-
 
 scrapy-poet integration
 =======================
