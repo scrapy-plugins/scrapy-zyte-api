@@ -9,6 +9,10 @@ from unittest import mock
 import pytest
 from pytest_twisted import ensureDeferred
 from scrapy import Request
+from scrapy.core.downloader.handlers.http import (
+    HTTP10DownloadHandler,
+    HTTPDownloadHandler,
+)
 from scrapy.exceptions import NotConfigured
 from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
@@ -16,16 +20,14 @@ from zyte_api.aio.client import AsyncClient
 from zyte_api.aio.retry import RetryFactory
 from zyte_api.constants import API_URL
 
-from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
-
-from . import (
-    DEFAULT_CLIENT_CONCURRENCY,
-    SETTINGS,
-    SETTINGS_ADDON,
-    UNSET,
-    make_handler,
-    set_env,
+from scrapy_zyte_api.handler import (
+    ScrapyZyteAPIDownloadHandler,
+    ScrapyZyteAPIHTTPDownloadHandler,
 )
+
+from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_ADDON, UNSET
+from . import get_crawler as get_crawler_zyte_api
+from . import get_download_handler, make_handler, set_env
 
 
 @pytest.mark.parametrize(
@@ -439,6 +441,13 @@ def test_log_request_truncate_negative(enabled):
         )
 
 
+def test_fallback_setting():
+    crawler = get_crawler_zyte_api(settings=SETTINGS)
+    handler = get_download_handler(crawler, "https")
+    assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
+    assert isinstance(handler._fallback_handler, HTTPDownloadHandler)
+
+
 @ensureDeferred
 async def test_addon(mockserver):
     async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
@@ -463,15 +472,14 @@ async def test_addon_disable_transparent(mockserver):
 
 
 @ensureDeferred
-async def test_addon_check_settings():
-    settings: Dict[str, Any]
-    with pytest.raises(
-        ValueError, match="The 'http' value in the 'DOWNLOAD_HANDLERS' setting is set"
-    ):
-        settings = {**SETTINGS_ADDON, "DOWNLOAD_HANDLERS": {"http": "foo"}}
-        get_crawler(settings_dict=settings)
-    with pytest.raises(
-        ValueError, match="The 'REQUEST_FINGERPRINTER_CLASS' setting is set"
-    ):
-        settings = {**SETTINGS_ADDON, "REQUEST_FINGERPRINTER_CLASS": "foo"}
-        get_crawler(settings_dict=settings)
+async def test_addon_fallback():
+    settings = {
+        **SETTINGS_ADDON,
+        "DOWNLOAD_HANDLERS": {
+            "http": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler"
+        },
+    }
+    crawler = get_crawler_zyte_api(settings=settings)
+    handler = get_download_handler(crawler, "http")
+    assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
+    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
