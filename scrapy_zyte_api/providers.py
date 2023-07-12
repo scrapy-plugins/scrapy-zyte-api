@@ -6,7 +6,10 @@ from scrapy.crawler import Crawler
 from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import PageObjectInputProvider
 from web_poet import BrowserHtml, BrowserResponse
-from zyte_common_items import Product
+from zyte_common_items import (
+    Product, ProductList, ProductNavigation,
+    Article, ArticleList, ArticleNavigation
+)
 
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
@@ -20,7 +23,16 @@ except ImportError:
 class ZyteApiProvider(PageObjectInputProvider):
     name = "zyte_api"
 
-    provided_classes = {BrowserResponse, BrowserHtml, Product}
+    provided_classes = {
+        BrowserResponse,
+        BrowserHtml,
+        Product,
+        ProductList,
+        ProductNavigation,
+        Article,
+        ArticleList,
+        ArticleNavigation
+    }
 
     def __init__(self, injector):
         super().__init__(injector)
@@ -47,7 +59,14 @@ class ZyteApiProvider(PageObjectInputProvider):
             return results
 
         html_requested = BrowserResponse in to_provide or BrowserHtml in to_provide
-        item_keywords = {Product: "product"}
+        item_keywords = {
+            Product: "product",
+            ProductList: "productList",
+            ProductNavigation: "productNavigation",
+            Article: "article",
+            ArticleList: "articleList",
+            ArticleNavigation: "articleNavigation",
+        }
 
         zyte_api_meta = {}
         if html_requested:

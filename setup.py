@@ -19,7 +19,7 @@ setuptools.setup(
         "provider": [
             "scrapy-poet>=0.9.0",
             "web-poet>=0.13.0",
-            "zyte-common-items",
+            "zyte-common-items>=0.7.0",
         ]
     },
     classifiers=[
