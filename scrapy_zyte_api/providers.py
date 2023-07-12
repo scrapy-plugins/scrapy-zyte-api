@@ -7,8 +7,12 @@ from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import PageObjectInputProvider
 from web_poet import BrowserHtml, BrowserResponse
 from zyte_common_items import (
-    Product, ProductList, ProductNavigation,
-    Article, ArticleList, ArticleNavigation
+    Article,
+    ArticleList,
+    ArticleNavigation,
+    Product,
+    ProductList,
+    ProductNavigation,
 )
 
 from scrapy_zyte_api.responses import ZyteAPITextResponse
@@ -31,7 +35,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         ProductNavigation,
         Article,
         ArticleList,
-        ArticleNavigation
+        ArticleNavigation,
     }
 
     def __init__(self, injector):
