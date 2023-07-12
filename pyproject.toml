@@ -1,0 +1,23 @@
+[tool.black]
+target-version = ["py38", "py39", "py310", "py311"]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+check_untyped_defs = true
+ignore_missing_imports = true
+no_warn_no_return = true
+files = [
+    "scrapy_zyte_api",
+    "tests"
+]
+
+[tool.pytest.ini_options]
+junit_family = "xunit2"
+testpaths = [
+    "scrapy_zyte_api/",
+    "tests/"
+]
+minversion = "6.0"
