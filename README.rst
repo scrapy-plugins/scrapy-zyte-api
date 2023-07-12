@@ -863,6 +863,11 @@ The currently supported dependencies are:
 * ``web_poet.BrowserHtml``
 * ``web_poet.BrowserResponse``
 * ``zyte_common_items.Product``
+* ``zyte_common_items.ProductList``
+* ``zyte_common_items.ProductNavigation``
+* ``zyte_common_items.Article``
+* ``zyte_common_items.ArticleList``
+* ``zyte_common_items.ArticleNavigation``
 
 The provider will make a request to Zyte API using the ``ZYTE_API_KEY`` and
 ``ZYTE_API_URL`` settings. It will ignore the transparent mode and parameter
