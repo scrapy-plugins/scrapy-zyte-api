@@ -1,16 +1,14 @@
 import json
 import logging
 from copy import deepcopy
-from typing import Generator, Optional, Union
+from typing import Any, Generator, Optional, Union
 
 from scrapy import Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
-from scrapy.settings.default_settings import DOWNLOAD_HANDLERS_BASE
 from scrapy.utils.defer import deferred_from_coro
-from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
@@ -53,7 +51,7 @@ def _load_retry_policy(settings):
     return policy
 
 
-class ScrapyZyteAPIDownloadHandler:
+class _ScrapyZyteAPIBaseDownloadHandler:
     lazy = False
 
     def __init__(
@@ -142,20 +140,9 @@ class ScrapyZyteAPIDownloadHandler:
                 "Your Zyte API key is not set. Set ZYTE_API_KEY to your API key."
             )
 
-    def _load_fallback_handler(self, scheme: str) -> None:
-        if scheme == "http":
-            setting = "_ZYTE_API_FALLBACK_HTTP_HANDLER"
-        elif scheme == "https":
-            setting = "_ZYTE_API_FALLBACK_HTTPS_HANDLER"
-        else:
-            raise ValueError(f"Unsupported scheme {scheme}")
-        setting_value = self._crawler.settings.get(
-            setting, DOWNLOAD_HANDLERS_BASE[scheme]
-        )
-        dhcls = load_object(setting_value)
-        self._fallback_handler = create_instance(
-            dhcls, settings=None, crawler=self._crawler
-        )
+    def _create_handler(self, path: Any) -> Any:
+        dhcls = load_object(path)
+        return create_instance(dhcls, settings=None, crawler=self._crawler)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._param_parser.parse(request)
@@ -163,9 +150,6 @@ class ScrapyZyteAPIDownloadHandler:
             return deferred_from_coro(
                 self._download_request(api_params, request, spider)
             )
-        if not self._fallback_handler:
-            scheme = urlparse_cached(request).scheme
-            self._load_fallback_handler(scheme)
         assert self._fallback_handler
         return self._fallback_handler.download_request(request, spider)
 
@@ -268,3 +252,33 @@ class ScrapyZyteAPIDownloadHandler:
 
     async def _close(self) -> None:  # NOQA
         await self._session.close()
+
+
+class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
+    def __init__(
+        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+    ):
+        super().__init__(settings, crawler, client)
+        self._fallback_handler = self._create_handler(
+            "scrapy.core.downloader.handlers.http.HTTPDownloadHandler"
+        )
+
+
+class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
+    def __init__(
+        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+    ):
+        super().__init__(settings, crawler, client)
+        self._fallback_handler = self._create_handler(
+            settings.get("_ZYTE_API_FALLBACK_HTTP_HANDLER")
+        )
+
+
+class ScrapyZyteAPIHTTPSDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
+    def __init__(
+        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+    ):
+        super().__init__(settings, crawler, client)
+        self._fallback_handler = self._create_handler(
+            settings.get("_ZYTE_API_FALLBACK_HTTPS_HANDLER")
+        )

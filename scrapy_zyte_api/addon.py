@@ -48,10 +48,10 @@ class Addon:
 
         settings["DOWNLOAD_HANDLERS"][
             "http"
-        ] = "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler"
+        ] = "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPDownloadHandler"
         settings["DOWNLOAD_HANDLERS"][
             "https"
-        ] = "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler"
+        ] = "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler"
         settings["DOWNLOADER_MIDDLEWARES"][ScrapyZyteAPIDownloaderMiddleware] = 1000
         settings.set(
             "REQUEST_FINGERPRINTER_CLASS",

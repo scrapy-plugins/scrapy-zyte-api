@@ -8,7 +8,7 @@ from scrapy.utils.test import get_crawler as _get_crawler
 from zyte_api.aio.client import AsyncClient
 
 from scrapy_zyte_api.addon import Addon
-from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
+from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 
 _API_KEY = "a"
 
@@ -64,7 +64,7 @@ async def make_handler(
         settings["ZYTE_API_URL"] = api_url
     crawler = get_crawler(settings)
     handler = get_download_handler(crawler, "https")
-    if not isinstance(handler, ScrapyZyteAPIDownloadHandler):
+    if not isinstance(handler, _ScrapyZyteAPIBaseDownloadHandler):
         # i.e. ZYTE_API_ENABLED=False
         handler = None
     try:
