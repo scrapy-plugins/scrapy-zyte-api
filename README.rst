@@ -820,12 +820,12 @@ scrapy-poet integration
 
 ``scrapy-zyte-api`` includes a `scrapy-poet provider`_ that you can use to get
 data from Zyte API in page objects. It requires additional dependencies which
-you can get by installing the optional ``provider`` feature, e.g. with
+you can get by installing the optional ``provider`` feature:
 ``pip install scrapy-zyte-api[provider]``. Enable the provider in the Scrapy
 settings::
 
     SCRAPY_POET_PROVIDERS = {
-        ZyteApiProvider: 1100,
+        "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
     }
 
 Request some supported dependencies in the page object::
