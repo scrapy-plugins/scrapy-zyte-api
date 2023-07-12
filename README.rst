@@ -109,7 +109,7 @@ The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 ``False`` to disable this plugin.
 
 If you want to use scrapy-poet integration, add a provider to
-``SCRAPY_POET_PROVIDERS`` (see :ref:`scrapy-poet-integration`):
+``SCRAPY_POET_PROVIDERS`` (see `scrapy-poet integration`_):
 
 .. code-block:: python
 
@@ -844,9 +844,6 @@ For example::
 The ``ZYTE_API_LOG_REQUESTS_TRUNCATE``, 64 by default, determines the maximum
 length of any string value in the logged JSON object, excluding object keys. To
 disable truncation, set it to 0.
-
-
-.. scrapy-poet-integration::
 
 scrapy-poet integration
 =======================
