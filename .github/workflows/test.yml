@@ -37,9 +37,9 @@ jobs:
           toxenv: provider
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -59,12 +59,12 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11"]
-        tox-job: ["mypy", "flake8", "twine-check"]
+        tox-job: ["mypy", "linters", "twine-check"]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
