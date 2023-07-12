@@ -30,6 +30,10 @@ Requirements
 * Python 3.7+
 * Scrapy 2.0.1+
 
+Scrapy-poet integration requires more recent software:
+
+* Python 3.8+
+* Scrapy 2.6+
 
 Installation
 ============
