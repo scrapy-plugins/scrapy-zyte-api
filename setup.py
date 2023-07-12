@@ -13,11 +13,15 @@ setuptools.setup(
     install_requires=[
         "packaging>=20.0",
         "scrapy>=2.0.1",
-        "scrapy-poet>=0.9.0",
-        "web-poet>=0.13.0",
         "zyte-api>=0.4.0",
-        "zyte-common-items",
     ],
+    extras_require={
+        "provider": [
+            "scrapy-poet>=0.9.0",
+            "web-poet>=0.13.0",
+            "zyte-common-items>=0.7.0",
+        ]
+    },
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

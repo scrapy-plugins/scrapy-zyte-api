@@ -1,5 +1,8 @@
-import attrs
 import pytest
+
+pytest.importorskip("scrapy_poet")
+
+import attrs
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy_poet import DummyResponse

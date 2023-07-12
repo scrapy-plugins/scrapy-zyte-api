@@ -30,6 +30,10 @@ Requirements
 * Python 3.7+
 * Scrapy 2.0.1+
 
+scrapy-poet integration requires more recent software:
+
+* Python 3.8+
+* Scrapy 2.6+
 
 Installation
 ============
@@ -38,6 +42,40 @@ Installation
 
     pip install scrapy-zyte-api
 
+
+Quick start
+===========
+
+Get a `Zyte API`_ key, and add it to your project settings.py:
+
+.. code-block:: python
+
+    ZYTE_API_KEY = "YOUR_API_KEY"
+
+Instead of adding API key to setting.py you can also set
+``ZYTE_API_KEY`` environment variable.
+
+Then, set up the scrapy-zyte-api integration:
+
+.. code-block:: python
+
+    DOWNLOAD_HANDLERS = {
+        "http": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
+        "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
+    }
+    DOWNLOADER_MIDDLEWARES = {
+        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+    }
+    REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
+    TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+
+By default, scrapy-zyte-api doesn't change the spider behavior.
+To switch your spider to use Zyte API for all requests,
+set the following option:
+
+.. code-block:: python
+
+    ZYTE_API_TRANSPARENT_MODE = True
 
 Configuration
 =============
@@ -104,6 +142,14 @@ The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 If the Scrapy addon is enabled, the ``ZYTE_API_TRANSPARENT_MODE`` setting is
 enabled by default and can be disabled manually.
 
+If you want to use scrapy-poet integration, add a provider to
+``SCRAPY_POET_PROVIDERS`` (see `scrapy-poet integration`_):
+
+.. code-block:: python
+
+    SCRAPY_POET_PROVIDERS = {
+        "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
+    }
 
 Usage
 =====
@@ -833,15 +879,17 @@ The ``ZYTE_API_LOG_REQUESTS_TRUNCATE``, 64 by default, determines the maximum
 length of any string value in the logged JSON object, excluding object keys. To
 disable truncation, set it to 0.
 
-
 scrapy-poet integration
 =======================
 
 ``scrapy-zyte-api`` includes a `scrapy-poet provider`_ that you can use to get
-data from Zyte API in page objects. Enable it in the Scrapy settings::
+data from Zyte API in page objects. It requires additional dependencies which
+you can get by installing the optional ``provider`` feature:
+``pip install scrapy-zyte-api[provider]``. Enable the provider in the Scrapy
+settings::
 
     SCRAPY_POET_PROVIDERS = {
-        ZyteApiProvider: 1100,
+        "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
     }
 
 Request some supported dependencies in the page object::
@@ -875,6 +923,11 @@ The currently supported dependencies are:
 * ``web_poet.BrowserHtml``
 * ``web_poet.BrowserResponse``
 * ``zyte_common_items.Product``
+* ``zyte_common_items.ProductList``
+* ``zyte_common_items.ProductNavigation``
+* ``zyte_common_items.Article``
+* ``zyte_common_items.ArticleList``
+* ``zyte_common_items.ArticleNavigation``
 
 The provider will make a request to Zyte API using the ``ZYTE_API_KEY`` and
 ``ZYTE_API_URL`` settings. It will ignore the transparent mode and parameter
