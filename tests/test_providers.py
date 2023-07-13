@@ -108,10 +108,10 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
 @ensureDeferred
 async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, product: Product, my_item: MyItem):  # type: ignore[override]
+        def parse_(self, response: DummyResponse, product: Product, my_page: MyPage):  # type: ignore[override]
             yield {
                 "product": product,
-                "my_item": my_item,
+                "my_page": my_page,
             }
 
     port = get_ephemeral_port()
@@ -129,8 +129,67 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     )
     call_count = int((await readBody(count_resp)).decode())
     assert call_count == 1
-    assert "my_item" in item
+    assert "my_page" in item
     assert "product" in item
+
+
+# TODO: Make incremental changes to this test to make it closer to the test
+# above until you find what makes the test below pass while the test above
+# fails.
+@ensureDeferred
+async def test_build_callback_dependencies_minimize_provider_calls():
+    import attr
+    from scrapy_poet import PageObjectInputProvider
+    from scrapy_poet.injection import get_injector_for_testing, get_response_for_testing
+    from scrapy_poet.page_input_providers import ItemProvider
+    from web_poet import ApplyRule, Injectable
+
+    class ExpensiveDependency1:
+        pass
+
+    class ExpensiveDependency2:
+        pass
+
+    class ExpensiveProvider(PageObjectInputProvider):
+        provided_classes = {ExpensiveDependency1, ExpensiveDependency2}
+
+        def __call__(self, to_provide):
+            if to_provide != self.provided_classes:
+                raise RuntimeError(
+                    "The expensive dependency provider has been called "
+                    "with a subset of the classes that it provides and "
+                    "that are required for the callback in this test."
+                )
+            return [cls() for cls in to_provide]
+
+    @attrs.define
+    class MyItem:
+        pass
+
+    @attrs.define
+    class MyPage(ItemPage[MyItem]):
+        expensive: ExpensiveDependency2
+
+    def callback(
+        expensive: ExpensiveDependency1,
+        item: MyItem,
+    ):
+        pass
+
+    providers = {
+        ItemProvider: 1,
+        ExpensiveProvider: 2,
+    }
+    injector = get_injector_for_testing(providers)
+    injector.registry.add_rule(ApplyRule("", use=MyPage, to_return=MyItem))
+    response = get_response_for_testing(callback)
+
+    # This would raise RuntimeError if expectations are not met.
+    kwargs = await injector.build_callback_dependencies(response.request, response)
+
+    # Make sure the test does not simply pass because some dependencies were
+    # not injected at all.
+    assert set(kwargs.keys()) == {"expensive", "item"}
 
 
 @ensureDeferred
