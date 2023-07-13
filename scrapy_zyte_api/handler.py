@@ -84,7 +84,10 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         self._param_parser = _ParamParser(crawler)
         self._retry_policy = _load_retry_policy(settings)
         self._stats = crawler.stats
-        self._session = create_session(connection_pool_size=self._client.n_conn)
+        self._session = create_session(
+            connection_pool_size=self._client.n_conn,
+            trust_env=settings.getbool("ZYTE_API_USE_ENV_PROXY"),
+        )
         self._must_log_request = settings.getbool("ZYTE_API_LOG_REQUESTS", False)
         self._truncate_limit = settings.getint("ZYTE_API_LOG_REQUESTS_TRUNCATE", 64)
         if self._truncate_limit < 0:

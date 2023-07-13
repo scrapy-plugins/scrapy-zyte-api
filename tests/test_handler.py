@@ -430,3 +430,21 @@ def test_log_request_truncate_negative(enabled):
             settings=None,
             crawler=crawler,
         )
+
+
+@pytest.mark.parametrize("enabled", [True, False, None])
+def test_trust_env(enabled):
+    settings: Dict[str, Any] = {
+        **SETTINGS,
+    }
+    if enabled is not None:
+        settings["ZYTE_API_USE_ENV_PROXY"] = enabled
+    else:
+        enabled = False
+    crawler = get_crawler(settings_dict=settings)
+    handler = create_instance(
+        ScrapyZyteAPIDownloadHandler,
+        settings=None,
+        crawler=crawler,
+    )
+    assert handler._session._trust_env == enabled

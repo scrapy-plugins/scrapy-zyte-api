@@ -913,3 +913,11 @@ We are planning to solve these problems in the future releases of
 ``scrapy-poet`` and ``scrapy-zyte-api``.
 
 .. _scrapy-poet provider: https://scrapy-poet.readthedocs.io/en/stable/providers.html
+
+
+Running behind a proxy
+======================
+
+If you need Zyte API requests to go through a proxy, configure the
+``HTTP_PROXY`` and ``HTTPS_PROXY`` environment variables accordingly, and set
+the ``ZYTE_API_USE_ENV_PROXY`` setting to ``True``.
