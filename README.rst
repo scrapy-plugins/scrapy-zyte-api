@@ -55,7 +55,15 @@ Get a `Zyte API`_ key, and add it to your project settings.py:
 Instead of adding API key to setting.py you can also set
 ``ZYTE_API_KEY`` environment variable.
 
-Then, set up the scrapy-zyte-api integration:
+Then, set up the scrapy-zyte-api integration. If your Scrapy version supports addons:
+
+.. code-block:: python
+
+    ADDONS = {
+        "scrapy_zyte_api.Addon": 1,
+    }
+
+Otherwise:
 
 .. code-block:: python
 
@@ -111,30 +119,6 @@ In both cases:
     <https://docs.zyte.com/zyte-api/usage/general.html#authorization>`_ as
     either the ``ZYTE_API_KEY`` Scrapy setting or as an environment variable of
     the same name.
-
-For example, in the ``settings.py`` file of your Scrapy project:
-
-.. code-block:: python
-
-    ADDONS = {
-        "scrapy_zyte_api.Addon": 1,
-    }
-    ZYTE_API_KEY = "YOUR_API_KEY"
-
-or:
-
-.. code-block:: python
-
-    DOWNLOAD_HANDLERS = {
-        "http": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
-        "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
-    }
-    DOWNLOADER_MIDDLEWARES = {
-        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
-    }
-    REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
-    TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
-    ZYTE_API_KEY = "YOUR_API_KEY"
 
 The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 ``False`` to disable this plugin.
