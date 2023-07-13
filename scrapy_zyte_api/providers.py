@@ -72,7 +72,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             ArticleNavigation: "articleNavigation",
         }
 
-        zyte_api_meta = request.meta.get('zyte_api', {})
+        zyte_api_meta = request.meta.get("zyte_api", {})
         if html_requested:
             zyte_api_meta["browserHtml"] = True
         for item_type, kw in item_keywords.items():
