@@ -77,13 +77,22 @@ Otherwise:
     REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
-By default, scrapy-zyte-api doesn't change the spider behavior.
-To switch your spider to use Zyte API for all requests,
+By default, if the addon is not enabled, scrapy-zyte-api doesn't change the
+spider behavior. To switch your spider to use Zyte API for all requests,
 set the following option:
 
 .. code-block:: python
 
     ZYTE_API_TRANSPARENT_MODE = True
+
+Enabling the addon enables this option, unless you disable it explicitly:
+
+.. code-block:: python
+
+    ADDONS = {
+        "scrapy_zyte_api.Addon": 1,
+    }
+    ZYTE_API_TRANSPARENT_MODE = False
 
 Configuration
 =============
