@@ -18,6 +18,9 @@ Changes
 
 * Improved result caching in the scrapy-poet provider.
 
+* Added a new setting, ``ZYTE_API_USE_ENV_PROXY``, which can be set to ``True``
+  to access Zyte API using a proxy configured in the local environment.
+
 * Fixed getting the Scrapy Cloud job ID.
 
 * Improved the documentation.
