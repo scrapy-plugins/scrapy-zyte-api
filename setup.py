@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="scrapy-zyte-api",
-    version="0.9.0",
+    version="0.10.0",
     description="Client library to process URLs through Zyte API",
     long_description=open("README.rst").read(),
     long_description_content_type="text/x-rst",
@@ -17,7 +17,7 @@ setuptools.setup(
     ],
     extras_require={
         "provider": [
-            "scrapy-poet>=0.9.0",
+            "scrapy-poet>=0.10.0",
             "web-poet>=0.13.0",
             "zyte-common-items>=0.7.0",
         ]

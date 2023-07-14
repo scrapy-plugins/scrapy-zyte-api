@@ -1,6 +1,32 @@
 Changes
 =======
 
+0.10.0 (2023-07-14)
+-------------------
+
+* Added more data types to the scrapy-poet provider:
+
+  * ``zyte_common_items.ProductList``
+  * ``zyte_common_items.ProductNavigation``
+  * ``zyte_common_items.Article``
+  * ``zyte_common_items.ArticleList``
+  * ``zyte_common_items.ArticleNavigation``
+
+* Moved the new dependencies added in 0.9.0 and needed only for the scrapy-poet
+  provider (``scrapy-poet``, ``web-poet``, ``zyte-common-items``) into the new
+  optional feature ``[provider]``.
+
+* Improved result caching in the scrapy-poet provider.
+
+* Added a new setting, ``ZYTE_API_USE_ENV_PROXY``, which can be set to ``True``
+  to access Zyte API using a proxy configured in the local environment.
+
+* Fixed getting the Scrapy Cloud job ID.
+
+* Improved the documentation.
+
+* Improved the CI configuration.
+
 0.9.0 (2023-06-13)
 ------------------
 
