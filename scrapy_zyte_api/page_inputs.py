@@ -52,4 +52,4 @@ def Actions(actions: List[_Action]):
             # ...
 
     """
-    return Annotated[_Actions, _ActionsList[actions]]
+    return Annotated[_Actions, _ActionsList(actions)]
