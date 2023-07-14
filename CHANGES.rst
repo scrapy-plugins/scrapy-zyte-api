@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.10.0 (YYYY-MM-DD)
+0.10.0 (2023-07-14)
 -------------------
 
 * Added more data types to the scrapy-poet provider:
