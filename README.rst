@@ -918,6 +918,6 @@ We are planning to solve these problems in the future releases of
 Running behind a proxy
 ======================
 
-If you need Zyte API requests to go through a proxy, configure the
-``HTTP_PROXY`` and ``HTTPS_PROXY`` environment variables accordingly, and set
-the ``ZYTE_API_USE_ENV_PROXY`` setting to ``True``.
+If you require a proxy to access Zyte API (e.g. a corporate proxy), configure
+the ``HTTP_PROXY`` and ``HTTPS_PROXY`` environment variables accordingly, and
+set the ``ZYTE_API_USE_ENV_PROXY`` setting to ``True``.
