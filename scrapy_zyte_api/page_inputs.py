@@ -39,11 +39,17 @@ def Actions(actions: List[_Action]):
     """
     Add this dependency to your page object to execute Zyte API actions::
 
+        import attrs
+        from web_poet import ItemPage, BrowserResponse
+        from scrapy_zyte_api.page_inputs import Actions
+
         @attrs.define
         class MyPage(ItemPage)
+            response: BrowserResponse
             actions: Actions([
                 {"action": "scrollBottom"},
             ])
+            # ...
 
     """
     return Annotated[_Actions, _ActionsList[actions]]
