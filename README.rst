@@ -962,7 +962,7 @@ those variables::
     ZYTE_API_FALLBACK_HTTP_HANDLER = "myproject.MyHandler"
     ZYTE_API_FALLBACK_HTTPS_HANDLER = "myproject.MyHandler"
 
-Alternatively, if you use the Scrapy addon, you can set the
+Alternatively, if you use the Scrapy addon, you can keep your custom
 ``DOWNLOAD_HANDLERS`` setting and the addon will use those values::
 
     DOWNLOAD_HANDLERS = {
