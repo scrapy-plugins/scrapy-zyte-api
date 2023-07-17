@@ -501,3 +501,15 @@ async def test_addon_fallback():
     handler = get_download_handler(crawler, "http")
     assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
     assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
+
+
+@ensureDeferred
+async def test_addon_fallback_explicit():
+    settings = {
+        **SETTINGS_ADDON,
+        "ZYTE_API_FALLBACK_HTTP_HANDLER": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler",
+    }
+    crawler = get_crawler_zyte_api(settings=settings)
+    handler = get_download_handler(crawler, "http")
+    assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
+    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)

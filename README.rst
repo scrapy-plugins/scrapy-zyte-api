@@ -948,3 +948,30 @@ Running behind a proxy
 If you require a proxy to access Zyte API (e.g. a corporate proxy), configure
 the ``HTTP_PROXY`` and ``HTTPS_PROXY`` environment variables accordingly, and
 set the ``ZYTE_API_USE_ENV_PROXY`` setting to ``True``.
+
+
+Customizing the fallback download handler
+=========================================
+
+When the plugin needs to do requests directly, not via Zyte API, it uses a
+fallback download handler. It will use the Scrapy default one unless the
+``ZYTE_API_FALLBACK_HTTP_HANDLER`` and ``ZYTE_API_FALLBACK_HTTPS_HANDLER``
+settings are set. So if you want to use some other handler as a fallback, set
+those variables::
+
+    ZYTE_API_FALLBACK_HTTP_HANDLER = "myproject.MyHandler"
+    ZYTE_API_FALLBACK_HTTPS_HANDLER = "myproject.MyHandler"
+
+Alternatively, if you use the Scrapy addon, you can set the
+``DOWNLOAD_HANDLERS`` setting and the addon will use those values::
+
+    DOWNLOAD_HANDLERS = {
+        "http": "myproject.MyHandler",
+        "https": "myproject.MyHandler",
+    }
+    ADDONS = {
+        "scrapy_zyte_api.Addon": 1,
+    }
+
+This allows using the same setting snippet in projects that use
+``scrapy-zyte-api`` as in projects that don't use it.

@@ -273,7 +273,7 @@ class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
-            settings.get("_ZYTE_API_FALLBACK_HTTP_HANDLER")
+            settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER")
         )
 
 
@@ -283,5 +283,5 @@ class ScrapyZyteAPIHTTPSDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
-            settings.get("_ZYTE_API_FALLBACK_HTTPS_HANDLER")
+            settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER")
         )
