@@ -37,23 +37,21 @@ class ScrapyZyteAPIDownloaderMiddleware:
         _, slot = downloader._get_slot(request, spider)
         slot.delay = 0
 
-        if (
-            self._max_requests
-            and self._zapi_req_count() + self._download_req_count(downloader)
-            >= self._max_requests
-        ):
+        if self._max_requests_reached(downloader):
             self._crawler.engine.close_spider(spider, "closespider_max_zapi_requests")
-            self._crawler.engine.downloader.close()
             raise IgnoreRequest("Reached max Zyte API requests")
 
-    def _zapi_req_count(self) -> int:
-        return self._crawler.stats.get_value("scrapy-zyte-api/processed", 0)
+    def _max_requests_reached(self, downloader) -> bool:
+        if not self._max_requests:
+            return False
 
-    def _download_req_count(self, downloader) -> int:
-        return sum(
+        zapi_req_count = self._crawler.stats.get_value("scrapy-zyte-api/processed", 0)
+        download_req_count = sum(
             [
                 len(slot.transferring)
                 for slot_id, slot in downloader.slots.items()
                 if slot_id.startswith(self._slot_prefix)
             ]
         )
+        total_requests = zapi_req_count + download_req_count
+        return total_requests >= self._max_requests
