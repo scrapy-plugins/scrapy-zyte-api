@@ -55,7 +55,7 @@ Get a `Zyte API`_ key, and add it to your project settings.py:
 Instead of adding API key to setting.py you can also set
 ``ZYTE_API_KEY`` environment variable.
 
-Then, set up the scrapy-zyte-api integration. If your Scrapy version supports addons:
+Then, set up the scrapy-zyte-api integration. If your Scrapy version supports add-ons:
 
 .. code-block:: python
 
@@ -77,7 +77,7 @@ Otherwise:
     REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
-By default, if the addon is not enabled, scrapy-zyte-api doesn't change the
+By default, if the add-on is not enabled, scrapy-zyte-api doesn't change the
 spider behavior. To switch your spider to use Zyte API for all requests,
 set the following option:
 
@@ -85,7 +85,7 @@ set the following option:
 
     ZYTE_API_TRANSPARENT_MODE = True
 
-Enabling the addon enables this option, unless you disable it explicitly:
+Enabling the add-on enables this option, unless you disable it explicitly:
 
 .. code-block:: python
 
@@ -97,7 +97,7 @@ Enabling the addon enables this option, unless you disable it explicitly:
 Configuration
 =============
 
-To enable this plugin, if your Scrapy version supports addons:
+To enable this plugin, if your Scrapy version supports add-ons:
 
 -   Add ``"scrapy_zyte_api.Addon"`` to the ``ADDONS`` setting with any
     priority.
@@ -132,7 +132,7 @@ In both cases:
 The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
 ``False`` to disable this plugin.
 
-If the Scrapy addon is enabled, the ``ZYTE_API_TRANSPARENT_MODE`` setting is
+If the Scrapy add-on is enabled, the ``ZYTE_API_TRANSPARENT_MODE`` setting is
 enabled by default and can be disabled manually.
 
 If you want to use scrapy-poet integration, add a provider to
@@ -962,8 +962,8 @@ those variables::
     ZYTE_API_FALLBACK_HTTP_HANDLER = "myproject.MyHandler"
     ZYTE_API_FALLBACK_HTTPS_HANDLER = "myproject.MyHandler"
 
-Alternatively, if you use the Scrapy addon, you can keep your custom
-``DOWNLOAD_HANDLERS`` setting and the addon will use those values::
+Alternatively, if you use the Scrapy add-on, you can keep your custom
+``DOWNLOAD_HANDLERS`` setting and the add-on will use those values::
 
     DOWNLOAD_HANDLERS = {
         "http": "myproject.MyHandler",
