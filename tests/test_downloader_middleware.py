@@ -80,7 +80,7 @@ async def test_cookies():
 
 @ensureDeferred
 async def test_max_requests(caplog):
-    spider_requests = 200
+    spider_requests = 13
     zapi_max_requests = 5
 
     with MockServer(DelayedResource) as server:
@@ -89,9 +89,18 @@ async def test_max_requests(caplog):
             name = "test_spider"
 
             def start_requests(self):
-                # TODO: try a lower number as well close to max requests count
-                for index in range(spider_requests):
-                    yield Request("https://example.com", dont_filter=True)
+                for i in range(spider_requests):
+                    meta = {"zyte_api": {"browserHtml": True}}
+
+                    # Alternating requests between ZAPI and non-ZAPI tests if
+                    # ZYTE_API_MAX_REQUESTS solely limits ZAPI Requests.
+
+                    if i % 2:
+                        yield Request(
+                            "https://example.com", meta=meta, dont_filter=True
+                        )
+                    else:
+                        yield Request("https://example.com", dont_filter=True)
 
             def parse(self, response):
                 yield Item()
@@ -101,7 +110,6 @@ async def test_max_requests(caplog):
                 "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000
             },
             "ZYTE_API_MAX_REQUESTS": zapi_max_requests,
-            "ZYTE_API_TRANSPARENT_MODE": True,
             "ZYTE_API_URL": server.urljoin("/"),
             **SETTINGS,
         }
@@ -116,7 +124,7 @@ async def test_max_requests(caplog):
     )
     assert crawler.stats.get_value("scrapy-zyte-api/success") <= zapi_max_requests
     assert crawler.stats.get_value("scrapy-zyte-api/processed") == zapi_max_requests
-    assert crawler.stats.get_value("item_scraped_count") == zapi_max_requests
+    assert crawler.stats.get_value("item_scraped_count") == zapi_max_requests + 6
     assert crawler.stats.get_value("finish_reason") == "closespider_max_zapi_requests"
     assert (
         crawler.stats.get_value(
