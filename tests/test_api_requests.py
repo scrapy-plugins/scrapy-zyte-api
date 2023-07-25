@@ -1933,6 +1933,33 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
             [],
             [],
         ),
+        # Setting requestCookies to [] disables automatic mapping, but logs a
+        # a warning recommending to either use False to achieve the same or
+        # remove the parameter to let automated mapping work.
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "experimental": {
+                    "requestCookies": [],
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "requestCookies": [],
+                    "responseCookies": True,
+                },
+            },
+            [
+                "is overriding automatic request cookie mapping",
+            ],
+            [],
+        ),
         # Cookies work for browser and automatic extraction requests as well.
         (
             {

@@ -211,8 +211,23 @@ def _set_http_request_cookies_from_request(
 ):
     api_params.setdefault("experimental", {})
     if "requestCookies" in api_params["experimental"]:
-        if api_params["experimental"]["requestCookies"] is False:
+        request_cookies = api_params["experimental"]["requestCookies"]
+        if request_cookies is False:
             del api_params["experimental"]["requestCookies"]
+        elif not request_cookies and isinstance(request_cookies, list):
+            logger.warning(
+                (
+                    "Request %(request)r is overriding automatic request "
+                    "cookie mapping by explicitly setting "
+                    "experimental.requestCookies to []. If this was your "
+                    "intention, please use False instead of []. Otherwise, "
+                    "stop defining experimental.requestCookies in your "
+                    "request to let automatic mapping work."
+                ),
+                {
+                    "request": request,
+                },
+            )
         return
     output_cookies = []
     input_cookies = _get_all_cookies(request, cookie_jars)
