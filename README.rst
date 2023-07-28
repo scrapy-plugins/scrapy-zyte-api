@@ -35,6 +35,7 @@ scrapy-poet integration requires more recent software:
 * Python 3.8+
 * Scrapy 2.6+
 
+
 Installation
 ============
 
@@ -43,97 +44,57 @@ Installation
     pip install scrapy-zyte-api
 
 
-Quick start
-===========
+Basic configuration
+===================
 
-Get a `Zyte API`_ key, and add it to your project settings.py:
+#.  Get a `Zyte API`_ key, and add it to your project ``settings.py``:
+
+    .. code-block:: python
+
+        ZYTE_API_KEY = "YOUR_API_KEY"
+
+    Instead of adding API key to setting.py you can also set
+    ``ZYTE_API_KEY`` environment variable.
+
+#.  If you are using Scrapy 2.10 or higher, add ``scrapy_zyte_api.Addon`` to
+    your ``ADDONS`` setting with any priority:
+
+    .. code-block:: python
+
+        ADDONS = {
+            "scrapy_zyte_api.Addon": 1,
+        }
+
+    Otherwise, define the following settings:
+
+    .. code-block:: python
+
+        DOWNLOAD_HANDLERS = {
+            "http": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
+            "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
+        }
+        DOWNLOADER_MIDDLEWARES = {
+            "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+        }
+        REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
+        TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+        ZYTE_API_TRANSPARENT_MODE = True
+
+This will make all your requests go through Zyte API automatically by default.
+
+
+Additional configuration
+========================
+
+If you prefer to enable Zyte API per request, disable the transparent mode:
 
 .. code-block:: python
 
-    ZYTE_API_KEY = "YOUR_API_KEY"
-
-Instead of adding API key to setting.py you can also set
-``ZYTE_API_KEY`` environment variable.
-
-Then, set up the scrapy-zyte-api integration. If your Scrapy version supports add-ons:
-
-.. code-block:: python
-
-    ADDONS = {
-        "scrapy_zyte_api.Addon": 1,
-    }
-
-Otherwise:
-
-.. code-block:: python
-
-    DOWNLOAD_HANDLERS = {
-        "http": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
-        "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
-    }
-    DOWNLOADER_MIDDLEWARES = {
-        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
-    }
-    REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
-    TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
-
-By default, if the add-on is not enabled, scrapy-zyte-api doesn't change the
-spider behavior. To switch your spider to use Zyte API for all requests,
-set the following option:
-
-.. code-block:: python
-
-    ZYTE_API_TRANSPARENT_MODE = True
-
-Enabling the add-on enables this option, unless you disable it explicitly:
-
-.. code-block:: python
-
-    ADDONS = {
-        "scrapy_zyte_api.Addon": 1,
-    }
     ZYTE_API_TRANSPARENT_MODE = False
 
-Configuration
-=============
-
-To enable this plugin, if your Scrapy version supports add-ons:
-
--   Add ``"scrapy_zyte_api.Addon"`` to the ``ADDONS`` setting with any
-    priority.
-
-Otherwise:
-
--   Set the ``http`` and ``https`` keys in the `DOWNLOAD_HANDLERS
-    <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-DOWNLOAD_HANDLERS>`_
-    Scrapy setting to ``"scrapy_zyte_api.ScrapyZyteAPIDownloadHandler"``.
-
--   Add ``"scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"`` to the
-    `DOWNLOADER_MIDDLEWARES
-    <https://docs.scrapy.org/en/latest/topics/settings.html#downloader-middlewares>`_
-    Scrapy setting with any value, e.g. ``1000``.
-
--   Set the `REQUEST_FINGERPRINTER_CLASS
-    <https://docs.scrapy.org/en/latest/topics/request-response.html#request-fingerprinter-class>`_
-    Scrapy setting to ``"scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"``.
-
--   Set the `TWISTED_REACTOR
-    <https://docs.scrapy.org/en/latest/topics/settings.html#std-setting-TWISTED_REACTOR>`_
-    Scrapy setting to
-    ``"twisted.internet.asyncioreactor.AsyncioSelectorReactor"``.
-
-In both cases:
-
--   Set `your Zyte API key
-    <https://docs.zyte.com/zyte-api/usage/general.html#authorization>`_ as
-    either the ``ZYTE_API_KEY`` Scrapy setting or as an environment variable of
-    the same name.
-
 The ``ZYTE_API_ENABLED`` setting, which is ``True`` by default, can be set to
-``False`` to disable this plugin.
-
-If the Scrapy add-on is enabled, the ``ZYTE_API_TRANSPARENT_MODE`` setting is
-enabled by default and can be disabled manually.
+``False`` to disable this plugin altogether, so that no request can go through
+Zyte API.
 
 If you want to use scrapy-poet integration, add a provider to
 ``SCRAPY_POET_PROVIDERS`` (see `scrapy-poet integration`_):
@@ -954,24 +915,21 @@ Customizing the fallback download handler
 =========================================
 
 When the plugin needs to do requests directly, not via Zyte API, it uses a
-fallback download handler. It will use the Scrapy default one unless the
-``ZYTE_API_FALLBACK_HTTP_HANDLER`` and ``ZYTE_API_FALLBACK_HTTPS_HANDLER``
-settings are set. So if you want to use some other handler as a fallback, set
-those variables::
+fallback download handler.
+
+If you configured this plugin through the ``ADDONS`` settings, the HTTP and
+HTTPS download handlers defined in your ``DOWNLOAD_HANDLERS`` setting are used
+as fallback by default.
+
+If you did not configure this plugin through the ``ADDONS`` setting, the
+default Scrapy HTTP and HTTPS download handlers are used as fallback by
+default, regardless of the your ``DOWNLOAD_HANDLERS`` setting.
+
+If you want different download handlers to be used as fallback, set them
+through the ``ZYTE_API_FALLBACK_HTTP_HANDLER`` and
+``ZYTE_API_FALLBACK_HTTPS_HANDLER`` settings:
+
+.. code-block:: python
 
     ZYTE_API_FALLBACK_HTTP_HANDLER = "myproject.MyHandler"
     ZYTE_API_FALLBACK_HTTPS_HANDLER = "myproject.MyHandler"
-
-Alternatively, if you use the Scrapy add-on, you can keep your custom
-``DOWNLOAD_HANDLERS`` setting and the add-on will use those values::
-
-    DOWNLOAD_HANDLERS = {
-        "http": "myproject.MyHandler",
-        "https": "myproject.MyHandler",
-    }
-    ADDONS = {
-        "scrapy_zyte_api.Addon": 1,
-    }
-
-This allows using the same setting snippet in projects that use
-``scrapy-zyte-api`` as in projects that don't use it.
