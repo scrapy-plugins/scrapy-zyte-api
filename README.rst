@@ -723,6 +723,19 @@ as HTTP 520 errors, you can implement:
 .. _tenacity.AsyncRetrying: https://tenacity.readthedocs.io/en/latest/api.html#tenacity.AsyncRetrying
 
 
+Misc Settings
+=============
+
+- ``ZYTE_API_MAX_REQUESTS``
+
+  default: None
+
+  When set to an integer value > 0, the spider will close when the number of
+  successful Zyte API requests reaches it. Note that in some cases, the actual
+  number of successful Zyte API requests would be below this number if some of
+  the in-progress requests fail or error out.
+
+
 Stats
 =====
 
