@@ -100,6 +100,14 @@ To enable this plugin:
     Scrapy setting to
     ``"twisted.internet.asyncioreactor.AsyncioSelectorReactor"``.
 
+    .. note:: On existing projects that were not using the asyncio Twisted
+        reactor and make use of advanced Scrapy features, like interacting with
+        the Scrapy engine at run time, switching reactors may require
+        additional changes. If that is your case, see
+        `asyncio <https://docs.scrapy.org/en/latest/topics/asyncio.html>`_ in
+        the Scrapy documentation, specially `Awaiting on Deferreds
+        <https://docs.scrapy.org/en/latest/topics/asyncio.html#awaiting-on-deferreds>`_.
+
 -   Set `your Zyte API key
     <https://docs.zyte.com/zyte-api/usage/general.html#authorization>`_ as
     either the ``ZYTE_API_KEY`` Scrapy setting or as an environment variable of
