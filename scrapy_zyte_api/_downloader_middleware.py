@@ -22,7 +22,8 @@ class ScrapyZyteAPIDownloaderMiddleware:
         if self._max_requests:
             logger.info(
                 f"Maximum Zyte API requests for this crawl is set at "
-                f"{self._max_requests}. Spider will close when it's reached."
+                f"{self._max_requests}. The spider will close when it's "
+                f"reached."
             )
 
     def process_request(self, request, spider):
