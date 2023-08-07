@@ -103,10 +103,8 @@ To enable this plugin:
     .. note:: On existing projects that were not using the asyncio Twisted
         reactor, your existing code may need changes, such as:
 
-        -   Moving some module-level Twisted imports to the method or function
-            definitions where they are used, or `installing the asyncio reactor
-            <https://docs.scrapy.org/en/latest/topics/asyncio.html#installing-the-asyncio-reactor>`_
-            before those imports happen.
+        -   `Handling a pre-installed Twisted reactor
+            <https://docs.scrapy.org/en/latest/topics/asyncio.html#handling-a-pre-installed-reactor>`_.
 
             Some Twisted imports install the default, non-async Twisted
             reactor as a side effect. Once a reactor is installed, it cannot be
