@@ -100,6 +100,24 @@ To enable this plugin:
     Scrapy setting to
     ``"twisted.internet.asyncioreactor.AsyncioSelectorReactor"``.
 
+    .. note:: On existing projects that were not using the asyncio Twisted
+        reactor, your existing code may need changes, such as:
+
+        -   `Handling a pre-installed Twisted reactor
+            <https://docs.scrapy.org/en/latest/topics/asyncio.html#handling-a-pre-installed-reactor>`_.
+
+            Some Twisted imports install the default, non-asyncio Twisted
+            reactor as a side effect. Once a reactor is installed, it cannot be
+            changed for the whole run time.
+
+        -   `Converting Twisted Deferreds into asyncio Futures
+            <https://docs.scrapy.org/en/latest/topics/asyncio.html#awaiting-on-deferreds>`_.
+
+            Note that you might be using Deferreds without realizing it through
+            some Scrapy functions and methods. For example, when you yield the
+            return value of ``self.crawler.engine.download()`` from a spider
+            callback, you are yielding a Deferred.
+
 -   Set `your Zyte API key
     <https://docs.zyte.com/zyte-api/usage/general.html#authorization>`_ as
     either the ``ZYTE_API_KEY`` Scrapy setting or as an environment variable of
