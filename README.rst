@@ -106,7 +106,7 @@ To enable this plugin:
         -   `Handling a pre-installed Twisted reactor
             <https://docs.scrapy.org/en/latest/topics/asyncio.html#handling-a-pre-installed-reactor>`_.
 
-            Some Twisted imports install the default, non-async Twisted
+            Some Twisted imports install the default, non-asyncio Twisted
             reactor as a side effect. Once a reactor is installed, it cannot be
             changed for the whole run time.
 
