@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.11.0 (to be released)
------------------------
+0.11.0 (2023-08-07)
+-------------------
 
 * Added a ``ZYTE_API_MAX_REQUESTS`` setting to limit the number of successful
   Zyte API requests that a spider can send. Reaching the limit stops the
