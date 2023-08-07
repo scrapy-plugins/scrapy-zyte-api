@@ -1,6 +1,16 @@
 Changes
 =======
 
+0.11.0 (to be released)
+-----------------------
+
+* Added a ``ZYTE_API_MAX_REQUESTS`` setting to limit the number of successful
+  Zyte API requests that a spider can send. Reaching the limit stops the
+  spider.
+
+* Setting ``requestCookies`` to ``[]`` in the ``zyte_api_automap`` request
+  metadata field now triggers a warning.
+
 0.10.0 (2023-07-14)
 -------------------
 
