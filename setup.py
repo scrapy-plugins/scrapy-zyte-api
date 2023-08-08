@@ -17,7 +17,7 @@ setuptools.setup(
     ],
     extras_require={
         "provider": [
-            "scrapy-poet>=0.11.0",
+            "scrapy-poet>=0.10.0",
             "web-poet>=0.13.0",
             "zyte-common-items>=0.7.0",
         ]
