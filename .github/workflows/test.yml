@@ -33,6 +33,9 @@ jobs:
         - python-version: '3.9'
         - python-version: '3.10'
         - python-version: '3.11'
+
+        - python-version: '3.8'
+          toxenv: pinned-provider
         - python-version: '3.11'
           toxenv: provider
 
