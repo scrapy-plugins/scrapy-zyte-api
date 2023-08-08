@@ -10,12 +10,14 @@ setuptools.setup(
     author_email="info@zyte.com",
     url="https://github.com/scrapy-plugins/scrapy-zyte-api",
     packages=["scrapy_zyte_api"],
+    # Sync with [pinned] @ tox.ini
     install_requires=[
         "packaging>=20.0",
         "scrapy>=2.0.1",
         "zyte-api>=0.4.0",
     ],
     extras_require={
+        # Sync with [testenv:provider-pinned] @ tox.ini
         "provider": [
             "scrapy-poet>=0.10.0",
             "web-poet>=0.13.0",
