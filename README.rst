@@ -760,6 +760,20 @@ Stats
 Stats from python-zyte-api_ are exposed as Scrapy stats with the
 ``scrapy-zyte-api`` prefix.
 
+For example, ``scrapy-zyte-api/status_codes/<status code>`` stats indicate the
+status code of Zyte API responses (e.g. ``429`` for `rate limiting
+<https://docs.zyte.com/zyte-api/usage/errors.html#rate-limiting-responses>`_ or
+``520`` for `temporary download errors
+<https://docs.zyte.com/zyte-api/usage/errors.html#temporary-download-errors>`_).
+
+.. note:: The actual status code that is received from the target website, i.e.
+    the `statusCode
+    <https://docs.zyte.com/zyte-api/usage/reference.html#operation/extract/response/200/statusCode>`_
+    response field of a `Zyte API successful response
+    <https://docs.zyte.com/zyte-api/usage/errors.html#zyte-api-successful-responses>`_,
+    is accounted for in the ``downloader/response_status_count/<status code>``
+    stat, as with any other Scrapy response.
+
 
 Request fingerprinting
 ======================
