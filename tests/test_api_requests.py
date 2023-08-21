@@ -14,6 +14,7 @@ from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
+from scrapy.downloadermiddlewares.httpcompression import ACCEPTED_ENCODINGS
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
@@ -1488,14 +1489,16 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             ["cannot be mapped"],
         ),
-        # The Accept and Accept-Language headers, when unsupported, are dropped
-        # silently if their value matches the default value of Scrapy for
-        # DEFAULT_REQUEST_HEADERS, or with a warning otherwise.
+        # The Accept, Accept-Encoding and Accept-Language headers, when
+        # unsupported (i.e. browser requests), are dropped silently if their
+        # value matches the default value of Scrapy, or with a warning
+        # otherwise.
         (
             {
-                k: v
-                for k, v in DEFAULT_REQUEST_HEADERS.items()
-                if k in {"Accept", "Accept-Language"}
+                **DEFAULT_REQUEST_HEADERS,  # Accept, Accept-Language
+                "Accept-Encoding": ", ".join(
+                    encoding.decode() for encoding in ACCEPTED_ENCODINGS
+                ),
             },
             {"browserHtml": True},
             {
@@ -1503,16 +1506,26 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
-        (
-            {
-                "Accept": "application/json",
-                "Accept-Language": "uk",
-            },
-            {"browserHtml": True},
-            {
-                "browserHtml": True,
-            },
-            ["cannot be mapped"],
+        *(
+            (
+                headers,
+                {"browserHtml": True},
+                {
+                    "browserHtml": True,
+                },
+                ["cannot be mapped"],
+            )
+            for headers in (
+                {
+                    "Accept": "application/json",
+                },
+                {
+                    "Accept-Encoding": "br",
+                },
+                {
+                    "Accept-Language": "uk",
+                },
+            )
         ),
         # The User-Agent header, which Scrapy sets by default, is dropped
         # silently if it matches the default value of the USER_AGENT setting,
