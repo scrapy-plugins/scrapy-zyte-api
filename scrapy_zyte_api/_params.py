@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Mapping, Optional, Set
 from warnings import warn
 
 from scrapy import Request
+from scrapy.downloadermiddlewares.httpcompression import ACCEPTED_ENCODINGS
 from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
@@ -24,6 +25,10 @@ _EXTRACT_KEYS = {
 }
 _BROWSER_KEYS = _EXTRACT_KEYS | {"browserHtml", "screenshot"}
 _DEFAULT_API_PARAMS = {key: False for key in _BROWSER_KEYS}
+
+_DEFAULT_ACCEPT_ENCODING = ", ".join(
+    encoding.decode() for encoding in ACCEPTED_ENCODINGS
+)
 
 
 def _iter_headers(
@@ -97,6 +102,10 @@ def _map_request_headers(
             (
                 lowercase_k == b"accept"
                 and decoded_v == DEFAULT_REQUEST_HEADERS["Accept"]
+            )
+            or (
+                lowercase_k == b"accept-encoding"
+                and decoded_v == _DEFAULT_ACCEPT_ENCODING
             )
             or (
                 lowercase_k == b"accept-language"
