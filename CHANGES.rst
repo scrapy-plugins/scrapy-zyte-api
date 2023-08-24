@@ -14,7 +14,7 @@ Changes
 * The README now mentions additional changes that may be necessary when
   switching Twisted reactors on existing projects.
 
-* The README now explains how status code, from Zyte API or from wrapped
+* The README now explains how status codes, from Zyte API or from wrapped
   responses, are reflected in Scrapy stats.
 
 0.11.0 (2023-08-07)
