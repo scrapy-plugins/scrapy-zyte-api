@@ -1,6 +1,22 @@
 Changes
 =======
 
+0.11.1 (to be released)
+-----------------------
+
+* scrapy-zyte-api 0.11.0 accidentally increased the minimum required version of
+  scrapy-poet from 0.10.0 to 0.11.0. We have reverted that change and
+  implemented measures to prevent similar accidents in the future.
+
+* Automatic parameter mapping no longer warns about dropping the
+  ``Accept-Encoding`` header when the header value matches the Scrapy default.
+
+* The README now mentions additional changes that may be necessary when
+  switching Twisted reactors on existing projects.
+
+* The README now explains how status codes, from Zyte API or from wrapped
+  responses, are reflected in Scrapy stats.
+
 0.11.0 (2023-08-07)
 -------------------
 
