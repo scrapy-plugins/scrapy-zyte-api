@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.11.1 (to be released)
------------------------
+0.11.1 (2023-08-25)
+-------------------
 
 * scrapy-zyte-api 0.11.0 accidentally increased the minimum required version of
   scrapy-poet from 0.10.0 to 0.11.0. We have reverted that change and
