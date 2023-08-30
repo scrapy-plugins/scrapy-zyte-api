@@ -150,7 +150,11 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     def _update_stats(self, api_params):
         prefix = "scrapy-zyte-api"
         for arg in api_params:
-            self._stats.inc_value(f"{prefix}/request_args/{arg}")
+            if arg == "experimental":
+                for subarg in api_params[arg]:
+                    self._stats.inc_value(f"{prefix}/request_args/{arg}.{subarg}")
+            else:
+                self._stats.inc_value(f"{prefix}/request_args/{arg}")
         for stat in (
             "429",
             "attempts",
