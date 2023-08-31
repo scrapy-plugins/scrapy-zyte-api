@@ -247,7 +247,7 @@ async def test_stats(mockserver):
         scrapy_stats = handler._stats
         assert scrapy_stats.get_stats() == {}
 
-        meta = {"zyte_api": {"foo": "bar"}}
+        meta = {"zyte_api": {"a": "…", "b": {"b0": "…"}, "experimental": {"c0": "…"}}}
         request = Request("https://example.com", meta=meta)
         await handler.download_request(request, None)
 
@@ -262,6 +262,10 @@ async def test_stats(mockserver):
                 "mean_connection_seconds",
                 "mean_response_seconds",
                 "processed",
+                "request_args/a",
+                "request_args/b",
+                "request_args/experimental.c0",
+                "request_args/url",
                 "status_codes/200",
                 "success_ratio",
                 "success",
@@ -275,6 +279,10 @@ async def test_stats(mockserver):
             ("errors", 0),
             ("fatal_errors", 0),
             ("processed", 1),
+            ("request_args/a", 1),
+            ("request_args/b", 1),
+            ("request_args/experimental.c0", 1),
+            ("request_args/url", 1),
             ("status_codes/200", 1),
             ("success_ratio", 1.0),
             ("success", 1),
