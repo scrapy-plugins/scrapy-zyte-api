@@ -14,6 +14,8 @@ from .mockserver import DelayedResource, MockServer
 async def test_autothrottle_handling():
     crawler = get_crawler()
     await crawler.crawl("a")
+    assert crawler.engine
+    assert crawler.spider
     spider = crawler.spider
 
     middleware = create_instance(
@@ -21,14 +23,14 @@ async def test_autothrottle_handling():
     )
 
     # AutoThrottle does this.
-    spider.download_delay = 5
+    spider.download_delay = 5  # type: ignore[attr-defined]
 
     # No effect on non-Zyte-API requests
     request = Request("https://example.com")
     assert middleware.process_request(request, spider) is None
     assert "download_slot" not in request.meta
     _, slot = crawler.engine.downloader._get_slot(request, spider)
-    assert slot.delay == spider.download_delay
+    assert slot.delay == spider.download_delay  # type: ignore[attr-defined]
 
     # On Zyte API requests, the download slot is changed, and its delay is set
     # to 0.
@@ -122,6 +124,7 @@ async def test_max_requests(caplog):
         f"Maximum Zyte API requests for this crawl is set at {zapi_max_requests}"
         in caplog.text
     )
+    assert crawler.stats
     assert crawler.stats.get_value("scrapy-zyte-api/success") <= zapi_max_requests
     assert crawler.stats.get_value("scrapy-zyte-api/processed") == zapi_max_requests
     assert crawler.stats.get_value("item_scraped_count") == zapi_max_requests + 6

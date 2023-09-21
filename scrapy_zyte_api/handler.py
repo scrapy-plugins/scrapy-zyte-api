@@ -67,8 +67,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             # We keep the client in the crawler object to prevent multiple,
             # duplicate clients with the same settings to be used.
             # https://github.com/scrapy-plugins/scrapy-zyte-api/issues/58
-            crawler.zyte_api_client = client
-        self._client: AsyncClient = crawler.zyte_api_client
+            crawler.zyte_api_client = client  # type: ignore[attr-defined]
+        self._client: AsyncClient = crawler.zyte_api_client  # type: ignore[attr-defined]
         logger.info("Using a Zyte API key starting with %r", self._client.api_key[:7])
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
@@ -83,6 +83,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         )
         self._param_parser = _ParamParser(crawler)
         self._retry_policy = _load_retry_policy(settings)
+        assert crawler.stats
         self._stats = crawler.stats
         self._session = create_session(
             connection_pool_size=self._client.n_conn,

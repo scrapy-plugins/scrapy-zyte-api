@@ -1,6 +1,7 @@
 from base64 import b64encode
 from collections import defaultdict
 from functools import partial
+from typing import cast
 
 import pytest
 from scrapy import Request
@@ -261,7 +262,7 @@ def test__process_response_no_body():
         "product": {"name": "shoes"},
     }
 
-    resp = _process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
 
     assert isinstance(resp, Response)
     assert resp.body == b""
@@ -431,7 +432,7 @@ def test__process_response_non_text():
             }
         ],
     }
-    resp = _process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
 
     assert isinstance(resp, Response)
     with pytest.raises(NotSupported):
