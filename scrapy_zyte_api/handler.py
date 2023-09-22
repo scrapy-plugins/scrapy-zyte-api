@@ -2,7 +2,7 @@ import json
 import logging
 from copy import deepcopy
 from typing import Generator, Optional, Union
-from importlib.metadata import version
+
 from scrapy import Spider, signals
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
@@ -22,10 +22,6 @@ from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 
 logger = logging.getLogger(__name__)
-
-
-def _user_agent(package):
-    return f'{package}/{version(package)}'
 
 
 def _truncate_str(obj, index, text, limit):
@@ -213,7 +209,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             retrying = self._retry_policy
         self._log_request(api_params)
 
-        api_params["user-agent"] = _user_agent('scrapy-zyte-api')
         try:
             api_response = await self._client.request_raw(
                 api_params,
