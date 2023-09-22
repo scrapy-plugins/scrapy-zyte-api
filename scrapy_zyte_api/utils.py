@@ -3,8 +3,6 @@ from importlib.metadata import version
 import scrapy
 from packaging.version import Version
 
-PACKAGE_NAME = "scrapy-zyte-api"
-
 _SCRAPY_VERSION = Version(scrapy.__version__)
 _SCRAPY_2_1_0 = Version("2.1.0")
 _SCRAPY_2_4_0 = Version("2.4.0")
@@ -24,7 +22,8 @@ _RESPONSE_HAS_PROTOCOL = _SCRAPY_VERSION >= _SCRAPY_2_5_0
 
 
 def _user_agent(custom_user_agent):
-    user_agent = f"{PACKAGE_NAME}/{version(PACKAGE_NAME)}"
+    package_name = "scrapy-zyte-api"
+    user_agent = f"{package_name}/{version(package_name)}"
     if custom_user_agent:
         return f"{user_agent}, {custom_user_agent}"
     return user_agent
