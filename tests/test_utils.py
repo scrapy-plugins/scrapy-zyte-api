@@ -1,4 +1,5 @@
 import pytest
+
 from scrapy_zyte_api.utils import _user_agent, version
 
 
@@ -10,7 +11,7 @@ from scrapy_zyte_api.utils import _user_agent, version
             f'scrapy-zyte-api/{version("scrapy-zyte-api")}',
         ),
         (
-            'zyte-crawlers/0.0.1',
+            "zyte-crawlers/0.0.1",
             f'scrapy-zyte-api/{version("scrapy-zyte-api")}, zyte-crawlers/0.0.1',
         ),
     ),
