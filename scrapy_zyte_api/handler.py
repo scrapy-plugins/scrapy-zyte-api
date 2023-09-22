@@ -20,6 +20,7 @@ from zyte_api.constants import API_URL
 
 from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
+from .utils import _user_agent
 
 logger = logging.getLogger(__name__)
 
