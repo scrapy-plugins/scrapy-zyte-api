@@ -17,7 +17,7 @@ from zyte_api.aio.client import AsyncClient, create_session
 from zyte_api.aio.errors import RequestError
 from zyte_api.apikey import NoApiKey
 from zyte_api.constants import API_URL
-from zyte_api.utils import USER_AGENT as _USER_AGENT
+from zyte_api.utils import USER_AGENT as PYTHON_ZYTE_API_USER_AGENT
 
 from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
@@ -131,7 +131,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 api_key=settings.get("ZYTE_API_KEY") or None,
                 api_url=settings.get("ZYTE_API_URL") or API_URL,
                 n_conn=settings.getint("CONCURRENT_REQUESTS"),
-                user_agent=f'{_USER_AGENT}, {USER_AGENT}, {settings.get("_USER_AGENT", "")}'.rstrip(", "),
+                user_agent=f'{settings.get("_USER_AGENT", "")} {USER_AGENT} {PYTHON_ZYTE_API_USER_AGENT}'.lstrip(),
             )
         except NoApiKey:
             logger.warning(
