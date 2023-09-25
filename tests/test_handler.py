@@ -16,7 +16,7 @@ from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
 from zyte_api.aio.retry import RetryFactory
 from zyte_api.constants import API_URL
-from zyte_api.utils import USER_AGENT as _USER_AGENT
+from zyte_api.utils import USER_AGENT as PYTHON_ZYTE_API_USER_AGENT
 
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.utils import USER_AGENT
@@ -466,18 +466,20 @@ def test_trust_env(enabled):
     (
         (
             None,
-            f'{_USER_AGENT}, {USER_AGENT}',
+            f"{USER_AGENT} {PYTHON_ZYTE_API_USER_AGENT}",
         ),
         (
             "zyte-crawlers/0.0.1",
-            f'{_USER_AGENT}, {USER_AGENT}, zyte-crawlers/0.0.1',
+            f"zyte-crawlers/0.0.1 {USER_AGENT} {PYTHON_ZYTE_API_USER_AGENT}",
         ),
     ),
 )
 def test_user_agent_for_build_client(user_agent, expected):
-    settings = Settings({
-        **SETTINGS,
-        "_USER_AGENT": user_agent,
-    })
+    settings = Settings(
+        {
+            **SETTINGS,
+            "_USER_AGENT": user_agent,
+        }
+    )
     client = ScrapyZyteAPIDownloadHandler._build_client(settings)
     assert client.user_agent == expected
