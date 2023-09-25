@@ -10,13 +10,16 @@ import pytest
 from pytest_twisted import ensureDeferred
 from scrapy import Request
 from scrapy.exceptions import NotConfigured
+from scrapy.settings import Settings
 from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
 from zyte_api.aio.retry import RetryFactory
 from zyte_api.constants import API_URL
+from zyte_api.utils import USER_AGENT as _USER_AGENT
 
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
+from scrapy_zyte_api.utils import USER_AGENT
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET, make_handler, set_env
 
@@ -456,3 +459,25 @@ def test_trust_env(enabled):
         crawler=crawler,
     )
     assert handler._session._trust_env == enabled
+
+
+@pytest.mark.parametrize(
+    "user_agent,expected",
+    (
+        (
+            None,
+            f'{_USER_AGENT}, {USER_AGENT}',
+        ),
+        (
+            "zyte-crawlers/0.0.1",
+            f'{_USER_AGENT}, {USER_AGENT}, zyte-crawlers/0.0.1',
+        ),
+    ),
+)
+def test_user_agent_for_build_client(user_agent, expected):
+    settings = Settings({
+        **SETTINGS,
+        "_USER_AGENT": user_agent,
+    })
+    client = ScrapyZyteAPIDownloadHandler._build_client(settings)
+    assert client.user_agent == expected
