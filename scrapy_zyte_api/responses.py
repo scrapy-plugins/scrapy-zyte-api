@@ -24,8 +24,8 @@ class ZyteAPIMixin:
         # decompress an already decompressed body based on this header.
         "content-encoding",
         # Cookies should be fetched from experimental.responseCookies only, the
-        # Set-Cookie may define cookies from the main HTTP response that were
-        # overriden later on during browser rendering, for example.
+        # Set-Cookie header may define cookies from the main HTTP response that
+        # were overriden later on, e.g. during browser rendering.
         "set-cookie",
     }
 
