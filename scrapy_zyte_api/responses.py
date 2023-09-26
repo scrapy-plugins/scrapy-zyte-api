@@ -22,7 +22,11 @@ class ZyteAPIMixin:
         # Zyte API already decompresses the HTTP Response Body. Scrapy's
         # HttpCompressionMiddleware will error out when it attempts to
         # decompress an already decompressed body based on this header.
-        "content-encoding"
+        "content-encoding",
+        # Cookies should be fetched from experimental.responseCookies only, the
+        # Set-Cookie may define cookies from the main HTTP response that were
+        # overriden later on during browser rendering, for example.
+        "set-cookie",
     }
 
     def __init__(self, *args, raw_api_response: Optional[Dict] = None, **kwargs):

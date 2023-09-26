@@ -235,6 +235,7 @@ def test_response_headers_removal(api_response, cls):
     """
     additional_headers = [
         {"name": "Content-Encoding", "value": "gzip"},
+        {"name": "Set-Cookie", "value": "a=b"},
         {"name": "X-Some-Other-Value", "value": "123"},
     ]
     raw_response = api_response()
