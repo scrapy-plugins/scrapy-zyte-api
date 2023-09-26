@@ -18,6 +18,7 @@ SETTINGS = {
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
     },
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
+    "REQUEST_FINGERPRINTER_IMPLEMENTATION": "2.7",  # Silence deprecation warning
     "ZYTE_API_KEY": _API_KEY,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
 }

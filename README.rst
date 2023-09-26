@@ -941,11 +941,17 @@ The currently supported dependencies are:
 * ``zyte_common_items.ArticleNavigation``
 
 The provider will make a request to Zyte API using the ``ZYTE_API_KEY`` and
-``ZYTE_API_URL`` settings. It will ignore the transparent mode and parameter
-mapping settings.
+``ZYTE_API_URL`` settings.
+
+The provider will ignore the transparent mode and parameter mapping settings.
+To add extra parameters to all Zyte API requests sent by the provider, set them
+as a dictionary through the ``ZYTE_API_PROVIDER_PARAMS`` setting, for example
+in ``settings.py``::
+
+    ZYTE_API_PROVIDER_PARAMS = {"geolocation": "IE"}
 
 Note that the built-in ``scrapy_poet.page_input_providers.ItemProvider`` has a
-priority of 1000, so when you have page objects producing
+priority of 2000, so when you have page objects producing
 ``zyte_common_items.Product`` items you should use higher values for
 ``ZyteApiProvider`` if you want these items to come from these page objects,
 and lower values if you want them to come from Zyte API.

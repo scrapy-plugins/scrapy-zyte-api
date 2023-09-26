@@ -167,3 +167,15 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
     assert "my_item" in item
     assert "product" in item
     assert "browser_response" in item
+
+
+@ensureDeferred
+async def test_provider_params(mockserver):
+    settings = create_scrapy_settings(None)
+    settings.update(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {"geolocation": "IE"}
+    _, _, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    assert crawler.stats.get_value("scrapy-zyte-api/request_args/browserHtml") == 1
+    assert crawler.stats.get_value("scrapy-zyte-api/request_args/geolocation") == 1
