@@ -945,10 +945,8 @@ The provider will make a request to Zyte API using the ``ZYTE_API_KEY`` and
 
 The provider will ignore the transparent mode and parameter mapping settings.
 To add extra parameters to all Zyte API requests sent by the provider, set them
-as a dictionary through the ``ZYTE_API_PROVIDER_PARAMS`` setting, e.g.
-
-.. code-block:: python
-    :caption: settings.py
+as a dictionary through the ``ZYTE_API_PROVIDER_PARAMS`` setting, for example
+in ``settings.py``::
 
     ZYTE_API_PROVIDER_PARAMS = {"geolocation": "IE"}
 
