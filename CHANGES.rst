@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.12.0 (to be released)
------------------------
+0.12.0 (2023-09-26)
+-------------------
 
 * A new ``ZYTE_API_PROVIDER_PARAMS`` setting allows setting Zyte API
   parameters, like ``geolocation``, to be included in all Zyte API requests by
