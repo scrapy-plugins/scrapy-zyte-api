@@ -1,9 +1,9 @@
-from importlib.metadata import version
-
 import scrapy
 from packaging.version import Version
 
-USER_AGENT = f"scrapy-zyte-api/{version('scrapy-zyte-api')}"
+from .__version__ import __version__
+
+USER_AGENT = f"scrapy-zyte-api/{__version__}"
 
 _SCRAPY_VERSION = Version(scrapy.__version__)
 _SCRAPY_2_1_0 = Version("2.1.0")
