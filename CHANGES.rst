@@ -1,6 +1,24 @@
 Changes
 =======
 
+0.12.0 (2023-09-26)
+-------------------
+
+* A new ``ZYTE_API_PROVIDER_PARAMS`` setting allows setting Zyte API
+  parameters, like ``geolocation``, to be included in all Zyte API requests by
+  the scrapy-poet provider.
+
+* A new ``scrapy-zyte-api/request_args/<parameter>`` stat, counts the number of
+  requests containing a given Zyte API request parameter. For example,
+  ``scrapy-zyte-api/request_args/url`` counts the number of Zyte API requests
+  with the URL parameter set (which should be all of them).
+
+  Experimental is treated as a namespace, and its parameters are the ones
+  counted, i.e. there is no ``scrapy-zyte-api/request_args/experimental`` stat,
+  but there are stats like
+  ``scrapy-zyte-api/request_args/experimental.responseCookies``.
+
+
 0.11.1 (2023-08-25)
 -------------------
 
