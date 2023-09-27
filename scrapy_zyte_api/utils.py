@@ -1,9 +1,10 @@
 import scrapy
 from packaging.version import Version
+from zyte_api.utils import USER_AGENT as PYTHON_ZYTE_API_USER_AGENT
 
 from .__version__ import __version__
 
-USER_AGENT = f"scrapy-zyte-api/{__version__}"
+USER_AGENT = f"scrapy-zyte-api/{__version__} {PYTHON_ZYTE_API_USER_AGENT}"
 
 _SCRAPY_VERSION = Version(scrapy.__version__)
 _SCRAPY_2_1_0 = Version("2.1.0")
