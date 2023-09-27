@@ -1,8 +1,18 @@
+import os
 import setuptools
+
+
+def get_version():
+    about = {}
+    here = os.path.abspath(os.path.dirname(__file__))
+    with open(os.path.join(here, 'scrapy_zyte_api/__version__.py')) as f:
+        exec(f.read(), about)
+    return about['__version__']
+
 
 setuptools.setup(
     name="scrapy-zyte-api",
-    version="0.11.1",
+    version=get_version(),
     description="Client library to process URLs through Zyte API",
     long_description=open("README.rst").read(),
     long_description_content_type="text/x-rst",
