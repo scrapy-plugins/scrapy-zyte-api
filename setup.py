@@ -1,13 +1,14 @@
 import os
+
 import setuptools
 
 
 def get_version():
     about = {}
     here = os.path.abspath(os.path.dirname(__file__))
-    with open(os.path.join(here, 'scrapy_zyte_api/__version__.py')) as f:
+    with open(os.path.join(here, "scrapy_zyte_api/__version__.py")) as f:
         exec(f.read(), about)
-    return about['__version__']
+    return about["__version__"]
 
 
 setuptools.setup(
