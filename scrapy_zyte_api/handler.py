@@ -131,7 +131,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 api_key=settings.get("ZYTE_API_KEY") or None,
                 api_url=settings.get("ZYTE_API_URL") or API_URL,
                 n_conn=settings.getint("CONCURRENT_REQUESTS"),
-                user_agent=settings.get("_ZYTE_API_USER_AGENT") or f'{USER_AGENT} {PYTHON_ZYTE_API_USER_AGENT}',
+                user_agent=settings.get("_ZYTE_API_USER_AGENT")
+                or f"{USER_AGENT} {PYTHON_ZYTE_API_USER_AGENT}",
             )
         except NoApiKey:
             logger.warning(
