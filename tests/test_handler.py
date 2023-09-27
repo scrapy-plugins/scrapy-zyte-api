@@ -470,7 +470,7 @@ def test_trust_env(enabled):
         ),
         (
             "zyte-crawlers/0.0.1",
-            f"zyte-crawlers/0.0.1 {USER_AGENT} {PYTHON_ZYTE_API_USER_AGENT}",
+            "zyte-crawlers/0.0.1",
         ),
     ),
 )
@@ -478,7 +478,7 @@ def test_user_agent_for_build_client(user_agent, expected):
     settings = Settings(
         {
             **SETTINGS,
-            "_USER_AGENT": user_agent,
+            "_ZYTE_API_USER_AGENT": user_agent,
         }
     )
     client = ScrapyZyteAPIDownloadHandler._build_client(settings)
