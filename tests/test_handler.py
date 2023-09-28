@@ -247,7 +247,9 @@ async def test_stats(mockserver):
         scrapy_stats = handler._stats
         assert scrapy_stats.get_stats() == {}
 
-        meta = {"zyte_api": {"a": "…", "b": {"b0": "…"}, "experimental": {"c0": "…"}}}
+        meta = {
+            "zyte_api": {"a": "...", "b": {"b0": "..."}, "experimental": {"c0": "..."}}
+        }
         request = Request("https://example.com", meta=meta)
         await handler.download_request(request, None)
 
@@ -342,10 +344,10 @@ async def test_log_request_toggle(
 @pytest.mark.parametrize(
     "settings,short_str,long_str,truncated_str",
     [
-        ({}, "a" * 64, "a" * 65, "a" * 63 + "…"),
+        ({}, "a" * 64, "a" * 65, "a" * 63 + "..."),
         ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 0}, "a" * 64, "a" * 65, "a" * 65),
-        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 1}, "a", "aa", "…"),
-        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 2}, "aa", "aaa", "a…"),
+        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 1}, "a", "aa", "..."),
+        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 2}, "aa", "aaa", "a..."),
     ],
 )
 async def test_log_request_truncate(
