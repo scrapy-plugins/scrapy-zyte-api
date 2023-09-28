@@ -1,6 +1,13 @@
 Changes
 =======
 
+0.12.1 (to be released)
+-----------------------
+
+* With a new setting ``_ZYTE_API_USER_AGENT`` spider can send the custom user agent to Zyte API.
+  Otherwise, to Zyte API will be sent the custom user agent "scrapy-zyte-api/version python-zyte-api/version".
+
+
 0.12.0 (2023-09-26)
 -------------------
 
