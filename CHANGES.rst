@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.12.1 (to be released)
------------------------
+0.12.1 (2023-09-29)
+-------------------
 
 * The new ``_ZYTE_API_USER_AGENT`` setting allows customizing the user agent 
   string reported to Zyte API.
