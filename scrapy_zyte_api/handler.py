@@ -20,6 +20,7 @@ from zyte_api.constants import API_URL
 
 from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
+from .utils import USER_AGENT
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 api_key=settings.get("ZYTE_API_KEY") or None,
                 api_url=settings.get("ZYTE_API_URL") or API_URL,
                 n_conn=settings.getint("CONCURRENT_REQUESTS"),
+                user_agent=settings.get("_ZYTE_API_USER_AGENT", default=USER_AGENT),
             )
         except NoApiKey:
             logger.warning(
@@ -208,6 +210,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         else:
             retrying = self._retry_policy
         self._log_request(api_params)
+
         try:
             api_response = await self._client.request_raw(
                 api_params,
