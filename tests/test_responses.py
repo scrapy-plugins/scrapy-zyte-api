@@ -243,13 +243,105 @@ def test_response_headers_removal(api_response, cls):
 
     response = cls.from_api_response(raw_response)
 
-    assert response.headers == {
+    expected_headers = {
         b"X-Some-Other-Value": [b"123"],
         **OUTPUT_COOKIE_HEADERS,
     }
+    assert response.headers == expected_headers
     assert (
         response.raw_api_response["httpResponseHeaders"]
         == raw_response["httpResponseHeaders"]
+    )
+
+
+INPUT_COOKIES_SIMPLE = [{"name": "c", "value": "d"}]
+
+
+@pytest.mark.parametrize(
+    "fields,cls,keep",
+    [
+        # For HTTP requests, whether the response Set-Cookie header is kept or
+        # not depends on whether experimental.responseCookies is received.
+        *(
+            (
+                {
+                    "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+                    "httpResponseHeaders": [
+                        {"name": "Content-Type", "value": "text/html"},
+                        {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
+                    ],
+                    **cookie_fields,
+                },
+                ZyteAPIResponse,
+                keep,
+            )
+            for cookie_fields, keep in (
+                # No response cookies, so Set-Cookie is kept.
+                (
+                    {},
+                    True,
+                ),
+                # Response cookies, so Set-Cookie is not kept.
+                (
+                    {
+                        "experimental": {
+                            "responseCookies": INPUT_COOKIES_SIMPLE,
+                        },
+                    },
+                    False,
+                ),
+            )
+        ),
+        # For non-HTTP requests, the response Set-Cookie header is always
+        # dropped.
+        *(
+            (
+                {
+                    "browserHtml": PAGE_CONTENT,
+                    "httpResponseHeaders": [
+                        {"name": "Content-Type", "value": "text/html"},
+                        {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
+                    ],
+                    **cookie_fields,
+                },
+                ZyteAPITextResponse,
+                False,
+            )
+            for cookie_fields in (
+                {},
+                {
+                    "experimental": {
+                        "responseCookies": INPUT_COOKIES_SIMPLE,
+                    },
+                },
+            )
+        ),
+    ],
+)
+def test_response_cookie_header(fields, cls, keep):
+    """Test the logic to keep or not the Set-Cookie header in response
+    headers."""
+    expected_headers = {
+        **{
+            header["name"].encode(): [header["value"].encode()]
+            for header in fields["httpResponseHeaders"]
+        },
+    }
+    if keep:
+        expected_headers[b"Set-Cookie"] = [b"a=b"]
+    elif "experimental" in fields:
+        expected_headers[b"Set-Cookie"] = [b"c=d"]
+
+    fields["url"] = "https://example.com"
+    fields["statusCode"] = 200
+    fields["httpResponseHeaders"].append({"name": "Set-Cookie", "value": "a=b"})
+
+    response = cls.from_api_response(fields)
+
+    assert response.headers == expected_headers
+    assert (
+        response.raw_api_response["httpResponseHeaders"]
+        == fields["httpResponseHeaders"]
     )
 
 

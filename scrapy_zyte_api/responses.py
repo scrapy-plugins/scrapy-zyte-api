@@ -1,4 +1,5 @@
 from base64 import b64decode
+from copy import copy
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -23,10 +24,6 @@ class ZyteAPIMixin:
         # HttpCompressionMiddleware will error out when it attempts to
         # decompress an already decompressed body based on this header.
         "content-encoding",
-        # Cookies should be fetched from experimental.responseCookies only, the
-        # Set-Cookie header may define cookies from the main HTTP response that
-        # were overriden later on, e.g. during browser rendering.
-        "set-cookie",
     }
 
     def __init__(self, *args, raw_api_response: Optional[Dict] = None, **kwargs):
@@ -94,18 +91,28 @@ class ZyteAPIMixin:
         input_headers: Optional[List[Dict[str, str]]] = api_response.get(
             "httpResponseHeaders"
         )
+        response_cookies: Optional[List[Dict[str, str]]] = api_response.get(
+            "experimental", {}
+        ).get("responseCookies")
         if input_headers:
+            headers_to_remove = copy(cls.REMOVE_HEADERS)
+            if response_cookies or "httpResponseBody" not in api_response:
+                # Only the experimental.responseCookies response field should be
+                # used in general to get cookies. since the Set-Cookie header may
+                # define cookies from the main HTTP response that were overridden
+                # later on, e.g. during browser rendering.
+                # However, for HTTP requests (i.e. with httpResponseBody), it
+                # is OK to keep the Set-Cookie header if
+                # experimental.responseCookies was not received.
+                headers_to_remove.add("set-cookie")
             result = {
                 h["name"]: [h["value"]]
                 for h in input_headers
-                if h["name"].lower() not in cls.REMOVE_HEADERS
+                if h["name"].lower() not in headers_to_remove
             }
-        input_cookies: Optional[List[Dict[str, str]]] = api_response.get(
-            "experimental", {}
-        ).get("responseCookies")
-        if input_cookies:
+        if response_cookies:
             result["Set-Cookie"] = []
-            for cookie in input_cookies:
+            for cookie in response_cookies:
                 result["Set-Cookie"].append(
                     cls._response_cookie_to_header_value(cookie)
                 )
