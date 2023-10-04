@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 def _truncate_str(obj, index, text, limit):
     if len(text) <= limit:
         return
-    obj[index] = text[: limit - 1] + "…"
+    obj[index] = text[: limit - 1] + "..."
 
 
 def _truncate(obj, limit):
