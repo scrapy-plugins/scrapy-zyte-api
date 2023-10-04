@@ -97,13 +97,15 @@ class ZyteAPIMixin:
         if input_headers:
             headers_to_remove = copy(cls.REMOVE_HEADERS)
             if response_cookies or "httpResponseBody" not in api_response:
-                # Only the experimental.responseCookies response field should be
-                # used in general to get cookies. since the Set-Cookie header may
-                # define cookies from the main HTTP response that were overridden
-                # later on, e.g. during browser rendering.
+                # Only the experimental.responseCookies response field should
+                # be used in general to get cookies, since the Set-Cookie
+                # header may define cookies from the main HTTP response that
+                # were overridden later on, e.g. during browser rendering.
                 # However, for HTTP requests (i.e. with httpResponseBody), it
                 # is OK to keep the Set-Cookie header if
-                # experimental.responseCookies was not received.
+                # experimental.responseCookies was not received, as it should
+                # be identical to what experimental.responseCookies would
+                # contain.
                 headers_to_remove.add("set-cookie")
             result = {
                 h["name"]: [h["value"]]
