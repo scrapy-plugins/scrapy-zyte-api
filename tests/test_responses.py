@@ -270,7 +270,7 @@ INPUT_COOKIES_SIMPLE = [{"name": "c", "value": "d"}]
                         {"name": "Content-Type", "value": "text/html"},
                         {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
                     ],
-                    **cookie_fields,
+                    **cookie_fields,  # type: ignore[dict-item]
                 },
                 ZyteAPIResponse,
                 keep,
@@ -302,7 +302,7 @@ INPUT_COOKIES_SIMPLE = [{"name": "c", "value": "d"}]
                         {"name": "Content-Type", "value": "text/html"},
                         {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
                     ],
-                    **cookie_fields,
+                    **cookie_fields,  # type: ignore[dict-item]
                 },
                 ZyteAPITextResponse,
                 False,
