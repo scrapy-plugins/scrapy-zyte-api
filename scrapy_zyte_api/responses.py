@@ -1,6 +1,6 @@
 from base64 import b64decode
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 from scrapy import Request
 from scrapy.http import HtmlResponse, Response, TextResponse
@@ -110,7 +110,9 @@ class ZyteAPIMixin:
 
 class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
     @classmethod
-    def from_api_response(cls, api_response: Dict, *, request: Request = None):
+    def from_api_response(
+        cls, api_response: Dict, *, request: Optional[Request] = None
+    ):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
@@ -141,7 +143,9 @@ class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
 
 class ZyteAPIResponse(ZyteAPIMixin, Response):
     @classmethod
-    def from_api_response(cls, api_response: Dict, *, request: Request = None):
+    def from_api_response(
+        cls, api_response: Dict, *, request: Optional[Request] = None
+    ):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
@@ -188,8 +192,8 @@ def _process_response(
 
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
         response_cls = responsetypes.from_args(
-            headers=api_response["httpResponseHeaders"],
-            url=api_response["url"],
+            headers=cast(List[Dict[str, str]], api_response["httpResponseHeaders"]),
+            url=cast(str, api_response["url"]),
             # FIXME: update this when python-zyte-api supports base64 decoding
             body=b64decode(api_response["httpResponseBody"]),  # type: ignore
         )

@@ -21,7 +21,7 @@ try:
     # requires Scrapy >= 2.8
     from scrapy.http.request import NO_CALLBACK
 except ImportError:
-    NO_CALLBACK = None
+    NO_CALLBACK = None  # type: ignore[assignment]
 
 
 class ZyteApiProvider(PageObjectInputProvider):
@@ -86,6 +86,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             },
             callback=NO_CALLBACK,
         )
+        assert crawler.engine
         api_response: ZyteAPITextResponse = await maybe_deferred_to_future(
             crawler.engine.download(api_request)
         )
