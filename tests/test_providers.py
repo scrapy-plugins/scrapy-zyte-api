@@ -16,7 +16,7 @@ from twisted.web.client import Agent, readBody
 from web_poet import BrowserHtml, BrowserResponse, ItemPage, field, handle_urls
 from zyte_common_items import BasePage, Product
 
-from scrapy_zyte_api.providers import ZyteApiProvider
+from scrapy_zyte_api.providers import ExtractFrom, ZyteApiProvider
 
 from . import SETTINGS
 from .mockserver import get_ephemeral_port
@@ -179,3 +179,33 @@ async def test_provider_params(mockserver):
     _, _, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/browserHtml") == 1
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/geolocation") == 1
+
+
+@ensureDeferred
+async def test_provider_extractfrom(mockserver):
+    from typing import Annotated
+
+    @attrs.define
+    class AnnotatedProductPage(BasePage):
+        product: Annotated[Product, ExtractFrom.httpResponseBody]
+
+    class AnnotatedZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):
+            return super().parse_(response, page)
+
+    settings = create_scrapy_settings(None)
+    settings.update(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(
+        AnnotatedZyteAPISpider, HtmlResource, settings
+    )
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
+        )
+    )
