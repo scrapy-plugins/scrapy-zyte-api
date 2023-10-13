@@ -191,7 +191,9 @@ async def test_provider_extractfrom(mockserver):
 
     class AnnotatedZyteAPISpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: AnnotatedProductPage):
-            return super().parse_(response, page)
+            yield {
+                "product": page.product,
+            }
 
     settings = create_scrapy_settings(None)
     settings.update(SETTINGS)
@@ -204,7 +206,7 @@ async def test_provider_extractfrom(mockserver):
     assert item["product"] == Product.from_dict(
         dict(
             url=url,
-            name="Product name",
+            name="Product name (from httpResponseBody)",
             price="10",
             currency="USD",
         )

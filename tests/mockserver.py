@@ -17,6 +17,7 @@ from twisted.internet.task import deferLater
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET, Site
 
+from scrapy_zyte_api.providers import ExtractFrom
 from scrapy_zyte_api.responses import _API_RESPONSE
 
 from . import SETTINGS, make_handler
@@ -113,6 +114,9 @@ class DefaultResource(Resource):
                 "price": "10",
                 "currency": "USD",
             }
+            extract_from = request_data.get("productOptions", {}).get("extractFrom")
+            if extract_from == ExtractFrom.httpResponseBody:
+                response_data["product"]["name"] += " (from httpResponseBody)"
 
         return json.dumps(response_data).encode()
 

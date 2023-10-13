@@ -6,7 +6,7 @@ from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
 from scrapy.utils.defer import maybe_deferred_to_future
-from scrapy_poet import PageObjectInputProvider
+from scrapy_poet import AnnotatedResult, PageObjectInputProvider
 from web_poet import BrowserHtml, BrowserResponse
 from zyte_common_items import (
     Article,
@@ -135,7 +135,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                 continue
             item = cls_stripped.from_dict(api_response.raw_api_response[kw])
             if is_typing_annotated(cls):
-                item.__metadata__ = cls.__metadata__
+                item = AnnotatedResult(item, cls.__metadata__)
             results.append(item)
             self.update_cache(request, {cls_stripped: item})
         return results
