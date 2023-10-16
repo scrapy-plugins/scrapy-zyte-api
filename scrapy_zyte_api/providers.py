@@ -96,6 +96,8 @@ class ZyteApiProvider(PageObjectInputProvider):
                 for option in ExtractFrom:
                     if option in metadata:
                         product_options = zyte_api_meta.setdefault("productOptions", {})
+                        if "extractFrom" in product_options:
+                            raise ValueError("Multiple extractFrom specified")
                         product_options["extractFrom"] = option.value
                         break
 

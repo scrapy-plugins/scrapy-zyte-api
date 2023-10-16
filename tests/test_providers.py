@@ -188,11 +188,13 @@ async def test_provider_extractfrom(mockserver):
     @attrs.define
     class AnnotatedProductPage(BasePage):
         product: Annotated[Product, ExtractFrom.httpResponseBody]
+        product2: Annotated[Product, ExtractFrom.httpResponseBody]
 
     class AnnotatedZyteAPISpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: AnnotatedProductPage):
             yield {
                 "product": page.product,
+                "product2": page.product,
             }
 
     settings = create_scrapy_settings(None)
@@ -211,3 +213,27 @@ async def test_provider_extractfrom(mockserver):
             currency="USD",
         )
     )
+
+
+@ensureDeferred
+async def test_provider_extractfrom_double(mockserver):
+    from typing import Annotated
+
+    @attrs.define
+    class AnnotatedProductPage(BasePage):
+        product: Annotated[Product, ExtractFrom.httpResponseBody]
+        product2: Annotated[Product, ExtractFrom.browserHtml]
+
+    class AnnotatedZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):
+            yield {
+                "product": page.product,
+            }
+
+    settings = create_scrapy_settings(None)
+    settings.update(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, _, _ = await crawl_single_item(AnnotatedZyteAPISpider, HtmlResource, settings)
+    assert item is None
