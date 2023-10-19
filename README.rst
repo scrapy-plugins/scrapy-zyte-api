@@ -950,7 +950,7 @@ in ``settings.py``::
 
     ZYTE_API_PROVIDER_PARAMS = {"geolocation": "IE"}
 
-When ``ZYTE_API_PROVIDER_PARAMS`` setting includes one of the Zyte API
+When the ``ZYTE_API_PROVIDER_PARAMS`` setting includes one of the Zyte API
 extraction options (e.g. ``productOptions`` for ``product``), but the
 final Zyte API request doesn't include the corresponding data type, the
 unused options are automatically removed. So, it's safe to use
