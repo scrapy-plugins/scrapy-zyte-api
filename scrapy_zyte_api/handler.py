@@ -218,10 +218,12 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 retrying=retrying,
             )
         except RequestError as er:
+            request_id = er.headers.get("request-id")
             error_detail = (er.parsed.data or {}).get("detail", er.message)
             logger.error(
-                f"Got Zyte API error (status={er.status}, type={er.parsed.type!r}) "
-                f"while processing URL ({request.url}): {error_detail}"
+                f"Got Zyte API error (status={er.status}, type={er.parsed.type!r}, "
+                f"request_id='{request_id}') while processing URL ({request.url}): "
+                f"{error_detail}"
             )
             raise
         except Exception as er:

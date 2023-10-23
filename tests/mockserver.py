@@ -67,6 +67,10 @@ class DefaultResource(Resource):
             b"Content-Type",
             [b"application/json"],
         )
+        request.responseHeaders.setRawHeaders(
+            b"request-id",
+            [b"abcd1234"],
+        )
 
         response_data: _API_RESPONSE = {}
         if "url" not in request_data:
