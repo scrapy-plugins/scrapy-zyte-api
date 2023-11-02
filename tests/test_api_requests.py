@@ -273,6 +273,7 @@ SKIP_HEADERS = {b"cookie", b"user-agent"}
 JOB_ID = None
 COOKIES_ENABLED = False
 MAX_COOKIES = 100
+EXPERIMENTAL_COOKIES = True
 GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
     "transparent_mode": TRANSPARENT_MODE,
@@ -282,6 +283,7 @@ GET_API_PARAMS_KWARGS = {
     "job_id": JOB_ID,
     "cookies_enabled": COOKIES_ENABLED,
     "max_cookies": MAX_COOKIES,
+    "experimental_cookies": EXPERIMENTAL_COOKIES,
 }
 
 
@@ -314,6 +316,7 @@ async def test_param_parser_input_custom(mockserver):
         assert parser._max_cookies == 1
         assert parser._skip_headers == {b"a"}
         assert parser._transparent_mode is True
+        assert parser._experimental_cookies is True
 
 
 @ensureDeferred
@@ -1633,8 +1636,11 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
     "settings,cookies,meta,params,expected,warnings,cookie_jar",
     [
         # Cookies, both for requests and for responses, are enabled based on
-        # both ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED (default: False) and
         # COOKIES_ENABLED (default: True).
+        #
+        # ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED (deprecated, default: False)
+        # forces the experimental name space to be used when enabled, and
+        # triggers a deprecation warning.
         *(
             (
                 settings,
@@ -1645,27 +1651,14 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     "httpResponseBody": True,
                     "httpResponseHeaders": True,
                 },
-                setup_warnings
-                or (
-                    run_time_warnings
-                    if cast(Dict, settings).get("COOKIES_ENABLED", True)
-                    else []
-                ),
+                warnings,
                 [],
             )
-            for input_cookies, run_time_warnings in (
-                (
-                    REQUEST_INPUT_COOKIES_EMPTY,
-                    [],
-                ),
-                (
-                    REQUEST_INPUT_COOKIES_MINIMAL_DICT,
-                    [
-                        "there are cookies in the cookiejar, but ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is False",
-                    ],
-                ),
+            for input_cookies in (
+                REQUEST_INPUT_COOKIES_EMPTY,
+                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
             )
-            for settings, setup_warnings in (
+            for settings, warnings in (
                 (
                     {},
                     [],
@@ -1673,6 +1666,22 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 (
                     {
                         "COOKIES_ENABLED": True,
+                    },
+                    [],
+                ),
+                (
+                    {
+                        "COOKIES_ENABLED": True,
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                    ],
+                ),
+                (
+                    {
+                        "COOKIES_ENABLED": True,
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": False,
                     },
                     [],
                 ),
@@ -1688,7 +1697,8 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
                     },
                     [
-                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is True, but it will have no effect because COOKIES_ENABLED is False.",
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                        "will have no effect",
                     ],
                 ),
                 (
@@ -1700,6 +1710,41 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 ),
             )
         ),
+        # When COOKIES_ENABLED is True, responseCookies is set to True, and
+        # requestCookies is filled automatically if there are cookies.
+        *(
+            (
+                settings,
+                input_cookies,
+                {},
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "responseCookies": True,
+                    **cast(Dict, output_cookies),
+                },
+                [],
+                [],
+            )
+            for input_cookies, output_cookies in (
+                (
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {},
+                ),
+                (
+                    REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                    {"requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL},
+                ),
+            )
+            for settings in (
+                {},
+                {"COOKIES_ENABLED": True},
+            )
+        ),
+        # When ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is also True,
+        # responseCookies and requestCookies are defined within the
+        # experimental name space, and a deprecation warning is issued.
         *(
             (
                 settings,
@@ -1714,7 +1759,9 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         **cast(Dict, output_cookies),
                     },
                 },
-                [],
+                [
+                    "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                ],
                 [],
             )
             for input_cookies, output_cookies in (
@@ -1737,74 +1784,11 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 },
             )
         ),
-        # Do not warn about request cookies not being mapped if cookies are
-        # manually set.
-        *(
-            (
-                settings,
-                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
-                {},
-                {
-                    "experimental": {
-                        "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
-                    }
-                },
-                {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
-                    "experimental": {
-                        "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
-                    },
-                },
-                [],
-                [],
-            )
-            for settings in (
-                {},
-                {
-                    "COOKIES_ENABLED": True,
-                },
-            )
-        ),
         # dont_merge_cookies=True on request metadata disables cookies.
         (
-            {
-                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
-            },
-            REQUEST_INPUT_COOKIES_EMPTY,
-            {
-                "dont_merge_cookies": True,
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-            [],
-        ),
-        (
-            {
-                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
-            },
-            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
-            {
-                "dont_merge_cookies": True,
-            },
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-            [],
-        ),
-        # Do not warn about request cookies not being mapped if
-        # dont_merge_cookies=True is set on request metadata.
-        *(
             (
                 settings,
-                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                input_cookies,
                 {
                     "dont_merge_cookies": True,
                 },
@@ -1813,80 +1797,221 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     "httpResponseBody": True,
                     "httpResponseHeaders": True,
                 },
+                warnings,
                 [],
-                [
-                    {
-                        "name": "foo",
-                        "value": "bar",
-                        "domain": "example.com",
-                    }
-                ],
             )
-            for settings in (
-                {},
-                {
-                    "COOKIES_ENABLED": True,
-                },
+            for input_cookies in (
+                REQUEST_INPUT_COOKIES_EMPTY,
+                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            )
+            for settings, warnings in (
+                (
+                    {},
+                    [],
+                ),
+                (
+                    {
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                ),
             )
         ),
         # Cookies can be disabled setting the corresponding Zyte API parameter
         # to False.
-        (
-            {
-                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
-            },
-            REQUEST_INPUT_COOKIES_EMPTY,
-            {},
-            {
-                "experimental": {
-                    "responseCookies": False,
-                }
-            },
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-            [],
+        #
+        # By default, setting experimental parameters to False has no effect.
+        # If ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is True, then only
+        # experimental parameters are taken into account instead.
+        *(
+            (
+                settings,
+                input_cookies,
+                {},
+                input_params,
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    **output_params,
+                },
+                warnings,
+                [],
+            )
+            for settings, input_cookies, input_params, output_params, warnings in (
+                # No cookies, responseCookies disabled.
+                (
+                    {},
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "responseCookies": False,
+                    },
+                    {},
+                    [],
+                ),
+                (
+                    {},
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "experimental": {
+                            "responseCookies": False,
+                        }
+                    },
+                    {
+                        "responseCookies": True,
+                        "experimental": {
+                            "responseCookies": False,
+                        },
+                    },
+                    [],
+                ),
+                (
+                    {
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "responseCookies": False,
+                    },
+                    {
+                        "responseCookies": False,
+                        "experimental": {
+                            "responseCookies": False,
+                        },
+                    },
+                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                ),
+                (
+                    {
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "experimental": {
+                            "responseCookies": False,
+                        }
+                    },
+                    {},
+                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                ),
+                # No cookies, requestCookies disabled.
+                (
+                    {},
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "requestCookies": False,
+                    },
+                    {
+                        "responseCookies": True,
+                    },
+                    [],
+                ),
+                (
+                    {},
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "experimental": {
+                            "requestCookies": False,
+                        }
+                    },
+                    {
+                        "responseCookies": True,
+                        "experimental": {
+                            "requestCookies": False,
+                        },
+                    },
+                    [],
+                ),
+                (
+                    {
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "requestCookies": False,
+                    },
+                    {
+                        "requestCookies": False,
+                        "experimental": {"responseCookies": True},
+                    },
+                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                ),
+                (
+                    {
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "experimental": {
+                            "requestCookies": False,
+                        }
+                    },
+                    {
+                        "experimental": {"responseCookies": True},
+                    },
+                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                ),
+                # No cookies, requestCookies and responseCookies disabled.
+                (
+                    {},
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "requestCookies": False,
+                        "responseCookies": False,
+                    },
+                    {},
+                    [],
+                ),
+                (
+                    {},
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "experimental": {
+                            "requestCookies": False,
+                            "responseCookies": False,
+                        }
+                    },
+                    {
+                        "responseCookies": True,
+                        "experimental": {
+                            "requestCookies": False,
+                            "responseCookies": False,
+                        },
+                    },
+                    [],
+                ),
+                (
+                    {
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "requestCookies": False,
+                        "responseCookies": False,
+                    },
+                    {
+                        "requestCookies": False,
+                        "responseCookies": False,
+                        "experimental": {"responseCookies": True},
+                    },
+                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                ),
+                (
+                    {
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    REQUEST_INPUT_COOKIES_EMPTY,
+                    {
+                        "experimental": {
+                            "requestCookies": False,
+                            "responseCookies": False,
+                        }
+                    },
+                    {},
+                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                ),
+            )
         ),
-        (
-            {
-                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
-            },
-            REQUEST_INPUT_COOKIES_EMPTY,
-            {},
-            {
-                "experimental": {
-                    "requestCookies": False,
-                }
-            },
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "experimental": {"responseCookies": True},
-            },
-            [],
-            [],
-        ),
-        (
-            {
-                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
-            },
-            REQUEST_INPUT_COOKIES_EMPTY,
-            {},
-            {
-                "experimental": {
-                    "responseCookies": False,
-                    "requestCookies": False,
-                }
-            },
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            [],
-            [],
-        ),
+        # TODO: Continue adapting the test scenarios from here.
         (
             {
                 "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,

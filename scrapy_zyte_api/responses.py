@@ -96,9 +96,14 @@ class ZyteAPIMixin:
                 for h in input_headers
                 if h["name"].lower() not in cls.REMOVE_HEADERS
             }
-        input_cookies: Optional[List[Dict[str, str]]] = api_response.get(
+        old_input_cookies: Optional[List[Dict[str, str]]] = api_response.get(
             "experimental", {}
         ).get("responseCookies")
+        input_cookies: Optional[List[Dict[str, str]]] = api_response.get(
+            "responseCookies", old_input_cookies
+        )
+        # Note: We do not warn about deprecated experimental cookie use because
+        # _process_cookies is called earlier and already takes care of that.
         if input_cookies:
             result["Set-Cookie"] = []
             for cookie in input_cookies:
@@ -173,11 +178,10 @@ def _process_response(
     on which if it can properly decode the HTTP Body or have access to browserHtml.
     """
 
-    # NOTES: Currently, Zyte API does NOT only allow both 'browserHtml' and
+    # NOTES: Currently, Zyte API does NOT allow both 'browserHtml' and
     # 'httpResponseBody' to be present at the same time. The support for both
     # will be addressed in the future. Reference:
     # - https://github.com/scrapy-plugins/scrapy-zyte-api/pull/10#issuecomment-1131406460
-    # For now, at least one of them should be present.
 
     _process_cookies(api_response, request, cookie_jars)
 

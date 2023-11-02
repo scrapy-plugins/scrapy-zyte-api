@@ -1,6 +1,23 @@
 Changes
 =======
 
+0.12.3 (unreleased)
+-------------------
+
+* Cookie support is no longer experimental:
+
+  * The ``responseCookies`` response parameter is now handled the same as
+    ``experimental.responseCookies``; the latter still works but is deprecated.
+
+  * The ``ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED`` setting is now deprecated.
+    When enabled, however, the ``experimental`` name space is still used for
+    automatic request parameter mapping.
+
+  * If the ``COOKIES_ENABLED`` setting is ``True`` (default), automatic request
+    parameter mapping now sets ``responseCookies`` to ``True`` and maps request
+    cookies to ``requestCookies``.
+
+
 0.12.2 (2023-10-19)
 -------------------
 
@@ -36,7 +53,7 @@ Changes
   Experimental is treated as a namespace, and its parameters are the ones
   counted, i.e. there is no ``scrapy-zyte-api/request_args/experimental`` stat,
   but there are stats like
-  ``scrapy-zyte-api/request_args/experimental.responseCookies``.
+  ``scrapy-zyte-api/request_args/experimental.foo``.
 
 
 0.11.1 (2023-08-25)

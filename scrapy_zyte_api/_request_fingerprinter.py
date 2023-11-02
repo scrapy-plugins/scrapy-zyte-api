@@ -37,10 +37,13 @@ else:
             self._cache: "WeakKeyDictionary[Request, bytes]" = WeakKeyDictionary()
             self._param_parser = _ParamParser(crawler, cookies_enabled=False)
             self._skip_keys = (
+                "cookieManagement",
                 "customHttpRequestHeaders",
                 "echoData",
                 "jobId",
+                "requestCookies",
                 "requestHeaders",
+                "responseCookies",
                 "experimental",
             )
 

@@ -1,6 +1,7 @@
 from http.cookiejar import Cookie
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+from warnings import warn
 
 from scrapy.http import Request
 from scrapy.http.cookies import CookieJar
@@ -30,9 +31,21 @@ def _process_cookies(
 ):
     if not cookie_jars:
         return
-    response_cookies = api_response.get("experimental", {}).get("responseCookies")
+    old_response_cookies = api_response.get("experimental", {}).get("responseCookies")
+    response_cookies = api_response.get("responseCookies", old_response_cookies)
     if not response_cookies:
         return
+    if old_response_cookies:
+        warn(
+            "Found experimental.responseCookies in a Zyte API response. The "
+            "experimental name space is deprecated for that parameter. "
+            "Please, make sure you are no longer using the deprecated "
+            "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting, and remove the "
+            "experimental name space from the responseCookies and "
+            "requestCookies parameters in your code, both when building "
+            "requests and when parsing responses.",
+            DeprecationWarning,
+        )
     cookie_jar = _get_cookie_jar(request, cookie_jars)
     for response_cookie in response_cookies:
         rest = {}

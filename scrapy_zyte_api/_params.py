@@ -204,11 +204,17 @@ def _set_http_response_headers_from_request(
 def _set_http_response_cookies_from_request(
     *,
     api_params: Dict[str, Any],
+    experimental: bool,
 ):
-    api_params.setdefault("experimental", {})
-    api_params["experimental"].setdefault("responseCookies", True)
-    if api_params["experimental"]["responseCookies"] is False:
-        del api_params["experimental"]["responseCookies"]
+    if not experimental:
+        api_params.setdefault("responseCookies", True)
+        if api_params["responseCookies"] is False:
+            del api_params["responseCookies"]
+    else:
+        api_params.setdefault("experimental", {})
+        api_params["experimental"].setdefault("responseCookies", True)
+        if api_params["experimental"]["responseCookies"] is False:
+            del api_params["experimental"]["responseCookies"]
 
 
 def _set_http_request_cookies_from_request(
@@ -217,61 +223,117 @@ def _set_http_request_cookies_from_request(
     request: Request,
     cookie_jars: Dict[Any, CookieJar],
     max_cookies: int,
+    experimental: bool,
 ):
-    api_params.setdefault("experimental", {})
-    if "requestCookies" in api_params["experimental"]:
-        request_cookies = api_params["experimental"]["requestCookies"]
-        if request_cookies is False:
-            del api_params["experimental"]["requestCookies"]
-        elif not request_cookies and isinstance(request_cookies, list):
+    if not experimental:
+        if "requestCookies" in api_params:
+            request_cookies = api_params["requestCookies"]
+            if request_cookies is False:
+                del api_params["requestCookies"]
+            elif not request_cookies and isinstance(request_cookies, list):
+                logger.warning(
+                    (
+                        "Request %(request)r is overriding automatic request "
+                        "cookie mapping by explicitly setting "
+                        "requestCookies to []. If this was your intention, "
+                        "please use False instead of []. Otherwise, stop "
+                        "defining requestCookies in your request to let "
+                        "automatic mapping work."
+                    ),
+                    {
+                        "request": request,
+                    },
+                )
+            return
+        output_cookies = []
+        input_cookies = _get_all_cookies(request, cookie_jars)
+        input_cookie_count = len(input_cookies)
+        if input_cookie_count > max_cookies:
             logger.warning(
                 (
-                    "Request %(request)r is overriding automatic request "
-                    "cookie mapping by explicitly setting "
-                    "experimental.requestCookies to []. If this was your "
-                    "intention, please use False instead of []. Otherwise, "
-                    "stop defining experimental.requestCookies in your "
-                    "request to let automatic mapping work."
+                    "Request %(request)r would get %(count)r cookies, but "
+                    "request cookie automatic mapping is limited to %(max)r "
+                    "cookies (see the ZYTE_API_MAX_COOKIES setting), so only "
+                    "%(max)r cookies have been added to this request. To "
+                    "silence this warning, set the request cookies manually "
+                    "through the requestCookies Zyte API parameter instead. "
+                    "Alternatively, if Zyte API starts supporting more than "
+                    "%(max)r request cookies, update the ZYTE_API_MAX_COOKIES "
+                    "setting accordingly."
                 ),
                 {
                     "request": request,
+                    "count": input_cookie_count,
+                    "max": max_cookies,
                 },
             )
-        return
-    output_cookies = []
-    input_cookies = _get_all_cookies(request, cookie_jars)
-    input_cookie_count = len(input_cookies)
-    if input_cookie_count > max_cookies:
-        logger.warning(
-            (
-                "Request %(request)r would get %(count)r cookies, but request "
-                "cookie automatic mapping is limited to %(max)r cookies "
-                "(see the ZYTE_API_MAX_COOKIES setting), so only %(max)r "
-                "cookies have been added to this request. To silence this "
-                "warning, set the request cookies manually through the "
-                "experimental.requestCookies Zyte API parameter instead. "
-                "Alternatively, if Zyte API starts supporting more than "
-                "%(max)r request cookies, update the ZYTE_API_MAX_COOKIES "
-                "setting accordingly."
-            ),
-            {
-                "request": request,
-                "count": input_cookie_count,
-                "max": max_cookies,
-            },
-        )
-        input_cookies = input_cookies[:max_cookies]
-    for input_cookie in input_cookies:
-        output_cookie = {
-            "name": input_cookie.name,
-            "value": input_cookie.value,
-            "domain": input_cookie.domain,
-        }
-        if input_cookie.path_specified:
-            output_cookie["path"] = input_cookie.path
-        output_cookies.append(output_cookie)
-    if output_cookies:
-        api_params["experimental"]["requestCookies"] = output_cookies
+            input_cookies = input_cookies[:max_cookies]
+        for input_cookie in input_cookies:
+            output_cookie = {
+                "name": input_cookie.name,
+                "value": input_cookie.value,
+                "domain": input_cookie.domain,
+            }
+            if input_cookie.path_specified:
+                output_cookie["path"] = input_cookie.path
+            output_cookies.append(output_cookie)
+        if output_cookies:
+            api_params["requestCookies"] = output_cookies
+    else:
+        api_params.setdefault("experimental", {})
+        if "requestCookies" in api_params["experimental"]:
+            request_cookies = api_params["experimental"]["requestCookies"]
+            if request_cookies is False:
+                del api_params["experimental"]["requestCookies"]
+            elif not request_cookies and isinstance(request_cookies, list):
+                logger.warning(
+                    (
+                        "Request %(request)r is overriding automatic request "
+                        "cookie mapping by explicitly setting "
+                        "experimental.requestCookies to []. If this was your "
+                        "intention, please use False instead of []. Otherwise, "
+                        "stop defining experimental.requestCookies in your "
+                        "request to let automatic mapping work."
+                    ),
+                    {
+                        "request": request,
+                    },
+                )
+            return
+        output_cookies = []
+        input_cookies = _get_all_cookies(request, cookie_jars)
+        input_cookie_count = len(input_cookies)
+        if input_cookie_count > max_cookies:
+            logger.warning(
+                (
+                    "Request %(request)r would get %(count)r cookies, but request "
+                    "cookie automatic mapping is limited to %(max)r cookies "
+                    "(see the ZYTE_API_MAX_COOKIES setting), so only %(max)r "
+                    "cookies have been added to this request. To silence this "
+                    "warning, set the request cookies manually through the "
+                    "experimental.requestCookies Zyte API parameter instead. "
+                    "Alternatively, if Zyte API starts supporting more than "
+                    "%(max)r request cookies, update the ZYTE_API_MAX_COOKIES "
+                    "setting accordingly."
+                ),
+                {
+                    "request": request,
+                    "count": input_cookie_count,
+                    "max": max_cookies,
+                },
+            )
+            input_cookies = input_cookies[:max_cookies]
+        for input_cookie in input_cookies:
+            output_cookie = {
+                "name": input_cookie.name,
+                "value": input_cookie.value,
+                "domain": input_cookie.domain,
+            }
+            if input_cookie.path_specified:
+                output_cookie["path"] = input_cookie.path
+            output_cookies.append(output_cookie)
+        if output_cookies:
+            api_params["experimental"]["requestCookies"] = output_cookies
 
 
 def _set_http_request_method_from_request(
@@ -348,6 +410,7 @@ def _update_api_params_from_request(
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
+    experimental_cookies: bool,
 ):
     _set_http_response_body_from_request(api_params=api_params, request=request)
     _set_http_response_headers_from_request(
@@ -365,14 +428,17 @@ def _update_api_params_from_request(
     _set_http_request_body_from_request(api_params=api_params, request=request)
     if cookies_enabled:
         assert cookie_jars is not None  # typing
-        _set_http_response_cookies_from_request(api_params=api_params)
+        _set_http_response_cookies_from_request(
+            api_params=api_params, experimental=experimental_cookies
+        )
         _set_http_request_cookies_from_request(
             api_params=api_params,
             request=request,
             cookie_jars=cookie_jars,
             max_cookies=max_cookies,
+            experimental=experimental_cookies,
         )
-        if not api_params["experimental"]:
+        if experimental_cookies and not api_params["experimental"]:
             del api_params["experimental"]
     _unset_unneeded_api_params(
         api_params=api_params, request=request, default_params=default_params
@@ -478,6 +544,7 @@ def _get_automap_params(
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
+    experimental_cookies: bool,
 ):
     meta_params = request.meta.get("zyte_api_automap", default_enabled)
     if meta_params is False:
@@ -507,6 +574,7 @@ def _get_automap_params(
         cookies_enabled=cookies_enabled,
         cookie_jars=cookie_jars,
         max_cookies=max_cookies,
+        experimental_cookies=experimental_cookies,
     )
 
     return params
@@ -524,6 +592,7 @@ def _get_api_params(
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
+    experimental_cookies: bool,
 ) -> Optional[dict]:
     """Returns a dictionary of API parameters that must be sent to Zyte API for
     the specified request, or None if the request should not be sent through
@@ -539,6 +608,7 @@ def _get_api_params(
             cookies_enabled=cookies_enabled,
             cookie_jars=cookie_jars,
             max_cookies=max_cookies,
+            experimental_cookies=experimental_cookies,
         )
         if api_params is None:
             return None
@@ -597,19 +667,38 @@ class _ParamParser:
         self._job_id = environ.get("SHUB_JOBKEY", None)
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._skip_headers = _load_skip_headers(settings)
-        self._warn_on_cookies = False
+        self._experimental_cookies = settings.getbool(
+            "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"
+        )
+        if self._experimental_cookies:
+            warn(
+                "The deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting "
+                "is set to True. Please, remove the deprecated "
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting, and remove "
+                "the experimental name space from the responseCookies and "
+                "requestCookies parameters in your code (if any), both when "
+                "building requests and when parsing responses.",
+                DeprecationWarning,
+            )
         if cookies_enabled is not None:
             self._cookies_enabled = cookies_enabled
-        elif settings.getbool("ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED") is True:
-            self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
-            if not self._cookies_enabled:
-                logger.warning(
-                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is True, but it "
-                    "will have no effect because COOKIES_ENABLED is False."
-                )
         else:
-            self._cookies_enabled = False
-            self._warn_on_cookies = settings.getbool("COOKIES_ENABLED")
+            self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
+            if not self._cookies_enabled and self._experimental_cookies:
+                logger.warning(
+                    "The deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED "
+                    "setting is True, but it will have no effect because the "
+                    "COOKIES_ENABLED setting is False. To silence this "
+                    "warning, remove the deprecated "
+                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting. To enable "
+                    "automatic cookie mapping, set COOKIES_ENABLED to True. "
+                    "Please, consider removing the deprecated "
+                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting, and "
+                    "removing the experimental name space from the "
+                    "responseCookies and requestCookies parameters in your "
+                    "code (if any), both when building requests and when "
+                    "parsing responses.",
+                )
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 100)
         self._crawler = crawler
         self._cookie_jars = None
@@ -629,32 +718,6 @@ class _ParamParser:
             cookies_enabled=cookies_enabled,
             cookie_jars=self._cookie_jars,
             max_cookies=self._max_cookies,
+            experimental_cookies=self._experimental_cookies,
         )
-        if not dont_merge_cookies and self._warn_on_cookies:
-            self._handle_warn_on_cookies(request, params)
         return params
-
-    def _handle_warn_on_cookies(self, request, params):
-        if params and params.get("experimental", {}).get("requestCookies") is not None:
-            return
-        if self._cookie_jars is None:
-            return
-        input_cookies = _get_all_cookies(request, self._cookie_jars)
-        if len(input_cookies) <= 0:
-            return
-        logger.warning(
-            (
-                "Cookies are enabled for request %(request)r, and there are "
-                "cookies in the cookiejar, but "
-                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is False, so automatic "
-                "mapping will not map cookies for this or any other request. "
-                "To silence this warning, disable cookies for all requests "
-                "that use automated mapping, either with the "
-                "COOKIES_ENABLED setting or with the dont_merge_cookies "
-                "request metadata key."
-            ),
-            {
-                "request": request,
-            },
-        )
-        self._warn_on_cookies = False
