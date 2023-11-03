@@ -19,6 +19,7 @@ _EXTRACT_KEYS = {
     "article",
     "articleList",
     "articleNavigation",
+    "jobPosting",
     "product",
     "productList",
     "productNavigation",
@@ -671,14 +672,13 @@ class _ParamParser:
             "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"
         )
         if self._experimental_cookies:
-            warn(
+            logger.warning(
                 "The deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting "
                 "is set to True. Please, remove the deprecated "
                 "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting, and remove "
                 "the experimental name space from the responseCookies and "
                 "requestCookies parameters in your code (if any), both when "
                 "building requests and when parsing responses.",
-                DeprecationWarning,
             )
         if cookies_enabled is not None:
             self._cookies_enabled = cookies_enabled
