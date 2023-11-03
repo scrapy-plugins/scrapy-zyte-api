@@ -1,21 +1,29 @@
 Changes
 =======
 
-0.12.3 (unreleased)
+0.13.0 (unreleased)
 -------------------
 
 * Cookie support is no longer experimental:
 
-  * The ``responseCookies`` response parameter is now handled the same as
-    ``experimental.responseCookies``; the latter still works but is deprecated.
+  * If the ``COOKIES_ENABLED`` setting is ``True`` (default), automatic request
+    parameter mapping now sets ``responseCookies`` to ``True`` and maps request
+    cookies to ``requestCookies``.
 
   * The ``ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED`` setting is now deprecated.
     When enabled, however, the ``experimental`` name space is still used for
     automatic request parameter mapping.
 
-  * If the ``COOKIES_ENABLED`` setting is ``True`` (default), automatic request
-    parameter mapping now sets ``responseCookies`` to ``True`` and maps request
-    cookies to ``requestCookies``.
+  * If you use ``requestCookies``, ``responseCookies``, or ``cookieManagement``
+    within the ``experimental`` name space in request parameters, a deprecation
+    warning is now logged.
+
+  * The ``responseCookies`` response parameter is now handled the same as
+    ``experimental.responseCookies``; the latter still works but is deprecated.
+
+* Zyte API Request IDs are now included in the error logs.
+
+* Bump the zyte-api dependency: 0.4.7 → 0.4.8.
 
 
 0.12.2 (2023-10-19)

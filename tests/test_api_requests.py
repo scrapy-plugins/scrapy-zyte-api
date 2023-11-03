@@ -187,8 +187,8 @@ async def test_coro_handling(zyte_api: bool, mockserver):
             {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
             RequestError,
             (
-                "Got Zyte API error (status=422, "
-                "type='/request/unprocessable') while processing URL "
+                "Got Zyte API error (status=422, type='/request/unprocessable'"
+                ", request_id='abcd1234') while processing URL "
                 "(http://example.com): Incompatible parameters were found in "
                 "the request."
             ),
