@@ -221,7 +221,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             error_detail = (er.parsed.data or {}).get("detail", er.message)
             logger.error(
                 f"Got Zyte API error (status={er.status}, type={er.parsed.type!r}, "
-                f"request_id='{er.request_id}') while processing URL ({request.url}): "
+                f"request_id={er.request_id!r}) while processing URL ({request.url}): "
                 f"{error_detail}"
             )
             raise
