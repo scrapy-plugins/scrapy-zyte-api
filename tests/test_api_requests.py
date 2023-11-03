@@ -5,7 +5,7 @@ from copy import copy
 from functools import partial
 from http.cookiejar import Cookie
 from inspect import isclass
-from typing import Any, Dict, cast
+from typing import Any, Dict, List, cast
 from unittest import mock
 from unittest.mock import patch
 
@@ -1814,7 +1814,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 {
                     "httpResponseBody": True,
                     "httpResponseHeaders": True,
-                    **output_params,
+                    **cast(Dict, output_params),
                 },
                 warnings,
                 [],
@@ -2257,7 +2257,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         },
                     },
                     [
-                        *override_warnings,
+                        *cast(List, override_warnings),
                         "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
                     ],
                 ),
@@ -2290,7 +2290,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 params,
                 {
                     **params,
-                    **extra_output_params,
+                    **cast(Dict, extra_output_params),
                 },
                 warnings,
                 [],
