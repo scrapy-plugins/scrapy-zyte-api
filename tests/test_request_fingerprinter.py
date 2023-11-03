@@ -81,6 +81,32 @@ def test_headers():
     assert fingerprint1 == fingerprint2
 
 
+def test_cookies():
+    crawler = get_crawler()
+    fingerprinter = create_instance(
+        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
+    )
+    request1 = Request(
+        "https://example.com",
+        meta={
+            "zyte_api": {
+                "responseCookies": True,
+                "requestCookies": [{"name": "foo", "value": "bar"}],
+                "cookieManagement": False,
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": [{"name": "foo", "value": "bar"}],
+                    "cookieManagement": False,
+                },
+            }
+        },
+    )
+    request2 = Request("https://example.com", meta={"zyte_api": True})
+    fingerprint1 = fingerprinter.fingerprint(request1)
+    fingerprint2 = fingerprinter.fingerprint(request2)
+    assert fingerprint1 == fingerprint2
+
+
 @pytest.mark.parametrize(
     "url,params,fingerprint",
     (
