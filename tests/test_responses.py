@@ -481,3 +481,44 @@ def test_status_code(base_kwargs_func, kwargs, expected_status_code):
     response = _process_response(api_response, Request(api_response["url"]))
     assert response is not None
     assert response.status == expected_status_code
+
+
+@pytest.mark.parametrize(
+    "api_response",
+    [
+        {
+            "url": "https://example.com",
+            "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+            "statusCode": 200,
+            "responseCookies": INPUT_COOKIES,
+        },
+        {
+            "url": "https://example.com",
+            "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+            "statusCode": 200,
+            "experimental": {
+                "responseCookies": INPUT_COOKIES,
+            },
+        },
+        {
+            "url": "https://example.com",
+            "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+            "statusCode": 200,
+            "responseCookies": INPUT_COOKIES,
+            "experimental": {
+                "responseCookies": [
+                    {
+                        "name": "foo",
+                        "value": "bar",
+                    },
+                ],
+            },
+        },
+    ],
+)
+def test_cookies(api_response):
+    response = _process_response(api_response, Request(api_response["url"]))
+    assert response is not None
+    assert response.headers == {
+        **OUTPUT_COOKIE_HEADERS,
+    }
