@@ -271,9 +271,9 @@ DEFAULT_PARAMS: Dict[str, Any] = {}
 TRANSPARENT_MODE = False
 SKIP_HEADERS = {b"cookie", b"user-agent"}
 JOB_ID = None
-COOKIES_ENABLED = False
+COOKIES_ENABLED = True
 MAX_COOKIES = 100
-EXPERIMENTAL_COOKIES = True
+EXPERIMENTAL_COOKIES = False
 GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
     "transparent_mode": TRANSPARENT_MODE,
@@ -293,7 +293,7 @@ async def test_params_parser_input_default(mockserver):
         for key in GET_API_PARAMS_KWARGS:
             actual = getattr(handler._param_parser, f"_{key}")
             expected = GET_API_PARAMS_KWARGS[key]
-            assert actual == expected, key
+            assert expected == actual, key
 
 
 @ensureDeferred
@@ -353,6 +353,7 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
 DEFAULT_AUTOMAP_PARAMS: Dict[str, Any] = {
     "httpResponseBody": True,
     "httpResponseHeaders": True,
+    "responseCookies": True,
 }
 
 
@@ -554,7 +555,7 @@ async def test_default_params_none(mockserver, caplog):
         (
             "ZYTE_API_AUTOMAP_PARAMS",
             "zyte_api_automap",
-            {"httpResponseBody", "httpResponseHeaders"},
+            DEFAULT_AUTOMAP_PARAMS.keys(),
         ),
     ],
 )
@@ -692,12 +693,11 @@ def _test_automap(
     [
         # If no other known main output is specified in meta, httpResponseBody
         # is requested.
-        ({}, {"httpResponseBody": True, "httpResponseHeaders": True}, []),
+        ({}, DEFAULT_AUTOMAP_PARAMS, []),
         (
             {"unknownMainOutput": True},
             {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "unknownMainOutput": True,
             },
             [],
@@ -707,29 +707,29 @@ def _test_automap(
         # may stop working for binary responses in the future.
         (
             {"httpResponseBody": True},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
+            DEFAULT_AUTOMAP_PARAMS,
             [],
         ),
-        # If other main outputs are specified in meta, httpRequestBody is not
-        # set.
+        # If other main outputs are specified in meta, httpResponseBody and
+        # httpResponseHeaders are not set.
         (
             {"browserHtml": True},
-            {"browserHtml": True},
+            {"browserHtml": True, "responseCookies": True},
             [],
         ),
         (
             {"screenshot": True},
-            {"screenshot": True},
+            {"screenshot": True, "responseCookies": True},
             [],
         ),
         (
             {EXTRACT_KEY: True},
-            {EXTRACT_KEY: True},
+            {EXTRACT_KEY: True, "responseCookies": True},
             [],
         ),
         (
             {"browserHtml": True, "screenshot": True},
-            {"browserHtml": True, "screenshot": True},
+            {"browserHtml": True, "screenshot": True, "responseCookies": True},
             [],
         ),
         # If no known main output is specified, and httpResponseBody is
@@ -737,12 +737,12 @@ def _test_automap(
         # is added.
         (
             {"httpResponseBody": False},
-            {},
+            {"responseCookies": True},
             [],
         ),
         (
             {"httpResponseBody": False, "unknownMainOutput": True},
-            {"unknownMainOutput": True},
+            {"unknownMainOutput": True, "responseCookies": True},
             [],
         ),
         # We allow httpResponseBody and browserHtml to be both set to True, in
@@ -751,8 +751,7 @@ def _test_automap(
             {"httpResponseBody": True, "browserHtml": True},
             {
                 "browserHtml": True,
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             [],
         ),
@@ -773,22 +772,22 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
         # not be implicitly set to True, it is passed as such.
         (
             {"httpResponseBody": False, "httpResponseHeaders": True},
-            {"httpResponseHeaders": True},
+            {"httpResponseHeaders": True, "responseCookies": True},
             [],
         ),
         (
             {"browserHtml": True, "httpResponseHeaders": True},
-            {"browserHtml": True, "httpResponseHeaders": True},
+            {"browserHtml": True, "httpResponseHeaders": True, "responseCookies": True},
             [],
         ),
         (
             {"screenshot": True, "httpResponseHeaders": True},
-            {"screenshot": True, "httpResponseHeaders": True},
+            {"screenshot": True, "httpResponseHeaders": True, "responseCookies": True},
             [],
         ),
         (
             {EXTRACT_KEY: True, "httpResponseHeaders": True},
-            {EXTRACT_KEY: True, "httpResponseHeaders": True},
+            {EXTRACT_KEY: True, "httpResponseHeaders": True, "responseCookies": True},
             [],
         ),
         (
@@ -797,7 +796,11 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
                 "httpResponseBody": False,
                 "httpResponseHeaders": True,
             },
-            {"unknownMainOutput": True, "httpResponseHeaders": True},
+            {
+                "unknownMainOutput": True,
+                "httpResponseHeaders": True,
+                "responseCookies": True,
+            },
             [],
         ),
         # Setting httpResponseHeaders to True where it would be already True
@@ -807,12 +810,20 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
         # stops being set to True by default in those scenarios.
         (
             {"httpResponseHeaders": True},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "responseCookies": True,
+            },
             [],
         ),
         (
             {"httpResponseBody": True, "httpResponseHeaders": True},
-            {"httpResponseBody": True, "httpResponseHeaders": True},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "responseCookies": True,
+            },
             [],
         ),
         (
@@ -825,6 +836,7 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
                 "browserHtml": True,
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -834,16 +846,21 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
                 "unknownMainOutput": True,
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
+                "responseCookies": True,
             },
             [],
         ),
         # If httpResponseHeaders is set to False, httpResponseHeaders is not
         # defined, even if httpResponseBody is set to True, implicitly or
         # explicitly.
-        ({"httpResponseHeaders": False}, {"httpResponseBody": True}, []),
+        (
+            {"httpResponseHeaders": False},
+            {"httpResponseBody": True, "responseCookies": True},
+            [],
+        ),
         (
             {"httpResponseBody": True, "httpResponseHeaders": False},
-            {"httpResponseBody": True},
+            {"httpResponseBody": True, "responseCookies": True},
             [],
         ),
         (
@@ -852,12 +869,16 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
                 "browserHtml": True,
                 "httpResponseHeaders": False,
             },
-            {"browserHtml": True, "httpResponseBody": True},
+            {"browserHtml": True, "httpResponseBody": True, "responseCookies": True},
             [],
         ),
         (
             {"unknownMainOutput": True, "httpResponseHeaders": False},
-            {"unknownMainOutput": True, "httpResponseBody": True},
+            {
+                "unknownMainOutput": True,
+                "httpResponseBody": True,
+                "responseCookies": True,
+            },
             [],
         ),
         # If httpResponseHeaders is unnecessarily set to False where
@@ -866,22 +887,22 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
         # logged.
         (
             {"httpResponseBody": False, "httpResponseHeaders": False},
-            {},
+            {"responseCookies": True},
             ["do not need to set httpResponseHeaders to False"],
         ),
         (
             {"browserHtml": True, "httpResponseHeaders": False},
-            {"browserHtml": True},
+            {"browserHtml": True, "responseCookies": True},
             ["do not need to set httpResponseHeaders to False"],
         ),
         (
             {"screenshot": True, "httpResponseHeaders": False},
-            {"screenshot": True},
+            {"screenshot": True, "responseCookies": True},
             ["do not need to set httpResponseHeaders to False"],
         ),
         (
             {EXTRACT_KEY: True, "httpResponseHeaders": False},
-            {EXTRACT_KEY: True},
+            {EXTRACT_KEY: True, "responseCookies": True},
             ["do not need to set httpResponseHeaders to False"],
         ),
         (
@@ -890,7 +911,7 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
                 "httpResponseBody": False,
                 "httpResponseHeaders": False,
             },
-            {"unknownMainOutput": True},
+            {"unknownMainOutput": True, "responseCookies": True},
             ["do not need to set httpResponseHeaders to False"],
         ),
     ],
@@ -906,10 +927,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
         (
             "GET",
             {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             [],
         ),
         # Other HTTP methods, regardless of whether they are supported,
@@ -920,8 +938,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
                 method,
                 {},
                 {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
+                    **DEFAULT_AUTOMAP_PARAMS,
                     "httpRequestMethod": method,
                 },
                 [],
@@ -946,8 +963,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
                 request_method,
                 {"httpRequestMethod": meta_method},
                 {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
+                    **DEFAULT_AUTOMAP_PARAMS,
                     "httpRequestMethod": meta_method,
                 },
                 ["Use Request.method"],
@@ -965,8 +981,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
                 request_method,
                 {"httpRequestMethod": meta_method},
                 {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
+                    **DEFAULT_AUTOMAP_PARAMS,
                     "httpRequestMethod": meta_method,
                 },
                 [
@@ -987,6 +1002,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "httpRequestMethod": "POST",
+                "responseCookies": True,
             },
             [],
         ),
@@ -996,6 +1012,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
             {
                 "screenshot": True,
                 "httpRequestMethod": "POST",
+                "responseCookies": True,
             },
             [],
         ),
@@ -1005,6 +1022,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
             {
                 EXTRACT_KEY: True,
                 "httpRequestMethod": "POST",
+                "responseCookies": True,
             },
             [],
         ),
@@ -1026,8 +1044,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             [],
         ),
@@ -1039,6 +1056,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "requestHeaders": {"referer": "a"},
+                "responseCookies": True,
             },
             [],
         ),
@@ -1048,6 +1066,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "requestHeaders": {"referer": "a"},
                 "screenshot": True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -1057,6 +1076,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "requestHeaders": {"referer": "a"},
                 EXTRACT_KEY: True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -1072,8 +1092,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "requestHeaders": {"referer": "a"},
             },
             [],
@@ -1085,8 +1104,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "requestHeaders": {"referer": "a"},
                 "screenshot": True,
             },
@@ -1099,8 +1117,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "requestHeaders": {"referer": "a"},
                 EXTRACT_KEY: True,
             },
@@ -1114,8 +1131,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "requestHeaders": {"referer": "a"},
                 "screenshot": True,
             },
@@ -1137,8 +1153,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "unknownMainOutput": True,
             },
             [],
@@ -1152,6 +1167,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"httpResponseBody": False},
             {
                 "requestHeaders": {"referer": "a"},
+                "responseCookies": True,
             },
             [],
         ),
@@ -1161,6 +1177,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "requestHeaders": {"referer": "a"},
                 "unknownMainOutput": True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -1168,10 +1185,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         (
             {"Referer": "a"},
             {"customHttpRequestHeaders": False},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             [],
         ),
         (
@@ -1179,6 +1193,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True, "requestHeaders": False},
             {
                 "browserHtml": True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -1191,8 +1206,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             {
                 "browserHtml": True,
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "requestHeaders": {"referer": "a"},
             },
             [],
@@ -1205,8 +1219,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             [],
         ),
@@ -1220,8 +1233,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             {
                 "browserHtml": True,
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             [],
         ),
@@ -1233,8 +1245,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "requestHeaders": {"referer": "a"},
             },
             [],
@@ -1248,6 +1259,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                     {"name": "Referer", "value": "a"},
                 ],
                 "requestHeaders": {"referer": "a"},
+                "responseCookies": True,
             },
             [],
         ),
@@ -1255,10 +1267,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         (
             {"Referer": None},
             {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             [],
         ),
         (
@@ -1266,6 +1275,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -1274,8 +1284,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True, "httpResponseBody": True},
             {
                 "browserHtml": True,
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             [],
         ),
@@ -1284,6 +1293,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"screenshot": True},
             {
                 "screenshot": True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -1292,6 +1302,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {EXTRACT_KEY: True},
             {
                 EXTRACT_KEY: True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -1300,8 +1311,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"screenshot": True, "httpResponseBody": True},
             {
                 "screenshot": True,
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             [],
         ),
@@ -1310,8 +1320,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {EXTRACT_KEY: True, "httpResponseBody": True},
             {
                 EXTRACT_KEY: True,
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             [],
         ),
@@ -1319,8 +1328,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"Referer": None},
             {"unknownMainOutput": True},
             {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "unknownMainOutput": True,
             },
             [],
@@ -1330,13 +1338,14 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"unknownMainOutput": True, "httpResponseBody": False},
             {
                 "unknownMainOutput": True,
+                "responseCookies": True,
             },
             [],
         ),
         (
             {"Referer": None},
             {"httpResponseBody": False},
-            {},
+            {"responseCookies": True},
             [],
         ),
         # Warn if header parameters are used in meta, even if the values match
@@ -1353,8 +1362,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             ["Use Request.headers instead"],
         ),
@@ -1367,6 +1375,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "requestHeaders": {"referer": "a"},
+                "responseCookies": True,
             },
             ["Use Request.headers instead"],
         ),
@@ -1381,8 +1390,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "b"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             ["Use Request.headers instead"],
         ),
@@ -1395,6 +1403,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "requestHeaders": {"referer": "b"},
+                "responseCookies": True,
             },
             ["Use Request.headers instead"],
         ),
@@ -1409,8 +1418,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
             },
             ["Use Request.headers instead"],
         ),
@@ -1423,6 +1431,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "requestHeaders": {"referer": "a"},
+                "responseCookies": True,
             },
             ["Use Request.headers instead"],
         ),
@@ -1440,8 +1449,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "requestHeaders": {"referer": "a"},
             },
             {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "requestHeaders": {"referer": "a"},
             },
             [],
@@ -1459,6 +1467,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
+                "responseCookies": True,
             },
             [],
         ),
@@ -1470,6 +1479,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
+                "responseCookies": True,
             },
             ["cannot be mapped"],
         ),
@@ -1479,6 +1489,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
+                "responseCookies": True,
             },
             ["cannot be mapped"],
         ),
@@ -1486,10 +1497,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         (
             {"user-Agent": ""},
             {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             ["cannot be mapped"],
         ),
         # The Accept, Accept-Encoding and Accept-Language headers, when
@@ -1506,6 +1514,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -1515,6 +1524,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 {"browserHtml": True},
                 {
                     "browserHtml": True,
+                    "responseCookies": True,
                 },
                 ["cannot be mapped"],
             )
@@ -1536,19 +1546,13 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         (
             {"User-Agent": DEFAULT_USER_AGENT},
             {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             [],
         ),
         (
             {"User-Agent": ""},
             {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             ["cannot be mapped"],
         ),
         (
@@ -1556,6 +1560,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -1564,6 +1569,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"browserHtml": True},
             {
                 "browserHtml": True,
+                "responseCookies": True,
             },
             ["cannot be mapped"],
         ),
@@ -1588,8 +1594,7 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
             },
             {},
             {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "customHttpRequestHeaders": [
                     {"name": "User-Agent", "value": ""},
                 ],
@@ -1611,6 +1616,7 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
             {
                 "browserHtml": True,
                 "requestHeaders": {"userAgent": ""},
+                "responseCookies": True,
             },
             [],
         ),
@@ -2452,7 +2458,6 @@ def test_automap_all_cookies(meta):
     the target URL domain."""
     settings: Dict[str, Any] = {
         **SETTINGS,
-        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
     crawler = get_crawler(settings)
@@ -2483,7 +2488,7 @@ def test_automap_all_cookies(meta):
     )
     cookie_middleware.process_request(request1, spider=None)
     api_params = param_parser.parse(request1)
-    assert api_params["experimental"]["requestCookies"] == [
+    assert api_params["requestCookies"] == [
         {"name": "a", "value": "b", "domain": "a.example"},
         # https://github.com/scrapy/scrapy/issues/5841
         # {"name": "c", "value": "d", "domain": "b.example"},
@@ -2527,9 +2532,7 @@ def test_automap_all_cookies(meta):
     cookie_middleware.process_request(request2, spider=None)
     api_params = param_parser.parse(request2)
 
-    assert sort_dict_list(
-        api_params["experimental"]["requestCookies"]
-    ) == sort_dict_list(
+    assert sort_dict_list(api_params["requestCookies"]) == sort_dict_list(
         [
             {"name": "e", "value": "f", "domain": ".c.example"},
             {"name": "i", "value": "j", "domain": ".d.example"},
@@ -2560,7 +2563,6 @@ def test_automap_cookie_jar(meta):
     request4 = Request(url="https://example.com/4", meta={**meta, "cookiejar": "a"})
     settings: Dict[str, Any] = {
         **SETTINGS,
-        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
     crawler = get_crawler(settings)
@@ -2570,20 +2572,18 @@ def test_automap_cookie_jar(meta):
 
     cookie_middleware.process_request(request1, spider=None)
     api_params = param_parser.parse(request1)
-    assert api_params["experimental"]["requestCookies"] == [
+    assert api_params["requestCookies"] == [
         {"name": "z", "value": "y", "domain": "example.com"}
     ]
 
     cookie_middleware.process_request(request2, spider=None)
     api_params = param_parser.parse(request2)
-    assert "requestCookies" not in api_params["experimental"]
+    assert "requestCookies" not in api_params
 
     cookie_middleware.process_request(request3, spider=None)
 
     api_params = param_parser.parse(request3)
-    assert sort_dict_list(
-        api_params["experimental"]["requestCookies"]
-    ) == sort_dict_list(
+    assert sort_dict_list(api_params["requestCookies"]) == sort_dict_list(
         [
             {"name": "x", "value": "w", "domain": "example.com"},
             {"name": "z", "value": "y", "domain": "example.com"},
@@ -2592,9 +2592,7 @@ def test_automap_cookie_jar(meta):
 
     cookie_middleware.process_request(request4, spider=None)
     api_params = param_parser.parse(request4)
-    assert sort_dict_list(
-        api_params["experimental"]["requestCookies"]
-    ) == sort_dict_list(
+    assert sort_dict_list(api_params["requestCookies"]) == sort_dict_list(
         [
             {"name": "x", "value": "w", "domain": "example.com"},
             {"name": "z", "value": "y", "domain": "example.com"},
@@ -2612,7 +2610,6 @@ def test_automap_cookie_jar(meta):
 def test_automap_cookie_limit(meta, caplog):
     settings: Dict[str, Any] = {
         **SETTINGS,
-        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_MAX_COOKIES": 1,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2632,7 +2629,7 @@ def test_automap_cookie_limit(meta, caplog):
     cookie_middleware.process_request(request, spider=None)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
-    assert api_params["experimental"]["requestCookies"] == [
+    assert api_params["requestCookies"] == [
         {"name": "z", "value": "y", "domain": "example.com"}
     ]
     assert not caplog.records
@@ -2649,7 +2646,7 @@ def test_automap_cookie_limit(meta, caplog):
     cookie_middleware.process_request(request, spider=None)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
-    assert api_params["experimental"]["requestCookies"] in [
+    assert api_params["requestCookies"] in [
         [{"name": "z", "value": "y", "domain": "example.com"}],
         [{"name": "x", "value": "w", "domain": "example.com"}],
     ]
@@ -2674,7 +2671,7 @@ def test_automap_cookie_limit(meta, caplog):
     cookie_middleware.process_request(request, spider=None)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
-    assert api_params["experimental"]["requestCookies"] in [
+    assert api_params["requestCookies"] in [
         [{"name": "z", "value": "y", "domain": "example.com"}],
         [{"name": "x", "value": "w", "domain": "example.com"}],
     ]
@@ -2698,7 +2695,7 @@ def test_automap_cookie_limit(meta, caplog):
     cookie_middleware.process_request(request, spider=None)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
-    assert api_params["experimental"]["requestCookies"] in [
+    assert api_params["requestCookies"] in [
         [{"name": "z", "value": "y", "domain": "other.example"}],
         [{"name": "x", "value": "w", "domain": "example.com"}],
     ]
@@ -2747,7 +2744,6 @@ def test_automap_custom_cookie_middleware():
             f"{mw_cls.__module__}.{mw_cls.__qualname__}": 700,
         },
         "ZYTE_API_COOKIE_MIDDLEWARE": f"{mw_cls.__module__}.{mw_cls.__qualname__}",
-        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
     crawler = get_crawler(settings)
@@ -2758,7 +2754,7 @@ def test_automap_custom_cookie_middleware():
     request = Request(url="https://example.com/1")
     cookie_middleware.process_request(request, spider=None)
     api_params = param_parser.parse(request)
-    assert api_params["experimental"]["requestCookies"] == [
+    assert api_params["requestCookies"] == [
         {"name": "z", "value": "y", "domain": "example.com"}
     ]
 
@@ -2771,8 +2767,7 @@ def test_automap_custom_cookie_middleware():
             "a",
             {},
             {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "httpRequestBody": "YQ==",
             },
             [],
@@ -2783,8 +2778,7 @@ def test_automap_custom_cookie_middleware():
             "a",
             {"httpRequestBody": "Yg=="},
             {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "httpRequestBody": "Yg==",
             },
             [
@@ -2798,8 +2792,7 @@ def test_automap_custom_cookie_middleware():
             "a",
             {"httpRequestBody": "YQ=="},
             {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
+                **DEFAULT_AUTOMAP_PARAMS,
                 "httpRequestBody": "YQ==",
             },
             ["Use Request.body instead"],
@@ -2811,6 +2804,7 @@ def test_automap_custom_cookie_middleware():
             {
                 "browserHtml": True,
                 "httpRequestBody": "YQ==",
+                "responseCookies": True,
             },
             [],
         ),
@@ -2820,6 +2814,7 @@ def test_automap_custom_cookie_middleware():
             {
                 "httpRequestBody": "YQ==",
                 "screenshot": True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -2829,6 +2824,7 @@ def test_automap_custom_cookie_middleware():
             {
                 "httpRequestBody": "YQ==",
                 EXTRACT_KEY: True,
+                "responseCookies": True,
             },
             [],
         ),
@@ -2852,6 +2848,7 @@ def test_automap_body(body, meta, expected, warnings, caplog):
             },
             {
                 "browserHtml": True,
+                "responseCookies": True,
             },
             ["unnecessarily defines"],
         ),
@@ -2859,20 +2856,14 @@ def test_automap_body(body, meta, expected, warnings, caplog):
             {
                 "browserHtml": False,
             },
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             ["unnecessarily defines"],
         ),
         (
             {
                 "screenshot": False,
             },
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             ["unnecessarily defines"],
         ),
         (
@@ -2882,6 +2873,7 @@ def test_automap_body(body, meta, expected, warnings, caplog):
             },
             {
                 "screenshot": True,
+                "responseCookies": True,
             },
             ["do not need to set httpResponseHeaders to False"],
         ),
@@ -2889,10 +2881,7 @@ def test_automap_body(body, meta, expected, warnings, caplog):
             {
                 EXTRACT_KEY: False,
             },
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             ["unnecessarily defines"],
         ),
         (
@@ -2902,6 +2891,7 @@ def test_automap_body(body, meta, expected, warnings, caplog):
             },
             {
                 EXTRACT_KEY: True,
+                "responseCookies": True,
             },
             ["do not need to set httpResponseHeaders to False"],
         ),
@@ -2919,16 +2909,14 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
             {"screenshot": True, "browserHtml": False},
             {
                 "screenshot": True,
+                "responseCookies": True,
             },
             [],
         ),
         (
             {},
             {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
+            DEFAULT_AUTOMAP_PARAMS,
             [],
         ),
     ],

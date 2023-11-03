@@ -64,8 +64,7 @@ async def test_autothrottle_handling():
 async def test_cookies():
     """Make sure that the downloader middleware does not crash on Zyte API
     requests with cookies."""
-    settings = {"ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True}
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler()
     await crawler.crawl("a")
     spider = crawler.spider
     middleware = create_instance(

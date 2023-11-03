@@ -228,9 +228,7 @@ def test_only_end_parameters_matter():
             "zyte_api": {
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
-                "experimental": {
-                    "responseCookies": True,
-                },
+                "responseCookies": True,
             }
         },
     )

@@ -66,9 +66,7 @@ def raw_api_response_browser():
             {"name": "Content-Length", "value": len(PAGE_CONTENT)},
         ],
         "statusCode": 200,
-        "experimental": {
-            "responseCookies": INPUT_COOKIES,
-        },
+        "responseCookies": INPUT_COOKIES,
     }
 
 
@@ -82,9 +80,7 @@ def raw_api_response_body():
             {"name": "Content-Length", "value": len(PAGE_CONTENT)},
         ],
         "statusCode": 200,
-        "experimental": {
-            "responseCookies": INPUT_COOKIES,
-        },
+        "responseCookies": INPUT_COOKIES,
     }
 
 
@@ -99,9 +95,7 @@ def raw_api_response_mixed():
             {"name": "Content-Length", "value": len(PAGE_CONTENT_2)},
         ],
         "statusCode": 200,
-        "experimental": {
-            "responseCookies": INPUT_COOKIES,
-        },
+        "responseCookies": INPUT_COOKIES,
     }
 
 
