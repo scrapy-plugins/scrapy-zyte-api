@@ -702,6 +702,14 @@ class _ParamParser:
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 100)
         self._crawler = crawler
         self._cookie_jars = None
+        if not self._experimental_cookies:
+            self._unreported_deprecated_experimental_fields = {
+                "requestCookies",
+                "responseCookies",
+                "cookieManagement",
+            }
+        else:
+            self._unreported_deprecated_experimental_fields = set()
 
     def parse(self, request):
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
@@ -720,4 +728,19 @@ class _ParamParser:
             max_cookies=self._max_cookies,
             experimental_cookies=self._experimental_cookies,
         )
+        if (
+            params
+            and self._unreported_deprecated_experimental_fields
+            and "experimental" in params
+        ):
+            for field in list(self._unreported_deprecated_experimental_fields):
+                if field in params["experimental"]:
+                    self._unreported_deprecated_experimental_fields.remove(field)
+                    logger.warning(
+                        f"Zyte API parameters for request {request} include "
+                        f"experimental.{field}, which is deprecated. Please, "
+                        f"replace it with {field}, both in request parameters "
+                        f"and in any response parsing logic that might rely "
+                        f"on the old parameter."
+                    )
         return params

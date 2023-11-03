@@ -1844,7 +1844,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "responseCookies": False,
                         },
                     },
-                    [],
+                    ["experimental.responseCookies, which is deprecated"],
                 ),
                 (
                     {
@@ -1901,7 +1901,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "requestCookies": False,
                         },
                     },
-                    [],
+                    ["experimental.requestCookies, which is deprecated"],
                 ),
                 (
                     {
@@ -1959,7 +1959,10 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "responseCookies": False,
                         },
                     },
-                    [],
+                    [
+                        "experimental.responseCookies, which is deprecated",
+                        "experimental.requestCookies, which is deprecated",
+                    ],
                 ),
                 (
                     {
@@ -2018,7 +2021,9 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "responseCookies": False,
                         },
                     },
-                    [],
+                    [
+                        "experimental.responseCookies, which is deprecated",
+                    ],
                 ),
                 (
                     {
@@ -2081,7 +2086,9 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "requestCookies": False,
                         },
                     },
-                    [],
+                    [
+                        "experimental.requestCookies, which is deprecated",
+                    ],
                 ),
                 (
                     {
@@ -2145,7 +2152,10 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "responseCookies": False,
                         },
                     },
-                    [],
+                    [
+                        "experimental.responseCookies, which is deprecated",
+                        "experimental.requestCookies, which is deprecated",
+                    ],
                 ),
                 (
                     {
@@ -2237,7 +2247,9 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "requestCookies": override_cookies,
                         },
                     },
-                    [],
+                    [
+                        "experimental.requestCookies, which is deprecated",
+                    ],
                 ),
                 (
                     {
@@ -2966,3 +2978,76 @@ def test_default_params_false(default_params):
     param_parser = handler._param_parser
     api_params = param_parser.parse(request)
     assert api_params is None
+
+
+# https://stackoverflow.com/a/6037657
+def unflatten(dictionary):
+    resultDict: Dict[Any, Any] = dict()
+    for key, value in dictionary.items():
+        parts = key.split(".")
+        d = resultDict
+        for part in parts[:-1]:
+            if part not in d:
+                d[part] = dict()
+            d = d[part]
+        d[parts[-1]] = value
+    return resultDict
+
+
+@pytest.mark.parametrize(
+    "old_field,new_field",
+    [
+        (
+            f"experimental.{field}",
+            field,
+        )
+        for field in (
+            "responseCookies",
+            "requestCookies",
+            "cookieManagement",
+        )
+    ],
+)
+def test_field_deprecation_warnings(old_field, new_field, caplog):
+    input_params = unflatten({old_field: "foo"})
+
+    # Raw
+    raw_request = Request(
+        url="https://example.com",
+        meta={"zyte_api": input_params},
+    )
+    crawler = get_crawler(SETTINGS)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    with caplog.at_level("WARNING"):
+        output_params = param_parser.parse(raw_request)
+    output_params.pop("url")
+    assert input_params == output_params
+    assert f"{old_field}, which is deprecated" in caplog.text
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        # Only warn once per field.
+        param_parser.parse(raw_request)
+    assert not caplog.text
+    caplog.clear()
+
+    # Automap
+    raw_request = Request(
+        url="https://example.com",
+        meta={"zyte_api_automap": input_params},
+    )
+    crawler = get_crawler(SETTINGS)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    with caplog.at_level("WARNING"):
+        output_params = param_parser.parse(raw_request)
+    output_params.pop("url")
+    for key, value in input_params.items():
+        assert output_params[key] == value
+    assert f"{old_field}, which is deprecated" in caplog.text
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        # Only warn once per field.
+        param_parser.parse(raw_request)
+    assert not caplog.text
+    caplog.clear()
