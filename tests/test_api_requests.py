@@ -3051,3 +3051,40 @@ def test_field_deprecation_warnings(old_field, new_field, caplog):
         param_parser.parse(raw_request)
     assert not caplog.text
     caplog.clear()
+
+
+def test_field_deprecation_warnings_false_positives(caplog):
+    """Make sure that the code tested by test_field_deprecation_warnings does
+    not trigger for unrelated fields that just happen to share their name space
+    (experimental)."""
+
+    input_params = {"experimental": {"foo": "bar"}}
+
+    # Raw
+    raw_request = Request(
+        url="https://example.com",
+        meta={"zyte_api": input_params},
+    )
+    crawler = get_crawler(SETTINGS)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    with caplog.at_level("WARNING"):
+        output_params = param_parser.parse(raw_request)
+    output_params.pop("url")
+    assert input_params == output_params
+    assert not caplog.text
+
+    # Automap
+    raw_request = Request(
+        url="https://example.com",
+        meta={"zyte_api_automap": input_params},
+    )
+    crawler = get_crawler(SETTINGS)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    with caplog.at_level("WARNING"):
+        output_params = param_parser.parse(raw_request)
+    output_params.pop("url")
+    for key, value in input_params.items():
+        assert output_params[key] == value
+    assert not caplog.text
