@@ -751,8 +751,8 @@ Misc settings
   When set to an integer value > 0, the spider will close when the number of
   Zyte API requests reaches it.
 
-  Note that error responses that cannot be retried or exceed their retry limit
-  also count here.
+  Note that requests with error responses that cannot be retried or exceed
+  their retry limit also count here.
 
 
 Stats
