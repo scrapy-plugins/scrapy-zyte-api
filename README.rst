@@ -65,8 +65,12 @@ Then, set up the scrapy-zyte-api integration:
     }
     DOWNLOADER_MIDDLEWARES = {
         "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+        "scrapy_zyte_api.ForbiddenDomainDownloaderMiddleware": 1100,
     }
     REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
+    SPIDER_MIDDLEWARES = {
+        "scrapy_zyte_api.ForbiddenDomainSpiderMiddleware": 100,
+    }
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 By default, scrapy-zyte-api doesn't change the spider behavior.
@@ -134,6 +138,20 @@ If you want to use scrapy-poet integration, add a provider to
     SCRAPY_POET_PROVIDERS = {
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
     }
+
+To have your spiders finish with ``failed-forbidden-domain`` as a close reason
+when all start URLs belong to domains forbidden by Zyte API, edit your Scrapy
+settings further as follows:
+
+-   Add ``"scrapy_zyte_api.ForbiddenDomainDownloaderMiddleware"`` to the
+    `DOWNLOADER_MIDDLEWARES
+    <https://docs.scrapy.org/en/latest/topics/settings.html#downloader-middlewares>`_
+    Scrapy setting with any value, e.g. ``1100``.
+
+-   Add ``"scrapy_zyte_api.ForbiddenDomainSpiderMiddleware"`` to the
+    `SPIDER_MIDDLEWARES
+    <https://docs.scrapy.org/en/latest/topics/settings.html#spider-middlewares>`_
+    Scrapy setting with any value, e.g. ``100``.
 
 Usage
 =====

@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 from pytest_twisted import ensureDeferred
 from scrapy import Request
@@ -73,9 +74,23 @@ class DefaultResource(Resource):
         )
 
         response_data: _API_RESPONSE = {}
+
         if "url" not in request_data:
             request.setResponseCode(400)
             return json.dumps(response_data).encode()
+
+        domain = urlparse(request_data["url"]).netloc
+        if "forbidden" in domain:
+            request.setResponseCode(451)
+            response_data = {
+                "status": 451,
+                "type": "/download/domain-forbidden",
+                "title": "Domain Forbidden",
+                "detail": "Extraction for the domain is forbidden.",
+                "blockedDomain": domain,
+            }
+            return json.dumps(response_data).encode()
+
         response_data["url"] = request_data["url"]
 
         html = "<html><body>Hello<h1>World!</h1></body></html>"
