@@ -83,11 +83,14 @@ class ZyteApiProvider(PageObjectInputProvider):
         if html_requested:
             zyte_api_meta["browserHtml"] = True
 
+        to_provide_stripped: Set[type] = set()
+
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
+            to_provide_stripped.add(cls_stripped)
             zyte_api_meta[kw] = True
             if not is_typing_annotated(cls):
                 continue
@@ -103,7 +106,7 @@ class ZyteApiProvider(PageObjectInputProvider):
 
         for item_type, kw in item_keywords.items():
             options_name = f"{kw}Options"
-            if item_type not in to_provide and options_name in zyte_api_meta:
+            if item_type not in to_provide_stripped and options_name in zyte_api_meta:
                 del zyte_api_meta[options_name]
 
         api_request = Request(
