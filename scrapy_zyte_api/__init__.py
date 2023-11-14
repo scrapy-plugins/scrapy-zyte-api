@@ -6,9 +6,8 @@ if _NEEDS_EARLY_REACTOR:
     install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
 from ._middlewares import (
-    ForbiddenDomainDownloaderMiddleware,
-    ForbiddenDomainSpiderMiddleware,
     ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPISpiderMiddleware,
 )
 from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter
 from .handler import ScrapyZyteAPIDownloadHandler
