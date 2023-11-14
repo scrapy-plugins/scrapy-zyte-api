@@ -32,7 +32,7 @@ async def test_single_forbidden():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
-    assert crawler.stats.get_value("finish_reason") == "failed-forbidden-domain"
+    assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
 
 
 @ensureDeferred
@@ -65,7 +65,7 @@ async def test_multiple_forbidden():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
-    assert crawler.stats.get_value("finish_reason") == "failed-forbidden-domain"
+    assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
 
 
 @ensureDeferred
@@ -165,4 +165,4 @@ async def test_partial_start_request_consumption():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
-    assert crawler.stats.get_value("finish_reason") == "failed-forbidden-domain"
+    assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"

@@ -139,7 +139,7 @@ If you want to use scrapy-poet integration, add a provider to
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
     }
 
-To have your spiders finish with ``failed-forbidden-domain`` as a close reason
+To have your spiders finish with ``failed_forbidden_domain`` as a close reason
 when all start URLs belong to domains forbidden by Zyte API, edit your Scrapy
 settings further as follows:
 

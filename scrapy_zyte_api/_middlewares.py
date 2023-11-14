@@ -87,7 +87,7 @@ class ForbiddenDomainSpiderMiddleware:
 
 
 class ForbiddenDomainDownloaderMiddleware:
-    """Closes the spider with ``failed-forbidden-domain`` as close reason if
+    """Closes the spider with ``failed_forbidden_domain`` as close reason if
     all start requests get a 451 response from Zyte API."""
 
     @classmethod
@@ -127,5 +127,5 @@ class ForbiddenDomainDownloaderMiddleware:
             "were pointing to a domain forbidden by Zyte API."
         )
         self._crawler.engine.close_spider(
-            self._crawler.spider, "failed-forbidden-domain"
+            self._crawler.spider, "failed_forbidden_domain"
         )
