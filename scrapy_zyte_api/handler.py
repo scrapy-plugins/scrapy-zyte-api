@@ -217,13 +217,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 session=self._session,
                 retrying=retrying,
             )
-        except RequestError as er:
-            error_detail = (er.parsed.data or {}).get("detail", er.message)
-            logger.error(
-                f"Got Zyte API error (status={er.status}, type={er.parsed.type!r}, "
-                f"request_id={er.request_id!r}) while processing URL ({request.url}): "
-                f"{error_detail}"
-            )
+        except RequestError as error:
+            self._process_request_error(request, error)
             raise
         except Exception as er:
             logger.error(
@@ -234,6 +229,21 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             self._update_stats(api_params)
 
         return _process_response(api_response, request, self._cookie_jars)
+
+    def _process_request_error(self, request, error):
+        detail = (error.parsed.data or {}).get("detail", error.message)
+        logger.error(
+            f"Got Zyte API error (status={error.status}, "
+            f"type={error.parsed.type!r}, request_id={error.request_id!r}) "
+            f"while processing URL ({request.url}): {detail}"
+        )
+        for status, error_type, close_reason in (
+            (401, "/auth/key-not-found", "zyte_api_bad_key"),
+            (403, "/auth/account-suspended", "zyte_api_suspended_account"),
+        ):
+            if error.status == status and error.parsed.type == error_type:
+                self._crawler.engine.close_spider(self._crawler.spider, close_reason)
+                return
 
     def _log_request(self, params):
         if not self._must_log_request:
