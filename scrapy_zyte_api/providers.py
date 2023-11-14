@@ -12,6 +12,7 @@ from zyte_common_items import (
     Article,
     ArticleList,
     ArticleNavigation,
+    Item,
     Product,
     ProductList,
     ProductNavigation,
@@ -91,6 +92,7 @@ class ZyteApiProvider(PageObjectInputProvider):
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
+            assert isinstance(cls_stripped, type)
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
@@ -98,7 +100,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             zyte_api_meta[kw] = True
             if not is_typing_annotated(cls):
                 continue
-            metadata = cls.__metadata__
+            metadata = cls.__metadata__  # type: ignore[attr-defined]
             for extract_from in ExtractFrom:
                 if extract_from in metadata:
                     prev_extract_from = extract_from_seen.get(kw)
@@ -148,12 +150,14 @@ class ZyteApiProvider(PageObjectInputProvider):
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
+            assert isinstance(cls_stripped, type)
+            assert issubclass(cls_stripped, Item)
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
             item = cls_stripped.from_dict(api_response.raw_api_response[kw])
             if is_typing_annotated(cls):
-                item = AnnotatedResult(item, cls.__metadata__)
+                item = AnnotatedResult(item, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(item)
             self.update_cache(request, {cls_stripped: item})
         return results

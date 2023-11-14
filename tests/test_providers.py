@@ -210,7 +210,7 @@ async def test_provider_extractfrom(mockserver):
         product2: Annotated[Product, ExtractFrom.httpResponseBody]
 
     class AnnotatedZyteAPISpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):
+        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):  # type: ignore[override]
             yield {
                 "product": page.product,
                 "product2": page.product,
@@ -244,7 +244,7 @@ async def test_provider_extractfrom_double(mockserver):
         product2: Annotated[Product, ExtractFrom.browserHtml]
 
     class AnnotatedZyteAPISpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):
+        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):  # type: ignore[override]
             yield {
                 "product": page.product,
             }
