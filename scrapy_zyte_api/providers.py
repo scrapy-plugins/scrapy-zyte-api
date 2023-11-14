@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Callable, Dict, List, Sequence, Set, Type
+from typing import Any, Callable, Dict, List, Sequence, Set
 from weakref import WeakKeyDictionary
 
 from andi.typeutils import is_typing_annotated, strip_annotated
@@ -53,7 +53,7 @@ class ZyteApiProvider(PageObjectInputProvider):
     def is_provided(self, type_: Callable) -> bool:
         return super().is_provided(strip_annotated(type_))
 
-    def update_cache(self, request: Request, mapping: Dict[Type, Any]) -> None:
+    def update_cache(self, request: Request, mapping: Dict[Any, Any]) -> None:
         if request not in self._cached_instances:
             self._cached_instances[request] = {}
         self._cached_instances[request].update(mapping)
@@ -151,13 +151,13 @@ class ZyteApiProvider(PageObjectInputProvider):
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
-            assert issubclass(cls_stripped, Item)
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
+            assert issubclass(cls_stripped, Item)
             item = cls_stripped.from_dict(api_response.raw_api_response[kw])
             if is_typing_annotated(cls):
                 item = AnnotatedResult(item, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(item)
-            self.update_cache(request, {cls_stripped: item})
+            self.update_cache(request, {cls: item})
         return results
