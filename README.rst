@@ -757,9 +757,10 @@ Misc settings
   Default: ``None``
 
   When set to an integer value > 0, the spider will close when the number of
-  successful Zyte API requests reaches it. Note that in some cases, the actual
-  number of successful Zyte API requests would be below this number if some of
-  the in-progress requests fail or error out.
+  Zyte API requests reaches it.
+
+  Note that requests with error responses that cannot be retried or exceed
+  their retry limit also count here.
 
 
 Stats
