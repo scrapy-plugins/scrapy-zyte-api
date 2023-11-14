@@ -54,7 +54,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             self._cached_instances[request] = {}
         self._cached_instances[request].update(mapping)
 
-    async def __call__(
+    async def __call__(  # noqa: C901
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
@@ -100,6 +100,11 @@ class ZyteApiProvider(PageObjectInputProvider):
                             raise ValueError("Multiple extractFrom specified")
                         product_options["extractFrom"] = option.value
                         break
+
+        for item_type, kw in item_keywords.items():
+            options_name = f"{kw}Options"
+            if item_type not in to_provide and options_name in zyte_api_meta:
+                del zyte_api_meta[options_name]
 
         api_request = Request(
             url=request.url,

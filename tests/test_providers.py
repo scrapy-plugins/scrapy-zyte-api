@@ -182,6 +182,25 @@ async def test_provider_params(mockserver):
 
 
 @ensureDeferred
+async def test_provider_params_remove_unused_options(mockserver):
+    settings = create_scrapy_settings(None)
+    settings.update(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "productOptions": {"extractFrom": "httpResponseBody"},
+        "productNavigationOptions": {"extractFrom": "httpResponseBody"},
+    }
+    _, _, crawler = await crawl_single_item(ZyteAPISpider, Product, settings)
+    assert crawler.stats.get_value("scrapy-zyte-api/request_args/product") == 1
+    assert crawler.stats.get_value("scrapy-zyte-api/request_args/productOptions") == 1
+    assert (
+        crawler.stats.get_value("scrapy-zyte-api/request_args/productNavigationOptions")
+        is None
+    )
+
+
+@ensureDeferred
 async def test_provider_extractfrom(mockserver):
     from typing import Annotated
 

@@ -749,9 +749,10 @@ Misc settings
   Default: ``None``
 
   When set to an integer value > 0, the spider will close when the number of
-  successful Zyte API requests reaches it. Note that in some cases, the actual
-  number of successful Zyte API requests would be below this number if some of
-  the in-progress requests fail or error out.
+  Zyte API requests reaches it.
+
+  Note that requests with error responses that cannot be retried or exceed
+  their retry limit also count here.
 
 
 Stats
@@ -949,6 +950,18 @@ as a dictionary through the ``ZYTE_API_PROVIDER_PARAMS`` setting, for example
 in ``settings.py``::
 
     ZYTE_API_PROVIDER_PARAMS = {"geolocation": "IE"}
+
+When the ``ZYTE_API_PROVIDER_PARAMS`` setting includes one of the Zyte API
+extraction options (e.g. ``productOptions`` for ``product``), but the
+final Zyte API request doesn't include the corresponding data type, the
+unused options are automatically removed. So, it's safe to use
+``ZYTE_API_PROVIDER_PARAMS`` to set the default options for various extraction
+types, e.g.::
+
+    ZYTE_API_PROVIDER_PARAMS = {
+        "productOptions": {"extractFrom": "httpResponseBody"},
+        "productNavigationOptions": {"extractFrom": "httpResponseBody"},
+    }
 
 Note that the built-in ``scrapy_poet.page_input_providers.ItemProvider`` has a
 priority of 2000, so when you have page objects producing

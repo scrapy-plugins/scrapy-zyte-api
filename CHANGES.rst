@@ -1,6 +1,20 @@
 Changes
 =======
 
+TBR
+---
+
+* Zyte API Request IDs are now included in the error logs.
+* Bump the zyte-api dependency: 0.4.7 → 0.4.8.
+
+0.12.2 (2023-10-19)
+-------------------
+
+* Unused ``<data type>Options`` (e.g. ``productOptions``) are now dropped
+  from ``ZYTE_API_PROVIDER_PARAMS`` when sending the Zyte API request
+* When logging Zyte API requests, truncation now uses
+  "..." instead of Unicode ellipsis.
+
 0.12.1 (2023-09-29)
 -------------------
 
