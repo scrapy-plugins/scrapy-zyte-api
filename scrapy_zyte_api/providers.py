@@ -49,6 +49,9 @@ class ZyteApiProvider(PageObjectInputProvider):
         super().__init__(injector)
         self._cached_instances: WeakKeyDictionary[Request, Dict] = WeakKeyDictionary()
 
+    def is_provided(self, type_: Callable) -> bool:
+        return super().is_provided(strip_annotated(type_))
+
     def update_cache(self, request: Request, mapping: Dict[Type, Any]) -> None:
         if request not in self._cached_instances:
             self._cached_instances[request] = {}
@@ -84,6 +87,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             zyte_api_meta["browserHtml"] = True
 
         to_provide_stripped: Set[type] = set()
+        extract_from_seen: Dict[str, str] = {}
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
@@ -95,14 +99,18 @@ class ZyteApiProvider(PageObjectInputProvider):
             if not is_typing_annotated(cls):
                 continue
             metadata = cls.__metadata__
-            if cls_stripped == Product:
-                for option in ExtractFrom:
-                    if option in metadata:
-                        product_options = zyte_api_meta.setdefault("productOptions", {})
-                        if "extractFrom" in product_options:
-                            raise ValueError("Multiple extractFrom specified")
-                        product_options["extractFrom"] = option.value
-                        break
+            for extract_from in ExtractFrom:
+                if extract_from in metadata:
+                    prev_extract_from = extract_from_seen.get(kw)
+                    if prev_extract_from and prev_extract_from != extract_from:
+                        raise ValueError(
+                            f"Multiple different extractFrom specified for {kw}"
+                        )
+                    extract_from_seen[kw] = extract_from
+                    options = zyte_api_meta.setdefault(f"{kw}Options", {})
+                    # TODO better logic for overwriting the value
+                    options["extractFrom"] = extract_from.value
+                    break
 
         for item_type, kw in item_keywords.items():
             options_name = f"{kw}Options"
