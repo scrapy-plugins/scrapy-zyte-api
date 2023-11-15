@@ -8,7 +8,7 @@ from unittest import mock
 
 import pytest
 from pytest_twisted import ensureDeferred
-from scrapy import Request
+from scrapy import Request, Spider
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
 from scrapy.utils.misc import create_instance
@@ -21,6 +21,7 @@ from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.utils import USER_AGENT
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET, make_handler, set_env
+from .mockserver import MockServer
 
 
 @pytest.mark.parametrize(
@@ -484,3 +485,74 @@ def test_user_agent_for_build_client(user_agent, expected):
     )
     client = ScrapyZyteAPIDownloadHandler._build_client(settings)
     assert client.user_agent == expected
+
+
+@ensureDeferred
+async def test_bad_key():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://bad-key.example"]
+
+        def parse(self, response):
+            pass
+
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "zyte_api_bad_key"
+
+
+# NOTE: Under the assumption that a case of bad key will happen since the
+# beginning of a crawl, we only test the start_urls scenario, and not also the
+# case of follow-up responses suddenly giving such an error.
+
+
+@ensureDeferred
+async def test_suspended_account_start_urls():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://suspended-account.example"]
+
+        def parse(self, response):
+            pass
+
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
+
+
+@ensureDeferred
+async def test_suspended_account_callback():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            yield response.follow("https://suspended-account.example")
+
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"

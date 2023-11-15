@@ -93,6 +93,26 @@ class DefaultResource(Resource):
 
         response_data["url"] = request_data["url"]
 
+        domain = urlparse(request_data["url"]).netloc
+        if "bad-key" in domain:
+            request.setResponseCode(401)
+            response_data = {
+                "status": 401,
+                "type": "/auth/key-not-found",
+                "title": "Authentication Key Not Found",
+                "detail": "The authentication key is not valid or can't be matched.",
+            }
+            return json.dumps(response_data).encode()
+        if "suspended-account" in domain:
+            request.setResponseCode(403)
+            response_data = {
+                "status": 403,
+                "type": "/auth/account-suspended",
+                "title": "Account Suspended",
+                "detail": "Account is suspended, check billing details.",
+            }
+            return json.dumps(response_data).encode()
+
         html = "<html><body>Hello<h1>World!</h1></body></html>"
         if "browserHtml" in request_data:
             if "httpResponseBody" in request_data:
