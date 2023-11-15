@@ -5,7 +5,7 @@ from copy import copy
 from functools import partial
 from http.cookiejar import Cookie
 from inspect import isclass
-from typing import Any, Dict, cast
+from typing import Any, Dict, Type, cast
 from unittest import mock
 from unittest.mock import patch
 
@@ -198,7 +198,7 @@ async def test_coro_handling(zyte_api: bool, mockserver):
 async def test_exceptions(
     caplog: LogCaptureFixture,
     meta: Dict[str, Dict[str, Any]],
-    exception_type: Exception,
+    exception_type: Type[Exception],
     exception_text: str,
     mockserver,
 ):
