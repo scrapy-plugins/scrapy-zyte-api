@@ -91,7 +91,7 @@ class ScrapyZyteAPIDownloaderMiddleware:
         if self._forbidden_domain_start_request_count < self._total_start_request_count:
             return
         logger.error(
-            "Stopping the spider, all start request failed because they "
+            "Stopping the spider, all start requests failed because they "
             "were pointing to a domain forbidden by Zyte API."
         )
         self._crawler.engine.close_spider(
