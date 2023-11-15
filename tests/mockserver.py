@@ -78,19 +78,6 @@ class DefaultResource(Resource):
         if "url" not in request_data:
             request.setResponseCode(400)
             return json.dumps(response_data).encode()
-
-        domain = urlparse(request_data["url"]).netloc
-        if "forbidden" in domain:
-            request.setResponseCode(451)
-            response_data = {
-                "status": 451,
-                "type": "/download/domain-forbidden",
-                "title": "Domain Forbidden",
-                "detail": "Extraction for the domain is forbidden.",
-                "blockedDomain": domain,
-            }
-            return json.dumps(response_data).encode()
-
         response_data["url"] = request_data["url"]
 
         domain = urlparse(request_data["url"]).netloc
@@ -101,6 +88,16 @@ class DefaultResource(Resource):
                 "type": "/auth/key-not-found",
                 "title": "Authentication Key Not Found",
                 "detail": "The authentication key is not valid or can't be matched.",
+            }
+            return json.dumps(response_data).encode()
+        if "forbidden" in domain:
+            request.setResponseCode(451)
+            response_data = {
+                "status": 451,
+                "type": "/download/domain-forbidden",
+                "title": "Domain Forbidden",
+                "detail": "Extraction for the domain is forbidden.",
+                "blockedDomain": domain,
             }
             return json.dumps(response_data).encode()
         if "suspended-account" in domain:
