@@ -167,7 +167,7 @@ TBR
     cookiejar of the request.
 
   * A new boolean setting, ``ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED``, can be
-    set to ``True`` to enable automated mapping of cookies from a request
+    set to ``True`` to enable automatic mapping of cookies from a request
     cookiejar into the ``experimental.requestCookies`` Zyte API parameter.
 
 * ``ZyteAPITextResponse`` is now a subclass of ``HtmlResponse``, so that the
@@ -239,10 +239,10 @@ When upgrading, you should set the following in your Scrapy settings:
   be set to ``True`` to make all requests use Zyte API by default, with request
   parameters being automatically mapped to Zyte API parameters.
 * Add a Request meta key, ``zyte_api_automap``, that can be used to enable
-  automated request parameter mapping for specific requests, or to modify the
-  outcome of automated request parameter mapping for specific requests.
+  automatic request parameter mapping for specific requests, or to modify the
+  outcome of automatic request parameter mapping for specific requests.
 * Add a ``ZYTE_API_AUTOMAP_PARAMS`` setting, which is a counterpart for
-  ``ZYTE_API_DEFAULT_PARAMS`` that applies to requests where automated request
+  ``ZYTE_API_DEFAULT_PARAMS`` that applies to requests where automatic request
   parameter mapping is enabled.
 * Add the ``ZYTE_API_SKIP_HEADERS`` and ``ZYTE_API_BROWSER_HEADERS`` settings
   to control the automatic mapping of request headers.
