@@ -318,7 +318,8 @@ def merge_dicts(*dicts):
     "params,match",
     (
         # As long as browserHtml or screenshot are True, different fragments
-        # make for different fingerprints, regardless of other parameters.
+        # make for different fingerprints, regardless of other parameters. Same
+        # for extraction types if browserHtml is set in *Options.extractFrom.
         *(
             (
                 merge_dicts(body, headers, unknown, browser),
@@ -345,10 +346,12 @@ def merge_dicts(*dicts):
                 {"browserHtml": True, "screenshot": False},
                 {"browserHtml": False, "screenshot": True},
                 {"browserHtml": True, "screenshot": True},
+                {"product": True, "productOptions": {"extractFrom": "browserHtml"}},
             )
         ),
         # If neither browserHtml nor screenshot are enabled, different
-        # fragments do *not* make for different fingerprints.
+        # fragments do *not* make for different fingerprints. Same for
+        # extraction types if browserHtml is not set in # *Options.extractFrom.
         *(
             (
                 merge_dicts(body, headers, unknown, browser),
@@ -374,6 +377,11 @@ def merge_dicts(*dicts):
                 {"browserHtml": False},
                 {"screenshot": False},
                 {"browserHtml": False, "screenshot": False},
+                {"product": True},
+                {
+                    "product": True,
+                    "productOptions": {"extractFrom": "httpResponseBody"},
+                },
             )
         ),
     ),
@@ -393,7 +401,7 @@ def test_url_fragments(params, match):
         assert fingerprint1 != fingerprint2
 
 
-def test_autoextract():
+def test_extract_types():
     crawler = get_crawler()
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
@@ -405,3 +413,19 @@ def test_autoextract():
     )
     fingerprint2 = fingerprinter.fingerprint(request2)
     assert fingerprint1 != fingerprint2
+
+
+def test_request_body():
+    crawler = get_crawler()
+    fingerprinter = create_instance(
+        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
+    )
+    request1 = Request(
+        "https://toscrape.com", meta={"zyte_api": {"httpRequestBody": "Zm9v"}}
+    )
+    fingerprint1 = fingerprinter.fingerprint(request1)
+    request2 = Request(
+        "https://toscrape.com", meta={"zyte_api": {"httpRequestText": "foo"}}
+    )
+    fingerprint2 = fingerprinter.fingerprint(request2)
+    assert fingerprint1 == fingerprint2

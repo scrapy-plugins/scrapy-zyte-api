@@ -46,7 +46,7 @@ else:
 
             if "httpRequestText" in api_params:
                 api_params["httpRequestBody"] = b64encode(
-                    api_params["httpRequestText"].encode()
+                    api_params.pop("httpRequestText").encode()
                 ).decode()
 
             for key, value in _REQUEST_PARAMS.items():
