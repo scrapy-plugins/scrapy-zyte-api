@@ -17,58 +17,237 @@ logger = getLogger(__name__)
 
 _NoDefault = object()
 
-# Map of all known Zyte API request params and how they need to be handled.
-# Sorted by appearance in https://docs.zyte.com/zyte-api/usage/reference.html.
+# Map of all known root Zyte API request params and how they need to be
+# handled. Sorted by appearance in
+# https://docs.zyte.com/zyte-api/usage/reference.html.
 _REQUEST_PARAMS = {
     "url": {
         "default": _NoDefault,
         "is_extract_type": False,
         "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "requestHeaders": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
+    "httpRequestMethod": {
+        "default": "GET",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "httpRequestBody": {
+        "default": "",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "httpRequestText": {
+        "default": "",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "customHttpRequestHeaders": {
+        "default": [],
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
+    "httpResponseBody": {
+        "default": False,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "httpResponseHeaders": {
+        "default": False,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
     },
     "browserHtml": {
         "default": False,
         "is_extract_type": False,
         "requires_browser_rendering": True,
+        "changes_fingerprint": True,
     },
     "screenshot": {
         "default": False,
         "is_extract_type": False,
         "requires_browser_rendering": True,
+        "changes_fingerprint": True,
+    },
+    "screenshotOptions": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,  # Not on its own.
+        "changes_fingerprint": True,
     },
     "article": {
         "default": False,
         "is_extract_type": True,
         "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "articleOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
     },
     "articleList": {
         "default": False,
         "is_extract_type": True,
         "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "articleListOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
     },
     "articleNavigation": {
         "default": False,
         "is_extract_type": True,
         "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "articleNavigationOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
     },
     "jobPosting": {
         "default": False,
         "is_extract_type": True,
         "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "jobPostingOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
     },
     "product": {
         "default": False,
         "is_extract_type": True,
         "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "productOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
     },
     "productList": {
         "default": False,
         "is_extract_type": True,
         "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "productListOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
     },
     "productNavigation": {
         "default": False,
         "is_extract_type": True,
         "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "productNavigationOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "geolocation": {
+        "default": None,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "javascript": {
+        "default": None,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,  # Not on its own.
+        "changes_fingerprint": True,
+    },
+    "actions": {
+        "default": [],
+        "is_extract_type": False,
+        "requires_browser_rendering": False,  # Not on its own.
+        "changes_fingerprint": True,
+    },
+    "jobId": {
+        "default": None,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
+    "echoData": {
+        "default": None,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
+    "viewport": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "sessionContext": {
+        "default": [],
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like headers.
+    },
+    "sessionContextParameters": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like sessionContext.
+    },
+    "device": {
+        "default": "auto",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,  # Treated like viewport.
+    },
+    "cookieManagement": {
+        "default": "auto",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like headers.
+    },
+    "requestCookies": {
+        "default": [],
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like headers.
+    },
+    "responseCookies": {
+        "default": False,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
+    "experimental": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
     },
 }
 
@@ -392,6 +571,9 @@ def _set_http_request_body_from_request(
         api_params["httpRequestBody"] = base64_body
 
 
+_Undefined = object()
+
+
 def _unset_unneeded_api_params(
     *,
     api_params: Dict[str, Any],
@@ -399,7 +581,10 @@ def _unset_unneeded_api_params(
     request: Request,
 ):
     for param, default_value in _DEFAULT_API_PARAMS.items():
-        if api_params.get(param) != default_value:
+        value = api_params.get(param, _Undefined)
+        if value is _Undefined:
+            continue
+        if value != default_value:
             continue
         if param not in default_params or default_params.get(param) == default_value:
             logger.warning(
