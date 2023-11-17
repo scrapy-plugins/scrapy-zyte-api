@@ -20,7 +20,7 @@ _NoDefault = object()
 # Map of all known root Zyte API request params and how they need to be
 # handled. Sorted by appearance in
 # https://docs.zyte.com/zyte-api/usage/reference.html.
-_REQUEST_PARAMS = {
+_REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
     "url": {
         "default": _NoDefault,
         "is_extract_type": False,
