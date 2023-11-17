@@ -15,7 +15,7 @@ else:
     from scrapy.utils.misc import create_instance, load_object
     from w3lib.url import canonicalize_url
 
-    from ._params import _ParamParser
+    from ._params import _ParamParser, _uses_browser
 
     class ScrapyZyteAPIRequestFingerprinter:
         @classmethod
@@ -44,11 +44,6 @@ else:
                 "experimental",
             )
 
-        def _keep_fragments(self, api_params):
-            return any(
-                api_params.get(key, False) for key in ("browserHtml", "screenshot")
-            )
-
         def fingerprint(self, request):
             if request in self._cache:
                 return self._cache[request]
@@ -56,7 +51,7 @@ else:
             if api_params is not None:
                 api_params["url"] = canonicalize_url(
                     api_params["url"],
-                    keep_fragments=self._keep_fragments(api_params),
+                    keep_fragments=_uses_browser(api_params),
                 )
                 for key in self._skip_keys:
                     api_params.pop(key, None)

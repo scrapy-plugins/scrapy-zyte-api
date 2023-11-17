@@ -799,7 +799,9 @@ for Zyte API requests based on the following Zyte API parameters:
 
     For URLs that include a URL fragment, like ``https://example.com#foo``, URL
     canonicalization keeps the URL fragment if ``browserHtml`` or
-    ``screenshot`` are enabled.
+    ``screenshot`` are enabled, or if extractFrom_ is set to ``browserHtml``.
+
+    .. _extractFrom: https://docs.zyte.com/zyte-api/usage/extract.html#extraction-source
 
 -   Request attribute parameters (``httpRequestBody``,
     ``httpRequestMethod``)

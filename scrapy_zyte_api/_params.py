@@ -90,6 +90,20 @@ _DEFAULT_ACCEPT_ENCODING = ", ".join(
 )
 
 
+def _uses_browser(api_params: Dict[str, Any]) -> bool:
+    for key in _BROWSER_KEYS:
+        if api_params.get(key, _REQUEST_PARAMS[key]["default"]):
+            return True
+    for key in _EXTRACT_KEYS:
+        options = api_params.get(f"{key}Options", {})
+        extract_from = options.get("extractFrom", None)
+        if extract_from == "browserHtml":
+            return True
+    # Note: This could be a “maybe”, e.g. if no extractFrom is specified, a
+    # extract key could be triggering browser rendering.
+    return False
+
+
 def _iter_headers(
     *,
     api_params: Dict[str, Any],
