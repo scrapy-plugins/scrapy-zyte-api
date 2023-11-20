@@ -234,7 +234,7 @@ async def test_follow_up_forbidden_domain_url():
 @ensureDeferred
 async def test_forbidden_domain_with_partial_start_request_consumption():
     """With concurrency lower than the number of start requests + 1, the code
-    path followed changes, because ``__total_start_request_count`` is not set
+    path followed changes, because ``_total_start_request_count`` is not set
     in the downloader middleware until *after* some start requests have been
     processed."""
 
