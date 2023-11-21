@@ -700,7 +700,7 @@ def _test_automap(
             [],
         ),
         # httpResponseBody can be explicitly requested in meta, and should be
-        # in cases where a binary response is expected, since automated mapping
+        # in cases where a binary response is expected, since automatic mapping
         # may stop working for binary responses in the future.
         (
             {"httpResponseBody": True},
@@ -1957,7 +1957,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         ),
         # Setting requestCookies to [] disables automatic mapping, but logs a
         # a warning recommending to either use False to achieve the same or
-        # remove the parameter to let automated mapping work.
+        # remove the parameter to let automatic mapping work.
         (
             {
                 "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,

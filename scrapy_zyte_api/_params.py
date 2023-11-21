@@ -907,7 +907,7 @@ class _ParamParser:
                 "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is False, so automatic "
                 "mapping will not map cookies for this or any other request. "
                 "To silence this warning, disable cookies for all requests "
-                "that use automated mapping, either with the "
+                "that use automatic mapping, either with the "
                 "COOKIES_ENABLED setting or with the dont_merge_cookies "
                 "request metadata key."
             ),
