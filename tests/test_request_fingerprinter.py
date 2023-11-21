@@ -415,3 +415,17 @@ def test_url_fragments(params, match):
         assert fingerprint1 == fingerprint2
     else:
         assert fingerprint1 != fingerprint2
+
+
+def test_autoextract():
+    crawler = get_crawler()
+    fingerprinter = create_instance(
+        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
+    )
+    request1 = Request("https://toscrape.com", meta={"zyte_api": {"product": True}})
+    fingerprint1 = fingerprinter.fingerprint(request1)
+    request2 = Request(
+        "https://toscrape.com", meta={"zyte_api": {"productNavigation": True}}
+    )
+    fingerprint2 = fingerprinter.fingerprint(request2)
+    assert fingerprint1 != fingerprint2
