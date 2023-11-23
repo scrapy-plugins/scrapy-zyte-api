@@ -260,20 +260,32 @@ INPUT_COOKIES_SIMPLE = [{"name": "c", "value": "d"}]
 @pytest.mark.parametrize(
     "fields,cls,keep",
     [
-        # For HTTP requests, whether the response Set-Cookie header is kept or
-        # not depends on whether experimental.responseCookies is received.
+        # Only keep the Set-Cookie header if experimental.responseCookies is
+        # not received.
         *(
             (
                 {
-                    "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+                    **output_fields,
                     "httpResponseHeaders": [
                         {"name": "Content-Type", "value": "text/html"},
                         {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
                     ],
                     **cookie_fields,  # type: ignore[dict-item]
                 },
-                ZyteAPIResponse,
+                response_cls,
                 keep,
+            )
+            for output_fields, response_cls in (
+                (
+                    {"httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8"))},
+                    ZyteAPIResponse,
+                ),
+                (
+                    {
+                        "browserHtml": PAGE_CONTENT,
+                    },
+                    ZyteAPITextResponse,
+                ),
             )
             for cookie_fields, keep in (
                 # No response cookies, so Set-Cookie is kept.
@@ -290,30 +302,6 @@ INPUT_COOKIES_SIMPLE = [{"name": "c", "value": "d"}]
                     },
                     False,
                 ),
-            )
-        ),
-        # For non-HTTP requests, the response Set-Cookie header is always
-        # dropped.
-        *(
-            (
-                {
-                    "browserHtml": PAGE_CONTENT,
-                    "httpResponseHeaders": [
-                        {"name": "Content-Type", "value": "text/html"},
-                        {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
-                    ],
-                    **cookie_fields,  # type: ignore[dict-item]
-                },
-                ZyteAPITextResponse,
-                False,
-            )
-            for cookie_fields in (
-                {},
-                {
-                    "experimental": {
-                        "responseCookies": INPUT_COOKIES_SIMPLE,
-                    },
-                },
             )
         ),
     ],
