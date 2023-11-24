@@ -64,4 +64,4 @@ remember to also request :http:`request:httpResponseHeaders`:
             # "<html>…</html>"
 
 To learn more about Zyte API parameters, see the upstream :ref:`usage
-<zyte-api-usage>` and :ref:`API reference <zyte-api-http-api>` pages.
+<zyte-api-usage>` and :ref:`API reference <zyte-api-reference>` pages.

@@ -1,6 +1,7 @@
 from base64 import b64encode
 from collections import defaultdict
 from functools import partial
+from typing import Any, Dict, cast
 
 import pytest
 from scrapy import Request
@@ -265,7 +266,7 @@ INPUT_COOKIES_SIMPLE = [{"name": "c", "value": "d"}]
         *(
             (
                 {
-                    **output_fields,
+                    **cast(Dict[Any, Any], output_fields),
                     "httpResponseHeaders": [
                         {"name": "Content-Type", "value": "text/html"},
                         {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
