@@ -72,12 +72,17 @@ class ZyteApiProvider(PageObjectInputProvider):
             ArticleNavigation: "articleNavigation",
         }
 
-        zyte_api_meta = {}
+        zyte_api_meta = crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS")
         if html_requested:
             zyte_api_meta["browserHtml"] = True
         for item_type, kw in item_keywords.items():
             if item_type in to_provide:
                 zyte_api_meta[kw] = True
+            else:
+                options_name = f"{kw}Options"
+                if options_name in zyte_api_meta:
+                    del zyte_api_meta[options_name]
+
         api_request = Request(
             url=request.url,
             meta={

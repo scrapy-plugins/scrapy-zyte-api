@@ -1,6 +1,50 @@
 Changes
 =======
 
+TBR
+---
+
+* Zyte API Request IDs are now included in the error logs.
+* Bump the zyte-api dependency: 0.4.7 → 0.4.8.
+
+0.12.2 (2023-10-19)
+-------------------
+
+* Unused ``<data type>Options`` (e.g. ``productOptions``) are now dropped
+  from ``ZYTE_API_PROVIDER_PARAMS`` when sending the Zyte API request
+* When logging Zyte API requests, truncation now uses
+  "..." instead of Unicode ellipsis.
+
+0.12.1 (2023-09-29)
+-------------------
+
+* The new ``_ZYTE_API_USER_AGENT`` setting allows customizing the user agent 
+  string reported to Zyte API.
+  
+  Note that this setting is only meant for libraries and frameworks built on 
+  top of scrapy-zyte-api, to report themselves to Zyte API, for client software 
+  tracking and monitoring purposes. The value of this setting is *not* the 
+  ``User-Agent`` header sent to upstream websites when using Zyte API.
+
+
+0.12.0 (2023-09-26)
+-------------------
+
+* A new ``ZYTE_API_PROVIDER_PARAMS`` setting allows setting Zyte API
+  parameters, like ``geolocation``, to be included in all Zyte API requests by
+  the scrapy-poet provider.
+
+* A new ``scrapy-zyte-api/request_args/<parameter>`` stat, counts the number of
+  requests containing a given Zyte API request parameter. For example,
+  ``scrapy-zyte-api/request_args/url`` counts the number of Zyte API requests
+  with the URL parameter set (which should be all of them).
+
+  Experimental is treated as a namespace, and its parameters are the ones
+  counted, i.e. there is no ``scrapy-zyte-api/request_args/experimental`` stat,
+  but there are stats like
+  ``scrapy-zyte-api/request_args/experimental.responseCookies``.
+
+
 0.11.1 (2023-08-25)
 -------------------
 
@@ -123,7 +167,7 @@ Changes
     cookiejar of the request.
 
   * A new boolean setting, ``ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED``, can be
-    set to ``True`` to enable automated mapping of cookies from a request
+    set to ``True`` to enable automatic mapping of cookies from a request
     cookiejar into the ``experimental.requestCookies`` Zyte API parameter.
 
 * ``ZyteAPITextResponse`` is now a subclass of ``HtmlResponse``, so that the
@@ -195,10 +239,10 @@ When upgrading, you should set the following in your Scrapy settings:
   be set to ``True`` to make all requests use Zyte API by default, with request
   parameters being automatically mapped to Zyte API parameters.
 * Add a Request meta key, ``zyte_api_automap``, that can be used to enable
-  automated request parameter mapping for specific requests, or to modify the
-  outcome of automated request parameter mapping for specific requests.
+  automatic request parameter mapping for specific requests, or to modify the
+  outcome of automatic request parameter mapping for specific requests.
 * Add a ``ZYTE_API_AUTOMAP_PARAMS`` setting, which is a counterpart for
-  ``ZYTE_API_DEFAULT_PARAMS`` that applies to requests where automated request
+  ``ZYTE_API_DEFAULT_PARAMS`` that applies to requests where automatic request
   parameter mapping is enabled.
 * Add the ``ZYTE_API_SKIP_HEADERS`` and ``ZYTE_API_BROWSER_HEADERS`` settings
   to control the automatic mapping of request headers.

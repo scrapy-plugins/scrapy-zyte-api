@@ -57,8 +57,7 @@ class ZyteAPIMixin:
     def raw_api_response(self) -> Optional[Dict]:
         """Contains the raw API response from Zyte API.
 
-        To see the full list of parameters and their description, kindly refer to the
-        `Zyte API Specification <https://docs.zyte.com/zyte-api/openapi.html#zyte-openapi-spec>`_.
+        For the full list of parameters, see :ref:`zyte-api-http-api`.
         """
         return self._raw_api_response
 
