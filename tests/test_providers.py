@@ -6,11 +6,8 @@ import attrs
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy_poet import DummyResponse
-from scrapy_poet.utils.testing import (
-    HtmlResource,
-    crawl_single_item,
-    create_scrapy_settings,
-)
+from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
+from scrapy_poet.utils.testing import create_scrapy_settings as _create_scrapy_settings
 from twisted.internet import reactor
 from twisted.web.client import Agent, readBody
 from web_poet import BrowserHtml, BrowserResponse, ItemPage, field, handle_urls
@@ -20,6 +17,16 @@ from scrapy_zyte_api.providers import ZyteApiProvider
 
 from . import SETTINGS
 from .mockserver import get_ephemeral_port
+
+
+def create_scrapy_settings():
+    settings = _create_scrapy_settings(None)
+    for setting, value in SETTINGS.items():
+        if setting.endswith("_MIDDLEWARES") and settings[setting]:
+            settings[setting].update(value)
+        else:
+            settings[setting] = value
+    return settings
 
 
 @attrs.define
@@ -45,8 +52,7 @@ class ZyteAPISpider(Spider):
 
 @ensureDeferred
 async def test_provider(mockserver):
-    settings = create_scrapy_settings(None)
-    settings.update(SETTINGS)
+    settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     item, url, _ = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
@@ -93,8 +99,7 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     port = get_ephemeral_port()
     handle_urls(f"{fresh_mockserver.host}:{port}")(MyPage)
 
-    settings = create_scrapy_settings(None)
-    settings.update(SETTINGS)
+    settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
     item, url, _ = await crawl_single_item(
@@ -123,8 +128,7 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     port = get_ephemeral_port()
     handle_urls(f"{fresh_mockserver.host}:{port}")(MyPage)
 
-    settings = create_scrapy_settings(None)
-    settings.update(SETTINGS)
+    settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
     item, url, _ = await crawl_single_item(
@@ -152,8 +156,7 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
     port = get_ephemeral_port()
     handle_urls(f"{fresh_mockserver.host}:{port}")(MyPage)
 
-    settings = create_scrapy_settings(None)
-    settings.update(SETTINGS)
+    settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1}
     item, url, _ = await crawl_single_item(
@@ -171,8 +174,7 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
 
 @ensureDeferred
 async def test_provider_params(mockserver):
-    settings = create_scrapy_settings(None)
-    settings.update(SETTINGS)
+    settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_PROVIDER_PARAMS"] = {"geolocation": "IE"}
@@ -183,8 +185,7 @@ async def test_provider_params(mockserver):
 
 @ensureDeferred
 async def test_provider_params_remove_unused_options(mockserver):
-    settings = create_scrapy_settings(None)
-    settings.update(SETTINGS)
+    settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_PROVIDER_PARAMS"] = {
