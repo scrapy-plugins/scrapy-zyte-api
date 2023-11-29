@@ -139,6 +139,133 @@ async def test_max_requests(caplog):
 
 
 @ensureDeferred
+async def test_forbidden_domain_start_url():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://forbidden.example"]
+
+        def parse(self, response):
+            pass
+
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
+
+
+@ensureDeferred
+async def test_forbidden_domain_start_urls():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = [
+            "https://forbidden.example",
+            "https://also-forbidden.example",
+            "https://oh.definitely-forbidden.example",
+        ]
+
+        def parse(self, response):
+            pass
+
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
+
+
+@ensureDeferred
+async def test_some_forbidden_domain_start_url():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = [
+            "https://forbidden.example",
+            "https://allowed.example",
+        ]
+
+        def parse(self, response):
+            pass
+
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "finished"
+
+
+@ensureDeferred
+async def test_follow_up_forbidden_domain_url():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = [
+            "https://allowed.example",
+        ]
+
+        def parse(self, response):
+            yield response.follow("https://forbidden.example")
+
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "finished"
+
+
+@ensureDeferred
+async def test_forbidden_domain_with_partial_start_request_consumption():
+    """With concurrency lower than the number of start requests + 1, the code
+    path followed changes, because ``_total_start_request_count`` is not set
+    in the downloader middleware until *after* some start requests have been
+    processed."""
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = [
+            "https://forbidden.example",
+        ]
+
+        def parse(self, response):
+            yield response.follow("https://forbidden.example")
+
+    settings = {
+        "CONCURRENT_REQUESTS": 1,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
+
+
+@ensureDeferred
 async def test_spm_conflict_smartproxy_setting(caplog):
     settings = {
         "ZYTE_API_TRANSPARENT_MODE": True,

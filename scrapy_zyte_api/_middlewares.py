@@ -2,10 +2,14 @@ import logging
 
 from scrapy import signals
 from scrapy.exceptions import IgnoreRequest
+from zyte_api.aio.errors import RequestError
 
 from ._params import _ParamParser
 
 logger = logging.getLogger(__name__)
+
+
+_start_requests_processed = object()
 
 
 class ScrapyZyteAPIDownloaderMiddleware:
@@ -16,6 +20,8 @@ class ScrapyZyteAPIDownloaderMiddleware:
         return cls(crawler)
 
     def __init__(self, crawler) -> None:
+        self._forbidden_domain_start_request_count = 0
+        self._total_start_request_count = 0
         self._param_parser = _ParamParser(crawler, cookies_enabled=False)
         self._crawler = crawler
 
@@ -28,6 +34,9 @@ class ScrapyZyteAPIDownloaderMiddleware:
             )
 
         crawler.signals.connect(self.open_spider, signal=signals.spider_opened)
+        crawler.signals.connect(
+            self._start_requests_processed, signal=_start_requests_processed
+        )
 
     def _get_spm_mw(self):
         spm_mw_classes = []
@@ -79,6 +88,10 @@ class ScrapyZyteAPIDownloaderMiddleware:
             0, self._crawler.engine.close_spider, spider, "plugin_conflict"
         )
 
+    def _start_requests_processed(self, count):
+        self._total_start_request_count = count
+        self._maybe_close()
+
     def process_request(self, request, spider):
         if self._param_parser.parse(request) is None:
             return
@@ -112,3 +125,46 @@ class ScrapyZyteAPIDownloaderMiddleware:
         )
         total_requests = zapi_req_count + download_req_count
         return total_requests >= self._max_requests
+
+    def process_exception(self, request, exception, spider):
+        if (
+            not request.meta.get("is_start_request")
+            or not isinstance(exception, RequestError)
+            or exception.status != 451
+        ):
+            return
+
+        self._forbidden_domain_start_request_count += 1
+        self._maybe_close()
+
+    def _maybe_close(self):
+        if not self._total_start_request_count:
+            return
+        if self._forbidden_domain_start_request_count < self._total_start_request_count:
+            return
+        logger.error(
+            "Stopping the spider, all start requests failed because they "
+            "were pointing to a domain forbidden by Zyte API."
+        )
+        self._crawler.engine.close_spider(
+            self._crawler.spider, "failed_forbidden_domain"
+        )
+
+
+class ScrapyZyteAPISpiderMiddleware:
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        self._send_signal = crawler.signals.send_catch_log
+
+    def process_start_requests(self, start_requests, spider):
+        # Mark start requests and reports to the downloader middleware the
+        # number of them once all have been processed.
+        count = 0
+        for request in start_requests:
+            request.meta["is_start_request"] = True
+            yield request
+            count += 1
+        self._send_signal(_start_requests_processed, count=count)

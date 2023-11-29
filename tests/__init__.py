@@ -22,6 +22,9 @@ SETTINGS = {
     },
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "REQUEST_FINGERPRINTER_IMPLEMENTATION": "2.7",  # Silence deprecation warning
+    "SPIDER_MIDDLEWARES": {
+        "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
+    },
     "ZYTE_API_KEY": _API_KEY,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
 }
