@@ -17,16 +17,26 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
     .. _extractFrom: https://docs.zyte.com/zyte-api/usage/extract.html#extraction-source
 
 -   Request attribute parameters (:http:`request:httpRequestBody`,
-    :http:`request:httpRequestMethod`)
+    :http:`request:httpRequestText`, :http:`request:httpRequestMethod`), except
+    headers
+
+    Equivalent :http:`request:httpRequestBody` and
+    :http:`request:httpRequestText` values generate the same signature.
 
 -   Output parameters (:http:`request:browserHtml`,
     :http:`request:httpResponseBody`, :http:`request:httpResponseHeaders`,
-    :http:`request:screenshot`)
+    :http:`request:responseCookies`, :http:`request:screenshot`, and
+    :ref:`automatic extraction outputs <zyte-api-extract-fields>` like
+    :http:`request:product`)
 
 -   Rendering option parameters (:http:`request:actions`,
-    :http:`request:javascript`, :http:`request:screenshotOptions`)
+    :http:`request:device`, :http:`request:javascript`,
+    :http:`request:screenshotOptions`, :http:`request:viewport`, and automatic
+    extraction options like :http:`request:productOptions`)
 
 -   :http:`request:geolocation`
+
+-   :http:`request:echoData`
 
 The following Zyte API parameters are *not* taken into account for request
 fingerprinting:
@@ -34,6 +44,12 @@ fingerprinting:
 -   Request header parameters (:http:`request:customHttpRequestHeaders`,
     :http:`request:requestHeaders`)
 
--   Metadata parameters (:http:`request:echoData`, :http:`request:jobId`)
+-   Request cookie parameters (:http:`request:cookieManagement`,
+    :http:`request:requestCookies`)
 
--   Experimental parameters (:http:`request:experimental`)
+-   Session handling parameters (:http:`request:sessionContext`,
+    :http:`request:sessionContextParameters`)
+
+-   :http:`request:jobId`
+
+-   Experimental parameters (:http:`experimental.* <request:experimental>`)

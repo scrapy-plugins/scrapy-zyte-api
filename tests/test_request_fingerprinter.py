@@ -198,9 +198,11 @@ def test_metadata():
     fingerprint3 = no_job_fingerprinter.fingerprint(request1)
     fingerprint4 = no_job_fingerprinter.fingerprint(request2)
 
-    assert fingerprint1 == fingerprint2
-    assert fingerprint3 == fingerprint4
+    assert fingerprint1 != fingerprint2
+    assert fingerprint2 != fingerprint3
+    assert fingerprint3 != fingerprint4
     assert fingerprint1 == fingerprint3
+    assert fingerprint2 == fingerprint4
 
 
 def test_only_end_parameters_matter():

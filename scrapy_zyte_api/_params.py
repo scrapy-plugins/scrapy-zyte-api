@@ -199,7 +199,7 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
         "default": None,
         "is_extract_type": False,
         "requires_browser_rendering": False,
-        "changes_fingerprint": False,
+        "changes_fingerprint": True,
     },
     "viewport": {
         "default": {},
@@ -241,7 +241,7 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
         "default": False,
         "is_extract_type": False,
         "requires_browser_rendering": False,
-        "changes_fingerprint": False,
+        "changes_fingerprint": True,
     },
     "experimental": {
         "default": {},
