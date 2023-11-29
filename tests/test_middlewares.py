@@ -1,3 +1,4 @@
+from typing import Any, Dict, cast
 from unittest import SkipTest
 
 from packaging.version import Version
@@ -298,7 +299,7 @@ async def test_spm_conflict_smartproxy():
             "ZYTE_SMARTPROXY_APIKEY": "foo",
             **SETTINGS,
         }
-        mws = dict(settings["DOWNLOADER_MIDDLEWARES"])
+        mws = dict(cast(Dict[Any, int], settings["DOWNLOADER_MIDDLEWARES"]))
         mws["scrapy_zyte_smartproxy.ZyteSmartProxyMiddleware"] = 610
         settings["DOWNLOADER_MIDDLEWARES"] = mws
 
@@ -348,7 +349,7 @@ async def test_spm_conflict_crawlera():
             "CRAWLERA_APIKEY": "foo",
             **SETTINGS,
         }
-        mws = dict(settings["DOWNLOADER_MIDDLEWARES"])
+        mws = dict(cast(Dict[Any, int], settings["DOWNLOADER_MIDDLEWARES"]))
         mws["scrapy_crawlera.CrawleraMiddleware"] = 610
         settings["DOWNLOADER_MIDDLEWARES"] = mws
 

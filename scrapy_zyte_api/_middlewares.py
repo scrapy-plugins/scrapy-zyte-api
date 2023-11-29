@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 from scrapy import signals
 from scrapy.exceptions import IgnoreRequest
@@ -83,7 +84,9 @@ class ScrapyZyteAPIDownloaderMiddleware:
             "either to True or to a dictionary of extra request fields."
         )
         from twisted.internet import reactor
+        from twisted.internet.interfaces import IReactorCore
 
+        reactor = cast(IReactorCore, reactor)
         reactor.callLater(
             0, self._crawler.engine.close_spider, spider, "plugin_conflict"
         )
