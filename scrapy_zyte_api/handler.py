@@ -62,29 +62,6 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             raise NotConfigured(
                 "Zyte API is disabled. Set ZYTE_API_ENABLED to True to enable it."
             )
-        if settings.getbool("ZYTE_API_TRANSPARENT_MODE", False) and (
-            settings.getbool("ZYTE_SMARTPROXY_ENABLED", False)
-            or settings.getbool("CRAWLERA_ENABLED", False)
-        ):
-            spm_setting = (
-                "ZYTE_SMARTPROXY_ENABLED"
-                if settings.getbool("ZYTE_SMARTPROXY_ENABLED", False)
-                else "CRAWLERA_ENABLED"
-            )
-            raise NotConfigured(
-                f"Both ZYTE_API_TRANSPARENT_MODE and {spm_setting} are "
-                f"enabled. You should only enable one of those at the same "
-                f"time.\n"
-                f"\n"
-                f"To combine requests that use Zyte API and requests that use "
-                f"Zyte Smart Proxy Manager in the same spider:\n"
-                f"\n"
-                f"1. Leave {spm_setting} as True.\n"
-                f"2. Unset ZYTE_API_TRANSPARENT_MODE or set it to False.\n"
-                f"3. To send a specific request through Zyte API, use "
-                f"request.meta to set dont_proxy to True and zyte_api_automap "
-                f"either to True or to a dictionary of extra request fields."
-            )
         if not hasattr(crawler, "zyte_api_client"):
             if not client:
                 client = self._build_client(settings)

@@ -10,6 +10,10 @@ from . import SETTINGS
 from .mockserver import DelayedResource, MockServer
 
 
+class NamedSpider(Spider):
+    name = "named"
+
+
 @ensureDeferred
 async def test_autothrottle_handling():
     crawler = get_crawler()
@@ -132,3 +136,73 @@ async def test_max_requests(caplog):
         )
         > 0
     )
+
+
+@ensureDeferred
+async def test_spm_conflict_smartproxy_setting(caplog):
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_SMARTPROXY_APIKEY": "foo",
+        "ZYTE_SMARTPROXY_ENABLED": True,
+        **SETTINGS,
+    }
+    mws = dict(settings["DOWNLOADER_MIDDLEWARES"])
+    mws["scrapy_zyte_smartproxy.ZyteSmartProxyMiddleware"] = 610
+    settings["DOWNLOADER_MIDDLEWARES"] = mws
+    crawler = get_crawler(NamedSpider, settings_dict=settings)
+    await crawler.crawl()
+    assert crawler.stats.get_value("finish_reason") == "plugin_conflict"
+
+
+@ensureDeferred
+async def test_spm_conflict_smartproxy_spider_attr():
+    class SPMSpider(Spider):
+        name = "spm_spider"
+        zyte_smartproxy_enabled = True
+
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_SMARTPROXY_APIKEY": "foo",
+        **SETTINGS,
+    }
+    mws = dict(settings["DOWNLOADER_MIDDLEWARES"])
+    mws["scrapy_zyte_smartproxy.ZyteSmartProxyMiddleware"] = 610
+    settings["DOWNLOADER_MIDDLEWARES"] = mws
+    crawler = get_crawler(SPMSpider, settings_dict=settings)
+    await crawler.crawl()
+    assert crawler.stats.get_value("finish_reason") == "plugin_conflict"
+
+
+@ensureDeferred
+async def test_spm_conflict_crawlera_setting():
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "CRAWLERA_APIKEY": "foo",
+        "CRAWLERA_ENABLED": True,
+        **SETTINGS,
+    }
+    mws = dict(settings["DOWNLOADER_MIDDLEWARES"])
+    mws["scrapy_crawlera.CrawleraMiddleware"] = 610
+    settings["DOWNLOADER_MIDDLEWARES"] = mws
+    crawler = get_crawler(NamedSpider, settings_dict=settings)
+    await crawler.crawl()
+    assert crawler.stats.get_value("finish_reason") == "plugin_conflict"
+
+
+@ensureDeferred
+async def test_spm_conflict_crawlera_spider_attr():
+    class CrawleraSpider(Spider):
+        name = "crawlera_spider"
+        crawlera_enabled = True
+
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "CRAWLERA_APIKEY": "foo",
+        **SETTINGS,
+    }
+    mws = dict(settings["DOWNLOADER_MIDDLEWARES"])
+    mws["scrapy_crawlera.CrawleraMiddleware"] = 610
+    settings["DOWNLOADER_MIDDLEWARES"] = mws
+    crawler = get_crawler(CrawleraSpider, settings_dict=settings)
+    await crawler.crawl()
+    assert crawler.stats.get_value("finish_reason") == "plugin_conflict"

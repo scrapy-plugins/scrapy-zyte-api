@@ -556,23 +556,3 @@ async def test_suspended_account_callback():
         await crawler.crawl()
 
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
-
-
-@pytest.mark.parametrize(
-    "spm_setting",
-    ("ZYTE_SMARTPROXY_ENABLED", "CRAWLERA_ENABLED"),
-)
-def test_spm_conflict(spm_setting):
-    settings = {
-        "ZYTE_API_TRANSPARENT_MODE": True,
-        spm_setting: True,
-        **SETTINGS,
-    }
-    crawler = get_crawler(settings_dict=settings)
-
-    with pytest.raises(NotConfigured):
-        create_instance(
-            ScrapyZyteAPIDownloadHandler,
-            settings=None,
-            crawler=crawler,
-        )

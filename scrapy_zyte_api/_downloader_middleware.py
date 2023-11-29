@@ -1,5 +1,6 @@
 import logging
 
+from scrapy import signals
 from scrapy.exceptions import IgnoreRequest
 
 from ._params import _ParamParser
@@ -25,6 +26,58 @@ class ScrapyZyteAPIDownloaderMiddleware:
                 f"{self._max_requests}. The spider will close when it's "
                 f"reached."
             )
+
+        crawler.signals.connect(self.open_spider, signal=signals.spider_opened)
+
+    def _get_spm_mw(self):
+        spm_mw_classes = []
+
+        try:
+            from scrapy_crawlera import CrawleraMiddleware
+        except ImportError:
+            pass
+        else:
+            spm_mw_classes.append(CrawleraMiddleware)
+
+        try:
+            from scrapy_zyte_smartproxy import ZyteSmartProxyMiddleware
+        except ImportError:
+            pass
+        else:
+            spm_mw_classes.append(ZyteSmartProxyMiddleware)
+
+        middlewares = self._crawler.engine.downloader.middleware.middlewares
+        for middleware in middlewares:
+            if isinstance(middleware, tuple(spm_mw_classes)):
+                return middleware
+        return None
+
+    def open_spider(self, spider):
+        settings = self._crawler.settings
+        in_transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
+        spm_mw = self._get_spm_mw()
+        spm_is_enabled = spm_mw and spm_mw.is_enabled(spider)
+        if not in_transparent_mode or not spm_is_enabled:
+            return
+        logger.error(
+            "Both scrapy-zyte-smartproxy and the transparent mode of "
+            "scrapy-zyte-api are enabled. You should only enable one of "
+            "those at the same time.\n"
+            "\n"
+            "To combine requests that use scrapy-zyte-api and requests "
+            "that use scrapy-zyte-smartproxy in the same spider:\n"
+            "\n"
+            "1. Leave scrapy-zyte-smartproxy enabled.\n"
+            "2. Disable the transparent mode of scrapy-zyte-api.\n"
+            "3. To send a specific request through Zyte API, use "
+            "request.meta to set dont_proxy to True and zyte_api_automap "
+            "either to True or to a dictionary of extra request fields."
+        )
+        from twisted.internet import reactor
+
+        reactor.callLater(
+            0, self._crawler.engine.close_spider, spider, "plugin_conflict"
+        )
 
     def process_request(self, request, spider):
         if self._param_parser.parse(request) is None:
