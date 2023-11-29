@@ -1,5 +1,6 @@
 from unittest import SkipTest
 
+from packaging.version import Version
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.item import Item
@@ -320,6 +321,8 @@ async def test_spm_conflict_crawlera():
         import scrapy_crawlera  # noqa: F401
     except ImportError:
         raise SkipTest("scrapy-crawlera missing")
+    else:
+        SCRAPY_CRAWLERA_VERSION = Version(scrapy_crawlera.__version__)
 
     for setting, attribute, conflict in (
         (None, None, False),
@@ -329,7 +332,8 @@ async def test_spm_conflict_crawlera():
         (False, False, False),
         (False, True, True),
         (True, None, True),
-        (True, False, False),
+        # https://github.com/scrapy-plugins/scrapy-zyte-smartproxy/commit/49ebedd8b1d48cf2667db73f18da3e2c2c7fbfa7
+        (True, False, SCRAPY_CRAWLERA_VERSION < Version("1.7")),
         (True, True, True),
     ):
 
