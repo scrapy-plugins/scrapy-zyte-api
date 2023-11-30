@@ -15,20 +15,272 @@ from ._cookies import _get_all_cookies
 
 logger = getLogger(__name__)
 
-_EXTRACT_KEYS = {
-    "article",
-    "articleList",
-    "articleNavigation",
-    "product",
-    "productList",
-    "productNavigation",
+_NoDefault = object()
+
+# Map of all known root Zyte API request params and how they need to be
+# handled. Sorted by appearance in
+# https://docs.zyte.com/zyte-api/usage/reference.html.
+_REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
+    "url": {
+        "default": _NoDefault,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "requestHeaders": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
+    "httpRequestMethod": {
+        "default": "GET",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "httpRequestBody": {
+        "default": "",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "httpRequestText": {
+        "default": "",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "customHttpRequestHeaders": {
+        "default": [],
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
+    "httpResponseBody": {
+        "default": False,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "httpResponseHeaders": {
+        "default": False,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "browserHtml": {
+        "default": False,
+        "is_extract_type": False,
+        "requires_browser_rendering": True,
+        "changes_fingerprint": True,
+    },
+    "screenshot": {
+        "default": False,
+        "is_extract_type": False,
+        "requires_browser_rendering": True,
+        "changes_fingerprint": True,
+    },
+    "screenshotOptions": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,  # Not on its own.
+        "changes_fingerprint": True,
+    },
+    "article": {
+        "default": False,
+        "is_extract_type": True,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "articleOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "articleList": {
+        "default": False,
+        "is_extract_type": True,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "articleListOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "articleNavigation": {
+        "default": False,
+        "is_extract_type": True,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "articleNavigationOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "jobPosting": {
+        "default": False,
+        "is_extract_type": True,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "jobPostingOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "product": {
+        "default": False,
+        "is_extract_type": True,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "productOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "productList": {
+        "default": False,
+        "is_extract_type": True,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "productListOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "productNavigation": {
+        "default": False,
+        "is_extract_type": True,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "productNavigationOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "geolocation": {
+        "default": None,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "javascript": {
+        "default": None,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,  # Not on its own.
+        "changes_fingerprint": True,
+    },
+    "actions": {
+        "default": [],
+        "is_extract_type": False,
+        "requires_browser_rendering": False,  # Not on its own.
+        "changes_fingerprint": True,
+    },
+    "jobId": {
+        "default": None,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
+    "echoData": {
+        "default": None,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "viewport": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "sessionContext": {
+        "default": [],
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like headers.
+    },
+    "sessionContextParameters": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like sessionContext.
+    },
+    "device": {
+        "default": "auto",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,  # Treated like viewport.
+    },
+    "cookieManagement": {
+        "default": "auto",
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like headers.
+    },
+    "requestCookies": {
+        "default": [],
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like headers.
+    },
+    "responseCookies": {
+        "default": False,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "experimental": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
 }
-_BROWSER_KEYS = _EXTRACT_KEYS | {"browserHtml", "screenshot"}
-_DEFAULT_API_PARAMS = {key: False for key in _BROWSER_KEYS}
+
+_BROWSER_KEYS = {
+    key for key, value in _REQUEST_PARAMS.items() if value["requires_browser_rendering"]
+}
+_EXTRACT_KEYS = {
+    key for key, value in _REQUEST_PARAMS.items() if value["is_extract_type"]
+}
+_BROWSER_OR_EXTRACT_KEYS = _BROWSER_KEYS | _EXTRACT_KEYS
+_DEFAULT_API_PARAMS = {
+    key: value["default"]
+    for key, value in _REQUEST_PARAMS.items()
+    if value["default"] != _NoDefault
+}
 
 _DEFAULT_ACCEPT_ENCODING = ", ".join(
     encoding.decode() for encoding in ACCEPTED_ENCODINGS
 )
+
+
+def _uses_browser(api_params: Dict[str, Any]) -> bool:
+    for key in _BROWSER_KEYS:
+        if api_params.get(key, _REQUEST_PARAMS[key]["default"]):
+            return True
+    for key in _EXTRACT_KEYS:
+        options = api_params.get(f"{key}Options", {})
+        extract_from = options.get("extractFrom", None)
+        if extract_from == "browserHtml":
+            return True
+    # Note: This could be a “maybe”, e.g. if no extractFrom is specified, a
+    # extract key could be triggering browser rendering.
+    return False
 
 
 def _iter_headers(
@@ -149,7 +401,7 @@ def _set_request_headers_from_request(
         api_params.pop("customHttpRequestHeaders")
 
     if (
-        (not response_body or any(api_params.get(k) for k in _BROWSER_KEYS))
+        (not response_body or any(api_params.get(k) for k in _BROWSER_OR_EXTRACT_KEYS))
         and request_headers is not False
         or request_headers is True
     ):
@@ -167,7 +419,7 @@ def _set_http_response_body_from_request(
     api_params: Dict[str, Any],
     request: Request,
 ):
-    if not any(api_params.get(k) for k in _BROWSER_KEYS):
+    if not any(api_params.get(k) for k in _BROWSER_OR_EXTRACT_KEYS):
         api_params.setdefault("httpResponseBody", True)
     elif api_params.get("httpResponseBody") is False:
         logger.warning(
@@ -319,6 +571,9 @@ def _set_http_request_body_from_request(
         api_params["httpRequestBody"] = base64_body
 
 
+_Undefined = object()
+
+
 def _unset_unneeded_api_params(
     *,
     api_params: Dict[str, Any],
@@ -326,7 +581,10 @@ def _unset_unneeded_api_params(
     request: Request,
 ):
     for param, default_value in _DEFAULT_API_PARAMS.items():
-        if api_params.get(param) != default_value:
+        value = api_params.get(param, _Undefined)
+        if value is _Undefined:
+            continue
+        if value != default_value:
             continue
         if param not in default_params or default_params.get(param) == default_value:
             logger.warning(

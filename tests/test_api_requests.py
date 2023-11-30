@@ -938,43 +938,52 @@ def test_automap_header_output(meta, expected, warnings, caplog):
         # If httpRequestMethod is also specified in meta with the same value
         # as Request.method, a warning is logged asking to use only
         # Request.method.
-        *(
-            (
-                request_method,
-                {"httpRequestMethod": meta_method},
-                {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
-                    "httpRequestMethod": meta_method,
-                },
-                ["Use Request.method"],
-            )
-            for request_method, meta_method in (
-                ("GET", "GET"),
-                ("POST", "POST"),
-            )
+        (
+            None,
+            {"httpRequestMethod": "GET"},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.method"],
+        ),
+        (
+            "POST",
+            {"httpRequestMethod": "POST"},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "httpRequestMethod": "POST",
+            },
+            ["Use Request.method"],
         ),
         # If httpRequestMethod is also specified in meta with a different value
         # from Request.method, a warning is logged asking to use Request.meta,
         # and the meta value takes precedence.
-        *(
-            (
-                request_method,
-                {"httpRequestMethod": meta_method},
-                {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
-                    "httpRequestMethod": meta_method,
-                },
-                [
-                    "Use Request.method",
-                    "does not match the Zyte API httpRequestMethod",
-                ],
-            )
-            for request_method, meta_method in (
-                ("GET", "POST"),
-                ("PUT", "GET"),
-            )
+        (
+            "POST",
+            {"httpRequestMethod": "GET"},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [
+                "Use Request.method",
+                "does not match the Zyte API httpRequestMethod",
+            ],
+        ),
+        (
+            "POST",
+            {"httpRequestMethod": "PUT"},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "httpRequestMethod": "PUT",
+            },
+            [
+                "Use Request.method",
+                "does not match the Zyte API httpRequestMethod",
+            ],
         ),
         # If httpResponseBody is not True, implicitly or explicitly,
         # Request.method is still mapped for anything other than GET.
