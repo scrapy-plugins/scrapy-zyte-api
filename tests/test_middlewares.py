@@ -1,3 +1,7 @@
+from typing import Any, Dict, cast
+from unittest import SkipTest
+
+from packaging.version import Version
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.item import Item
@@ -8,6 +12,10 @@ from scrapy_zyte_api import ScrapyZyteAPIDownloaderMiddleware
 
 from . import SETTINGS
 from .mockserver import DelayedResource, MockServer
+
+
+class NamedSpider(Spider):
+    name = "named"
 
 
 @ensureDeferred
@@ -259,3 +267,100 @@ async def test_forbidden_domain_with_partial_start_request_consumption():
         await crawler.crawl()
 
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
+
+
+@ensureDeferred
+async def test_spm_conflict_smartproxy():
+    try:
+        import scrapy_zyte_smartproxy  # noqa: F401
+    except ImportError:
+        raise SkipTest("scrapy-zyte-smartproxy missing")
+
+    for setting, attribute, conflict in (
+        (None, None, False),
+        (None, False, False),
+        (None, True, True),
+        (False, None, False),
+        (False, False, False),
+        (False, True, True),
+        (True, None, True),
+        (True, False, False),
+        (True, True, True),
+    ):
+
+        class SPMSpider(Spider):
+            name = "spm_spider"
+
+        if attribute is not None:
+            SPMSpider.zyte_smartproxy_enabled = attribute
+
+        settings = {
+            "ZYTE_API_TRANSPARENT_MODE": True,
+            "ZYTE_SMARTPROXY_APIKEY": "foo",
+            **SETTINGS,
+        }
+        mws = dict(cast(Dict[Any, int], settings["DOWNLOADER_MIDDLEWARES"]))
+        mws["scrapy_zyte_smartproxy.ZyteSmartProxyMiddleware"] = 610
+        settings["DOWNLOADER_MIDDLEWARES"] = mws
+
+        if setting is not None:
+            settings["ZYTE_SMARTPROXY_ENABLED"] = setting
+
+        crawler = get_crawler(SPMSpider, settings_dict=settings)
+        await crawler.crawl()
+        expected = "plugin_conflict" if conflict else "finished"
+        assert crawler.stats.get_value("finish_reason") == expected, (
+            setting,
+            attribute,
+            conflict,
+        )
+
+
+@ensureDeferred
+async def test_spm_conflict_crawlera():
+    try:
+        import scrapy_crawlera  # noqa: F401
+    except ImportError:
+        raise SkipTest("scrapy-crawlera missing")
+    else:
+        SCRAPY_CRAWLERA_VERSION = Version(scrapy_crawlera.__version__)
+
+    for setting, attribute, conflict in (
+        (None, None, False),
+        (None, False, False),
+        (None, True, True),
+        (False, None, False),
+        (False, False, False),
+        (False, True, True),
+        (True, None, True),
+        # https://github.com/scrapy-plugins/scrapy-zyte-smartproxy/commit/49ebedd8b1d48cf2667db73f18da3e2c2c7fbfa7
+        (True, False, SCRAPY_CRAWLERA_VERSION < Version("1.7")),
+        (True, True, True),
+    ):
+
+        class CrawleraSpider(Spider):
+            name = "crawlera_spider"
+
+        if attribute is not None:
+            CrawleraSpider.crawlera_enabled = attribute
+
+        settings = {
+            "ZYTE_API_TRANSPARENT_MODE": True,
+            "CRAWLERA_APIKEY": "foo",
+            **SETTINGS,
+        }
+        mws = dict(cast(Dict[Any, int], settings["DOWNLOADER_MIDDLEWARES"]))
+        mws["scrapy_crawlera.CrawleraMiddleware"] = 610
+        settings["DOWNLOADER_MIDDLEWARES"] = mws
+
+        if setting is not None:
+            settings["CRAWLERA_ENABLED"] = setting
+
+        crawler = get_crawler(CrawleraSpider, settings_dict=settings)
+        await crawler.crawl()
+        expected = "plugin_conflict" if conflict else "finished"
+        assert crawler.stats.get_value("finish_reason") == expected, (
+            setting,
+            attribute,
+            conflict,
+        )
