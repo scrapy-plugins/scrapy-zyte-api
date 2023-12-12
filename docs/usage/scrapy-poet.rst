@@ -65,3 +65,24 @@ always requested even when using a :class:`~scrapy_poet.DummyResponse`
 annotation, and in some dependency combinations two Zyte API requests will be
 made for the same page. We are planning to solve these problems in the future
 releases of :doc:`scrapy-poet <scrapy-poet:index>` and scrapy-zyte-api.
+
+
+Dependency annotations
+======================
+
+``ZyteApiProvider`` understands some dependency annotations. The only currently
+supported one is :class:`scrapy_zyte_api.ExtractFrom`:
+
+.. code-block:: python
+
+    from typing import Annotated
+
+    from scrapy_zyte_api import ExtractFrom
+
+    @attrs.define
+    class MyPageObject(BasePage):
+        product: Annotated[Product, ExtractFrom.httpResponseBody]
+
+The provider will set the extraction options based on the annotations, so for
+this code ``extractFrom`` will be set to ``httpResponseBody`` in
+``productOptions``.

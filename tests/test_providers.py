@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 pytest.importorskip("scrapy_poet")
@@ -13,6 +15,7 @@ from twisted.web.client import Agent, readBody
 from web_poet import BrowserHtml, BrowserResponse, ItemPage, field, handle_urls
 from zyte_common_items import BasePage, Product
 
+from scrapy_zyte_api._annotations import ExtractFrom
 from scrapy_zyte_api.providers import ZyteApiProvider
 
 from . import SETTINGS
@@ -199,3 +202,66 @@ async def test_provider_params_remove_unused_options(mockserver):
         crawler.stats.get_value("scrapy-zyte-api/request_args/productNavigationOptions")
         is None
     )
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@ensureDeferred
+async def test_provider_extractfrom(mockserver):
+    from typing import Annotated
+
+    @attrs.define
+    class AnnotatedProductPage(BasePage):
+        product: Annotated[Product, ExtractFrom.httpResponseBody]
+        product2: Annotated[Product, ExtractFrom.httpResponseBody]
+
+    class AnnotatedZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+                "product2": page.product,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(
+        AnnotatedZyteAPISpider, HtmlResource, settings
+    )
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name (from httpResponseBody)",
+            price="10",
+            currency="USD",
+        )
+    )
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@ensureDeferred
+async def test_provider_extractfrom_double(mockserver, caplog):
+    from typing import Annotated
+
+    @attrs.define
+    class AnnotatedProductPage(BasePage):
+        product: Annotated[Product, ExtractFrom.httpResponseBody]
+        product2: Annotated[Product, ExtractFrom.browserHtml]
+
+    class AnnotatedZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, _, _ = await crawl_single_item(AnnotatedZyteAPISpider, HtmlResource, settings)
+    assert item is None
+    assert "Multiple different extractFrom specified for product" in caplog.text

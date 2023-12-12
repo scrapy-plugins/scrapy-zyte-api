@@ -149,6 +149,14 @@ class DefaultResource(Resource):
                 "price": "10",
                 "currency": "USD",
             }
+            extract_from = request_data.get("productOptions", {}).get("extractFrom")
+            if extract_from:
+                from scrapy_zyte_api.providers import ExtractFrom
+
+                if extract_from == ExtractFrom.httpResponseBody:
+                    assert isinstance(response_data["product"], dict)
+                    assert isinstance(response_data["product"]["name"], str)
+                    response_data["product"]["name"] += " (from httpResponseBody)"
 
         return json.dumps(response_data).encode()
 
