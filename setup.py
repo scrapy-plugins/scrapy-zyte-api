@@ -32,7 +32,7 @@ setuptools.setup(
         "provider": [
             "andi>=0.5.0",
             "scrapy-poet>=0.18.0",
-            "web-poet>=0.13.0",
+            "web-poet>=0.15.1",
             "zyte-common-items>=0.7.0",
         ]
     },
