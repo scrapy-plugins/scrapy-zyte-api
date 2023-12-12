@@ -39,6 +39,11 @@ jobs:
         - python-version: '3.11'
           toxenv: provider
 
+        - python-version: '3.7'
+          toxenv: pinned-extra
+        - python-version: '3.11'
+          toxenv: extra
+
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
@@ -62,7 +67,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11"]
-        tox-job: ["mypy", "linters", "twine-check"]
+        tox-job: ["mypy", "linters", "twine-check", "docs"]
 
     steps:
     - uses: actions/checkout@v3
