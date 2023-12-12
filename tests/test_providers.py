@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 pytest.importorskip("scrapy_poet")
@@ -6,7 +8,11 @@ import attrs
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy_poet import DummyResponse
-from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
+from scrapy_poet.utils.testing import (
+    HtmlResource,
+    capture_exceptions,
+    crawl_single_item,
+)
 from scrapy_poet.utils.testing import create_scrapy_settings as _create_scrapy_settings
 from twisted.internet import reactor
 from twisted.web.client import Agent, readBody
@@ -201,6 +207,9 @@ async def test_provider_params_remove_unused_options(mockserver):
     )
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
 @ensureDeferred
 async def test_provider_extractfrom(mockserver):
     from typing import Annotated
@@ -217,8 +226,7 @@ async def test_provider_extractfrom(mockserver):
                 "product2": page.product,
             }
 
-    settings = create_scrapy_settings(None)
-    settings.update(SETTINGS)
+    settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
@@ -235,8 +243,11 @@ async def test_provider_extractfrom(mockserver):
     )
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
 @ensureDeferred
-async def test_provider_extractfrom_double(mockserver):
+async def test_provider_extractfrom_double(mockserver, caplog):
     from typing import Annotated
 
     @attrs.define
@@ -245,15 +256,18 @@ async def test_provider_extractfrom_double(mockserver):
         product2: Annotated[Product, ExtractFrom.browserHtml]
 
     class AnnotatedZyteAPISpider(ZyteAPISpider):
+        def start_requests(self):
+            yield Request(self.url, callback=capture_exceptions(self.parse_))
+
         def parse_(self, response: DummyResponse, page: AnnotatedProductPage):  # type: ignore[override]
             yield {
                 "product": page.product,
             }
 
-    settings = create_scrapy_settings(None)
-    settings.update(SETTINGS)
+    settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
     item, _, _ = await crawl_single_item(AnnotatedZyteAPISpider, HtmlResource, settings)
     assert item is None
+    assert "Multiple different extractFrom specified for product" in caplog.text
