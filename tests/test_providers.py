@@ -15,7 +15,8 @@ from twisted.web.client import Agent, readBody
 from web_poet import BrowserHtml, BrowserResponse, ItemPage, field, handle_urls
 from zyte_common_items import BasePage, Product
 
-from scrapy_zyte_api.providers import ExtractFrom, ZyteApiProvider
+from scrapy_zyte_api._annotations import ExtractFrom
+from scrapy_zyte_api.providers import ZyteApiProvider
 
 from . import SETTINGS
 from .mockserver import get_ephemeral_port

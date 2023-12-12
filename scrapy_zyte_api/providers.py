@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import Any, Callable, Dict, List, Sequence, Set
 from weakref import WeakKeyDictionary
 
@@ -18,6 +17,7 @@ from zyte_common_items import (
     ProductNavigation,
 )
 
+from scrapy_zyte_api._annotations import ExtractFrom
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -25,11 +25,6 @@ try:
     from scrapy.http.request import NO_CALLBACK
 except ImportError:
     NO_CALLBACK = None
-
-
-class ExtractFrom(str, Enum):
-    httpResponseBody: str = "httpResponseBody"
-    browserHtml: str = "browserHtml"
 
 
 class ZyteApiProvider(PageObjectInputProvider):
