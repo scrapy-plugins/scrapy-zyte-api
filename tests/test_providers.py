@@ -8,11 +8,7 @@ import attrs
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy_poet import DummyResponse
-from scrapy_poet.utils.testing import (
-    HtmlResource,
-    capture_exceptions,
-    crawl_single_item,
-)
+from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
 from scrapy_poet.utils.testing import create_scrapy_settings as _create_scrapy_settings
 from twisted.internet import reactor
 from twisted.web.client import Agent, readBody
@@ -256,9 +252,6 @@ async def test_provider_extractfrom_double(mockserver, caplog):
         product2: Annotated[Product, ExtractFrom.browserHtml]
 
     class AnnotatedZyteAPISpider(ZyteAPISpider):
-        def start_requests(self):
-            yield Request(self.url, callback=capture_exceptions(self.parse_))
-
         def parse_(self, response: DummyResponse, page: AnnotatedProductPage):  # type: ignore[override]
             yield {
                 "product": page.product,
