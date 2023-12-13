@@ -1,11 +1,47 @@
 Changes
 =======
 
-TBR
----
+0.13.0 (YYYY-MM-DD)
+-------------------
+
+* Updated requirement versions:
+
+  * andi >= 0.5.0
+  * scrapy-poet >= 0.18.0
+  * web-poet >= 0.15.1
+  * zyte-api >= 0.4.8
+
+* The spider is now closed and the finish reason is set to
+  ``"zyte_api_bad_key"`` or ``"zyte_api_suspended_account"`` when receiving
+  "Authentication Key Not Found" or "Account Suspended" responses from Zyte
+  API.
+
+* The spider is now closed and the finish reason is set to
+  ``"failed_forbidden_domain"`` when all start requests fail because they are
+  pointing to domains forbidden by Zyte API.
+
+* The spider is now closed and the finish reason is set to
+  ``"plugin_conflict"`` if both scrapy-zyte-smartproxy and the transparent mode
+  of scrapy-zyte-api are enabled.
+
+* The ``extractFrom`` extraction option can now be requested by annotating the
+  dependency with a ``scrapy_zyte_api.ExtractFrom`` member (e.g.
+  ``product: typing.Annotated[Product, ExtractFrom.httpResponseBody]``).
+
+* The ``Set-Cookie`` header is now removed from the response if the cookies
+  were returned by Zyte API (as ``"experimental.responseCookies"``).
+
+* The request fingerprinting was improved by refining which parts of the
+  request affect the fingerprint.
 
 * Zyte API Request IDs are now included in the error logs.
-* Bump the zyte-api dependency: 0.4.7 → 0.4.8.
+
+* Split README.rst into multiple documentation files and publish them on
+  ReadTheDocs.
+
+* Improve the documentation for the ``ZYTE_API_MAX_REQUESTS`` setting.
+
+* Test and CI improvements.
 
 0.12.2 (2023-10-19)
 -------------------
