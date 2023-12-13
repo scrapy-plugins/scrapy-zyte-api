@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.13.0 (YYYY-MM-DD)
+0.13.0 (2023-12-13)
 -------------------
 
 * Updated requirement versions:
