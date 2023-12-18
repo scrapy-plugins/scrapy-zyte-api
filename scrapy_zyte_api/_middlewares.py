@@ -108,7 +108,9 @@ class ScrapyZyteAPIDownloaderMiddleware:
         slot.delay = 0
 
         if self._max_requests_reached(downloader):
-            self._crawler.engine.close_spider(spider, "closespider_max_zapi_requests")
+            self._crawler.engine.close_spider(
+                spider, f"closespider_max_{self._max_requests}_zapi_requests"
+            )
             raise IgnoreRequest(
                 f"The request {request} is skipped as {self._max_requests} max "
                 f"Zyte API requests have been reached."
