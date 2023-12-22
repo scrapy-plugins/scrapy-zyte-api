@@ -330,6 +330,21 @@ def _map_custom_http_request_headers(
                     f"customHttpRequestHeaders parameter."
                 )
             continue
+        elif (
+            (
+                lowercase_k == b"accept"
+                and decoded_v == DEFAULT_REQUEST_HEADERS["Accept"]
+            )
+            or (
+                lowercase_k == b"accept-encoding"
+                and decoded_v == _DEFAULT_ACCEPT_ENCODING
+            )
+            or (
+                lowercase_k == b"accept-language"
+                and decoded_v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
+            )
+        ):
+            continue
         headers.append({"name": k.decode(), "value": decoded_v})
     if headers:
         api_params["customHttpRequestHeaders"] = headers

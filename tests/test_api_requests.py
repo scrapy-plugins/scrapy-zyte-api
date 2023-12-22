@@ -20,7 +20,8 @@ from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
-from twisted.internet.defer import Deferred
+from scrapy.utils.defer import deferred_from_coro
+from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.errors import RequestError
 
 from scrapy_zyte_api._cookies import _get_cookie_jar
@@ -2676,3 +2677,36 @@ def test_default_params_false(default_params):
     param_parser = handler._param_parser
     api_params = param_parser.parse(request)
     assert api_params is None
+
+
+@inlineCallbacks
+def test_default_scrapy_headers_http_default():
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    request = Request(url="https://example.com")
+
+    downloader_middlewares = crawler.engine.downloader.middleware
+    for process_request in downloader_middlewares.methods["process_request"]:
+        yield deferred_from_coro(
+            process_request(request=request, spider=crawler.spider)
+        )
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert "customHttpRequestHeaders" not in api_params
+
+
+# TODO:
+# Test a verbatim DEFAULT_REQUEST_HEADERS value manually set at different
+# setting levels higher than the global default.
+# Test a verbatim DEFAULT_REQUEST_HEADERS value set through request
+# headers.
+# Test the default Accept-Encoding header set through
+# DEFAULT_REQUEST_HEADERS or though request headers.
+# Test a custom Accept-Encoding header set through DEFAULT_REQUEST_HEADERS
+# or through request headers.
+# Test all of the above for browser requests.
