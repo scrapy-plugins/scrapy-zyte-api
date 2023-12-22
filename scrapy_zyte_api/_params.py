@@ -6,10 +6,7 @@ from typing import Any, Dict, List, Mapping, Optional, Set
 from warnings import warn
 
 from scrapy import Request
-from scrapy.downloadermiddlewares.httpcompression import (
-    ACCEPTED_ENCODINGS,
-    HttpCompressionMiddleware,
-)
+from scrapy.downloadermiddlewares.httpcompression import HttpCompressionMiddleware
 from scrapy.http.cookies import CookieJar
 
 from ._cookies import _get_all_cookies
@@ -264,10 +261,6 @@ _DEFAULT_API_PARAMS = {
     for key, value in _REQUEST_PARAMS.items()
     if value["default"] != _NoDefault
 }
-
-_DEFAULT_ACCEPT_ENCODING = ", ".join(
-    encoding.decode() for encoding in ACCEPTED_ENCODINGS
-)
 
 
 def _uses_browser(api_params: Dict[str, Any]) -> bool:
