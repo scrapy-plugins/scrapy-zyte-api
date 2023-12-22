@@ -851,17 +851,30 @@ def _load_skip_headers(crawler):
             ["Cookie", "User-Agent"],
         )
     }
+
     soft_skip_headers = set()
+
+    accept_encoding_in_default_headers = False
     if not crawler.settings.getpriority("DEFAULT_REQUEST_HEADERS"):
         for header in crawler.settings["DEFAULT_REQUEST_HEADERS"]:
             soft_skip_headers.add(header.lower().encode())
-    if crawler.engine:
-        for downloader_middleware in crawler.engine.downloader.middleware.middlewares:
-            if isinstance(downloader_middleware, HttpCompressionMiddleware):
-                soft_skip_headers.add(b"accept-encoding")
     else:
-        # Assume the default scenario on tests that do not initialize the engine.
-        soft_skip_headers.add(b"accept-encoding")
+        for header in crawler.settings["DEFAULT_REQUEST_HEADERS"]:
+            if header.lower().encode() == b"accept-encoding":
+                accept_encoding_in_default_headers = True
+                break
+
+    if not accept_encoding_in_default_headers:
+        if crawler.engine:
+            for (
+                downloader_middleware
+            ) in crawler.engine.downloader.middleware.middlewares:
+                if isinstance(downloader_middleware, HttpCompressionMiddleware):
+                    soft_skip_headers.add(b"accept-encoding")
+        else:
+            # Assume the default scenario on tests that do not initialize the engine.
+            soft_skip_headers.add(b"accept-encoding")
+
     return hard_skip_headers, soft_skip_headers
 
 
