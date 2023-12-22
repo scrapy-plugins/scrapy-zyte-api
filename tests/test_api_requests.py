@@ -2787,6 +2787,42 @@ def test_middleware_headers_default():
 
 
 @inlineCallbacks
+def test_middleware_headers_default_custom():
+    """Non-default values set for headers with a default value also work as
+    expected."""
+    settings = {
+        **SETTINGS,
+        "DEFAULT_REQUEST_HEADERS": {
+            "Accept": "text/html",
+            "Accept-Language": "fa",
+            "Accept-Encoding": "br",
+            "Referer": "https://google.com",
+        },
+        "REFERER_ENABLED": False,  # https://github.com/scrapy/scrapy/issues/6184
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    request = Request(url="https://example.com")
+    yield _process_request(crawler, request)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert api_params["customHttpRequestHeaders"] == [
+        {
+            "name": "Accept",
+            "value": "text/html",
+        },
+        {"name": "Accept-Language", "value": "fa"},
+        {
+            "name": "Accept-Encoding",
+            "value": "br",
+        },
+        {"name": "Referer", "value": "https://google.com"},
+    ]
+
+
+@inlineCallbacks
 def test_middleware_headers_request_headers():
     """If request headers match the global default value of
     DEFAULT_REQUEST_HEADERS, they should be translated nonetheless."""
@@ -2823,14 +2859,44 @@ def test_middleware_headers_request_headers():
     ]
 
 
+@inlineCallbacks
+def test_middleware_headers_request_headers_custom():
+    """If request headers match the global default value of
+    DEFAULT_REQUEST_HEADERS, they should be translated nonetheless."""
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    request = Request(
+        url="https://example.com",
+        headers={
+            "Accept": "text/html",
+            "Accept-Language": "fa",
+            "Accept-Encoding": "br",
+            "Referer": "https://google.com",
+        },
+    )
+    yield _process_request(crawler, request)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert api_params["customHttpRequestHeaders"] == [
+        {
+            "name": "Accept",
+            "value": "text/html",
+        },
+        {"name": "Accept-Language", "value": "fa"},
+        {
+            "name": "Accept-Encoding",
+            "value": "br",
+        },
+        {"name": "Referer", "value": "https://google.com"},
+    ]
+
+
 # TODO:
-# Test a custom Accept-Encoding header set through DEFAULT_REQUEST_HEADERS
-# or through request headers.
-# Test that the default Accept-Encoding value is sent to Zyte API itself.
-# Test that a custom Accept-Encoding value is *not* sent to Zyte API itself,
-# and only translated into a Zyte API parameter.
-# Provide a setting to override the Accept-Encoding value sent to Zyte API
-# itself, and test it.
 # Test that forcing the skipping of a header works for all these scenarios that would not skip it.
 # Also set the User-Agent if its value does not come from the global setting.
 # Test all of the above for browser requests.
