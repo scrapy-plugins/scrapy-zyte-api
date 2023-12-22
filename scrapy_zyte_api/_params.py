@@ -11,8 +11,6 @@ from scrapy.downloadermiddlewares.httpcompression import (
     HttpCompressionMiddleware,
 )
 from scrapy.http.cookies import CookieJar
-from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
-from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 
 from ._cookies import _get_all_cookies
 
@@ -314,7 +312,7 @@ def _map_custom_http_request_headers(
     *,
     api_params: Dict[str, Any],
     request: Request,
-    skip_headers: Set[str],
+    skip_headers: Set[bytes],
 ):
     headers = []
     for k, lowercase_k, decoded_v in _iter_headers(
@@ -323,27 +321,6 @@ def _map_custom_http_request_headers(
         header_parameter="customHttpRequestHeaders",
     ):
         if lowercase_k in skip_headers:
-            if not (
-                (
-                    lowercase_k == b"accept"
-                    and decoded_v == DEFAULT_REQUEST_HEADERS["Accept"]
-                )
-                or (
-                    lowercase_k == b"accept-encoding"
-                    and decoded_v == _DEFAULT_ACCEPT_ENCODING
-                )
-                or (
-                    lowercase_k == b"accept-language"
-                    and decoded_v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
-                )
-                or lowercase_k == b"cookie"
-                or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
-            ):
-                logger.warning(
-                    f"Request {request} defines header {k}, which will not be "
-                    f"mapped into the Zyte API customHttpRequestHeaders "
-                    f"parameter."
-                )
             continue
         headers.append({"name": k.decode(), "value": decoded_v})
     if headers:
@@ -355,6 +332,7 @@ def _map_request_headers(
     api_params: Dict[str, Any],
     request: Request,
     browser_headers: Dict[str, str],
+    browser_ignore_headers: Set[bytes],
 ):
     request_headers = {}
     for k, lowercase_k, decoded_v in _iter_headers(
@@ -365,26 +343,11 @@ def _map_request_headers(
         key = browser_headers.get(lowercase_k)
         if key is not None:
             request_headers[key] = decoded_v
-        elif not (
-            (
-                lowercase_k == b"accept"
-                and decoded_v == DEFAULT_REQUEST_HEADERS["Accept"]
-            )
-            or (
-                lowercase_k == b"accept-encoding"
-                and decoded_v == _DEFAULT_ACCEPT_ENCODING
-            )
-            or (
-                lowercase_k == b"accept-language"
-                and decoded_v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
-            )
-            or lowercase_k == b"cookie"
-            or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
-        ):
+        elif lowercase_k not in browser_ignore_headers:
             logger.warning(
                 f"Request {request} defines header {k}, which "
                 f"cannot be mapped into the Zyte API requestHeaders "
-                f"parameter."
+                f"parameter. See the ZYTE_API_BROWSER_HEADERS setting."
             )
     if request_headers:
         api_params["requestHeaders"] = request_headers
@@ -394,8 +357,9 @@ def _set_request_headers_from_request(
     *,
     api_params: Dict[str, Any],
     request: Request,
-    skip_headers: Set[str],
+    skip_headers: Set[bytes],
     browser_headers: Dict[str, str],
+    browser_ignore_headers: Set[bytes],
 ):
     """Updates *api_params*, in place, based on *request*."""
     custom_http_request_headers = api_params.get("customHttpRequestHeaders")
@@ -424,6 +388,7 @@ def _set_request_headers_from_request(
             api_params=api_params,
             request=request,
             browser_headers=browser_headers,
+            browser_ignore_headers=browser_ignore_headers,
         )
     elif request_headers is False:
         api_params.pop("requestHeaders")
@@ -616,8 +581,9 @@ def _update_api_params_from_request(
     *,
     default_params: Dict[str, Any],
     meta_params: Dict[str, Any],
-    skip_headers: Set[str],
+    skip_headers: Set[bytes],
     browser_headers: Dict[str, str],
+    browser_ignore_headers: Set[bytes],
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
@@ -634,6 +600,7 @@ def _update_api_params_from_request(
         request=request,
         skip_headers=skip_headers,
         browser_headers=browser_headers,
+        browser_ignore_headers=browser_ignore_headers,
     )
     _set_http_request_body_from_request(api_params=api_params, request=request)
     if cookies_enabled:
@@ -746,8 +713,9 @@ def _get_automap_params(
     *,
     default_enabled: bool,
     default_params: Dict[str, Any],
-    skip_headers: Set[str],
+    skip_headers: Set[bytes],
     browser_headers: Dict[str, str],
+    browser_ignore_headers: Set[bytes],
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
@@ -777,6 +745,7 @@ def _get_automap_params(
         meta_params=meta_params,
         skip_headers=skip_headers,
         browser_headers=browser_headers,
+        browser_ignore_headers=browser_ignore_headers,
         cookies_enabled=cookies_enabled,
         cookie_jars=cookie_jars,
         max_cookies=max_cookies,
@@ -791,8 +760,9 @@ def _get_api_params(
     default_params: Dict[str, Any],
     transparent_mode: bool,
     automap_params: Dict[str, Any],
-    skip_headers: Set[str],
+    skip_headers: Set[bytes],
     browser_headers: Dict[str, str],
+    browser_ignore_headers: Set[bytes],
     job_id: Optional[str],
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
@@ -809,6 +779,7 @@ def _get_api_params(
             default_params=automap_params,
             skip_headers=skip_headers,
             browser_headers=browser_headers,
+            browser_ignore_headers=browser_ignore_headers,
             cookies_enabled=cookies_enabled,
             cookie_jars=cookie_jars,
             max_cookies=max_cookies,
@@ -843,26 +814,31 @@ def _load_default_params(settings, setting):
     return params
 
 
-def _load_skip_headers(crawler):
-    hard_skip_headers = {
+def _load_http_skip_headers(settings):
+    return {
         header.strip().lower().encode()
-        for header in crawler.settings.getlist(
+        for header in settings.getlist(
             "ZYTE_API_SKIP_HEADERS",
-            ["Cookie", "User-Agent"],
+            ["Cookie"],
         )
     }
 
-    soft_skip_headers = set()
+
+def _load_mw_skip_headers(crawler):
+    mw_skip_headers = set()
 
     accept_encoding_in_default_headers = False
+    user_agent_in_default_headers = False
     if not crawler.settings.getpriority("DEFAULT_REQUEST_HEADERS"):
         for header in crawler.settings["DEFAULT_REQUEST_HEADERS"]:
-            soft_skip_headers.add(header.lower().encode())
+            mw_skip_headers.add(header.lower().encode())
     else:
         for header in crawler.settings["DEFAULT_REQUEST_HEADERS"]:
-            if header.lower().encode() == b"accept-encoding":
+            lowercase_k = header.lower().encode()
+            if lowercase_k == b"accept-encoding":
                 accept_encoding_in_default_headers = True
-                break
+            if lowercase_k == b"user-agent":
+                user_agent_in_default_headers = True
 
     if not accept_encoding_in_default_headers:
         if crawler.engine:
@@ -870,12 +846,17 @@ def _load_skip_headers(crawler):
                 downloader_middleware
             ) in crawler.engine.downloader.middleware.middlewares:
                 if isinstance(downloader_middleware, HttpCompressionMiddleware):
-                    soft_skip_headers.add(b"accept-encoding")
+                    mw_skip_headers.add(b"accept-encoding")
         else:
             # Assume the default scenario on tests that do not initialize the engine.
-            soft_skip_headers.add(b"accept-encoding")
+            mw_skip_headers.add(b"accept-encoding")
 
-    return hard_skip_headers, soft_skip_headers
+    if not user_agent_in_default_headers and not crawler.settings.getpriority(
+        "USER_AGENT"
+    ):
+        mw_skip_headers.add(b"user-agent")
+
+    return mw_skip_headers
 
 
 def _load_browser_headers(settings):
@@ -894,7 +875,8 @@ class _ParamParser:
         self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
         self._job_id = environ.get("SHUB_JOBKEY", None)
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
-        self._hard_skip_headers, self._soft_skip_headers = _load_skip_headers(crawler)
+        self._http_skip_headers = _load_http_skip_headers(settings)
+        self._mw_skip_headers = _load_mw_skip_headers(crawler)
         self._warn_on_cookies = False
         if cookies_enabled is not None:
             self._cookies_enabled = cookies_enabled
@@ -913,21 +895,24 @@ class _ParamParser:
         self._cookie_jars = None
 
     def _request_skip_headers(self, request):
-        return self._hard_skip_headers | (
-            self._soft_skip_headers - request.meta.get("_pre_mw_headers", set())
-        )
+        return self._mw_skip_headers - request.meta.get("_pre_mw_headers", set())
 
     def parse(self, request):
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
         use_default_params = request.meta.get("zyte_api_default_params", True)
         cookies_enabled = self._cookies_enabled and not dont_merge_cookies
+        request_skip_headers = self._request_skip_headers(request)
         params = _get_api_params(
             request,
             default_params=self._default_params if use_default_params else {},
             transparent_mode=self._transparent_mode,
             automap_params=self._automap_params,
-            skip_headers=self._request_skip_headers(request),
+            skip_headers=self._http_skip_headers | request_skip_headers,
             browser_headers=self._browser_headers,
+            browser_ignore_headers={
+                b"cookie",
+            }
+            | request_skip_headers,
             job_id=self._job_id,
             cookies_enabled=cookies_enabled,
             cookie_jars=self._cookie_jars,

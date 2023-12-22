@@ -239,7 +239,7 @@ See :ref:`retry`.
 ZYTE_API_SKIP_HEADERS
 =====================
 
-Default: ``["User-Agent"]``
+Default: ``["Cookie"]``
 
 Determines headers that must *not* be mapped as
 :http:`request:customHttpRequestHeaders`.

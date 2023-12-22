@@ -42,6 +42,10 @@ from .mockserver import DelayedResource, MockServer, produce_request_response
 # Pick one of the automatic extraction keys for testing purposes.
 EXTRACT_KEY = next(iter(_EXTRACT_KEYS))
 
+DEFAULT_ACCEPT_ENCODING = ", ".join(
+    encoding.decode() for encoding in ACCEPTED_ENCODINGS
+)
+
 
 def sort_dict_list(dict_list):
     return sorted(dict_list, key=lambda i: sorted(i.items()))
@@ -272,7 +276,6 @@ DEFAULT_PARAMS: Dict[str, Any] = {}
 TRANSPARENT_MODE = False
 SKIP_HEADERS = {
     b"cookie",
-    b"user-agent",
 }
 JOB_ID = None
 COOKIES_ENABLED = False
@@ -281,7 +284,7 @@ GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
     "transparent_mode": TRANSPARENT_MODE,
     "automap_params": AUTOMAP_PARAMS,
-    "hard_skip_headers": SKIP_HEADERS,
+    "http_skip_headers": SKIP_HEADERS,
     "browser_headers": BROWSER_HEADERS,
     "job_id": JOB_ID,
     "cookies_enabled": COOKIES_ENABLED,
@@ -316,7 +319,7 @@ async def test_param_parser_input_custom(mockserver):
         assert parser._cookies_enabled is True
         assert parser._default_params == {"a": "b"}
         assert parser._max_cookies == 1
-        assert parser._hard_skip_headers == {
+        assert parser._http_skip_headers == {
             b"a",
         }
         assert parser._transparent_mode is True
@@ -640,6 +643,7 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
     assert default_params == setting
 
 
+@inlineCallbacks
 def _test_automap(
     settings, request_kwargs, meta, expected, warnings, caplog, cookie_jar=None
 ):
@@ -647,13 +651,13 @@ def _test_automap(
     request.meta["zyte_api_automap"] = meta
     settings = {**SETTINGS, **settings, "ZYTE_API_TRANSPARENT_MODE": True}
     crawler = get_crawler(settings)
+    yield _process_request(crawler, request, is_start_request=True)
     if "cookies" in request_kwargs:
         try:
             cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
         except ValueError:
             pass
         else:
-            cookie_middleware.process_request(request, spider=None)
             if cookie_jar:
                 _cookie_jar = _get_cookie_jar(request, cookie_middleware.jars)
                 for cookie in cookie_jar:
@@ -1494,33 +1498,10 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             ["cannot be mapped"],
         ),
-        # Unsupported headers are looked up case-insensitively.
-        (
-            {"user-Agent": ""},
-            {},
-            {
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-            },
-            ["will not be mapped"],
-        ),
-        # The Accept, Accept-Encoding and Accept-Language headers, when
-        # unsupported (i.e. browser requests), are dropped silently if their
-        # value matches the default value of Scrapy, or with a warning
-        # otherwise.
-        (
-            {
-                **DEFAULT_REQUEST_HEADERS,  # Accept, Accept-Language
-                "Accept-Encoding": ", ".join(
-                    encoding.decode() for encoding in ACCEPTED_ENCODINGS
-                ),
-            },
-            {"browserHtml": True},
-            {
-                "browserHtml": True,
-            },
-            [],
-        ),
+        # The Accept, Accept-Encoding, Accept-Language and User-Agent headers,
+        # when unsupported (i.e. browser requests), are dropped with a warning
+        # if the user set them manually (even if they are set with their
+        # default value).
         *(
             (
                 headers,
@@ -1532,7 +1513,13 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             )
             for headers in (
                 {
+                    "Accept": DEFAULT_REQUEST_HEADERS["Accept"],
+                },
+                {
                     "Accept": "application/json",
+                },
+                {
+                    "Accept-Encoding": DEFAULT_ACCEPT_ENCODING,
                 },
                 {
                     "Accept-Encoding": "br",
@@ -1540,15 +1527,27 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 {
                     "Accept-Language": "uk",
                 },
+                {
+                    "Accept-Language": DEFAULT_REQUEST_HEADERS["Accept-Language"],
+                },
+                {
+                    "User-Agent": DEFAULT_USER_AGENT,
+                },
+                {
+                    "User-Agent": "foo/1.2.3",
+                },
             )
         ),
-        # The User-Agent header, which Scrapy sets by default, is dropped
-        # silently if it matches the default value of the USER_AGENT setting,
-        # or with a warning otherwise.
+        # The User-Agent header, which Scrapy sets by default, is used for
+        # customHttpRequestHeaders if the value comes from a user-defined
+        # setting (as opposed to the global default value).
         (
             {"User-Agent": DEFAULT_USER_AGENT},
             {},
             {
+                "customHttpRequestHeaders": [
+                    {"name": "User-Agent", "value": DEFAULT_USER_AGENT}
+                ],
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
@@ -1558,31 +1557,17 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             {"User-Agent": ""},
             {},
             {
+                "customHttpRequestHeaders": [{"name": "User-Agent", "value": ""}],
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
-            ["will not be mapped"],
-        ),
-        (
-            {"User-Agent": DEFAULT_USER_AGENT},
-            {"browserHtml": True},
-            {
-                "browserHtml": True,
-            },
             [],
-        ),
-        (
-            {"User-Agent": ""},
-            {"browserHtml": True},
-            {
-                "browserHtml": True,
-            },
-            ["cannot be mapped"],
         ),
     ],
 )
+@inlineCallbacks
 def test_automap_headers(headers, meta, expected, warnings, caplog):
-    _test_automap({}, {"headers": headers}, meta, expected, warnings, caplog)
+    yield _test_automap({}, {"headers": headers}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -2783,9 +2768,8 @@ def test_middleware_headers_default():
         **SETTINGS,
         "DEFAULT_REQUEST_HEADERS": {
             **DEFAULT_REQUEST_HEADERS,
-            "Accept-Encoding": ", ".join(
-                encoding.decode() for encoding in ACCEPTED_ENCODINGS
-            ),
+            "Accept-Encoding": DEFAULT_ACCEPT_ENCODING,
+            "User-Agent": DEFAULT_USER_AGENT,
         },
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2805,7 +2789,11 @@ def test_middleware_headers_default():
         {"name": "Accept-Language", "value": "en"},
         {
             "name": "Accept-Encoding",
-            "value": ", ".join(encoding.decode() for encoding in ACCEPTED_ENCODINGS),
+            "value": DEFAULT_ACCEPT_ENCODING,
+        },
+        {
+            "name": "User-Agent",
+            "value": DEFAULT_USER_AGENT,
         },
     ]
 
@@ -2821,6 +2809,7 @@ def test_middleware_headers_default_custom():
             "Accept-Language": "fa",
             "Accept-Encoding": "br",
             "Referer": "https://google.com",
+            "User-Agent": "foo/1.2.3",
         },
         "REFERER_ENABLED": False,  # https://github.com/scrapy/scrapy/issues/6184
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -2843,6 +2832,7 @@ def test_middleware_headers_default_custom():
             "value": "br",
         },
         {"name": "Referer", "value": "https://google.com"},
+        {"name": "User-Agent", "value": "foo/1.2.3"},
     ]
 
 
@@ -2854,13 +2844,12 @@ def test_middleware_headers_default_skip():
         **SETTINGS,
         "DEFAULT_REQUEST_HEADERS": {
             **DEFAULT_REQUEST_HEADERS,
-            "Accept-Encoding": ", ".join(
-                encoding.decode() for encoding in ACCEPTED_ENCODINGS
-            ),
+            "Accept-Encoding": DEFAULT_ACCEPT_ENCODING,
+            "User-Agent": DEFAULT_USER_AGENT,
         },
         "ZYTE_API_SKIP_HEADERS": list(
             set(header.decode() for header in SKIP_HEADERS)
-            | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer"}
+            | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer", "User-Agent"}
         ),
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2887,9 +2876,8 @@ def test_middleware_headers_request_headers():
         url="https://example.com",
         headers={
             **DEFAULT_REQUEST_HEADERS,
-            "Accept-Encoding": ", ".join(
-                encoding.decode() for encoding in ACCEPTED_ENCODINGS
-            ),
+            "Accept-Encoding": DEFAULT_ACCEPT_ENCODING,
+            "User-Agent": DEFAULT_USER_AGENT,
         },
     )
     yield _process_request(crawler, request)
@@ -2905,8 +2893,9 @@ def test_middleware_headers_request_headers():
         {"name": "Accept-Language", "value": "en"},
         {
             "name": "Accept-Encoding",
-            "value": ", ".join(encoding.decode() for encoding in ACCEPTED_ENCODINGS),
+            "value": DEFAULT_ACCEPT_ENCODING,
         },
+        {"name": "User-Agent", "value": DEFAULT_USER_AGENT},
         {"name": "Referer", "value": request.url},
     ]
 
@@ -2927,6 +2916,7 @@ def test_middleware_headers_request_headers_custom():
             "Accept-Language": "fa",
             "Accept-Encoding": "br",
             "Referer": "https://google.com",
+            "User-Agent": "foo/1.2.3",
         },
     )
     yield _process_request(crawler, request)
@@ -2945,6 +2935,7 @@ def test_middleware_headers_request_headers_custom():
             "value": "br",
         },
         {"name": "Referer", "value": "https://google.com"},
+        {"name": "User-Agent", "value": "foo/1.2.3"},
     ]
 
 
@@ -2956,7 +2947,7 @@ def test_middleware_headers_request_headers_skip():
         **SETTINGS,
         "ZYTE_API_SKIP_HEADERS": list(
             set(header.decode() for header in SKIP_HEADERS)
-            | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer"}
+            | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer", "User-Agent"}
         ),
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2965,9 +2956,8 @@ def test_middleware_headers_request_headers_skip():
         url="https://example.com",
         headers={
             **DEFAULT_REQUEST_HEADERS,
-            "Accept-Encoding": ", ".join(
-                encoding.decode() for encoding in ACCEPTED_ENCODINGS
-            ),
+            "Accept-Encoding": DEFAULT_ACCEPT_ENCODING,
+            "User-Agent": DEFAULT_USER_AGENT,
         },
     )
     yield _process_request(crawler, request)
@@ -2976,8 +2966,3 @@ def test_middleware_headers_request_headers_skip():
     param_parser = handler._param_parser
     api_params = param_parser.parse(request)
     assert "customHttpRequestHeaders" not in api_params
-
-
-# TODO:
-# Also set the User-Agent if its value does not come from the global setting.
-# Test all of the above for browser requests.
