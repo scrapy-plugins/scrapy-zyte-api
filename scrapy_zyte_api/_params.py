@@ -6,7 +6,10 @@ from typing import Any, Dict, List, Mapping, Optional, Set
 from warnings import warn
 
 from scrapy import Request
-from scrapy.downloadermiddlewares.httpcompression import ACCEPTED_ENCODINGS
+from scrapy.downloadermiddlewares.httpcompression import (
+    ACCEPTED_ENCODINGS,
+    HttpCompressionMiddleware,
+)
 from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
@@ -321,29 +324,26 @@ def _map_custom_http_request_headers(
     ):
         if lowercase_k in skip_headers:
             if not (
-                lowercase_k == b"cookie"
+                (
+                    lowercase_k == b"accept"
+                    and decoded_v == DEFAULT_REQUEST_HEADERS["Accept"]
+                )
+                or (
+                    lowercase_k == b"accept-encoding"
+                    and decoded_v == _DEFAULT_ACCEPT_ENCODING
+                )
+                or (
+                    lowercase_k == b"accept-language"
+                    and decoded_v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
+                )
+                or lowercase_k == b"cookie"
                 or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
             ):
                 logger.warning(
-                    f"Request {request} defines header {k}, which "
-                    f"cannot be mapped into the Zyte API "
-                    f"customHttpRequestHeaders parameter."
+                    f"Request {request} defines header {k}, which will not be "
+                    f"mapped into the Zyte API customHttpRequestHeaders "
+                    f"parameter."
                 )
-            continue
-        elif (
-            (
-                lowercase_k == b"accept"
-                and decoded_v == DEFAULT_REQUEST_HEADERS["Accept"]
-            )
-            or (
-                lowercase_k == b"accept-encoding"
-                and decoded_v == _DEFAULT_ACCEPT_ENCODING
-            )
-            or (
-                lowercase_k == b"accept-language"
-                and decoded_v == DEFAULT_REQUEST_HEADERS["Accept-Language"]
-            )
-        ):
             continue
         headers.append({"name": k.decode(), "value": decoded_v})
     if headers:
@@ -843,14 +843,25 @@ def _load_default_params(settings, setting):
     return params
 
 
-def _load_skip_headers(settings):
-    return {
+def _load_skip_headers(crawler):
+    skip_headers = {
         header.strip().lower().encode()
-        for header in settings.getlist(
+        for header in crawler.settings.getlist(
             "ZYTE_API_SKIP_HEADERS",
             ["Cookie", "User-Agent"],
         )
     }
+    if not crawler.settings.getpriority("DEFAULT_REQUEST_HEADERS"):
+        for header in crawler.settings["DEFAULT_REQUEST_HEADERS"]:
+            skip_headers.add(header.lower().encode())
+    if crawler.engine:
+        for downloader_middleware in crawler.engine.downloader.middleware.middlewares:
+            if isinstance(downloader_middleware, HttpCompressionMiddleware):
+                skip_headers.add(b"accept-encoding")
+    else:
+        # Assume the default scenario on tests that do not initialize the engine.
+        skip_headers.add(b"accept-encoding")
+    return skip_headers
 
 
 def _load_browser_headers(settings):
@@ -869,7 +880,7 @@ class _ParamParser:
         self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
         self._job_id = environ.get("SHUB_JOBKEY", None)
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
-        self._skip_headers = _load_skip_headers(settings)
+        self._skip_headers = _load_skip_headers(crawler)
         self._warn_on_cookies = False
         if cookies_enabled is not None:
             self._cookies_enabled = cookies_enabled

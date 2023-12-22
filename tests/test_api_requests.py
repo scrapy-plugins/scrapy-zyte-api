@@ -270,7 +270,13 @@ AUTOMAP_PARAMS: Dict[str, Any] = {}
 BROWSER_HEADERS = {b"referer": "referer"}
 DEFAULT_PARAMS: Dict[str, Any] = {}
 TRANSPARENT_MODE = False
-SKIP_HEADERS = {b"cookie", b"user-agent"}
+SKIP_HEADERS = {
+    b"cookie",
+    b"user-agent",
+    b"accept",
+    b"accept-encoding",
+    b"accept-language",
+}
 JOB_ID = None
 COOKIES_ENABLED = False
 MAX_COOKIES = 100
@@ -313,7 +319,12 @@ async def test_param_parser_input_custom(mockserver):
         assert parser._cookies_enabled is True
         assert parser._default_params == {"a": "b"}
         assert parser._max_cookies == 1
-        assert parser._skip_headers == {b"a"}
+        assert parser._skip_headers == {
+            b"a",
+            b"accept",
+            b"accept-encoding",
+            b"accept-language",
+        }
         assert parser._transparent_mode is True
 
 
@@ -2700,6 +2711,34 @@ def test_default_scrapy_headers_http_default():
     assert "customHttpRequestHeaders" not in api_params
 
 
+@inlineCallbacks
+def test_default_scrapy_headers_http_default_custom_setting():
+    settings = {
+        **SETTINGS,
+        "DEFAULT_REQUEST_HEADERS": DEFAULT_REQUEST_HEADERS,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    request = Request(url="https://example.com")
+
+    downloader_middlewares = crawler.engine.downloader.middleware
+    for process_request in downloader_middlewares.methods["process_request"]:
+        yield deferred_from_coro(
+            process_request(request=request, spider=crawler.spider)
+        )
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert api_params["customHttpRequestHeaders"] == [
+        {
+            "name": "Accept",
+            "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        {"name": "Accept-Language", "value": "en"},
+    ]
+
+
 # TODO:
 # Test a verbatim DEFAULT_REQUEST_HEADERS value manually set at different
 # setting levels higher than the global default.
@@ -2709,4 +2748,9 @@ def test_default_scrapy_headers_http_default():
 # DEFAULT_REQUEST_HEADERS or though request headers.
 # Test a custom Accept-Encoding header set through DEFAULT_REQUEST_HEADERS
 # or through request headers.
+# Test that the default Accept-Encoding value is sent to Zyte API itself.
+# Test that a custom Accept-Encoding value is *not* sent to Zyte API itself,
+# and only translated into a Zyte API parameter.
+# Provide a setting to override the Accept-Encoding value sent to Zyte API
+# itself, and test it.
 # Test all of the above for browser requests.
