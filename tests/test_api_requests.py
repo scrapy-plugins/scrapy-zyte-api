@@ -2750,6 +2750,30 @@ def test_middleware_headers_cb_requests():
 
 
 @inlineCallbacks
+def test_middleware_headers_cb_requests_skip():
+    """Callback requests will not include the Referer parameter if the Referer
+    header is configured to be skipped."""
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_SKIP_HEADERS": list(
+            set(header.decode() for header in SKIP_HEADERS)
+            | {
+                "Referer",
+            }
+        ),
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    request = Request(url="https://example.com")
+    yield _process_request(crawler, request)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert "customHttpRequestHeaders" not in api_params
+
+
+@inlineCallbacks
 def test_middleware_headers_default():
     """If DEFAULT_REQUEST_HEADERS is user-defined, even with the same value as
     the global default, and values matching defaults from middlewares that are
@@ -2820,6 +2844,34 @@ def test_middleware_headers_default_custom():
         },
         {"name": "Referer", "value": "https://google.com"},
     ]
+
+
+@inlineCallbacks
+def test_middleware_headers_default_skip():
+    """Headers set through DEFAULT_REQUEST_HEADERS will not be translated into
+    the customHttpRequestHeaders parameter if configured to be skipped."""
+    settings = {
+        **SETTINGS,
+        "DEFAULT_REQUEST_HEADERS": {
+            **DEFAULT_REQUEST_HEADERS,
+            "Accept-Encoding": ", ".join(
+                encoding.decode() for encoding in ACCEPTED_ENCODINGS
+            ),
+        },
+        "ZYTE_API_SKIP_HEADERS": list(
+            set(header.decode() for header in SKIP_HEADERS)
+            | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer"}
+        ),
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    request = Request(url="https://example.com")
+    yield _process_request(crawler, request)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert "customHttpRequestHeaders" not in api_params
 
 
 @inlineCallbacks
@@ -2896,7 +2948,36 @@ def test_middleware_headers_request_headers_custom():
     ]
 
 
+@inlineCallbacks
+def test_middleware_headers_request_headers_skip():
+    """Headers set on the request will not be translated into the
+    customHttpRequestHeaders parameter if configured to be skipped."""
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_SKIP_HEADERS": list(
+            set(header.decode() for header in SKIP_HEADERS)
+            | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer"}
+        ),
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = get_crawler(settings)
+    request = Request(
+        url="https://example.com",
+        headers={
+            **DEFAULT_REQUEST_HEADERS,
+            "Accept-Encoding": ", ".join(
+                encoding.decode() for encoding in ACCEPTED_ENCODINGS
+            ),
+        },
+    )
+    yield _process_request(crawler, request)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert "customHttpRequestHeaders" not in api_params
+
+
 # TODO:
-# Test that forcing the skipping of a header works for all these scenarios that would not skip it.
 # Also set the User-Agent if its value does not come from the global setting.
 # Test all of the above for browser requests.
