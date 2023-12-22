@@ -273,9 +273,6 @@ TRANSPARENT_MODE = False
 SKIP_HEADERS = {
     b"cookie",
     b"user-agent",
-    b"accept",
-    b"accept-encoding",
-    b"accept-language",
 }
 JOB_ID = None
 COOKIES_ENABLED = False
@@ -284,7 +281,7 @@ GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
     "transparent_mode": TRANSPARENT_MODE,
     "automap_params": AUTOMAP_PARAMS,
-    "skip_headers": SKIP_HEADERS,
+    "hard_skip_headers": SKIP_HEADERS,
     "browser_headers": BROWSER_HEADERS,
     "job_id": JOB_ID,
     "cookies_enabled": COOKIES_ENABLED,
@@ -319,11 +316,8 @@ async def test_param_parser_input_custom(mockserver):
         assert parser._cookies_enabled is True
         assert parser._default_params == {"a": "b"}
         assert parser._max_cookies == 1
-        assert parser._skip_headers == {
+        assert parser._hard_skip_headers == {
             b"a",
-            b"accept",
-            b"accept-encoding",
-            b"accept-language",
         }
         assert parser._transparent_mode is True
 
@@ -1508,7 +1502,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
-            ["cannot be mapped"],
+            ["will not be mapped"],
         ),
         # The Accept, Accept-Encoding and Accept-Language headers, when
         # unsupported (i.e. browser requests), are dropped silently if their
@@ -1567,7 +1561,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
-            ["cannot be mapped"],
+            ["will not be mapped"],
         ),
         (
             {"User-Agent": DEFAULT_USER_AGENT},
@@ -2753,4 +2747,6 @@ def test_default_scrapy_headers_http_default_custom_setting():
 # and only translated into a Zyte API parameter.
 # Provide a setting to override the Accept-Encoding value sent to Zyte API
 # itself, and test it.
+# Test that forcing the skipping of a header works for all these scenarios that would not skip it.
+# Handle User-Agent also as a soft skip.
 # Test all of the above for browser requests.

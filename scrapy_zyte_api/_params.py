@@ -844,24 +844,25 @@ def _load_default_params(settings, setting):
 
 
 def _load_skip_headers(crawler):
-    skip_headers = {
+    hard_skip_headers = {
         header.strip().lower().encode()
         for header in crawler.settings.getlist(
             "ZYTE_API_SKIP_HEADERS",
             ["Cookie", "User-Agent"],
         )
     }
+    soft_skip_headers = set()
     if not crawler.settings.getpriority("DEFAULT_REQUEST_HEADERS"):
         for header in crawler.settings["DEFAULT_REQUEST_HEADERS"]:
-            skip_headers.add(header.lower().encode())
+            soft_skip_headers.add(header.lower().encode())
     if crawler.engine:
         for downloader_middleware in crawler.engine.downloader.middleware.middlewares:
             if isinstance(downloader_middleware, HttpCompressionMiddleware):
-                skip_headers.add(b"accept-encoding")
+                soft_skip_headers.add(b"accept-encoding")
     else:
         # Assume the default scenario on tests that do not initialize the engine.
-        skip_headers.add(b"accept-encoding")
-    return skip_headers
+        soft_skip_headers.add(b"accept-encoding")
+    return hard_skip_headers, soft_skip_headers
 
 
 def _load_browser_headers(settings):
@@ -880,7 +881,7 @@ class _ParamParser:
         self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
         self._job_id = environ.get("SHUB_JOBKEY", None)
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
-        self._skip_headers = _load_skip_headers(crawler)
+        self._hard_skip_headers, self._soft_skip_headers = _load_skip_headers(crawler)
         self._warn_on_cookies = False
         if cookies_enabled is not None:
             self._cookies_enabled = cookies_enabled
@@ -898,6 +899,11 @@ class _ParamParser:
         self._crawler = crawler
         self._cookie_jars = None
 
+    def _request_skip_headers(self, request):
+        return self._hard_skip_headers | (
+            self._soft_skip_headers - request.meta.get("_pre_mw_headers", set())
+        )
+
     def parse(self, request):
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
         use_default_params = request.meta.get("zyte_api_default_params", True)
@@ -907,7 +913,7 @@ class _ParamParser:
             default_params=self._default_params if use_default_params else {},
             transparent_mode=self._transparent_mode,
             automap_params=self._automap_params,
-            skip_headers=self._skip_headers,
+            skip_headers=self._request_skip_headers(request),
             browser_headers=self._browser_headers,
             job_id=self._job_id,
             cookies_enabled=cookies_enabled,

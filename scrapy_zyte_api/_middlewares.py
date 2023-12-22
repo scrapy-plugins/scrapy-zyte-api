@@ -1,7 +1,7 @@
 import logging
 from typing import cast
 
-from scrapy import signals
+from scrapy import Request, signals
 from scrapy.exceptions import IgnoreRequest
 from zyte_api.aio.errors import RequestError
 
@@ -162,12 +162,33 @@ class ScrapyZyteAPISpiderMiddleware:
     def __init__(self, crawler):
         self._send_signal = crawler.signals.send_catch_log
 
+    @staticmethod
+    def _get_header_set(request):
+        return {header.strip().lower() for header in request.headers}
+
     def process_start_requests(self, start_requests, spider):
         # Mark start requests and reports to the downloader middleware the
         # number of them once all have been processed.
         count = 0
         for request in start_requests:
             request.meta["is_start_request"] = True
+            request.meta["_pre_mw_headers"] = self._get_header_set(request)
             yield request
             count += 1
         self._send_signal(_start_requests_processed, count=count)
+
+    def _process_output_item_or_request(self, item_or_request):
+        if not isinstance(item_or_request, Request):
+            return
+        request = item_or_request
+        request.meta["_pre_mw_headers"] = self._get_header_set(request)
+
+    def process_spider_output(self, response, result, spider):
+        for item_or_request in result:
+            self._process_output_item_or_request(item_or_request)
+            yield item_or_request
+
+    async def process_spider_output_async(self, response, result, spider):
+        async for item_or_request in result:
+            self._process_output_item_or_request(item_or_request)
+            yield item_or_request
