@@ -28,10 +28,10 @@ setuptools.setup(
         "zyte-api>=0.4.8",
     ],
     extras_require={
-        # Sync with [testenv:provider-pinned] @ tox.ini
+        # Sync with [testenv:pinned-provider] @ tox.ini
         "provider": [
-            "andi>=0.5.0",
-            "scrapy-poet>=0.18.0",
+            "andi>=0.6.0",
+            "scrapy-poet>=0.19.0",
             "web-poet>=0.15.1",
             "zyte-common-items>=0.7.0",
         ]
