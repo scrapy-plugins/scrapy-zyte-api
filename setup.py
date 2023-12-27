@@ -31,7 +31,7 @@ setuptools.setup(
         # Sync with [testenv:provider-pinned] @ tox.ini
         "provider": [
             "andi>=0.5.0",
-            "scrapy-poet>=0.18.0",
+            "scrapy-poet>=0.19.0",
             "web-poet>=0.15.1",
             "zyte-common-items>=0.7.0",
         ]
