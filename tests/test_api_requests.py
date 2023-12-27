@@ -5,7 +5,7 @@ from copy import copy
 from functools import partial
 from http.cookiejar import Cookie
 from inspect import isclass
-from typing import Any, Dict, cast
+from typing import Any, Dict, Type, cast
 from unittest import mock
 from unittest.mock import patch
 
@@ -14,6 +14,7 @@ from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
+from scrapy.downloadermiddlewares.httpcompression import ACCEPTED_ENCODINGS
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
@@ -186,8 +187,8 @@ async def test_coro_handling(zyte_api: bool, mockserver):
             {"zyte_api": {"browserHtml": True, "httpResponseBody": True}},
             RequestError,
             (
-                "Got Zyte API error (status=422, "
-                "type='/request/unprocessable') while processing URL "
+                "Got Zyte API error (status=422, type='/request/unprocessable'"
+                ", request_id='abcd1234') while processing URL "
                 "(http://example.com): Incompatible parameters were found in "
                 "the request."
             ),
@@ -197,7 +198,7 @@ async def test_coro_handling(zyte_api: bool, mockserver):
 async def test_exceptions(
     caplog: LogCaptureFixture,
     meta: Dict[str, Dict[str, Any]],
-    exception_type: Exception,
+    exception_type: Type[Exception],
     exception_text: str,
     mockserver,
 ):
@@ -699,7 +700,7 @@ def _test_automap(
             [],
         ),
         # httpResponseBody can be explicitly requested in meta, and should be
-        # in cases where a binary response is expected, since automated mapping
+        # in cases where a binary response is expected, since automatic mapping
         # may stop working for binary responses in the future.
         (
             {"httpResponseBody": True},
@@ -937,43 +938,52 @@ def test_automap_header_output(meta, expected, warnings, caplog):
         # If httpRequestMethod is also specified in meta with the same value
         # as Request.method, a warning is logged asking to use only
         # Request.method.
-        *(
-            (
-                request_method,
-                {"httpRequestMethod": meta_method},
-                {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
-                    "httpRequestMethod": meta_method,
-                },
-                ["Use Request.method"],
-            )
-            for request_method, meta_method in (
-                ("GET", "GET"),
-                ("POST", "POST"),
-            )
+        (
+            None,
+            {"httpRequestMethod": "GET"},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["Use Request.method"],
+        ),
+        (
+            "POST",
+            {"httpRequestMethod": "POST"},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "httpRequestMethod": "POST",
+            },
+            ["Use Request.method"],
         ),
         # If httpRequestMethod is also specified in meta with a different value
         # from Request.method, a warning is logged asking to use Request.meta,
         # and the meta value takes precedence.
-        *(
-            (
-                request_method,
-                {"httpRequestMethod": meta_method},
-                {
-                    "httpResponseBody": True,
-                    "httpResponseHeaders": True,
-                    "httpRequestMethod": meta_method,
-                },
-                [
-                    "Use Request.method",
-                    "does not match the Zyte API httpRequestMethod",
-                ],
-            )
-            for request_method, meta_method in (
-                ("GET", "POST"),
-                ("PUT", "GET"),
-            )
+        (
+            "POST",
+            {"httpRequestMethod": "GET"},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [
+                "Use Request.method",
+                "does not match the Zyte API httpRequestMethod",
+            ],
+        ),
+        (
+            "POST",
+            {"httpRequestMethod": "PUT"},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "httpRequestMethod": "PUT",
+            },
+            [
+                "Use Request.method",
+                "does not match the Zyte API httpRequestMethod",
+            ],
         ),
         # If httpResponseBody is not True, implicitly or explicitly,
         # Request.method is still mapped for anything other than GET.
@@ -1488,14 +1498,16 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             ["cannot be mapped"],
         ),
-        # The Accept and Accept-Language headers, when unsupported, are dropped
-        # silently if their value matches the default value of Scrapy for
-        # DEFAULT_REQUEST_HEADERS, or with a warning otherwise.
+        # The Accept, Accept-Encoding and Accept-Language headers, when
+        # unsupported (i.e. browser requests), are dropped silently if their
+        # value matches the default value of Scrapy, or with a warning
+        # otherwise.
         (
             {
-                k: v
-                for k, v in DEFAULT_REQUEST_HEADERS.items()
-                if k in {"Accept", "Accept-Language"}
+                **DEFAULT_REQUEST_HEADERS,  # Accept, Accept-Language
+                "Accept-Encoding": ", ".join(
+                    encoding.decode() for encoding in ACCEPTED_ENCODINGS
+                ),
             },
             {"browserHtml": True},
             {
@@ -1503,16 +1515,26 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
-        (
-            {
-                "Accept": "application/json",
-                "Accept-Language": "uk",
-            },
-            {"browserHtml": True},
-            {
-                "browserHtml": True,
-            },
-            ["cannot be mapped"],
+        *(
+            (
+                headers,
+                {"browserHtml": True},
+                {
+                    "browserHtml": True,
+                },
+                ["cannot be mapped"],
+            )
+            for headers in (
+                {
+                    "Accept": "application/json",
+                },
+                {
+                    "Accept-Encoding": "br",
+                },
+                {
+                    "Accept-Language": "uk",
+                },
+            )
         ),
         # The User-Agent header, which Scrapy sets by default, is dropped
         # silently if it matches the default value of the USER_AGENT setting,
@@ -1931,6 +1953,33 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 "httpResponseHeaders": True,
             },
             [],
+            [],
+        ),
+        # Setting requestCookies to [] disables automatic mapping, but logs a
+        # a warning recommending to either use False to achieve the same or
+        # remove the parameter to let automatic mapping work.
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+            {},
+            {
+                "experimental": {
+                    "requestCookies": [],
+                }
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "requestCookies": [],
+                    "responseCookies": True,
+                },
+            },
+            [
+                "is overriding automatic request cookie mapping",
+            ],
             [],
         ),
         # Cookies work for browser and automatic extraction requests as well.
