@@ -13,13 +13,20 @@ can define a custom Scrapy middleware as follows:
 .. code-block:: python
     :caption: myproject/middlewares.py
 
+    from typing import Optional, Type, Union
+
     from scrapy import Request, Spider
+    from scrapy.crawler import Crawler
     from scrapy.http import Response
     from scrapy.downloadermiddlewares.retry import get_retry_request
     from scrapy.settings import BaseSettings
     from scrapy_zyte_api.responses import ZyteAPIResponse, ZyteAPITextResponse
 
     class ZyteAPIFailedActionsRetryMiddleware:
+
+        @classmethod
+        def from_crawler(cls, crawler: Crawler):
+            return cls(crawler.settings)
 
         def __init__(self, settings: BaseSettings):
             if not settings.getbool("RETRY_ENABLED"):
