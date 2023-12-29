@@ -170,6 +170,11 @@ To force the mapping of these headers, define the corresponding setting
 :attr:`Request.headers <scrapy.http.Request.headers>`. They will be mapped
 even if defined with their default value.
 
+Headers will also be mapped if set to a non-default value elsewhere, e.g. in a
+custom downloader middleware, as long as it is done before the scrapy-zyte-api
+downloader middleware, which is responsible of the mapping, processes the
+request.
+
 Similarly, you can add any of those headers to the :ref:`ZYTE_API_SKIP_HEADERS`
 setting to prevent their mapping.
 

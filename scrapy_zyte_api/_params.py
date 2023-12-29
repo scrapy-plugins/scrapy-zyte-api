@@ -6,8 +6,12 @@ from typing import Any, Dict, List, Mapping, Optional, Set
 from warnings import warn
 
 from scrapy import Request
-from scrapy.downloadermiddlewares.httpcompression import HttpCompressionMiddleware
+from scrapy.downloadermiddlewares.httpcompression import (
+    ACCEPTED_ENCODINGS,
+    HttpCompressionMiddleware,
+)
 from scrapy.http.cookies import CookieJar
+from scrapy.settings.default_settings import USER_AGENT
 
 from ._cookies import _get_all_cookies
 
@@ -807,9 +811,12 @@ def _load_default_params(settings, setting):
     return params
 
 
+ANY_VALUE = object()
+
+
 def _load_http_skip_headers(settings):
     return {
-        header.strip().lower().encode()
+        header.strip().lower().encode(): ANY_VALUE
         for header in settings.getlist(
             "ZYTE_API_SKIP_HEADERS",
             ["Cookie"],
@@ -818,13 +825,13 @@ def _load_http_skip_headers(settings):
 
 
 def _load_mw_skip_headers(crawler):
-    mw_skip_headers = set()
+    mw_skip_headers = {}
 
     accept_encoding_in_default_headers = False
     user_agent_in_default_headers = False
     if not crawler.settings.getpriority("DEFAULT_REQUEST_HEADERS"):
-        for header in crawler.settings["DEFAULT_REQUEST_HEADERS"]:
-            mw_skip_headers.add(header.lower().encode())
+        for name, value in crawler.settings["DEFAULT_REQUEST_HEADERS"].items():
+            mw_skip_headers[name.lower().encode()] = value.encode()
     else:
         for header in crawler.settings["DEFAULT_REQUEST_HEADERS"]:
             lowercase_k = header.lower().encode()
@@ -835,19 +842,17 @@ def _load_mw_skip_headers(crawler):
 
     if not accept_encoding_in_default_headers:
         if crawler.engine:
-            for (
-                downloader_middleware
-            ) in crawler.engine.downloader.middleware.middlewares:
-                if isinstance(downloader_middleware, HttpCompressionMiddleware):
-                    mw_skip_headers.add(b"accept-encoding")
+            for mw in crawler.engine.downloader.middleware.middlewares:
+                if isinstance(mw, HttpCompressionMiddleware):
+                    mw_skip_headers[b"accept-encoding"] = b", ".join(ACCEPTED_ENCODINGS)
         else:
             # Assume the default scenario on tests that do not initialize the engine.
-            mw_skip_headers.add(b"accept-encoding")
+            mw_skip_headers[b"accept-encoding"] = b", ".join(ACCEPTED_ENCODINGS)
 
     if not user_agent_in_default_headers and not crawler.settings.getpriority(
         "USER_AGENT"
     ):
-        mw_skip_headers.add(b"user-agent")
+        mw_skip_headers[b"user-agent"] = USER_AGENT.encode()
 
     return mw_skip_headers
 
@@ -888,7 +893,11 @@ class _ParamParser:
         self._cookie_jars = None
 
     def _request_skip_headers(self, request):
-        return self._mw_skip_headers - request.meta.get("_pre_mw_headers", set())
+        result = dict(self._mw_skip_headers)
+        for name in request.meta.get("_pre_mw_headers", set()):
+            if name in result:
+                del result[name]
+        return result
 
     def parse(self, request):
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
@@ -900,12 +909,9 @@ class _ParamParser:
             default_params=self._default_params if use_default_params else {},
             transparent_mode=self._transparent_mode,
             automap_params=self._automap_params,
-            skip_headers=self._http_skip_headers | request_skip_headers,
+            skip_headers={**self._http_skip_headers, **request_skip_headers},
             browser_headers=self._browser_headers,
-            browser_ignore_headers={
-                b"cookie",
-            }
-            | request_skip_headers,
+            browser_ignore_headers={b"cookie": ANY_VALUE, **request_skip_headers},
             job_id=self._job_id,
             cookies_enabled=cookies_enabled,
             cookie_jars=self._cookie_jars,
