@@ -101,5 +101,4 @@ And enable it in your settings:
 .. code-block:: python
     :caption: myproject/settings.py
 
-
     HTTPCACHE_POLICY = "myproject.extensions.ZyteAPIFailedActionsPolicy"
