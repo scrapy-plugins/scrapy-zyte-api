@@ -28,6 +28,7 @@ either :ref:`globally <transparent>` or :ref:`per request <automap>`, or
    usage/retry
    usage/scrapy-poet
    usage/stats
+   usage/actions
    usage/fingerprint
    usage/proxy
 
