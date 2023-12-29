@@ -841,8 +841,9 @@ def _load_mw_skip_headers(crawler):
                 user_agent_in_default_headers = True
 
     if not accept_encoding_in_default_headers:
-        if crawler.engine:
-            for mw in crawler.engine.downloader.middleware.middlewares:
+        engine = getattr(crawler, "engine", None)
+        if engine:
+            for mw in engine.downloader.middleware.middlewares:
                 if isinstance(mw, HttpCompressionMiddleware):
                     mw_skip_headers[b"accept-encoding"] = b", ".join(ACCEPTED_ENCODINGS)
         else:
