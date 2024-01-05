@@ -12,6 +12,7 @@ from zyte_common_items import (
     ArticleList,
     ArticleNavigation,
     Item,
+    JobPosting,
     Product,
     ProductList,
     ProductNavigation,
@@ -39,6 +40,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         Article,
         ArticleList,
         ArticleNavigation,
+        JobPosting,
     }
 
     def __init__(self, injector):
@@ -76,6 +78,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             Article: "article",
             ArticleList: "articleList",
             ArticleNavigation: "articleNavigation",
+            JobPosting: "jobPosting",
         }
 
         zyte_api_meta = crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS")
