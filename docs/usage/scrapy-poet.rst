@@ -53,20 +53,6 @@ set the default options for various extraction types, e.g.::
         "productNavigationOptions": {"extractFrom": "httpResponseBody"},
     }
 
-Note that the built-in ``scrapy_poet.page_input_providers.ItemProvider`` has a
-priority of 2000, so when you have page objects producing
-:class:`zyte_common_items.Product` items you should use higher values for
-``ZyteApiProvider`` if you want these items to come from these page objects,
-and lower values if you want them to come from Zyte API.
-
-Currently, when ``ItemProvider`` is used together with ``ZyteApiProvider``,
-it may make more requests than is optimal: the normal Scrapy response will be
-always requested even when using a :class:`~scrapy_poet.DummyResponse`
-annotation, and in some dependency combinations two Zyte API requests will be
-made for the same page. We are planning to solve these problems in the future
-releases of :doc:`scrapy-poet <scrapy-poet:index>` and scrapy-zyte-api.
-
-
 Dependency annotations
 ======================
 
