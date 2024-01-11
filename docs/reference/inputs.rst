@@ -19,6 +19,8 @@ Inputs
 
 -   :class:`zyte_common_items.ArticleNavigation`
 
+-   :class:`zyte_common_items.JobPosting`
+
 -   :class:`zyte_common_items.Product`
 
 -   :class:`zyte_common_items.ProductList`
