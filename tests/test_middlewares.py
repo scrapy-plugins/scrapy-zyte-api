@@ -133,7 +133,10 @@ async def test_max_requests(caplog):
     assert crawler.stats.get_value("scrapy-zyte-api/success") <= zapi_max_requests
     assert crawler.stats.get_value("scrapy-zyte-api/processed") == zapi_max_requests
     assert crawler.stats.get_value("item_scraped_count") == zapi_max_requests + 6
-    assert crawler.stats.get_value("finish_reason") == "closespider_max_zapi_requests"
+    assert (
+        crawler.stats.get_value("finish_reason")
+        == f"closespider_max_{zapi_max_requests}_zapi_requests"
+    )
     assert (
         crawler.stats.get_value(
             "downloader/exception_type_count/scrapy.exceptions.IgnoreRequest"
