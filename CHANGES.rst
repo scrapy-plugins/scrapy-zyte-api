@@ -1,6 +1,17 @@
 Changes
 =======
 
+0.14.0 (YYYY-MM-DD)
+-------------------
+
+* Updated requirement versions:
+
+  * andi >= 0.6.0
+  * scrapy-poet >= 0.19.0
+  * zyte-common-items >= 0.8.0
+
+* Added support for ``zyte_common_items.JobPosting`` to the scrapy-poet provider.
+
 0.13.0 (2023-12-13)
 -------------------
 
