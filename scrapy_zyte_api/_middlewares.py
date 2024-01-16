@@ -16,6 +16,10 @@ _start_requests_processed = object()
 class _BaseMiddleware:
     _slot_prefix = "zyte-api@"
 
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
     def __init__(self, crawler):
         self._param_parser = _ParamParser(crawler, cookies_enabled=False)
         self._crawler = crawler
@@ -34,10 +38,6 @@ class _BaseMiddleware:
 
 
 class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(crawler)
-
     def __init__(self, crawler) -> None:
         super().__init__(crawler)
         self._forbidden_domain_start_request_count = 0
@@ -166,10 +166,6 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
 
 
 class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(crawler)
-
     def __init__(self, crawler):
         super().__init__(crawler)
         self._send_signal = crawler.signals.send_catch_log
