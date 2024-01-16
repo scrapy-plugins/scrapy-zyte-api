@@ -7,9 +7,9 @@ from scrapy.crawler import Crawler
 from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import AnnotatedResult, PageObjectInputProvider
 from web_poet import (
+    AnyResponse,
     BrowserHtml,
     BrowserResponse,
-    HttpOrBrowserResponse,
     HttpResponse,
     HttpResponseHeaders,
 )
@@ -47,7 +47,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         Article,
         ArticleList,
         ArticleNavigation,
-        HttpOrBrowserResponse,
+        AnyResponse,
         JobPosting,
     }
 
@@ -125,7 +125,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             elif options_name in zyte_api_meta:
                 extract_from = zyte_api_meta[options_name]["extractFrom"]
 
-        if HttpOrBrowserResponse in to_provide:
+        if AnyResponse in to_provide:
             if extract_from == "browserHtml":
                 html_requested = True
             elif extract_from == "httpResponseBody":
@@ -166,9 +166,9 @@ class ZyteApiProvider(PageObjectInputProvider):
             results.append(response)
             self.update_cache(request, {BrowserResponse: response})
 
-        if HttpOrBrowserResponse in to_provide:
+        if AnyResponse in to_provide:
             if extract_from == "browserHtml":
-                http_or_browser_response = HttpOrBrowserResponse(
+                any_response = AnyResponse(
                     response=BrowserResponse(
                         url=api_response.url,
                         status=api_response.status,
@@ -176,7 +176,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                     )
                 )
             elif extract_from == "httpResponseBody":
-                http_or_browser_response = HttpOrBrowserResponse(
+                any_response = AnyResponse(
                     response=HttpResponse(
                         url=api_response.url,
                         body=api_response.body,
@@ -187,10 +187,8 @@ class ZyteApiProvider(PageObjectInputProvider):
                     )
                 )
 
-            results.append(http_or_browser_response)
-            self.update_cache(
-                request, {HttpOrBrowserResponse: http_or_browser_response}
-            )
+            results.append(any_response)
+            self.update_cache(request, {AnyResponse: any_response})
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
