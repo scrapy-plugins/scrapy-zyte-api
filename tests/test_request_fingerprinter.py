@@ -1,5 +1,3 @@
-from typing import Any, Dict
-
 import pytest
 from packaging.version import Version
 from scrapy import __version__ as SCRAPY_VERSION
@@ -12,7 +10,7 @@ from scrapy.utils.misc import create_instance
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
 
-from . import SETTINGS, get_crawler
+from . import SETTINGS, SETTINGS_T, get_crawler
 
 
 def test_cache():
@@ -210,7 +208,7 @@ def test_only_end_parameters_matter():
     parameters, that the fingerprint is the same if the parameters actually
     sent to Zyte API are the same."""
 
-    settings: Dict[str, Any] = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }

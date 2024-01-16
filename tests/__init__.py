@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager, contextmanager
 from os import environ
-from typing import Optional
+from typing import Any, Dict, Optional, Type, Union
 
 from scrapy import Spider
 from scrapy.crawler import Crawler
@@ -12,7 +12,8 @@ from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 _API_KEY = "a"
 
 DEFAULT_CLIENT_CONCURRENCY = AsyncClient(api_key=_API_KEY).n_conn
-SETTINGS = {
+SETTINGS_T = Dict[Union[Type, str], Any]
+SETTINGS: SETTINGS_T = {
     "DOWNLOAD_HANDLERS": {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",

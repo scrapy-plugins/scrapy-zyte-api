@@ -32,6 +32,7 @@ from scrapy_zyte_api.responses import _process_response
 from . import (
     DEFAULT_CLIENT_CONCURRENCY,
     SETTINGS,
+    SETTINGS_T,
     get_crawler,
     get_download_handler,
     get_downloader_middleware,
@@ -146,7 +147,7 @@ UNSET = object()
     ],
 )
 async def test_enabled(setting, enabled, mockserver):
-    settings = {}
+    settings: SETTINGS_T = {}
     if setting is not UNSET:
         settings["ZYTE_API_ENABLED"] = setting
     async with mockserver.make_handler(settings) as handler:
@@ -161,7 +162,7 @@ async def test_enabled(setting, enabled, mockserver):
 async def test_coro_handling(zyte_api: bool, mockserver):
     """ScrapyZyteAPIDownloadHandler.download_request must return a deferred
     both when using Zyte API and when using the regular downloader logic."""
-    settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
+    settings: SETTINGS_T = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
     async with mockserver.make_handler(settings) as handler:
         req = Request(
             # this should really be a URL to a website, not to the API server,
@@ -303,7 +304,7 @@ async def test_params_parser_input_default(mockserver):
 
 @ensureDeferred
 async def test_param_parser_input_custom(mockserver):
-    settings = {
+    settings: SETTINGS_T = {
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_AUTOMAP_PARAMS": {"c": "d"},
         "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
@@ -441,7 +442,7 @@ def test_transparent_mode_toggling(setting, meta, expected):
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com", meta=meta)
-    settings = {**SETTINGS, "ZYTE_API_TRANSPARENT_MODE": setting}
+    settings: SETTINGS_T = {**SETTINGS, "ZYTE_API_TRANSPARENT_MODE": setting}
     crawler = get_crawler(settings)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -517,7 +518,7 @@ async def test_default_params_none(mockserver, caplog):
     the settings are mapped to the corresponding
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
-    settings = {
+    settings: SETTINGS_T = {
         "ZYTE_API_DEFAULT_PARAMS": {"a": None, "b": "c"},
         "ZYTE_API_AUTOMAP_PARAMS": {"d": None, "e": "f"},
     }
@@ -581,7 +582,7 @@ def test_default_params_merging(
     """
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
-    settings = {**SETTINGS, setting_key: setting}
+    settings: SETTINGS_T = {**SETTINGS, setting_key: setting}
     crawler = get_crawler(settings)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -635,7 +636,7 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
     default_params = copy(setting)
-    settings = {**SETTINGS, setting_key: setting}
+    settings: SETTINGS_T = {**SETTINGS, setting_key: setting}
     crawler = get_crawler(settings)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -645,7 +646,13 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
 
 @inlineCallbacks
 def _test_automap(
-    settings, request_kwargs, meta, expected, warnings, caplog, cookie_jar=None
+    settings: SETTINGS_T,
+    request_kwargs,
+    meta,
+    expected,
+    warnings,
+    caplog,
+    cookie_jar=None,
 ):
     request = Request(url="https://example.com", **request_kwargs)
     request.meta["zyte_api_automap"] = meta
@@ -2139,7 +2146,7 @@ def test_automap_all_cookies(meta):
     """Because of scenarios like cross-domain redirects and browser rendering,
     Zyte API requests should include all cookie jar cookies, regardless of
     the target URL domain."""
-    settings: Dict[str, Any] = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -2247,7 +2254,7 @@ def test_automap_cookie_jar(meta):
         url="https://example.com/3", meta={**meta, "cookiejar": "a"}, cookies={"x": "w"}
     )
     request4 = Request(url="https://example.com/4", meta={**meta, "cookiejar": "a"})
-    settings: Dict[str, Any] = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -2299,7 +2306,7 @@ def test_automap_cookie_jar(meta):
     ],
 )
 def test_automap_cookie_limit(meta, caplog):
-    settings: Dict[str, Any] = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_MAX_COOKIES": 1,
@@ -2429,7 +2436,7 @@ class CustomCookieMiddleware(CookiesMiddleware):
 
 def test_automap_custom_cookie_middleware():
     mw_cls = CustomCookieMiddleware
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "DOWNLOADER_MIDDLEWARES": {
             "scrapy.downloadermiddlewares.cookies.CookiesMiddleware": None,
@@ -2628,7 +2635,7 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
     ``ZYTE_API_AUTOMAP_PARAMS`` setting."""
     request = Request(url="https://example.com")
     request.meta["zyte_api_automap"] = meta
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_AUTOMAP_PARAMS": default_params,
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -2658,7 +2665,7 @@ def test_default_params_false(default_params):
     """If zyte_api_default_params=False is passed, ZYTE_API_DEFAULT_PARAMS is ignored."""
     request = Request(url="https://example.com")
     request.meta["zyte_api_default_params"] = False
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_DEFAULT_PARAMS": default_params,
     }
@@ -2700,7 +2707,7 @@ def _process_request(crawler, request, is_start_request=False):
 def test_middleware_headers_start_requests():
     """By default, automap should not generate a customHttpRequestHeaders
     parameter."""
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2718,7 +2725,7 @@ def test_middleware_headers_start_requests():
 def test_middleware_headers_cb_requests():
     """Callback requests will include the Referer parameter if the Referer
     middleware is not disabled."""
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2738,7 +2745,7 @@ def test_middleware_headers_cb_requests():
 def test_middleware_headers_cb_requests_skip():
     """Callback requests will not include the Referer parameter if the Referer
     header is configured to be skipped."""
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_SKIP_HEADERS": list(
             set(header.decode() for header in SKIP_HEADERS)
@@ -2764,7 +2771,7 @@ def test_middleware_headers_default():
     the global default, and values matching defaults from middlewares that are
     ignored otherwise, its headers should be translated into the
     customHttpRequestHeaders parameter."""
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "DEFAULT_REQUEST_HEADERS": {
             **DEFAULT_REQUEST_HEADERS,
@@ -2802,7 +2809,7 @@ def test_middleware_headers_default():
 def test_middleware_headers_default_custom():
     """Non-default values set for headers with a default value also work as
     expected."""
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "DEFAULT_REQUEST_HEADERS": {
             "Accept": "text/html",
@@ -2840,7 +2847,7 @@ def test_middleware_headers_default_custom():
 def test_middleware_headers_default_skip():
     """Headers set through DEFAULT_REQUEST_HEADERS will not be translated into
     the customHttpRequestHeaders parameter if configured to be skipped."""
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "DEFAULT_REQUEST_HEADERS": {
             **DEFAULT_REQUEST_HEADERS,
@@ -2867,7 +2874,7 @@ def test_middleware_headers_default_skip():
 def test_middleware_headers_request_headers():
     """If request headers match the global default value of
     DEFAULT_REQUEST_HEADERS, they should be translated nonetheless."""
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2904,7 +2911,7 @@ def test_middleware_headers_request_headers():
 def test_middleware_headers_request_headers_custom():
     """Non-default values set for headers with a default value also work as
     expected."""
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2943,7 +2950,7 @@ def test_middleware_headers_request_headers_custom():
 def test_middleware_headers_request_headers_skip():
     """Headers set on the request will not be translated into the
     customHttpRequestHeaders parameter if configured to be skipped."""
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_SKIP_HEADERS": list(
             set(header.decode() for header in SKIP_HEADERS)
@@ -2983,7 +2990,7 @@ def test_middleware_headers_custom_middleware_before():
             }.items():
                 request.headers[k] = v
 
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -3020,7 +3027,7 @@ def test_middleware_headers_custom_middleware_before_custom():
             }.items():
                 request.headers[k] = v
 
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -3070,7 +3077,7 @@ def test_middleware_headers_custom_middleware_before_skip():
             }.items():
                 request.headers[k] = v
 
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_SKIP_HEADERS": list(
             set(header.decode() for header in SKIP_HEADERS)

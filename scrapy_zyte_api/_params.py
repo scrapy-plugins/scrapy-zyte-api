@@ -2,7 +2,7 @@ from base64 import b64decode, b64encode
 from copy import copy
 from logging import getLogger
 from os import environ
-from typing import Any, Dict, List, Mapping, Optional, Set
+from typing import Any, Dict, List, Mapping, Optional, Union
 from warnings import warn
 
 from scrapy import Request
@@ -266,6 +266,10 @@ _DEFAULT_API_PARAMS = {
     if value["default"] != _NoDefault
 }
 
+ANY_VALUE = object()
+ANY_VALUE_T = Any
+SKIP_HEADER_T = Dict[bytes, Union[ANY_VALUE_T, str]]
+
 
 def _uses_browser(api_params: Dict[str, Any]) -> bool:
     for key in _BROWSER_KEYS:
@@ -309,7 +313,7 @@ def _map_custom_http_request_headers(
     *,
     api_params: Dict[str, Any],
     request: Request,
-    skip_headers: Set[bytes],
+    skip_headers: SKIP_HEADER_T,
 ):
     headers = []
     for k, lowercase_k, decoded_v in _iter_headers(
@@ -332,7 +336,7 @@ def _map_request_headers(
     api_params: Dict[str, Any],
     request: Request,
     browser_headers: Dict[str, str],
-    browser_ignore_headers: Set[bytes],
+    browser_ignore_headers: SKIP_HEADER_T,
 ):
     request_headers = {}
     for k, lowercase_k, decoded_v in _iter_headers(
@@ -359,9 +363,9 @@ def _set_request_headers_from_request(
     *,
     api_params: Dict[str, Any],
     request: Request,
-    skip_headers: Set[bytes],
+    skip_headers: SKIP_HEADER_T,
     browser_headers: Dict[str, str],
-    browser_ignore_headers: Set[bytes],
+    browser_ignore_headers: SKIP_HEADER_T,
 ):
     """Updates *api_params*, in place, based on *request*."""
     custom_http_request_headers = api_params.get("customHttpRequestHeaders")
@@ -583,9 +587,9 @@ def _update_api_params_from_request(
     *,
     default_params: Dict[str, Any],
     meta_params: Dict[str, Any],
-    skip_headers: Set[bytes],
+    skip_headers: SKIP_HEADER_T,
     browser_headers: Dict[str, str],
-    browser_ignore_headers: Set[bytes],
+    browser_ignore_headers: SKIP_HEADER_T,
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
@@ -715,9 +719,9 @@ def _get_automap_params(
     *,
     default_enabled: bool,
     default_params: Dict[str, Any],
-    skip_headers: Set[bytes],
+    skip_headers: SKIP_HEADER_T,
     browser_headers: Dict[str, str],
-    browser_ignore_headers: Set[bytes],
+    browser_ignore_headers: SKIP_HEADER_T,
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
     max_cookies: int,
@@ -762,9 +766,9 @@ def _get_api_params(
     default_params: Dict[str, Any],
     transparent_mode: bool,
     automap_params: Dict[str, Any],
-    skip_headers: Set[bytes],
+    skip_headers: SKIP_HEADER_T,
     browser_headers: Dict[str, str],
-    browser_ignore_headers: Set[bytes],
+    browser_ignore_headers: SKIP_HEADER_T,
     job_id: Optional[str],
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
@@ -814,9 +818,6 @@ def _load_default_params(settings, setting):
         )
         params.pop(param)
     return params
-
-
-ANY_VALUE = object()
 
 
 def _load_http_skip_headers(settings):
