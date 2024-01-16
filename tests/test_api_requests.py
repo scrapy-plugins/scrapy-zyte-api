@@ -2678,29 +2678,28 @@ def test_default_params_false(default_params):
 
 @inlineCallbacks
 def _process_request(crawler, request, is_start_request=False):
-    yield crawler.engine.scraper.open_spider(crawler.spider)
+    spider = crawler.spider
+
+    yield crawler.engine.scraper.open_spider(spider)
     yield crawler.engine.signals.send_catch_log_deferred(
-        signals.spider_opened, spider=crawler.spider
+        signals.spider_opened, spider=spider
     )
 
     spider_middlewares = crawler.engine.scraper.spidermw
     if is_start_request:
-        result = yield spider_middlewares.process_start_requests(
-            [request], crawler.spider
-        )
+        result = yield spider_middlewares.process_start_requests([request], spider)
+        request = next(result)
     else:
-        result = yield deferred_from_coro(
-            spider_middlewares._process_callback_output(
-                Response(request.url, request=request), crawler.spider, [request]
+        response = Response(request.url, request=request)
+        _, request, _ = yield deferred_from_coro(
+            spider_middlewares.scrape_response(
+                lambda *args: args, response, request, spider
             )
         )
-    request = next(result)
 
     downloader_middlewares = crawler.engine.downloader.middleware
     for process_request in downloader_middlewares.methods["process_request"]:
-        yield deferred_from_coro(
-            process_request(request=request, spider=crawler.spider)
-        )
+        yield deferred_from_coro(process_request(request=request, spider=spider))
 
 
 @inlineCallbacks
@@ -2975,28 +2974,30 @@ def test_middleware_headers_request_headers_skip():
     assert "customHttpRequestHeaders" not in api_params
 
 
+class DefaultValuesDownloaderMiddleware:
+    def process_request(self, request, spider):
+        for k, v in {
+            **DEFAULT_REQUEST_HEADERS,
+            "Accept-Encoding": DEFAULT_ACCEPT_ENCODING,
+            "User-Agent": DEFAULT_USER_AGENT,
+        }.items():
+            request.headers[k] = v
+
+
 @inlineCallbacks
 def test_middleware_headers_custom_middleware_before():
     """If request headers defined from a custom middleware configured before
     the scrapy-zyte-api downloader middleware match the global default value of
     DEFAULT_REQUEST_HEADERS, they will *not* be translated."""
 
-    class DownloaderMiddleware:
-        def process_request(self, request, spider):
-            for k, v in {
-                **DEFAULT_REQUEST_HEADERS,
-                "Accept-Encoding": DEFAULT_ACCEPT_ENCODING,
-                "User-Agent": DEFAULT_USER_AGENT,
-            }.items():
-                request.headers[k] = v
-
     settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    mw_key = "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
-    settings["DOWNLOADER_MIDDLEWARES"][DownloaderMiddleware] = (
-        settings["DOWNLOADER_MIDDLEWARES"][mw_key] - 1
+    mw1 = "tests.test_api_requests.DefaultValuesDownloaderMiddleware"
+    mw2 = "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
+    settings["DOWNLOADER_MIDDLEWARES"][mw1] = (
+        settings["DOWNLOADER_MIDDLEWARES"][mw2] - 1
     )
     crawler = get_crawler(settings)
     request = Request("https://example.com")
@@ -3010,30 +3011,31 @@ def test_middleware_headers_custom_middleware_before():
     ]
 
 
+class CustomValuesDownloaderMiddleware:
+    def process_request(self, request, spider):
+        for k, v in {
+            "Accept": "text/html",
+            "Accept-Language": "fa",
+            "Accept-Encoding": "br",
+            "Referer": "https://referrer.example",
+            "User-Agent": "foo/1.2.3",
+        }.items():
+            request.headers[k] = v
+
+
 @inlineCallbacks
 def test_middleware_headers_custom_middleware_before_custom():
     """If request headers defined from a custom middleware configured before
     the scrapy-zyte-api downloader middleware have non-default values, they
     will be translated."""
-
-    class DownloaderMiddleware:
-        def process_request(self, request, spider):
-            for k, v in {
-                "Accept": "text/html",
-                "Accept-Language": "fa",
-                "Accept-Encoding": "br",
-                "Referer": "https://referrer.example",
-                "User-Agent": "foo/1.2.3",
-            }.items():
-                request.headers[k] = v
-
     settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    mw_key = "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
-    settings["DOWNLOADER_MIDDLEWARES"][DownloaderMiddleware] = (
-        settings["DOWNLOADER_MIDDLEWARES"][mw_key] - 1
+    mw1 = "tests.test_api_requests.CustomValuesDownloaderMiddleware"
+    mw2 = "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
+    settings["DOWNLOADER_MIDDLEWARES"][mw1] = (
+        settings["DOWNLOADER_MIDDLEWARES"][mw2] - 1
     )
     crawler = get_crawler(settings)
     request = Request("https://example.com")
@@ -3066,17 +3068,6 @@ def test_middleware_headers_custom_middleware_before_skip():
     the scrapy-zyte-api downloader middleware will not be translated into the
     customHttpRequestHeaders parameter if configured to be skipped."""
 
-    class DownloaderMiddleware:
-        def process_request(self, request, spider):
-            for k, v in {
-                "Accept": "text/html",
-                "Accept-Language": "fa",
-                "Accept-Encoding": "br",
-                "Referer": "https://referrer.example",
-                "User-Agent": "foo/1.2.3",
-            }.items():
-                request.headers[k] = v
-
     settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_SKIP_HEADERS": list(
@@ -3085,9 +3076,10 @@ def test_middleware_headers_custom_middleware_before_skip():
         ),
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    mw_key = "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
-    settings["DOWNLOADER_MIDDLEWARES"][DownloaderMiddleware] = (
-        settings["DOWNLOADER_MIDDLEWARES"][mw_key] - 1
+    mw1 = "tests.test_api_requests.CustomValuesDownloaderMiddleware"
+    mw2 = "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
+    settings["DOWNLOADER_MIDDLEWARES"][mw1] = (
+        settings["DOWNLOADER_MIDDLEWARES"][mw2] - 1
     )
     crawler = get_crawler(settings)
     request = Request("https://example.com")
