@@ -2808,7 +2808,7 @@ def test_middleware_headers_default_custom():
             "Accept": "text/html",
             "Accept-Language": "fa",
             "Accept-Encoding": "br",
-            "Referer": "https://google.com",
+            "Referer": "https://referrer.example",
             "User-Agent": "foo/1.2.3",
         },
         "REFERER_ENABLED": False,  # https://github.com/scrapy/scrapy/issues/6184
@@ -2831,7 +2831,7 @@ def test_middleware_headers_default_custom():
             "name": "Accept-Encoding",
             "value": "br",
         },
-        {"name": "Referer", "value": "https://google.com"},
+        {"name": "Referer", "value": "https://referrer.example"},
         {"name": "User-Agent", "value": "foo/1.2.3"},
     ]
 
@@ -2902,8 +2902,8 @@ def test_middleware_headers_request_headers():
 
 @inlineCallbacks
 def test_middleware_headers_request_headers_custom():
-    """If request headers match the global default value of
-    DEFAULT_REQUEST_HEADERS, they should be translated nonetheless."""
+    """Non-default values set for headers with a default value also work as
+    expected."""
     settings = {
         **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -2915,7 +2915,7 @@ def test_middleware_headers_request_headers_custom():
             "Accept": "text/html",
             "Accept-Language": "fa",
             "Accept-Encoding": "br",
-            "Referer": "https://google.com",
+            "Referer": "https://referrer.example",
             "User-Agent": "foo/1.2.3",
         },
     )
@@ -2934,7 +2934,7 @@ def test_middleware_headers_request_headers_custom():
             "name": "Accept-Encoding",
             "value": "br",
         },
-        {"name": "Referer", "value": "https://google.com"},
+        {"name": "Referer", "value": "https://referrer.example"},
         {"name": "User-Agent", "value": "foo/1.2.3"},
     ]
 
@@ -2960,6 +2960,130 @@ def test_middleware_headers_request_headers_skip():
             "User-Agent": DEFAULT_USER_AGENT,
         },
     )
+    yield _process_request(crawler, request)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert "customHttpRequestHeaders" not in api_params
+
+
+@inlineCallbacks
+def test_middleware_headers_custom_middleware_before():
+    """If request headers defined from a custom middleware configured before
+    the scrapy-zyte-api downloader middleware match the global default value of
+    DEFAULT_REQUEST_HEADERS, they will *not* be translated."""
+
+    class DownloaderMiddleware:
+        def process_request(self, request, spider):
+            for k, v in {
+                **DEFAULT_REQUEST_HEADERS,
+                "Accept-Encoding": DEFAULT_ACCEPT_ENCODING,
+                "User-Agent": DEFAULT_USER_AGENT,
+            }.items():
+                request.headers[k] = v
+
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    mw_key = "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
+    settings["DOWNLOADER_MIDDLEWARES"][DownloaderMiddleware] = (
+        settings["DOWNLOADER_MIDDLEWARES"][mw_key] - 1
+    )
+    crawler = get_crawler(settings)
+    request = Request("https://example.com")
+    yield _process_request(crawler, request)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert api_params["customHttpRequestHeaders"] == [
+        {"name": "Referer", "value": request.url},
+    ]
+
+
+@inlineCallbacks
+def test_middleware_headers_custom_middleware_before_custom():
+    """If request headers defined from a custom middleware configured before
+    the scrapy-zyte-api downloader middleware have non-default values, they
+    will be translated."""
+
+    class DownloaderMiddleware:
+        def process_request(self, request, spider):
+            for k, v in {
+                "Accept": "text/html",
+                "Accept-Language": "fa",
+                "Accept-Encoding": "br",
+                "Referer": "https://referrer.example",
+                "User-Agent": "foo/1.2.3",
+            }.items():
+                request.headers[k] = v
+
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    mw_key = "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
+    settings["DOWNLOADER_MIDDLEWARES"][DownloaderMiddleware] = (
+        settings["DOWNLOADER_MIDDLEWARES"][mw_key] - 1
+    )
+    crawler = get_crawler(settings)
+    request = Request("https://example.com")
+    yield _process_request(crawler, request)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert api_params["customHttpRequestHeaders"] == [
+        {"name": "Referer", "value": "https://referrer.example"},
+        {
+            "name": "Accept",
+            "value": "text/html",
+        },
+        {"name": "Accept-Language", "value": "fa"},
+        {"name": "User-Agent", "value": "foo/1.2.3"},
+        {
+            "name": "Accept-Encoding",
+            "value": "br",
+        },
+    ]
+
+
+# TODO: custom middleware before (skip)
+
+
+@inlineCallbacks
+def test_middleware_headers_custom_middleware_before_skip():
+    """Headers set on the request from a custom middleware configured before
+    the scrapy-zyte-api downloader middleware will not be translated into the
+    customHttpRequestHeaders parameter if configured to be skipped."""
+
+    class DownloaderMiddleware:
+        def process_request(self, request, spider):
+            for k, v in {
+                "Accept": "text/html",
+                "Accept-Language": "fa",
+                "Accept-Encoding": "br",
+                "Referer": "https://referrer.example",
+                "User-Agent": "foo/1.2.3",
+            }.items():
+                request.headers[k] = v
+
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_SKIP_HEADERS": list(
+            set(header.decode() for header in SKIP_HEADERS)
+            | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer", "User-Agent"}
+        ),
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    mw_key = "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
+    settings["DOWNLOADER_MIDDLEWARES"][DownloaderMiddleware] = (
+        settings["DOWNLOADER_MIDDLEWARES"][mw_key] - 1
+    )
+    crawler = get_crawler(settings)
+    request = Request("https://example.com")
     yield _process_request(crawler, request)
 
     handler = get_download_handler(crawler, "https")

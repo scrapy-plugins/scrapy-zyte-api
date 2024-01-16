@@ -317,7 +317,10 @@ def _map_custom_http_request_headers(
         request=request,
         header_parameter="customHttpRequestHeaders",
     ):
-        if lowercase_k in skip_headers:
+        if lowercase_k in skip_headers and (
+            skip_headers[lowercase_k] is ANY_VALUE
+            or skip_headers[lowercase_k] == decoded_v
+        ):
             continue
         headers.append({"name": k.decode(), "value": decoded_v})
     if headers:
@@ -340,7 +343,9 @@ def _map_request_headers(
         key = browser_headers.get(lowercase_k)
         if key is not None:
             request_headers[key] = decoded_v
-        elif lowercase_k not in browser_ignore_headers:
+        elif lowercase_k not in browser_ignore_headers or browser_ignore_headers[
+            lowercase_k
+        ] not in (ANY_VALUE, decoded_v):
             logger.warning(
                 f"Request {request} defines header {k}, which "
                 f"cannot be mapped into the Zyte API requestHeaders "
@@ -910,7 +915,7 @@ class _ParamParser:
             default_params=self._default_params if use_default_params else {},
             transparent_mode=self._transparent_mode,
             automap_params=self._automap_params,
-            skip_headers={**self._http_skip_headers, **request_skip_headers},
+            skip_headers={**request_skip_headers, **self._http_skip_headers},
             browser_headers=self._browser_headers,
             browser_ignore_headers={b"cookie": ANY_VALUE, **request_skip_headers},
             job_id=self._job_id,
