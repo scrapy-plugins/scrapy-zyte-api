@@ -6,7 +6,13 @@ from scrapy import Request
 from scrapy.crawler import Crawler
 from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import AnnotatedResult, PageObjectInputProvider
-from web_poet import BrowserHtml, BrowserResponse
+from web_poet import (
+    BrowserHtml,
+    BrowserResponse,
+    HttpOrBrowserResponse,
+    HttpResponse,
+    HttpResponseHeaders,
+)
 from zyte_common_items import (
     Article,
     ArticleList,
@@ -19,6 +25,7 @@ from zyte_common_items import (
 )
 
 from scrapy_zyte_api._annotations import ExtractFrom
+from scrapy_zyte_api._params import _ParamParser
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -40,6 +47,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         Article,
         ArticleList,
         ArticleNavigation,
+        HttpOrBrowserResponse,
         JobPosting,
     }
 
@@ -82,8 +90,6 @@ class ZyteApiProvider(PageObjectInputProvider):
         }
 
         zyte_api_meta = crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS")
-        if html_requested:
-            zyte_api_meta["browserHtml"] = True
 
         to_provide_stripped: Set[type] = set()
         extract_from_seen: Dict[str, str] = {}
@@ -116,6 +122,20 @@ class ZyteApiProvider(PageObjectInputProvider):
             options_name = f"{kw}Options"
             if item_type not in to_provide_stripped and options_name in zyte_api_meta:
                 del zyte_api_meta[options_name]
+            elif options_name in zyte_api_meta:
+                extract_from = zyte_api_meta[options_name]["extractFrom"]
+
+        if HttpOrBrowserResponse in to_provide:
+            if extract_from == "browserHtml":
+                html_requested = True
+            elif extract_from == "httpResponseBody":
+                param_parser = _ParamParser(crawler)
+                params = param_parser.parse(request)
+                del params["url"]
+                zyte_api_meta.update(params)
+
+        if html_requested:
+            zyte_api_meta["browserHtml"] = True
 
         api_request = Request(
             url=request.url,
@@ -145,6 +165,32 @@ class ZyteApiProvider(PageObjectInputProvider):
             )
             results.append(response)
             self.update_cache(request, {BrowserResponse: response})
+
+        if HttpOrBrowserResponse in to_provide:
+            if extract_from == "browserHtml":
+                http_or_browser_response = HttpOrBrowserResponse(
+                    response=BrowserResponse(
+                        url=api_response.url,
+                        status=api_response.status,
+                        html=html,
+                    )
+                )
+            elif extract_from == "httpResponseBody":
+                http_or_browser_response = HttpOrBrowserResponse(
+                    response=HttpResponse(
+                        url=api_response.url,
+                        body=api_response.body,
+                        status=api_response.status,
+                        headers=HttpResponseHeaders.from_bytes_dict(
+                            api_response.headers
+                        ),
+                    )
+                )
+
+            results.append(http_or_browser_response)
+            self.update_cache(
+                request, {HttpOrBrowserResponse: http_or_browser_response}
+            )
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
