@@ -14,7 +14,7 @@ _start_requests_processed = object()
 
 
 class _BaseMiddleware:
-    slot_prefix = "zyte-api@"
+    _slot_prefix = "zyte-api@"
 
     def __init__(self, crawler):
         self._param_parser = _ParamParser(crawler, cookies_enabled=False)
@@ -26,8 +26,8 @@ class _BaseMiddleware:
 
         downloader = self._crawler.engine.downloader
         slot_id = downloader._get_slot_key(request, spider)
-        if not isinstance(slot_id, str) or not slot_id.startswith(self.slot_prefix):
-            slot_id = f"{self.slot_prefix}{slot_id}"
+        if not isinstance(slot_id, str) or not slot_id.startswith(self._slot_prefix):
+            slot_id = f"{self._slot_prefix}{slot_id}"
             request.meta["download_slot"] = slot_id
         _, slot = downloader._get_slot(request, spider)
         slot.delay = 0
@@ -134,7 +134,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             [
                 len(slot.transferring)
                 for slot_id, slot in downloader.slots.items()
-                if slot_id.startswith(self.slot_prefix)
+                if slot_id.startswith(self._slot_prefix)
             ]
         )
         total_requests = zapi_req_count + download_req_count
