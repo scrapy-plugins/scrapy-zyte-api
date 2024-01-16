@@ -304,9 +304,9 @@ def _iter_headers(
     for k, v in request.headers.items():
         if not v:
             continue
-        decoded_v = b",".join(v).decode()
+        v = b",".join(v)
         lowercase_k = k.strip().lower()
-        yield k, lowercase_k, decoded_v
+        yield k, lowercase_k, v
 
 
 def _map_custom_http_request_headers(
@@ -316,17 +316,14 @@ def _map_custom_http_request_headers(
     skip_headers: SKIP_HEADER_T,
 ):
     headers = []
-    for k, lowercase_k, decoded_v in _iter_headers(
+    for k, lowercase_k, v in _iter_headers(
         api_params=api_params,
         request=request,
         header_parameter="customHttpRequestHeaders",
     ):
-        if lowercase_k in skip_headers and (
-            skip_headers[lowercase_k] is ANY_VALUE
-            or skip_headers[lowercase_k] == decoded_v
-        ):
+        if skip_headers.get(lowercase_k) in (ANY_VALUE, v):
             continue
-        headers.append({"name": k.decode(), "value": decoded_v})
+        headers.append({"name": k.decode(), "value": v.decode()})
     if headers:
         api_params["customHttpRequestHeaders"] = headers
 
@@ -339,17 +336,17 @@ def _map_request_headers(
     browser_ignore_headers: SKIP_HEADER_T,
 ):
     request_headers = {}
-    for k, lowercase_k, decoded_v in _iter_headers(
+    for k, lowercase_k, v in _iter_headers(
         api_params=api_params,
         request=request,
         header_parameter="requestHeaders",
     ):
         key = browser_headers.get(lowercase_k)
         if key is not None:
-            request_headers[key] = decoded_v
+            request_headers[key] = v.decode()
         elif lowercase_k not in browser_ignore_headers or browser_ignore_headers[
             lowercase_k
-        ] not in (ANY_VALUE, decoded_v):
+        ] not in (ANY_VALUE, v):
             logger.warning(
                 f"Request {request} defines header {k}, which "
                 f"cannot be mapped into the Zyte API requestHeaders "

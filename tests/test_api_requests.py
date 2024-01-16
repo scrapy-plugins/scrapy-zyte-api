@@ -25,7 +25,7 @@ from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api.aio.errors import RequestError
 
 from scrapy_zyte_api._cookies import _get_cookie_jar
-from scrapy_zyte_api._params import _EXTRACT_KEYS
+from scrapy_zyte_api._params import _EXTRACT_KEYS, ANY_VALUE
 from scrapy_zyte_api.handler import _ParamParser
 from scrapy_zyte_api.responses import _process_response
 
@@ -276,7 +276,7 @@ BROWSER_HEADERS = {b"referer": "referer"}
 DEFAULT_PARAMS: Dict[str, Any] = {}
 TRANSPARENT_MODE = False
 SKIP_HEADERS = {
-    b"cookie",
+    b"cookie": ANY_VALUE,
 }
 JOB_ID = None
 COOKIES_ENABLED = False
@@ -321,7 +321,7 @@ async def test_param_parser_input_custom(mockserver):
         assert parser._default_params == {"a": "b"}
         assert parser._max_cookies == 1
         assert parser._http_skip_headers == {
-            b"a",
+            b"a": ANY_VALUE,
         }
         assert parser._transparent_mode is True
 
