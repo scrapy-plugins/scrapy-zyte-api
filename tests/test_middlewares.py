@@ -23,6 +23,10 @@ class NamedSpider(Spider):
     name = "named"
 
 
+def request_processor(middleware, request, spider):
+    assert middleware.process_request(request, spider) is None
+
+
 def start_request_processor(middleware, request, spider):
     assert list(middleware.process_start_requests([request], spider)) == [request]
 
@@ -35,21 +39,20 @@ def spider_output_processor(middleware, request, spider):
 
 
 @pytest.mark.parametrize(
-    "processor",
+    "mw_cls,processor",
     [
-        start_request_processor,
-        spider_output_processor,
+        (ScrapyZyteAPIDownloaderMiddleware, request_processor),
+        (ScrapyZyteAPISpiderMiddleware, start_request_processor),
+        (ScrapyZyteAPISpiderMiddleware, spider_output_processor),
     ],
 )
 @ensureDeferred
-async def test_autothrottle_handling(processor):
+async def test_autothrottle_handling(mw_cls, processor):
     crawler = get_crawler()
     await crawler.crawl("a")
     spider = crawler.spider
 
-    middleware = create_instance(
-        ScrapyZyteAPISpiderMiddleware, settings=crawler.settings, crawler=crawler
-    )
+    middleware = create_instance(mw_cls, settings=crawler.settings, crawler=crawler)
 
     # AutoThrottle does this.
     spider.download_delay = 5
