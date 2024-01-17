@@ -202,6 +202,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         if not isinstance(response, (ZyteAPIResponse, ZyteAPITextResponse)):
             return response
 
+        assert response.raw_api_response is not None
         action_error = any(
             "error" in action for action in response.raw_api_response["actions"]
         )
