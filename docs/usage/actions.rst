@@ -34,7 +34,7 @@ cached:
         def should_cache_response(self, response: Response, request: Request):
             if (
                 isinstance(response, (ZyteAPIResponse, ZyteAPITextResponse))
-                and any("error" in action for action in response.raw_api_response["actions"])
+                and any("error" in action for action in response.raw_api_response.get("actions", []))
             ):
                 return False
             return super().should_cache_response(response, request)

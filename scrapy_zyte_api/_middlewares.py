@@ -204,7 +204,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
 
         assert response.raw_api_response is not None
         action_error = any(
-            "error" in action for action in response.raw_api_response["actions"]
+            "error" in action for action in response.raw_api_response.get("actions", [])
         )
         if not action_error:
             return response
