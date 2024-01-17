@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.14.1 (unreleased)
+0.14.1 (2024-01-17)
 -------------------
 
 * The assignment of a custom download slot to requests that use Zyte API now
