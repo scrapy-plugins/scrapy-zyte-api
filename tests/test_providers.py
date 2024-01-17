@@ -27,6 +27,7 @@ from web_poet import (
 from zyte_common_items import BasePage, Product
 
 from scrapy_zyte_api._annotations import ExtractFrom
+from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import ZyteApiProvider
 
 from . import SETTINGS, get_crawler
@@ -382,3 +383,342 @@ def test_provider_any_response(mockserver):
     assert type(results[0]) == AnyResponse
     assert type(results[0].response) == HttpResponse
     assert type(results[1]) == Product
+
+
+class RecordingHandler(ScrapyZyteAPIDownloadHandler):
+    """Subclasses the original handler in order to record the Zyte API parameters
+    used for each downloading request, as well as counting the number of Zyte API
+    requests.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.params = []
+
+    def _log_request(self, params):
+        self.params.append(params)
+
+
+def provider_settings(server):
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = server.urljoin("/")
+    settings["ZYTE_API_TRANSPARENT_MODE"] = True
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
+    settings["DOWNLOAD_HANDLERS"]["http"] = RecordingHandler
+    return settings
+
+
+@ensureDeferred
+async def test_provider_any_response_only(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {"url"}
+    assert item is None
+
+
+@ensureDeferred
+async def test_provider_any_response_product(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        product: Product
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {"url", "product"}
+    assert item is None
+
+
+@ensureDeferred
+async def test_provider_any_response_product_extract_from_browser_html(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        product: Product
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "productOptions": {"extractFrom": "browserHtml"}
+    }
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {"url", "product", "browserHtml", "productOptions"}
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == BrowserResponse
+    assert type(item["page"].product) == Product
+
+
+@ensureDeferred
+async def test_provider_any_response_product_extract_from_browser_html_2(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        browser_response: BrowserResponse
+        product: Product
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "productOptions": {"extractFrom": "browserHtml"}
+    }
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {"url", "product", "browserHtml", "productOptions"}
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == BrowserResponse
+    assert type(item["page"].browser_response) == BrowserResponse
+    assert type(item["page"].product) == Product
+
+    assert id(item["page"].browser_response) == id(item["page"].response.response)
+
+
+@ensureDeferred
+async def test_provider_any_response_product_extract_from_http_response(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        product: Product
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "productOptions": {"extractFrom": "httpResponseBody"}
+    }
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {
+        "url",
+        "product",
+        "httpResponseBody",
+        "productOptions",
+        "httpResponseHeaders",
+        "customHttpRequestHeaders",
+    }
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == HttpResponse
+    assert type(item["page"].product) == Product
+
+
+@ensureDeferred
+async def test_provider_any_response_product_extract_from_http_response_2(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        http_response: HttpResponse
+        product: Product
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "productOptions": {"extractFrom": "httpResponseBody"}
+    }
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {
+        "url",
+        "product",
+        "httpResponseBody",
+        "productOptions",
+        "httpResponseHeaders",
+        "customHttpRequestHeaders",
+    }
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == HttpResponse
+    assert type(item["page"].product) == Product
+    assert type(item["page"].http_response) == HttpResponse
+
+
+@ensureDeferred
+async def test_provider_any_response_browser_html(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        html: BrowserHtml
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {"url", "browserHtml"}
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == BrowserResponse
+    assert type(item["page"].html) == BrowserHtml
+
+
+@ensureDeferred
+async def test_provider_any_response_browser_response(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        browser_response: BrowserResponse
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {"url", "browserHtml"}
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == BrowserResponse
+    assert type(item["page"].browser_response) == BrowserResponse
+
+
+@ensureDeferred
+async def test_provider_any_response_browser_html_response(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        browser_response: BrowserResponse
+        html: BrowserHtml
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {"url", "browserHtml"}
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == BrowserResponse
+    assert type(item["page"].browser_response) == BrowserResponse
+    assert type(item["page"].html) == BrowserHtml
+
+
+@ensureDeferred
+async def test_provider_any_response_http_response(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        http_response: HttpResponse
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0].keys() == {"url", "HttpResponseBody"}
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == BrowserResponse
+    assert type(item["page"].http_response) == HttpResponse
+
+
+@ensureDeferred
+async def test_provider_any_response_browser_http_response(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        browser_response: BrowserResponse
+        http_response: HttpResponse
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 2
+    assert params[0].keys() == {"url", "HttpResponseBody"}
+    assert params[1].keys() == {"url", "BrowserHtml"}
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == BrowserResponse
+    assert type(item["page"].browser_response) == BrowserResponse
+    assert type(item["page"].http_response) == HttpResponse
