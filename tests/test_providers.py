@@ -332,15 +332,16 @@ def test_provider_any_response(mockserver):
     assert len(results) == 2
     assert type(results[0]) == BrowserHtml
     assert type(results[1]) == AnyResponse
-    assert results[0] == results[1].response.html  # diff instance due to casting
+    # diff instance due to casting
+    assert results[0] == results[1].response.html  # type: ignore[union-attr]
 
     results = yield provide({AnyResponse, BrowserResponse, BrowserHtml})
     assert len(results) == 3
     assert type(results[0]) == BrowserHtml
     assert type(results[1]) == BrowserResponse
     assert type(results[2]) == AnyResponse
-    assert results[0] == results[1].html  # diff instance due to casting
-    assert results[0] == results[2].response.html
+    assert results[0] == results[1].html
+    assert results[0] == results[2].response.html  # type: ignore[union-attr]
 
     # NOTES: This is hard to test in this setup and would result in being empty.
     # This will be tested in a spider-setup instead so that HttpResponseProvider
