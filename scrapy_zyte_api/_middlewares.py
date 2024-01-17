@@ -1,11 +1,15 @@
 import logging
-from typing import cast
+from typing import Optional, Union, cast
 
-from scrapy import Request, signals
+from scrapy import Request, Spider, signals
+from scrapy.downloadermiddlewares.retry import get_retry_request
 from scrapy.exceptions import IgnoreRequest
+from scrapy.http import Response
 from zyte_api.aio.errors import RequestError
 
 from ._params import _ParamParser
+from .exceptions import ActionError
+from .responses import ZyteAPIResponse, ZyteAPITextResponse
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,13 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         self._forbidden_domain_start_request_count = 0
         self._total_start_request_count = 0
 
+        self._retry_action_errors = crawler.settings.getbool(
+            "ZYTE_API_ACTION_ERROR_RETRY_ENABLED", True
+        )
+        self._max_retry_times = crawler.settings.getint("RETRY_TIMES")
+        self._priority_adjust = crawler.settings.getint("RETRY_PRIORITY_ADJUST")
+        self._load_action_error_handling()
+
         self._max_requests = crawler.settings.getint("ZYTE_API_MAX_REQUESTS")
         if self._max_requests:
             logger.info(
@@ -55,6 +66,18 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         crawler.signals.connect(
             self._start_requests_processed, signal=_start_requests_processed
         )
+
+    def _load_action_error_handling(self):
+        value = self._crawler.settings.get("ZYTE_API_ACTION_ERROR_HANDLING", "pass")
+        if value in ("pass", "ignore", "err"):
+            self._action_error_handling = value
+        else:
+            fallback_value = "pass"
+            logger.error(
+                f"Setting ZYTE_API_ACTION_ERROR_HANDLING got an unexpected "
+                f"value: {value!r}. Falling back to {fallback_value!r}."
+            )
+            self._action_error_handling = fallback_value
 
     def _get_spm_mw(self):
         spm_mw_classes = []
@@ -162,6 +185,51 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         )
         self._crawler.engine.close_spider(
             self._crawler.spider, "failed_forbidden_domain"
+        )
+
+    def _handle_action_error(self, response):
+        if self._action_error_handling == "pass":
+            return response
+        elif self._action_error_handling == "ignore":
+            raise IgnoreRequest
+        else:
+            assert self._action_error_handling == "err"
+            raise ActionError(response)
+
+    def process_response(
+        self, request: Request, response: Response, spider: Spider
+    ) -> Union[Request, Response]:
+        if not isinstance(response, (ZyteAPIResponse, ZyteAPITextResponse)):
+            return response
+
+        action_error = any(
+            "error" in action for action in response.raw_api_response["actions"]
+        )
+        if not action_error:
+            return response
+
+        if not self._retry_action_errors or request.meta.get("dont_retry", False):
+            return self._handle_action_error(response)
+
+        return self._retry(
+            request, reason="action-error", spider=spider
+        ) or self._handle_action_error(response)
+
+    def _retry(
+        self,
+        request: Request,
+        *,
+        reason: str,
+        spider: Spider,
+    ) -> Optional[Request]:
+        max_retry_times = request.meta.get("max_retry_times", self._max_retry_times)
+        priority_adjust = request.meta.get("priority_adjust", self._priority_adjust)
+        return get_retry_request(
+            request,
+            reason=reason,
+            spider=spider,
+            max_retry_times=max_retry_times,
+            priority_adjust=priority_adjust,
         )
 
 

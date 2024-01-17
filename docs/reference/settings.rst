@@ -6,6 +6,44 @@ Settings
 
 :ref:`Settings <topics-settings>` for scrapy-zyte-api.
 
+.. _ZYTE_API_ACTION_ERROR_RETRY_ENABLED:
+
+ZYTE_API_ACTION_ERROR_RETRY_ENABLED
+===================================
+
+Default: ``True``
+
+Enables retries of Zyte API requests if responses contain an action error.
+
+Maximum retries and priority adjustment are handled with the same settings and
+request metadata keywords as regular retries in Scrapy, see
+:setting:`RETRY_TIMES <scrapy:RETRY_TIMES>` and
+:setting:`RETRY_PRIORITY_ADJUST <scrapy:RETRY_PRIORITY_ADJUST>`.
+
+See also :ref:`ZYTE_API_ACTION_ERROR_HANDLING`.
+
+.. _ZYTE_API_ACTION_ERROR_HANDLING:
+
+ZYTE_API_ACTION_ERROR_HANDLING
+==============================
+
+Default: ``"pass"``
+
+Determines how to handle Zyte API responses that contain an action error:
+
+-   ``"pass"``: Responses are treated as valid responses, i.e. they will reach
+    your spider callback.
+
+-   ``"ignore"``: Responses are dropped, i.e. they will not reach your spider.
+
+-   ``"err"``: :class:`~scrapy_zyte_api.exceptions.ActionError` is raised. It
+    will be processed by downloader middlewares as an exception, and will reach
+    your spider errback if you set one.
+
+.. autoexception:: scrapy_zyte_api.exceptions.ActionError
+    :members:
+
+
 .. _ZYTE_API_AUTOMAP_PARAMS:
 
 ZYTE_API_AUTOMAP_PARAMS

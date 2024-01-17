@@ -4,80 +4,16 @@
 Handling action errors
 ======================
 
-Zyte API responses are considered successful :ref:`even if some browser actions
-fail <zyte-api-successful-responses>`.
+Even though Zyte API considers a response successful :ref:`even if a browser
+action fails <zyte-api-successful-responses>`, scrapy-zyte-api retries such
+responses by default. See :ref:`ZYTE_API_ACTION_ERROR_RETRY_ENABLED`.
 
-If you wish to retry requests whose response contains actions that failed, you
-can define a custom Scrapy middleware as follows:
+You can also use :ref:`ZYTE_API_ACTION_ERROR_HANDLING` to determine how such
+responses are handled when they are not retried or when retries are exceeded:
+treated as a success (default), ignored, or treated as an error.
 
-.. code-block:: python
-    :caption: myproject/middlewares.py
-
-    from typing import Optional, Type, Union
-
-    from scrapy import Request, Spider
-    from scrapy.crawler import Crawler
-    from scrapy.http import Response
-    from scrapy.downloadermiddlewares.retry import get_retry_request
-    from scrapy.settings import BaseSettings
-    from scrapy_zyte_api.responses import ZyteAPIResponse, ZyteAPITextResponse
-
-    class ZyteAPIFailedActionsRetryMiddleware:
-
-        @classmethod
-        def from_crawler(cls, crawler: Crawler):
-            return cls(crawler.settings)
-
-        def __init__(self, settings: BaseSettings):
-            if not settings.getbool("RETRY_ENABLED"):
-                raise NotConfigured
-            self.max_retry_times = settings.getint("RETRY_TIMES")
-            self.priority_adjust = settings.getint("RETRY_PRIORITY_ADJUST")
-
-        def process_response(
-            self, request: Request, response: Response, spider: Spider
-        ) -> Union[Request, Response]:
-            if not isinstance(response, (ZyteAPIResponse, ZyteAPITextResponse)):
-                return response
-            if request.meta.get("dont_retry", False):
-                return response
-            if any("error" in action for action in response.raw_api_response["actions"]):
-                reason = "An action failed"
-                new_request = self._retry(request, reason, spider)
-                if new_request:
-                    return new_request
-                else:
-                    return response
-                    # Note: If you prefer requests that exceed all retries to
-                    # be dropped, raise scrapy.exceptions.IgnoreRequest here,
-                    # instead of returning the response.
-            return response
-
-        def _retry(
-            self,
-            request: Request,
-            reason: Union[str, Exception, Type[Exception]],
-            spider: Spider,
-        ) -> Optional[Request]:
-            max_retry_times = request.meta.get("max_retry_times", self.max_retry_times)
-            priority_adjust = request.meta.get("priority_adjust", self.priority_adjust)
-            return get_retry_request(
-                request,
-                reason=reason,
-                spider=spider,
-                max_retry_times=max_retry_times,
-                priority_adjust=priority_adjust,
-            )
-
-And enable it in your settings:
-
-.. code-block:: python
-    :caption: myproject/settings.py
-
-
-    DOWNLOADER_MIDDLEWARES = {
-        "myproject.middlewares.ZyteAPIFailedActionsRetryMiddleware": 525,
-    }
+Action error caching
+====================
 
 If you use
 :class:`~scrapy.downloadermiddlewares.httpcache.HttpCacheMiddleware`, you might

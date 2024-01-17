@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, cast
 from unittest import SkipTest
 
@@ -5,6 +6,7 @@ import pytest
 from packaging.version import Version
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
+from scrapy.exceptions import IgnoreRequest
 from scrapy.http.response import Response
 from scrapy.item import Item
 from scrapy.utils.misc import create_instance
@@ -14,6 +16,8 @@ from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
+from scrapy_zyte_api.exceptions import ActionError
+from scrapy_zyte_api.responses import ZyteAPIResponse
 
 from . import SETTINGS
 from .mockserver import DelayedResource, MockServer
@@ -389,3 +393,332 @@ async def test_spm_conflict_crawlera():
             attribute,
             conflict,
         )
+
+
+@pytest.mark.parametrize(
+    "settings,meta,enabled",
+    [
+        # ZYTE_API_ACTION_ERROR_RETRY_ENABLED enables, RETRY_ENABLED has no
+        # effect.
+        *(
+            (
+                {
+                    "RETRY_ENABLED": scrapy,
+                    "ZYTE_API_ACTION_ERROR_RETRY_ENABLED": zyte_api,
+                },
+                {},
+                zyte_api,
+            )
+            for zyte_api in (True, False)
+            for scrapy in (True, False)
+        ),
+        *(
+            (
+                {
+                    "RETRY_ENABLED": scrapy,
+                },
+                {},
+                True,
+            )
+            for scrapy in (True, False)
+        ),
+        # dont_retry=True overrides.
+        *(
+            (
+                {"ZYTE_API_ACTION_ERROR_RETRY_ENABLED": zyte_api},
+                {"dont_retry": dont_retry},
+                zyte_api and not dont_retry,
+            )
+            for zyte_api in (True, False)
+            for dont_retry in (True, False)
+        ),
+    ],
+)
+@ensureDeferred
+async def test_action_error_retry_enabled(settings, meta, enabled):
+    crawler = get_crawler(settings_dict=settings)
+    await crawler.crawl()
+
+    middleware = create_instance(
+        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
+    )
+
+    request = Request("https://example.com", meta=meta)
+    raw_api_response = {"url": request.url, "actions": [{"error": "foo"}]}
+    response = ZyteAPIResponse.from_api_response(raw_api_response, request=request)
+    result = middleware.process_response(request, response, crawler.spider)
+    if enabled:
+        assert isinstance(result, Request)
+        assert result.meta["retry_times"] == 1
+    else:
+        assert result is response
+
+    await crawler.stop()
+
+
+@pytest.mark.parametrize(
+    "settings,meta,max_retries",
+    [
+        (
+            {"RETRY_TIMES": 1},
+            {},
+            1,
+        ),
+        (
+            {},
+            {"max_retry_times": 1},
+            1,
+        ),
+        (
+            {"RETRY_TIMES": 1},
+            {"max_retry_times": 2},
+            2,
+        ),
+        (
+            {"RETRY_TIMES": 2},
+            {"max_retry_times": 1},
+            1,
+        ),
+    ],
+)
+@ensureDeferred
+async def test_action_error_retry_times(settings, meta, max_retries):
+    crawler = get_crawler(settings_dict=settings)
+    await crawler.crawl()
+
+    middleware = create_instance(
+        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
+    )
+
+    request = Request(
+        "https://example.com", meta={**meta, "retry_times": max_retries - 1}
+    )
+    raw_api_response = {"url": request.url, "actions": [{"error": "foo"}]}
+    response = ZyteAPIResponse.from_api_response(raw_api_response, request=request)
+
+    request2 = middleware.process_response(request, response, crawler.spider)
+    assert isinstance(request2, Request)
+    assert request2.meta["retry_times"] == max_retries
+
+    result = middleware.process_response(request2, response, crawler.spider)
+    assert result is response
+
+    await crawler.stop()
+
+
+@pytest.mark.parametrize(
+    "settings,meta,priority",
+    [
+        (
+            {"RETRY_PRIORITY_ADJUST": 1},
+            {},
+            1,
+        ),
+        (
+            {},
+            {"priority_adjust": 1},
+            1,
+        ),
+        (
+            {"RETRY_PRIORITY_ADJUST": 1},
+            {"priority_adjust": 2},
+            2,
+        ),
+        (
+            {"RETRY_PRIORITY_ADJUST": 2},
+            {"priority_adjust": 1},
+            1,
+        ),
+    ],
+)
+@ensureDeferred
+async def test_action_error_retry_priority_adjust(settings, meta, priority):
+    crawler = get_crawler(settings_dict=settings)
+    await crawler.crawl()
+
+    middleware = create_instance(
+        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
+    )
+
+    request = Request("https://example.com", meta=meta)
+    raw_api_response = {"url": request.url, "actions": [{"error": "foo"}]}
+    response = ZyteAPIResponse.from_api_response(raw_api_response, request=request)
+
+    request2 = middleware.process_response(request, response, crawler.spider)
+    assert isinstance(request2, Request)
+    assert request2.meta["retry_times"] == 1
+    assert request2.priority == priority
+
+    await crawler.stop()
+
+
+@pytest.mark.parametrize(
+    "settings,expected,setup_errors",
+    [
+        (
+            {},
+            Response,
+            [],
+        ),
+        (
+            {"ZYTE_API_ACTION_ERROR_HANDLING": "pass"},
+            Response,
+            [],
+        ),
+        (
+            {"ZYTE_API_ACTION_ERROR_HANDLING": "ignore"},
+            IgnoreRequest,
+            [],
+        ),
+        (
+            {"ZYTE_API_ACTION_ERROR_HANDLING": "err"},
+            ActionError,
+            [],
+        ),
+        (
+            {"ZYTE_API_ACTION_ERROR_HANDLING": "foo"},
+            Response,
+            [
+                (
+                    "Setting ZYTE_API_ACTION_ERROR_HANDLING got an unexpected "
+                    "value: 'foo'. Falling back to 'pass'."
+                )
+            ],
+        ),
+    ],
+)
+@ensureDeferred
+async def test_action_error_handling_no_retries(
+    settings, expected, setup_errors, caplog
+):
+    settings["ZYTE_API_ACTION_ERROR_RETRY_ENABLED"] = False
+    crawler = get_crawler(settings_dict=settings)
+    await crawler.crawl()
+
+    middleware = create_instance(
+        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
+    )
+    if setup_errors:
+        assert caplog.record_tuples == [
+            ("scrapy_zyte_api._middlewares", logging.ERROR, error)
+            for error in setup_errors
+        ]
+    else:
+        assert not caplog.records
+
+    request = Request("https://example.com")
+    raw_api_response = {"url": request.url, "actions": [{"error": "foo"}]}
+    response = ZyteAPIResponse.from_api_response(raw_api_response, request=request)
+
+    try:
+        result = middleware.process_response(request, response, crawler.spider)
+    except (ActionError, IgnoreRequest) as e:
+        result = e
+    assert isinstance(result, expected)
+
+    await crawler.stop()
+
+
+@pytest.mark.parametrize(
+    "settings,expected,setup_errors",
+    [
+        (
+            {},
+            Response,
+            [],
+        ),
+        (
+            {"ZYTE_API_ACTION_ERROR_HANDLING": "pass"},
+            Response,
+            [],
+        ),
+        (
+            {"ZYTE_API_ACTION_ERROR_HANDLING": "ignore"},
+            IgnoreRequest,
+            [],
+        ),
+        (
+            {"ZYTE_API_ACTION_ERROR_HANDLING": "err"},
+            ActionError,
+            [],
+        ),
+        (
+            {"ZYTE_API_ACTION_ERROR_HANDLING": "foo"},
+            Response,
+            [
+                (
+                    "Setting ZYTE_API_ACTION_ERROR_HANDLING got an unexpected "
+                    "value: 'foo'. Falling back to 'pass'."
+                )
+            ],
+        ),
+    ],
+)
+@ensureDeferred
+async def test_action_error_handling_retries(settings, expected, setup_errors, caplog):
+    settings["RETRY_TIMES"] = 1
+    crawler = get_crawler(settings_dict=settings)
+    await crawler.crawl()
+
+    middleware = create_instance(
+        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
+    )
+    if setup_errors:
+        assert caplog.record_tuples == [
+            ("scrapy_zyte_api._middlewares", logging.ERROR, error)
+            for error in setup_errors
+        ]
+    else:
+        assert not caplog.records
+
+    request = Request("https://example.com")
+    raw_api_response = {"url": request.url, "actions": [{"error": "foo"}]}
+    response = ZyteAPIResponse.from_api_response(raw_api_response, request=request)
+
+    request2 = middleware.process_response(request, response, crawler.spider)
+    assert isinstance(request2, Request)
+    assert request2.meta["retry_times"] == 1
+
+    try:
+        result = middleware.process_response(request2, response, crawler.spider)
+    except (ActionError, IgnoreRequest) as e:
+        result = e
+    assert isinstance(result, expected)
+
+    await crawler.stop()
+
+
+@ensureDeferred
+async def test_process_response_non_zyte_api():
+    crawler = get_crawler()
+    await crawler.crawl()
+
+    middleware = create_instance(
+        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
+    )
+
+    request = Request("https://example.com")
+    response = Response(request.url)
+    result = middleware.process_response(request, response, crawler.spider)
+    assert result is response
+
+    await crawler.stop()
+
+
+@ensureDeferred
+async def test_process_response_no_action_error():
+    crawler = get_crawler()
+    await crawler.crawl()
+
+    middleware = create_instance(
+        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
+    )
+
+    request = Request("https://example.com")
+    raw_api_response = {"url": request.url, "actions": [{"action": "foo"}]}
+    response = ZyteAPIResponse.from_api_response(raw_api_response, request=request)
+
+    result = middleware.process_response(request, response, crawler.spider)
+    assert result is response
+
+    await crawler.stop()
