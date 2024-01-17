@@ -436,7 +436,7 @@ async def test_spm_conflict_crawlera():
 )
 @ensureDeferred
 async def test_action_error_retry_enabled(settings, meta, enabled):
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(NamedSpider, settings_dict=settings)
     await crawler.crawl()
 
     middleware = create_instance(
@@ -483,7 +483,7 @@ async def test_action_error_retry_enabled(settings, meta, enabled):
 )
 @ensureDeferred
 async def test_action_error_retry_times(settings, meta, max_retries):
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(NamedSpider, settings_dict=settings)
     await crawler.crawl()
 
     middleware = create_instance(
@@ -533,7 +533,7 @@ async def test_action_error_retry_times(settings, meta, max_retries):
 )
 @ensureDeferred
 async def test_action_error_retry_priority_adjust(settings, meta, priority):
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(NamedSpider, settings_dict=settings)
     await crawler.crawl()
 
     middleware = create_instance(
@@ -592,7 +592,7 @@ async def test_action_error_handling_no_retries(
     settings, expected, setup_errors, caplog
 ):
     settings["ZYTE_API_ACTION_ERROR_RETRY_ENABLED"] = False
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(NamedSpider, settings_dict=settings)
     await crawler.crawl()
 
     middleware = create_instance(
@@ -657,7 +657,7 @@ async def test_action_error_handling_no_retries(
 @ensureDeferred
 async def test_action_error_handling_retries(settings, expected, setup_errors, caplog):
     settings["RETRY_TIMES"] = 1
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler(NamedSpider, settings_dict=settings)
     await crawler.crawl()
 
     middleware = create_instance(
@@ -690,7 +690,7 @@ async def test_action_error_handling_retries(settings, expected, setup_errors, c
 
 @ensureDeferred
 async def test_process_response_non_zyte_api():
-    crawler = get_crawler()
+    crawler = get_crawler(NamedSpider)
     await crawler.crawl()
 
     middleware = create_instance(
@@ -707,7 +707,7 @@ async def test_process_response_non_zyte_api():
 
 @ensureDeferred
 async def test_process_response_no_action_error():
-    crawler = get_crawler()
+    crawler = get_crawler(NamedSpider)
     await crawler.crawl()
 
     middleware = create_instance(
