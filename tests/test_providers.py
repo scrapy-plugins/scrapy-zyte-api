@@ -4,21 +4,32 @@ import pytest
 
 pytest.importorskip("scrapy_poet")
 
+import asyncio
+
 import attrs
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy_poet import DummyResponse
+from scrapy_poet.injection import Injector
 from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
 from scrapy_poet.utils.testing import create_scrapy_settings as _create_scrapy_settings
-from twisted.internet import reactor
+from twisted.internet import defer, reactor
 from twisted.web.client import Agent, readBody
-from web_poet import BrowserHtml, BrowserResponse, ItemPage, field, handle_urls
+from web_poet import (
+    AnyResponse,
+    BrowserHtml,
+    BrowserResponse,
+    HttpResponse,
+    ItemPage,
+    field,
+    handle_urls,
+)
 from zyte_common_items import BasePage, Product
 
 from scrapy_zyte_api._annotations import ExtractFrom
 from scrapy_zyte_api.providers import ZyteApiProvider
 
-from . import SETTINGS
+from . import SETTINGS, get_crawler
 from .mockserver import get_ephemeral_port
 
 
@@ -263,3 +274,110 @@ async def test_provider_extractfrom_double(mockserver, caplog):
     item, _, _ = await crawl_single_item(AnnotatedZyteAPISpider, HtmlResource, settings)
     assert item is None
     assert "Multiple different extractFrom specified for product" in caplog.text
+
+
+@defer.inlineCallbacks
+def run_provider(server, to_provide, settings_dict=None, request_meta=None):
+    class AnyResponseSpider(Spider):
+        name = "any_response"
+
+    request = Request(server.urljoin("/some-page"), meta=request_meta)
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = server.urljoin("/")
+    if settings_dict:
+        settings.update(settings_dict)
+    crawler = get_crawler(settings, AnyResponseSpider)
+    yield from crawler.engine.open_spider(crawler.spider)
+    injector = Injector(crawler)
+    provider = ZyteApiProvider(injector)
+
+    coro = provider(to_provide, request, crawler)
+    results = yield defer.Deferred.fromFuture(asyncio.ensure_future(coro))
+
+    return results
+
+
+@defer.inlineCallbacks
+def test_provider_any_response(mockserver):
+    # Use only one instance of the mockserver for faster tests.
+    def provide(*args, **kwargs):
+        return run_provider(mockserver, *args, **kwargs)
+
+    results = yield provide(set())
+    assert results == []
+
+    # Having only AnyResponse without any of the other responses to re-use
+    # does not result in anything.
+    results = yield provide(
+        {
+            AnyResponse,
+        }
+    )
+    assert results == []
+
+    # Same case as above, since no response is available.
+    results = yield provide({AnyResponse, Product})
+    assert len(results) == 1
+    assert type(results[0]) == Product
+
+    # AnyResponse should re-use BrowserResponse if available.
+    results = yield provide({AnyResponse, BrowserResponse})
+    assert len(results) == 2
+    assert type(results[0]) == BrowserResponse
+    assert type(results[1]) == AnyResponse
+    assert id(results[0]) == id(results[1].response)
+
+    # AnyResponse should re-use BrowserHtml if available.
+    results = yield provide({AnyResponse, BrowserHtml})
+    assert len(results) == 2
+    assert type(results[0]) == BrowserHtml
+    assert type(results[1]) == AnyResponse
+    assert results[0] == results[1].response.html  # diff instance due to casting
+
+    results = yield provide({AnyResponse, BrowserResponse, BrowserHtml})
+    assert len(results) == 3
+    assert type(results[0]) == BrowserHtml
+    assert type(results[1]) == BrowserResponse
+    assert type(results[2]) == AnyResponse
+    assert results[0] == results[1].html  # diff instance due to casting
+    assert results[0] == results[2].response.html
+
+    # NOTES: This is hard to test in this setup and would result in being empty.
+    # This will be tested in a spider-setup instead so that HttpResponseProvider
+    # can participate.
+    # results = yield provide({AnyResponse, HttpResponse})
+    # assert results == []
+
+    # For the following cases, extraction source isn't available in `to_provided`
+    # but are in the `*.extractFrom` parameter.
+
+    settings_dict = {
+        "ZYTE_API_PROVIDER_PARAMS": {"productOptions": {"extractFrom": "browserHtml"}}
+    }
+
+    results = yield provide({AnyResponse, Product}, settings_dict)
+    assert len(results) == 2
+    assert type(results[0]) == AnyResponse
+    assert type(results[0].response) == BrowserResponse
+    assert type(results[1]) == Product
+
+    results = yield provide({AnyResponse, BrowserHtml, Product}, settings_dict)
+    assert len(results) == 3
+    assert type(results[0]) == BrowserHtml
+    assert type(results[1]) == AnyResponse
+    assert type(results[1].response) == BrowserResponse
+    assert type(results[2]) == Product
+    assert results[0] == results[1].response.html  # diff instance due to casting
+
+    settings_dict = {
+        "ZYTE_API_PROVIDER_PARAMS": {
+            "productOptions": {"extractFrom": "httpResponseBody"}
+        }
+    }
+    request_meta = {"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": True}}
+
+    results = yield provide({AnyResponse, Product}, settings_dict, request_meta)
+    assert len(results) == 2
+    assert type(results[0]) == AnyResponse
+    assert type(results[0].response) == HttpResponse
+    assert type(results[1]) == Product
