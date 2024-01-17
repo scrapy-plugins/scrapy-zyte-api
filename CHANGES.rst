@@ -1,6 +1,34 @@
 Changes
 =======
 
+0.14.1 (2024-01-17)
+-------------------
+
+* The assignment of a custom download slot to requests that use Zyte API now
+  also happens in the spider middleware, not only in the downloader middleware.
+
+  This way requests get a download slot assigned before they reach the
+  scheduler, making Zyte API requests work as expected with
+  :class:`scrapy.pqueues.DownloaderAwarePriorityQueue`.
+
+  .. note:: New requests created from downloader middlewares do not get their
+            download slot assigned before they reach the scheduler. So, unless
+            they reuse the metadata from a requests that did get a download
+            slot assigned (e.g. retries, redirects), they will continue not to
+            work as expected with
+            :class:`~scrapy.pqueues.DownloaderAwarePriorityQueue`.
+
+0.14.0 (2024-01-15)
+-------------------
+
+* Updated requirement versions:
+
+  * andi >= 0.6.0
+  * scrapy-poet >= 0.19.0
+  * zyte-common-items >= 0.8.0
+
+* Added support for ``zyte_common_items.JobPosting`` to the scrapy-poet provider.
+
 0.13.0 (2023-12-13)
 -------------------
 
