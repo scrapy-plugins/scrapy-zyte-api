@@ -551,6 +551,10 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
     assert type(item["page"].product) == Product
 
 
+# The issue here is that HttpResponseProvider runs earlier than ScrapyZyteAPI.
+# HttpResponseProvider doesn't know that it should not run since ScrapyZyteAPI
+# could provide HttpResponse in anycase.
+@pytest.mark.xfail(reason="Not supported yet", raises=AssertionError, strict=True)
 @ensureDeferred
 async def test_provider_any_response_product_extract_from_http_response_2(mockserver):
     @attrs.define
@@ -688,10 +692,15 @@ async def test_provider_any_response_http_response(mockserver):
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
-    assert params[0].keys() == {"url", "HttpResponseBody"}
+    assert params[0].keys() == {
+        "url",
+        "httpResponseBody",
+        "customHttpRequestHeaders",
+        "httpResponseHeaders",
+    }
 
     assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
+    assert type(item["page"].response.response) == HttpResponse
     assert type(item["page"].http_response) == HttpResponse
 
 
@@ -715,10 +724,15 @@ async def test_provider_any_response_browser_http_response(mockserver):
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 2
-    assert params[0].keys() == {"url", "HttpResponseBody"}
-    assert params[1].keys() == {"url", "BrowserHtml"}
+    assert params[0].keys() == {
+        "url",
+        "httpResponseBody",
+        "customHttpRequestHeaders",
+        "httpResponseHeaders",
+    }
+    assert params[1].keys() == {"url", "browserHtml"}
 
     assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
+    assert type(item["page"].response.response) == HttpResponse
     assert type(item["page"].browser_response) == BrowserResponse
     assert type(item["page"].http_response) == HttpResponse

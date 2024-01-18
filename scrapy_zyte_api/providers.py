@@ -1,5 +1,4 @@
 from typing import Any, Callable, Dict, List, Sequence, Set
-from weakref import WeakKeyDictionary
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
@@ -51,30 +50,35 @@ class ZyteApiProvider(PageObjectInputProvider):
         JobPosting,
     }
 
-    def __init__(self, injector):
-        super().__init__(injector)
-        self._cached_instances: WeakKeyDictionary[Request, Dict] = WeakKeyDictionary()
-
     def is_provided(self, type_: Callable) -> bool:
         return super().is_provided(strip_annotated(type_))
 
     def update_cache(self, request: Request, mapping: Dict[Any, Any]) -> None:
-        if request not in self._cached_instances:
-            self._cached_instances[request] = {}
-        self._cached_instances[request].update(mapping)
+        if request not in self.injector.weak_cache:
+            self.injector.weak_cache[request] = {}
+        self.injector.weak_cache[request].update(mapping)
 
     async def __call__(  # noqa: C901
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
-        # TODO what if ``response`` is already from Zyte API and contains something we need
         results: List[Any] = []
 
         for cls in list(to_provide):
-            item = self._cached_instances.get(request, {}).get(cls)
+            item = self.injector.weak_cache.get(request, {}).get(cls)
             if item:
                 results.append(item)
                 to_provide.remove(cls)
+            elif cls == AnyResponse:
+                http_response = self.injector.weak_cache.get(request, {}).get(
+                    HttpResponse
+                )
+                if http_response:
+                    any_response = AnyResponse(response=http_response)
+                    results.append(any_response)
+                    self.update_cache(request, {AnyResponse: any_response})
+                    to_provide.remove(cls)
+
         if not to_provide:
             return results
 
@@ -170,7 +174,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             self.update_cache(request, {BrowserResponse: browser_response})
 
         if AnyResponse in to_provide:
-            any_response = None
+            any_response = None  # type: ignore[assignment]
 
             if "browserHtml" in api_response.raw_api_response:
                 any_response = AnyResponse(
