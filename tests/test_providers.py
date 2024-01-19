@@ -307,19 +307,22 @@ def test_provider_any_response(mockserver):
     results = yield provide(set())
     assert results == []
 
-    # Having only AnyResponse without any of the other responses to re-use
-    # does not result in anything.
+    # AnyResponse would use HttpResponse by default, if neither BrowserResponse
+    # nor HttpResponse is available.
     results = yield provide(
         {
             AnyResponse,
         }
     )
-    assert results == []
-
-    # Same case as above, since no response is available.
-    results = yield provide({AnyResponse, Product})
     assert len(results) == 1
-    assert type(results[0]) == Product
+    assert type(results[0]) == AnyResponse
+    assert type(results[0].response) == HttpResponse
+
+    # Same case as above, HttpResopnse is used by default
+    results = yield provide({AnyResponse, Product})
+    assert len(results) == 2
+    assert type(results[0]) == AnyResponse
+    assert type(results[1]) == Product
 
     # AnyResponse should re-use BrowserResponse if available.
     results = yield provide({AnyResponse, BrowserResponse})
@@ -426,8 +429,14 @@ async def test_provider_any_response_only(mockserver):
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
-    assert params[0].keys() == {"url"}
-    assert item is None
+    assert params[0].keys() == {
+        "url",
+        "httpResponseBody",
+        "httpResponseHeaders",
+        "customHttpRequestHeaders",
+    }
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == HttpResponse
 
 
 @ensureDeferred
@@ -449,8 +458,18 @@ async def test_provider_any_response_product(mockserver):
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
-    assert params[0].keys() == {"url", "product"}
-    assert item is None  # None represents as an error in crawl_single_item()
+    assert params[0].keys() == {
+        "url",
+        "product",
+        "productOptions",
+        "httpResponseBody",
+        "httpResponseHeaders",
+        "customHttpRequestHeaders",
+    }
+    assert params[0]["productOptions"] == {"extractFrom": "httpResponseBody"}
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == HttpResponse
+    assert type(item["page"].product) == Product
 
 
 @ensureDeferred

@@ -64,6 +64,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
         results: List[Any] = []
 
+        http_response = None
         for cls in list(to_provide):
             item = self.injector.weak_cache.get(request, {}).get(cls)
             if item:
@@ -124,6 +125,13 @@ class ZyteApiProvider(PageObjectInputProvider):
                     options["extractFrom"] = extract_from.value
                     break
 
+        http_response_needed = (
+            AnyResponse in to_provide
+            and BrowserResponse not in to_provide
+            and BrowserHtml not in to_provide
+            and not http_response
+        )
+
         extract_from = None  # type: ignore[assignment]
         for item_type, kw in item_keywords.items():
             options_name = f"{kw}Options"
@@ -131,12 +139,15 @@ class ZyteApiProvider(PageObjectInputProvider):
                 del zyte_api_meta[options_name]
             elif options_name in zyte_api_meta:
                 extract_from = zyte_api_meta[options_name]["extractFrom"]
+            elif item_type in to_provide_stripped and http_response_needed:
+                zyte_api_meta[options_name] = {"extractFrom": "httpResponseBody"}
 
         if AnyResponse in to_provide:
             if extract_from == "browserHtml":
                 html_requested = True
-            elif extract_from == "httpResponseBody":
+            elif extract_from == "httpResponseBody" or http_response_needed:
                 param_parser = _ParamParser(crawler)
+                param_parser._transparent_mode = True
                 http_request_params = param_parser.parse(request)
                 del http_request_params["url"]
                 zyte_api_meta.update(http_request_params)
