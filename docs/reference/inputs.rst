@@ -13,6 +13,12 @@ Inputs
 
 -   :class:`web_poet.BrowserResponse`
 
+-   :class:`web_poet.AnyResponse`
+
+    This re-uses either :class:`web_poet.BrowserResponse` *(takes priority)*
+    or :class:`web_poet.HttpResponse` if they're available. If neither is
+    available, then it won't cause either one to be obtained from Zyte API.
+
 -   :class:`zyte_common_items.Article`
 
 -   :class:`zyte_common_items.ArticleList`
