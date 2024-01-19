@@ -69,7 +69,9 @@ class ZyteApiProvider(PageObjectInputProvider):
             if item:
                 results.append(item)
                 to_provide.remove(cls)
-            elif cls == AnyResponse:
+
+            # BrowserResponse takes precedence than HttpResponse
+            elif cls == AnyResponse and BrowserResponse not in to_provide:
                 http_response = self.injector.weak_cache.get(request, {}).get(
                     HttpResponse
                 )

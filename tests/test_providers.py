@@ -733,6 +733,6 @@ async def test_provider_any_response_browser_http_response(mockserver):
     assert params[1].keys() == {"url", "browserHtml"}
 
     assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == HttpResponse
+    assert type(item["page"].response.response) == BrowserResponse
     assert type(item["page"].browser_response) == BrowserResponse
     assert type(item["page"].http_response) == HttpResponse
