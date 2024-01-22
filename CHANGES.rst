@@ -1,8 +1,8 @@
 Changes
 =======
 
-0.13.0 (unreleased)
--------------------
+To be released
+--------------
 
 * Cookie support is no longer experimental:
 
@@ -21,9 +21,80 @@ Changes
   * The ``responseCookies`` response parameter is now handled the same as
     ``experimental.responseCookies``; the latter still works but is deprecated.
 
+
+0.14.1 (2024-01-17)
+-------------------
+
+* The assignment of a custom download slot to requests that use Zyte API now
+  also happens in the spider middleware, not only in the downloader middleware.
+
+  This way requests get a download slot assigned before they reach the
+  scheduler, making Zyte API requests work as expected with
+  :class:`scrapy.pqueues.DownloaderAwarePriorityQueue`.
+
+  .. note:: New requests created from downloader middlewares do not get their
+            download slot assigned before they reach the scheduler. So, unless
+            they reuse the metadata from a requests that did get a download
+            slot assigned (e.g. retries, redirects), they will continue not to
+            work as expected with
+            :class:`~scrapy.pqueues.DownloaderAwarePriorityQueue`.
+
+
+0.14.0 (2024-01-15)
+-------------------
+
+* Updated requirement versions:
+
+  * andi >= 0.6.0
+  * scrapy-poet >= 0.19.0
+  * zyte-common-items >= 0.8.0
+
+* Added support for ``zyte_common_items.JobPosting`` to the scrapy-poet provider.
+
+
+0.13.0 (2023-12-13)
+-------------------
+
+* Updated requirement versions:
+
+  * andi >= 0.5.0
+  * scrapy-poet >= 0.18.0
+  * web-poet >= 0.15.1
+  * zyte-api >= 0.4.8
+
+* The spider is now closed and the finish reason is set to
+  ``"zyte_api_bad_key"`` or ``"zyte_api_suspended_account"`` when receiving
+  "Authentication Key Not Found" or "Account Suspended" responses from Zyte
+  API.
+
+* The spider is now closed and the finish reason is set to
+  ``"failed_forbidden_domain"`` when all start requests fail because they are
+  pointing to domains forbidden by Zyte API.
+
+* The spider is now closed and the finish reason is set to
+  ``"plugin_conflict"`` if both scrapy-zyte-smartproxy and the transparent mode
+  of scrapy-zyte-api are enabled.
+
+* The ``extractFrom`` extraction option can now be requested by annotating the
+  dependency with a ``scrapy_zyte_api.ExtractFrom`` member (e.g.
+  ``product: typing.Annotated[Product, ExtractFrom.httpResponseBody]``).
+
+* The ``Set-Cookie`` header is now removed from the response if the cookies
+  were returned by Zyte API (as ``"experimental.responseCookies"``).
+
+* The request fingerprinting was improved by refining which parts of the
+  request affect the fingerprint.
+
 * Zyte API Request IDs are now included in the error logs.
 
 * Bump the zyte-api dependency: 0.4.7 → 0.4.8.
+
+* Split README.rst into multiple documentation files and publish them on
+  ReadTheDocs.
+
+* Improve the documentation for the ``ZYTE_API_MAX_REQUESTS`` setting.
+
+* Test and CI improvements.
 
 
 0.12.2 (2023-10-19)
@@ -33,6 +104,7 @@ Changes
   from ``ZYTE_API_PROVIDER_PARAMS`` when sending the Zyte API request
 * When logging Zyte API requests, truncation now uses
   "..." instead of Unicode ellipsis.
+
 
 0.12.1 (2023-09-29)
 -------------------

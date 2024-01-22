@@ -74,6 +74,7 @@ class DefaultResource(Resource):
         )
 
         response_data: _API_RESPONSE = {}
+
         if "url" not in request_data:
             request.setResponseCode(400)
             return json.dumps(response_data).encode()
@@ -87,6 +88,16 @@ class DefaultResource(Resource):
                 "type": "/auth/key-not-found",
                 "title": "Authentication Key Not Found",
                 "detail": "The authentication key is not valid or can't be matched.",
+            }
+            return json.dumps(response_data).encode()
+        if "forbidden" in domain:
+            request.setResponseCode(451)
+            response_data = {
+                "status": 451,
+                "type": "/download/domain-forbidden",
+                "title": "Domain Forbidden",
+                "detail": "Extraction for the domain is forbidden.",
+                "blockedDomain": domain,
             }
             return json.dumps(response_data).encode()
         if "suspended-account" in domain:
@@ -138,6 +149,14 @@ class DefaultResource(Resource):
                 "price": "10",
                 "currency": "USD",
             }
+            extract_from = request_data.get("productOptions", {}).get("extractFrom")
+            if extract_from:
+                from scrapy_zyte_api.providers import ExtractFrom
+
+                if extract_from == ExtractFrom.httpResponseBody:
+                    assert isinstance(response_data["product"], dict)
+                    assert isinstance(response_data["product"]["name"], str)
+                    response_data["product"]["name"] += " (from httpResponseBody)"
 
         return json.dumps(response_data).encode()
 
