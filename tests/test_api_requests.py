@@ -682,8 +682,29 @@ def _test_automap(
     api_params.pop("url")
     assert expected == api_params
     if warnings:
+        seen_warnings = {record.getMessage(): False for record in caplog.records}
         for warning in warnings:
-            assert warning in caplog.text
+            matched = False
+            for seen_warning in list(seen_warnings):
+                if warning in seen_warning:
+                    if seen_warnings[seen_warning] is True:
+                        raise AssertionError(
+                            f"Expected warning {warning!r} matches more than "
+                            f"1 seen warning (all seen warnings: "
+                            f"{list(seen_warnings)!r})"
+                        )
+                    seen_warnings[seen_warning] = True
+                    matched = True
+                    break
+            if not matched:
+                raise AssertionError(
+                    f"Expected warning {warning!r} not found in {list(seen_warnings)!r}"
+                )
+        unexpected_warnings = [
+            warning for warning, is_expected in seen_warnings.items() if not is_expected
+        ]
+        if unexpected_warnings:
+            raise AssertionError(f"Got unexpected warnings: {unexpected_warnings}")
     else:
         assert not caplog.records
 
@@ -1841,13 +1862,11 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "responseCookies": False,
                         }
                     },
-                    {
-                        "responseCookies": True,
-                        "experimental": {
-                            "responseCookies": False,
-                        },
-                    },
-                    ["experimental.responseCookies, which is deprecated"],
+                    {},
+                    [
+                        "include experimental.responseCookies, which is deprecated",
+                        "experimental.responseCookies will be removed, and its value will be set as responseCookies",
+                    ],
                 ),
                 (
                     {
@@ -1857,13 +1876,11 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     {
                         "responseCookies": False,
                     },
-                    {
-                        "responseCookies": False,
-                        "experimental": {
-                            "responseCookies": True,
-                        },
-                    },
-                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                    {},
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                        "responseCookies will be removed, and its value will be set as experimental.responseCookies",
+                    ],
                 ),
                 (
                     {
@@ -1876,7 +1893,9 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         }
                     },
                     {},
-                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                    ],
                 ),
                 # No cookies, requestCookies disabled.
                 (
@@ -1900,11 +1919,11 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     },
                     {
                         "responseCookies": True,
-                        "experimental": {
-                            "requestCookies": False,
-                        },
                     },
-                    ["experimental.requestCookies, which is deprecated"],
+                    [
+                        "experimental.requestCookies, which is deprecated",
+                        "experimental.requestCookies will be removed, and its value will be set as requestCookies",
+                    ],
                 ),
                 (
                     {
@@ -1915,10 +1934,12 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         "requestCookies": False,
                     },
                     {
-                        "requestCookies": False,
                         "experimental": {"responseCookies": True},
                     },
-                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                        "requestCookies will be removed, and its value will be set as experimental.requestCookies",
+                    ],
                 ),
                 (
                     {
@@ -1955,16 +1976,12 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "responseCookies": False,
                         }
                     },
-                    {
-                        "responseCookies": True,
-                        "experimental": {
-                            "requestCookies": False,
-                            "responseCookies": False,
-                        },
-                    },
+                    {},
                     [
-                        "experimental.responseCookies, which is deprecated",
-                        "experimental.requestCookies, which is deprecated",
+                        "include experimental.requestCookies, which is deprecated",
+                        "include experimental.responseCookies, which is deprecated",
+                        "experimental.responseCookies will be removed, and its value will be set as responseCookies",
+                        "experimental.requestCookies will be removed, and its value will be set as requestCookies",
                     ],
                 ),
                 (
@@ -1976,12 +1993,12 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         "requestCookies": False,
                         "responseCookies": False,
                     },
-                    {
-                        "requestCookies": False,
-                        "responseCookies": False,
-                        "experimental": {"responseCookies": True},
-                    },
-                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                    {},
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                        "requestCookies will be removed, and its value will be set as experimental.requestCookies",
+                        "responseCookies will be removed, and its value will be set as experimental.responseCookies",
+                    ],
                 ),
                 (
                     {
@@ -1995,7 +2012,9 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         }
                     },
                     {},
-                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                    ],
                 ),
                 # Cookies, responseCookies disabled.
                 (
@@ -2019,13 +2038,10 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     },
                     {
                         "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
-                        "responseCookies": True,
-                        "experimental": {
-                            "responseCookies": False,
-                        },
                     },
                     [
-                        "experimental.responseCookies, which is deprecated",
+                        "include experimental.responseCookies, which is deprecated",
+                        "experimental.responseCookies will be removed, and its value will be set as responseCookies",
                     ],
                 ),
                 (
@@ -2037,13 +2053,14 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         "responseCookies": False,
                     },
                     {
-                        "responseCookies": False,
                         "experimental": {
                             "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
-                            "responseCookies": True,
                         },
                     },
-                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                        "responseCookies will be removed, and its value will be set as experimental.responseCookies",
+                    ],
                 ),
                 (
                     {
@@ -2083,14 +2100,11 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         }
                     },
                     {
-                        "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
                         "responseCookies": True,
-                        "experimental": {
-                            "requestCookies": False,
-                        },
                     },
                     [
                         "experimental.requestCookies, which is deprecated",
+                        "experimental.requestCookies will be removed, and its value will be set as requestCookies",
                     ],
                 ),
                 (
@@ -2102,13 +2116,14 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         "requestCookies": False,
                     },
                     {
-                        "requestCookies": False,
                         "experimental": {
-                            "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
                             "responseCookies": True,
                         },
                     },
-                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                        "requestCookies will be removed, and its value will be set as experimental.requestCookies",
+                    ],
                 ),
                 (
                     {
@@ -2147,17 +2162,12 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                             "responseCookies": False,
                         }
                     },
-                    {
-                        "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
-                        "responseCookies": True,
-                        "experimental": {
-                            "requestCookies": False,
-                            "responseCookies": False,
-                        },
-                    },
+                    {},
                     [
-                        "experimental.responseCookies, which is deprecated",
-                        "experimental.requestCookies, which is deprecated",
+                        "include experimental.requestCookies, which is deprecated",
+                        "include experimental.responseCookies, which is deprecated",
+                        "experimental.requestCookies will be removed, and its value will be set as requestCookies",
+                        "experimental.responseCookies will be removed, and its value will be set as responseCookies",
                     ],
                 ),
                 (
@@ -2169,15 +2179,12 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         "requestCookies": False,
                         "responseCookies": False,
                     },
-                    {
-                        "requestCookies": False,
-                        "responseCookies": False,
-                        "experimental": {
-                            "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
-                            "responseCookies": True,
-                        },
-                    },
-                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                    {},
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                        "requestCookies will be removed, and its value will be set as experimental.requestCookies",
+                        "responseCookies will be removed, and its value will be set as experimental.responseCookies",
+                    ],
                 ),
                 (
                     {
@@ -2215,6 +2222,92 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     [],
                     ["is overriding automatic request cookie mapping"],
                 ),
+            )
+            for settings, input_params, output_params, warnings in (
+                (
+                    {},
+                    {
+                        "requestCookies": override_cookies,
+                    },
+                    {
+                        "httpResponseBody": True,
+                        "httpResponseHeaders": True,
+                        "responseCookies": True,
+                    },
+                    override_warnings,
+                ),
+                (
+                    {},
+                    {
+                        "experimental": {
+                            "requestCookies": override_cookies,
+                        }
+                    },
+                    {
+                        "httpResponseBody": True,
+                        "httpResponseHeaders": True,
+                        "responseCookies": True,
+                    },
+                    [
+                        "experimental.requestCookies, which is deprecated",
+                        "experimental.requestCookies will be removed, and its value will be set as requestCookies",
+                        *override_warnings,
+                    ],
+                ),
+                (
+                    {
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    {
+                        "experimental": {
+                            "requestCookies": override_cookies,
+                        }
+                    },
+                    {
+                        "httpResponseBody": True,
+                        "httpResponseHeaders": True,
+                        "experimental": {
+                            "responseCookies": True,
+                        },
+                    },
+                    [
+                        *cast(List, override_warnings),
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                    ],
+                ),
+                (
+                    {
+                        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                    },
+                    {
+                        "requestCookies": override_cookies,
+                    },
+                    {
+                        "httpResponseBody": True,
+                        "httpResponseHeaders": True,
+                        "experimental": {
+                            "responseCookies": True,
+                        },
+                    },
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                        "requestCookies will be removed, and its value will be set as experimental.requestCookies",
+                        *override_warnings,
+                    ],
+                ),
+            )
+        ),
+        *(
+            (
+                settings,
+                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                {},
+                input_params,
+                output_params,
+                warnings,
+                [],
+            )
+            for override_cookies, override_warnings in (
                 (
                     REQUEST_OUTPUT_COOKIES_MAXIMAL,
                     [],
@@ -2244,14 +2337,12 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     {
                         "httpResponseBody": True,
                         "httpResponseHeaders": True,
-                        "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                        "requestCookies": override_cookies,
                         "responseCookies": True,
-                        "experimental": {
-                            "requestCookies": override_cookies,
-                        },
                     },
                     [
                         "experimental.requestCookies, which is deprecated",
+                        "experimental.requestCookies will be removed, and its value will be set as requestCookies",
                     ],
                 ),
                 (
@@ -2286,13 +2377,15 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     {
                         "httpResponseBody": True,
                         "httpResponseHeaders": True,
-                        "requestCookies": override_cookies,
                         "experimental": {
-                            "requestCookies": REQUEST_OUTPUT_COOKIES_MINIMAL,
+                            "requestCookies": override_cookies,
                             "responseCookies": True,
                         },
                     },
-                    ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
+                    [
+                        "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                        "requestCookies will be removed, and its value will be set as experimental.requestCookies",
+                    ],
                 ),
             )
         ),
@@ -2442,6 +2535,173 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                     },
                     ["deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"],
                 ),
+            )
+        ),
+        # If (contradictory) values are set for requestCookies or
+        # responseCookies both outside and inside the experimental namespace,
+        # the non-experimental value takes priority. This is so even if
+        # ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is True, in which case the
+        # outside value is moved into the experimental namespace, overriding
+        # its value.
+        (
+            {},
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {},
+            {
+                "responseCookies": True,
+                "experimental": {
+                    "responseCookies": False,
+                },
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "responseCookies": True,
+            },
+            [
+                "include experimental.responseCookies, which is deprecated",
+                "defines both responseCookies (True) and experimental.responseCookies (False)",
+            ],
+            [],
+        ),
+        (
+            {},
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {},
+            {
+                "responseCookies": False,
+                "experimental": {
+                    "responseCookies": True,
+                },
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [
+                "defines both responseCookies (False) and experimental.responseCookies (True)",
+                "include experimental.responseCookies, which is deprecated",
+            ],
+            [],
+        ),
+        *(
+            (
+                {},
+                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                {},
+                {
+                    "requestCookies": [
+                        {"name": regular_k, "value": regular_v},
+                    ],
+                    "experimental": {
+                        "requestCookies": [
+                            {"name": experimental_k, "value": experimental_v},
+                        ],
+                    },
+                },
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "requestCookies": [
+                        {"name": regular_k, "value": regular_v},
+                    ],
+                    "responseCookies": True,
+                },
+                [
+                    "include experimental.requestCookies, which is deprecated",
+                    "experimental.requestCookies will be ignored",
+                ],
+                [],
+            )
+            for regular_k, regular_v, experimental_k, experimental_v in (
+                ("b", "2", "c", "3"),
+                ("c", "3", "b", "2"),
+            )
+        ),
+        # Now with ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED=True
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {},
+            {
+                "responseCookies": True,
+                "experimental": {
+                    "responseCookies": False,
+                },
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                },
+            },
+            [
+                "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                "defines both responseCookies (True) and experimental.responseCookies (False)",
+            ],
+            [],
+        ),
+        (
+            {
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+            },
+            REQUEST_INPUT_COOKIES_EMPTY,
+            {},
+            {
+                "responseCookies": False,
+                "experimental": {
+                    "responseCookies": True,
+                },
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [
+                "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                "defines both responseCookies (False) and experimental.responseCookies (True)",
+            ],
+            [],
+        ),
+        *(
+            (
+                {
+                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+                },
+                REQUEST_INPUT_COOKIES_MINIMAL_DICT,
+                {},
+                {
+                    "requestCookies": [
+                        {"name": regular_k, "value": regular_v},
+                    ],
+                    "experimental": {
+                        "requestCookies": [
+                            {"name": experimental_k, "value": experimental_v},
+                        ],
+                    },
+                },
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "experimental": {
+                        "requestCookies": [
+                            {"name": regular_k, "value": regular_v},
+                        ],
+                        "responseCookies": True,
+                    },
+                },
+                [
+                    "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
+                    "requestCookies will be removed, and its value will be set as experimental.requestCookies",
+                ],
+                [],
+            )
+            for regular_k, regular_v, experimental_k, experimental_v in (
+                ("b", "2", "c", "3"),
+                ("c", "3", "b", "2"),
             )
         ),
     ],
