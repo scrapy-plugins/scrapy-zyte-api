@@ -2219,7 +2219,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
             )
             for override_cookies, override_warnings in (
                 (
-                    [],
+                    cast(List[Dict[str, str]], []),
                     ["is overriding automatic request cookie mapping"],
                 ),
             )
@@ -2307,12 +2307,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 warnings,
                 [],
             )
-            for override_cookies, override_warnings in (
-                (
-                    REQUEST_OUTPUT_COOKIES_MAXIMAL,
-                    [],
-                ),
-            )
+            for override_cookies in ((REQUEST_OUTPUT_COOKIES_MAXIMAL,),)
             for settings, input_params, output_params, warnings in (
                 (
                     {},
@@ -2325,7 +2320,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         "requestCookies": override_cookies,
                         "responseCookies": True,
                     },
-                    override_warnings,
+                    [],
                 ),
                 (
                     {},
@@ -2363,7 +2358,6 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                         },
                     },
                     [
-                        *cast(List, override_warnings),
                         "deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED",
                     ],
                 ),
