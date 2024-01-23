@@ -87,8 +87,6 @@ To be released
 
 * Zyte API Request IDs are now included in the error logs.
 
-* Bump the zyte-api dependency: 0.4.7 → 0.4.8.
-
 * Split README.rst into multiple documentation files and publish them on
   ReadTheDocs.
 
