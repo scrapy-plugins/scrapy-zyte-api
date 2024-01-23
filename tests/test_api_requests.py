@@ -206,7 +206,7 @@ async def test_exceptions(
         req = Request("http://example.com", method="POST", meta=meta)
         with pytest.raises(exception_type):
             await handler.download_request(req, None)
-        assert exception_text in caplog.text
+        _assert_warnings(caplog, [exception_text])
 
 
 @ensureDeferred
@@ -520,8 +520,13 @@ async def test_default_params_none(mockserver, caplog):
         async with mockserver.make_handler(settings) as handler:
             assert handler._param_parser._automap_params == {"e": "f"}
             assert handler._param_parser._default_params == {"b": "c"}
-    assert "Parameter 'a' in the ZYTE_API_DEFAULT_PARAMS setting is None" in caplog.text
-    assert "Parameter 'd' in the ZYTE_API_AUTOMAP_PARAMS setting is None" in caplog.text
+    _assert_warnings(
+        caplog,
+        [
+            "Parameter 'a' in the ZYTE_API_DEFAULT_PARAMS setting is None",
+            "Parameter 'd' in the ZYTE_API_AUTOMAP_PARAMS setting is None",
+        ],
+    )
 
 
 @pytest.mark.parametrize(
@@ -586,11 +591,7 @@ def test_default_params_merging(
         api_params.pop(key)
     api_params.pop("url")
     assert expected == api_params
-    if warnings:
-        for warning in warnings:
-            assert warning in caplog.text
-    else:
-        assert not caplog.records
+    _assert_warnings(caplog, warnings)
 
 
 @pytest.mark.parametrize(
@@ -638,6 +639,36 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
     assert default_params == setting
 
 
+def _assert_warnings(caplog, warnings):
+    if warnings:
+        seen_warnings = {record.getMessage(): False for record in caplog.records}
+        for warning in warnings:
+            matched = False
+            for seen_warning in list(seen_warnings):
+                if warning in seen_warning:
+                    if seen_warnings[seen_warning] is True:
+                        raise AssertionError(
+                            f"Expected warning {warning!r} matches more than "
+                            f"1 seen warning (all seen warnings: "
+                            f"{list(seen_warnings)!r})"
+                        )
+                    seen_warnings[seen_warning] = True
+                    matched = True
+                    break
+            if not matched:
+                raise AssertionError(
+                    f"Expected warning {warning!r} not found in {list(seen_warnings)!r}"
+                )
+        unexpected_warnings = [
+            warning for warning, is_expected in seen_warnings.items() if not is_expected
+        ]
+        if unexpected_warnings:
+            raise AssertionError(f"Got unexpected warnings: {unexpected_warnings}")
+    else:
+        assert not caplog.records
+    caplog.clear()
+
+
 def _test_automap(
     settings, request_kwargs, meta, expected, warnings, caplog, cookie_jar=None
 ):
@@ -681,32 +712,7 @@ def _test_automap(
         api_params = param_parser.parse(request)
     api_params.pop("url")
     assert expected == api_params
-    if warnings:
-        seen_warnings = {record.getMessage(): False for record in caplog.records}
-        for warning in warnings:
-            matched = False
-            for seen_warning in list(seen_warnings):
-                if warning in seen_warning:
-                    if seen_warnings[seen_warning] is True:
-                        raise AssertionError(
-                            f"Expected warning {warning!r} matches more than "
-                            f"1 seen warning (all seen warnings: "
-                            f"{list(seen_warnings)!r})"
-                        )
-                    seen_warnings[seen_warning] = True
-                    matched = True
-                    break
-            if not matched:
-                raise AssertionError(
-                    f"Expected warning {warning!r} not found in {list(seen_warnings)!r}"
-                )
-        unexpected_warnings = [
-            warning for warning, is_expected in seen_warnings.items() if not is_expected
-        ]
-        if unexpected_warnings:
-            raise AssertionError(f"Got unexpected warnings: {unexpected_warnings}")
-    else:
-        assert not caplog.records
+    _assert_warnings(caplog, warnings)
 
 
 @pytest.mark.parametrize(
@@ -983,7 +989,10 @@ def test_automap_header_output(meta, expected, warnings, caplog):
             None,
             {"httpRequestMethod": "GET"},
             DEFAULT_AUTOMAP_PARAMS,
-            ["Use Request.method"],
+            [
+                "Use Request.method",
+                "unnecessarily defines the Zyte API 'httpRequestMethod' parameter with its default value",
+            ],
         ),
         (
             "POST",
@@ -1004,6 +1013,7 @@ def test_automap_header_output(meta, expected, warnings, caplog):
             [
                 "Use Request.method",
                 "does not match the Zyte API httpRequestMethod",
+                "unnecessarily defines the Zyte API 'httpRequestMethod' parameter with its default value",
             ],
         ),
         (
@@ -1053,7 +1063,10 @@ def test_automap_header_output(meta, expected, warnings, caplog):
     ],
 )
 def test_automap_method(method, meta, expected, warnings, caplog):
-    _test_automap({}, {"method": method}, meta, expected, warnings, caplog)
+    request_kwargs = {}
+    if method is not None:
+        request_kwargs["method"] = method
+    _test_automap({}, request_kwargs, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -2901,8 +2914,7 @@ def test_automap_cookie_limit(meta, caplog):
     assert api_params["requestCookies"] == [
         {"name": "z", "value": "y", "domain": "example.com"}
     ]
-    assert not caplog.records
-    caplog.clear()
+    _assert_warnings(caplog, [])
 
     # Verify that requests with 2 cookies results in only 1 cookie set and a
     # warning.
@@ -2919,9 +2931,12 @@ def test_automap_cookie_limit(meta, caplog):
         [{"name": "z", "value": "y", "domain": "example.com"}],
         [{"name": "x", "value": "w", "domain": "example.com"}],
     ]
-    assert "would get 2 cookies" in caplog.text
-    assert "limited to 1 cookies" in caplog.text
-    caplog.clear()
+    _assert_warnings(
+        caplog,
+        [
+            "would get 2 cookies, but request cookie automatic mapping is limited to 1 cookies"
+        ],
+    )
 
     # Verify that 1 cookie in the cookie jar and 1 cookie in the request count
     # as 2 cookies, resulting in only 1 cookie set and a warning.
@@ -2944,9 +2959,12 @@ def test_automap_cookie_limit(meta, caplog):
         [{"name": "z", "value": "y", "domain": "example.com"}],
         [{"name": "x", "value": "w", "domain": "example.com"}],
     ]
-    assert "would get 2 cookies" in caplog.text
-    assert "limited to 1 cookies" in caplog.text
-    caplog.clear()
+    _assert_warnings(
+        caplog,
+        [
+            "would get 2 cookies, but request cookie automatic mapping is limited to 1 cookies"
+        ],
+    )
 
     # Vefify that unrelated-domain cookies count for the limit.
     pre_request = Request(
@@ -2968,9 +2986,12 @@ def test_automap_cookie_limit(meta, caplog):
         [{"name": "z", "value": "y", "domain": "other.example"}],
         [{"name": "x", "value": "w", "domain": "example.com"}],
     ]
-    assert "would get 2 cookies" in caplog.text
-    assert "limited to 1 cookies" in caplog.text
-    caplog.clear()
+    _assert_warnings(
+        caplog,
+        [
+            "would get 2 cookies, but request cookie automatic mapping is limited to 1 cookies"
+        ],
+    )
 
 
 class CustomCookieJar(CookieJar):
@@ -3208,11 +3229,7 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
         api_params = param_parser.parse(request)
     api_params.pop("url")
     assert expected == api_params
-    if warnings:
-        for warning in warnings:
-            assert warning in caplog.text
-    else:
-        assert not caplog.records
+    _assert_warnings(caplog, warnings)
 
 
 @pytest.mark.parametrize(
@@ -3252,21 +3269,15 @@ def unflatten(dictionary):
 
 
 @pytest.mark.parametrize(
-    "old_field,new_field",
+    "field",
     [
-        (
-            f"experimental.{field}",
-            field,
-        )
-        for field in (
-            "responseCookies",
-            "requestCookies",
-            "cookieManagement",
-        )
+        "responseCookies",
+        "requestCookies",
+        "cookieManagement",
     ],
 )
-def test_field_deprecation_warnings(old_field, new_field, caplog):
-    input_params = unflatten({old_field: "foo"})
+def test_field_deprecation_warnings(field, caplog):
+    input_params = {"experimental": {field: "foo"}}
 
     # Raw
     raw_request = Request(
@@ -3280,13 +3291,11 @@ def test_field_deprecation_warnings(old_field, new_field, caplog):
         output_params = param_parser.parse(raw_request)
     output_params.pop("url")
     assert input_params == output_params
-    assert f"{old_field}, which is deprecated" in caplog.text
-    caplog.clear()
+    _assert_warnings(caplog, [f"experimental.{field}, which is deprecated"])
     with caplog.at_level("WARNING"):
         # Only warn once per field.
         param_parser.parse(raw_request)
-    assert not caplog.text
-    caplog.clear()
+    _assert_warnings(caplog, [])
 
     # Automap
     raw_request = Request(
@@ -3299,15 +3308,22 @@ def test_field_deprecation_warnings(old_field, new_field, caplog):
     with caplog.at_level("WARNING"):
         output_params = param_parser.parse(raw_request)
     output_params.pop("url")
-    for key, value in input_params.items():
+    for key, value in input_params["experimental"].items():
         assert output_params[key] == value
-    assert f"{old_field}, which is deprecated" in caplog.text
-    caplog.clear()
+    _assert_warnings(
+        caplog,
+        [
+            f"experimental.{field}, which is deprecated",
+            f"experimental.{field} will be removed, and its value will be set as {field}",
+        ],
+    )
     with caplog.at_level("WARNING"):
         # Only warn once per field.
         param_parser.parse(raw_request)
-    assert not caplog.text
-    caplog.clear()
+    _assert_warnings(
+        caplog,
+        [f"experimental.{field} will be removed, and its value will be set as {field}"],
+    )
 
 
 def test_field_deprecation_warnings_false_positives(caplog):
@@ -3329,7 +3345,7 @@ def test_field_deprecation_warnings_false_positives(caplog):
         output_params = param_parser.parse(raw_request)
     output_params.pop("url")
     assert input_params == output_params
-    assert not caplog.text
+    _assert_warnings(caplog, [])
 
     # Automap
     raw_request = Request(
@@ -3344,4 +3360,4 @@ def test_field_deprecation_warnings_false_positives(caplog):
     output_params.pop("url")
     for key, value in input_params.items():
         assert output_params[key] == value
-    assert not caplog.text
+    _assert_warnings(caplog, [])

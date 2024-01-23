@@ -90,7 +90,38 @@ def test_cookies():
         "https://example.com",
         meta={
             "zyte_api": {
+                "responseCookies": False,
+                "requestCookies": [{"name": "foo", "value": "bar"}],
+                "cookieManagement": False,
+                "experimental": {
+                    "responseCookies": False,
+                    "requestCookies": [{"name": "foo", "value": "bar"}],
+                    "cookieManagement": False,
+                },
+            }
+        },
+    )
+    # Same with responseCookies set to `True`.
+    request2 = Request(
+        "https://example.com",
+        meta={
+            "zyte_api": {
                 "responseCookies": True,
+                "requestCookies": [{"name": "foo", "value": "bar"}],
+                "cookieManagement": False,
+                "experimental": {
+                    "responseCookies": False,
+                    "requestCookies": [{"name": "foo", "value": "bar"}],
+                    "cookieManagement": False,
+                },
+            }
+        },
+    )
+    # Same with experimental.responseCookies set to `True`.
+    request3 = Request(
+        "https://example.com",
+        meta={
+            "zyte_api": {
                 "requestCookies": [{"name": "foo", "value": "bar"}],
                 "cookieManagement": False,
                 "experimental": {
@@ -101,10 +132,15 @@ def test_cookies():
             }
         },
     )
-    request2 = Request("https://example.com", meta={"zyte_api": True})
+    request4 = Request("https://example.com", meta={"zyte_api": True})
     fingerprint1 = fingerprinter.fingerprint(request1)
     fingerprint2 = fingerprinter.fingerprint(request2)
-    assert fingerprint1 == fingerprint2
+    fingerprint3 = fingerprinter.fingerprint(request3)
+    fingerprint4 = fingerprinter.fingerprint(request4)
+    assert fingerprint1 != fingerprint2
+    assert fingerprint1 != fingerprint3
+    assert fingerprint1 == fingerprint4
+    assert fingerprint2 == fingerprint3
 
 
 @pytest.mark.parametrize(

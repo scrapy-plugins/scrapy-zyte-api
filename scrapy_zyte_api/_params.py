@@ -502,10 +502,6 @@ def _set_http_response_cookies_from_request(
     experimental: bool,
     request: Request,
 ):
-    _handle_experimental_unnamespacing(
-        api_params, request, experimental, "responseCookies"
-    )
-
     if "responseCookies" in api_params and api_params["responseCookies"] is False:
         del api_params["responseCookies"]
         return
@@ -562,10 +558,6 @@ def _set_http_request_cookies_from_request(
     max_cookies: int,
     experimental: bool,
 ):
-    _handle_experimental_unnamespacing(
-        api_params, request, experimental, "requestCookies"
-    )
-
     if "requestCookies" in api_params:
         request_cookies = api_params["requestCookies"]
         if not request_cookies:
@@ -711,21 +703,22 @@ def _update_api_params_from_request(
     experimental_cookies: bool,
     unreported_deprecated_experimental_fields: Set[str],
 ):
-    if (
-        api_params
-        and unreported_deprecated_experimental_fields
-        and "experimental" in api_params
-    ):
-        for field in list(unreported_deprecated_experimental_fields):
-            if field in api_params["experimental"]:
-                unreported_deprecated_experimental_fields.remove(field)
-                logger.warning(
-                    f"Zyte API parameters for request {request} include "
-                    f"experimental.{field}, which is deprecated. Please, "
-                    f"replace it with {field}, both in request parameters "
-                    f"and in any response parsing logic that might rely "
-                    f"on the old parameter."
-                )
+    for field in ("responseCookies", "requestCookies", "cookieManagement"):
+        if (
+            field in unreported_deprecated_experimental_fields
+            and field in api_params.get("experimental", {})
+        ):
+            unreported_deprecated_experimental_fields.remove(field)
+            logger.warning(
+                f"Zyte API parameters for request {request} include "
+                f"experimental.{field}, which is deprecated. Please, "
+                f"replace it with {field}, both in request parameters "
+                f"and in any response parsing logic that might rely "
+                f"on the old parameter."
+            )
+        _handle_experimental_unnamespacing(
+            api_params, request, experimental_cookies, field
+        )
     _set_http_response_body_from_request(api_params=api_params, request=request)
     _set_http_response_headers_from_request(
         api_params=api_params,
@@ -741,19 +734,21 @@ def _update_api_params_from_request(
     )
     _set_http_request_body_from_request(api_params=api_params, request=request)
     if cookies_enabled:
-        assert cookie_jars is not None  # typing
         _set_http_response_cookies_from_request(
             api_params=api_params,
             experimental=experimental_cookies,
             request=request,
         )
-        _set_http_request_cookies_from_request(
-            api_params=api_params,
-            request=request,
-            cookie_jars=cookie_jars,
-            max_cookies=max_cookies,
-            experimental=experimental_cookies,
-        )
+        # cookie_jars can be None when the param parser is used for request
+        # fingerprinting, in which case request cookies are not relevant.
+        if cookie_jars is not None:
+            _set_http_request_cookies_from_request(
+                api_params=api_params,
+                request=request,
+                cookie_jars=cookie_jars,
+                max_cookies=max_cookies,
+                experimental=experimental_cookies,
+            )
     _unset_unneeded_api_params(
         api_params=api_params, request=request, default_params=default_params
     )
@@ -935,6 +930,22 @@ def _get_api_params(
             f"Request {request} combines manually-defined parameters and "
             f"automatically-mapped parameters."
         )
+    else:
+        if (
+            api_params
+            and unreported_deprecated_experimental_fields
+            and "experimental" in api_params
+        ):
+            for field in list(unreported_deprecated_experimental_fields):
+                if field in api_params["experimental"]:
+                    unreported_deprecated_experimental_fields.remove(field)
+                    logger.warning(
+                        f"Zyte API parameters for request {request} include "
+                        f"experimental.{field}, which is deprecated. Please, "
+                        f"replace it with {field}, both in request parameters "
+                        f"and in any response parsing logic that might rely "
+                        f"on the old parameter."
+                    )
 
     if job_id is not None:
         api_params["jobId"] = job_id
