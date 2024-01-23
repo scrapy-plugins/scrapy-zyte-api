@@ -24,10 +24,10 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
     :http:`request:httpRequestText` values generate the same signature.
 
 -   Output parameters (:http:`request:browserHtml`,
-    :http:`request:httpResponseBody`, :http:`request:httpResponseHeaders`,
-    :http:`request:responseCookies`, :http:`request:screenshot`, and
-    :ref:`automatic extraction outputs <zyte-api-extract-fields>` like
-    :http:`request:product`)
+    :http:`request:httpResponseBody`, :http:`request:responseCookies`,
+    :http:`request:httpResponseHeaders`, :http:`request:responseCookies`,
+    :http:`request:screenshot`, and :ref:`automatic extraction outputs
+    <zyte-api-extract-fields>` like :http:`request:product`)
 
 -   Rendering option parameters (:http:`request:actions`,
     :http:`request:device`, :http:`request:javascript`,
@@ -42,10 +42,9 @@ The following Zyte API parameters are *not* taken into account for request
 fingerprinting:
 
 -   Request header parameters (:http:`request:customHttpRequestHeaders`,
-    :http:`request:requestHeaders`)
+    :http:`request:requestHeaders`, :http:`request:requestCookies`)
 
--   Request cookie parameters (:http:`request:cookieManagement`,
-    :http:`request:requestCookies`)
+-   :http:`request:cookieManagement`
 
 -   Session handling parameters (:http:`request:sessionContext`,
     :http:`request:sessionContextParameters`)

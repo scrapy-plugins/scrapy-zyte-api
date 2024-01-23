@@ -1,6 +1,27 @@
 Changes
 =======
 
+To be released
+--------------
+
+* Cookie support is no longer experimental:
+
+  * If the ``COOKIES_ENABLED`` setting is ``True`` (default), automatic request
+    parameter mapping now sets ``responseCookies`` to ``True`` and maps request
+    cookies to ``requestCookies``.
+
+  * The ``ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED`` setting is now deprecated.
+    When enabled, however, the ``experimental`` name space is still used for
+    automatic request parameter mapping.
+
+  * If you use ``requestCookies``, ``responseCookies``, or ``cookieManagement``
+    within the ``experimental`` name space in request parameters, a deprecation
+    warning is now logged.
+
+  * The ``responseCookies`` response parameter is now handled the same as
+    ``experimental.responseCookies``; the latter still works but is deprecated.
+
+
 0.14.1 (2024-01-17)
 -------------------
 
@@ -18,6 +39,7 @@ Changes
             work as expected with
             :class:`~scrapy.pqueues.DownloaderAwarePriorityQueue`.
 
+
 0.14.0 (2024-01-15)
 -------------------
 
@@ -28,6 +50,7 @@ Changes
   * zyte-common-items >= 0.8.0
 
 * Added support for ``zyte_common_items.JobPosting`` to the scrapy-poet provider.
+
 
 0.13.0 (2023-12-13)
 -------------------
@@ -71,6 +94,7 @@ Changes
 
 * Test and CI improvements.
 
+
 0.12.2 (2023-10-19)
 -------------------
 
@@ -78,6 +102,7 @@ Changes
   from ``ZYTE_API_PROVIDER_PARAMS`` when sending the Zyte API request
 * When logging Zyte API requests, truncation now uses
   "..." instead of Unicode ellipsis.
+
 
 0.12.1 (2023-09-29)
 -------------------
@@ -106,7 +131,7 @@ Changes
   Experimental is treated as a namespace, and its parameters are the ones
   counted, i.e. there is no ``scrapy-zyte-api/request_args/experimental`` stat,
   but there are stats like
-  ``scrapy-zyte-api/request_args/experimental.responseCookies``.
+  ``scrapy-zyte-api/request_args/experimental.foo``.
 
 
 0.11.1 (2023-08-25)
