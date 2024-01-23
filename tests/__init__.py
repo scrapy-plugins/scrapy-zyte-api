@@ -28,6 +28,12 @@ SETTINGS = {
     "ZYTE_API_KEY": _API_KEY,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
 }
+try:
+    import scrapy_poet
+except ImportError:
+    pass
+else:
+    SETTINGS["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
 UNSET = object()
 
 

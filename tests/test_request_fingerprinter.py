@@ -25,7 +25,7 @@ def test_cache():
     assert fingerprint == fingerprinter._cache[request]
 
 
-def test_fallback_custom():
+def test_fallback_custom(caplog):
     class CustomFingerprinter:
         def fingerprint(self, request):
             return b"foo"
@@ -34,13 +34,25 @@ def test_fallback_custom():
         "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS": CustomFingerprinter,
     }
     crawler = get_crawler(settings)
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    with caplog.at_level("WARNING"):
+        fingerprinter = create_instance(
+            ScrapyZyteAPIRequestFingerprinter,
+            settings=crawler.settings,
+            crawler=crawler,
+        )
     request = Request("https://example.com")
     assert fingerprinter.fingerprint(request) == b"foo"
     request = Request("https://example.com", meta={"zyte_api": True})
     assert fingerprinter.fingerprint(request) != b"foo"
+    try:
+        import scrapy_poet
+    except ImportError:
+        pass
+    else:
+        assert (
+            "does not point to a subclass of scrapy_poet.ScrapyPoetRequestFingerprinter"
+            in caplog.text
+        )
 
 
 def test_fallback_default():
