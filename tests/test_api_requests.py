@@ -3254,20 +3254,6 @@ def test_default_params_false(default_params):
     assert api_params is None
 
 
-# https://stackoverflow.com/a/6037657
-def unflatten(dictionary):
-    resultDict: Dict[Any, Any] = dict()
-    for key, value in dictionary.items():
-        parts = key.split(".")
-        d = resultDict
-        for part in parts[:-1]:
-            if part not in d:
-                d[part] = dict()
-            d = d[part]
-        d[parts[-1]] = value
-    return resultDict
-
-
 @pytest.mark.parametrize(
     "field",
     [
