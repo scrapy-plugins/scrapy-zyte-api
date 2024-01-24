@@ -27,6 +27,11 @@ def test_cache():
     )
     request = Request("https://example.com", meta={"zyte_api": True})
     fingerprint = fingerprinter.fingerprint(request)
+
+    fingerprinter._param_parser = None  # Prevent later calls from working
+    cached_fingerprint = fingerprinter.fingerprint(request)
+
+    assert fingerprint == cached_fingerprint
     assert fingerprint == fingerprinter._cache[request]
 
 
