@@ -7,12 +7,17 @@ from scrapy import __version__ as SCRAPY_VERSION
 if Version(SCRAPY_VERSION) < Version("2.7"):
     pytest.skip("Skipping tests for Scrapy ≥ 2.7", allow_module_level=True)
 
-from scrapy import Request
+from scrapy import Request, Spider
 from scrapy.utils.misc import create_instance
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
 
 from . import get_crawler
+
+try:
+    import scrapy_poet
+except ImportError:
+    scrapy_poet = None
 
 
 def test_cache():
@@ -217,6 +222,12 @@ def test_metadata():
     assert fingerprint2 == fingerprint4
 
 
+@pytest.mark.skipIf(
+    scrapy_poet is not None,
+    reason=(
+        "scrapy-poet is installed, and test_deps already covers these " "scenarios"
+    ),
+)
 def test_only_end_parameters_matter():
     """Test that it does not matter how a request comes to use some Zyte API
     parameters, that the fingerprint is the same if the parameters actually
@@ -442,3 +453,174 @@ def test_request_body():
     )
     fingerprint2 = fingerprinter.fingerprint(request2)
     assert fingerprint1 == fingerprint2
+
+
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+def test_deps():
+    """Test that some injected dependencies do not affect fingerprinting at
+    all (e.g. HttpClient) while others do (e.g. WebPage)."""
+    from web_poet import HttpClient, WebPage
+
+    request = Request("https://example.com")
+    raw_request = Request(
+        "https://example.com",
+        meta={
+            "zyte_api": {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                },
+            }
+        },
+    )
+    auto_request = Request("https://example.com", meta={"zyte_api_automap": True})
+
+    class DepsSpider(Spider):
+        name = "deps"
+
+        def __init__(self, *args, **kwargs):
+            self.client_request = Request(
+                "https://example.com", callback=self.parse_client
+            )
+            self.client_raw_request = Request(
+                "https://example.com",
+                callback=self.parse_client,
+                meta={
+                    "zyte_api": {
+                        "httpResponseBody": True,
+                        "httpResponseHeaders": True,
+                        "experimental": {
+                            "responseCookies": True,
+                        },
+                    }
+                },
+            )
+            self.client_auto_request = Request(
+                "https://example.com",
+                callback=self.parse_client,
+                meta={"zyte_api_automap": True},
+            )
+
+            self.page_request = Request("https://example.com", callback=self.parse_page)
+            self.page_raw_request = Request(
+                "https://example.com",
+                callback=self.parse_page,
+                meta={
+                    "zyte_api": {
+                        "httpResponseBody": True,
+                        "httpResponseHeaders": True,
+                        "experimental": {
+                            "responseCookies": True,
+                        },
+                    }
+                },
+            )
+            self.page_auto_request = Request(
+                "https://example.com",
+                callback=self.parse_page,
+                meta={"zyte_api_automap": True},
+            )
+
+        async def parse_client(self, response, a: HttpClient):
+            pass
+
+        async def parse_page(self, response, a: WebPage):
+            pass
+
+    default_crawler = get_crawler(spider_cls=DepsSpider)
+    default_fingerprinter = default_crawler.request_fingerprinter
+    transparent_crawler = get_crawler(
+        {"ZYTE_API_TRANSPARENT_MODE": True}, spider_cls=DepsSpider
+    )
+    transparent_fingerprinter = transparent_crawler.request_fingerprinter
+
+    request_default_fp = default_fingerprinter.fingerprint(request)
+    request_transparent_fp = transparent_fingerprinter.fingerprint(request)
+    raw_request_default_fp = default_fingerprinter.fingerprint(raw_request)
+    raw_request_transparent_fp = transparent_fingerprinter.fingerprint(raw_request)
+    auto_request_default_fp = default_fingerprinter.fingerprint(auto_request)
+    auto_request_transparent_fp = transparent_fingerprinter.fingerprint(auto_request)
+
+    client_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.client_request
+    )
+    client_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.client_request
+    )
+    client_raw_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.client_raw_request
+    )
+    client_raw_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.client_raw_request
+    )
+    client_auto_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.client_auto_request
+    )
+    client_auto_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.client_auto_request
+    )
+
+    page_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.page_request
+    )
+    page_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.page_request
+    )
+    page_raw_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.page_raw_request
+    )
+    page_raw_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.page_raw_request
+    )
+    page_auto_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.page_auto_request
+    )
+    page_auto_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.page_auto_request
+    )
+
+    assert request_default_fp != request_transparent_fp
+    assert request_default_fp != raw_request_default_fp
+    assert request_default_fp != raw_request_transparent_fp
+    assert request_default_fp != auto_request_default_fp
+    assert request_default_fp != auto_request_transparent_fp
+    assert request_default_fp == client_request_default_fp
+    assert request_default_fp != client_request_transparent_fp
+    assert request_default_fp != client_raw_request_default_fp
+    assert request_default_fp != client_raw_request_transparent_fp
+    assert request_default_fp != client_auto_request_default_fp
+    assert request_default_fp != client_auto_request_transparent_fp
+    assert request_default_fp != page_request_default_fp
+    assert request_default_fp != page_request_transparent_fp
+    assert request_default_fp != page_raw_request_default_fp
+    assert request_default_fp != page_raw_request_transparent_fp
+    assert request_default_fp != page_auto_request_default_fp
+    assert request_default_fp != page_auto_request_transparent_fp
+
+    assert request_transparent_fp == raw_request_default_fp
+    assert request_transparent_fp == raw_request_transparent_fp
+    assert request_transparent_fp == auto_request_default_fp
+    assert request_transparent_fp == auto_request_transparent_fp
+    assert request_transparent_fp == client_request_transparent_fp
+    assert request_transparent_fp == client_raw_request_default_fp
+    assert request_transparent_fp == client_raw_request_transparent_fp
+    assert request_transparent_fp == client_auto_request_default_fp
+    assert request_transparent_fp == client_auto_request_transparent_fp
+    assert request_transparent_fp != page_request_default_fp
+    assert request_transparent_fp != page_request_transparent_fp
+    assert request_transparent_fp != page_raw_request_default_fp
+    assert request_transparent_fp != page_raw_request_transparent_fp
+    assert request_transparent_fp != page_auto_request_default_fp
+    assert request_transparent_fp != page_auto_request_transparent_fp
+
+    assert page_request_default_fp != page_request_transparent_fp
+    assert page_request_default_fp != page_raw_request_default_fp
+    assert page_request_default_fp != page_raw_request_transparent_fp
+    assert page_request_default_fp != page_auto_request_default_fp
+    assert page_request_default_fp != page_auto_request_transparent_fp
+
+    assert page_request_transparent_fp == page_raw_request_default_fp
+    assert page_request_transparent_fp == page_raw_request_transparent_fp
+    assert page_request_transparent_fp == page_auto_request_default_fp
+    assert page_request_transparent_fp == page_auto_request_transparent_fp
