@@ -222,11 +222,9 @@ def test_metadata():
     assert fingerprint2 == fingerprint4
 
 
-@pytest.mark.skipIf(
+@pytest.mark.skipif(
     scrapy_poet is not None,
-    reason=(
-        "scrapy-poet is installed, and test_deps already covers these " "scenarios"
-    ),
+    reason=("scrapy-poet is installed, and test_deps already covers these scenarios"),
 )
 def test_only_end_parameters_matter():
     """Test that it does not matter how a request comes to use some Zyte API
@@ -624,3 +622,32 @@ def test_deps():
     assert page_request_transparent_fp == page_raw_request_transparent_fp
     assert page_request_transparent_fp == page_auto_request_default_fp
     assert page_request_transparent_fp == page_auto_request_transparent_fp
+
+
+def test_page_params():
+    no_params_request = Request("https://example.com")
+    empty_params_request = Request("https://example.com", meta={"page_params": {}})
+    some_param_request = Request(
+        "https://example.com", meta={"page_params": {"a": "b"}}
+    )
+    other_param_request = Request(
+        "https://example.com", meta={"page_params": {"c": "d"}}
+    )
+
+    crawler = get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
+    fingerprinter = crawler.request_fingerprinter
+
+    no_params_fingerprint = fingerprinter.fingerprint(no_params_request)
+    empty_params_fingerprint = fingerprinter.fingerprint(empty_params_request)
+    some_param_fingerprint = fingerprinter.fingerprint(some_param_request)
+    other_param_fingerprint = fingerprinter.fingerprint(other_param_request)
+
+    if scrapy_poet is None:
+        assert no_params_fingerprint == empty_params_fingerprint
+        assert no_params_fingerprint == some_param_fingerprint
+        assert no_params_fingerprint == other_param_fingerprint
+    else:
+        assert no_params_fingerprint == empty_params_fingerprint
+        assert no_params_fingerprint != some_param_fingerprint
+        assert no_params_fingerprint != other_param_fingerprint
+        assert some_param_fingerprint != other_param_fingerprint
