@@ -33,6 +33,7 @@ try:
 except ImportError:
     pass
 else:
+    assert isinstance(SETTINGS["DOWNLOADER_MIDDLEWARES"], dict)
     SETTINGS["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
 UNSET = object()
 
