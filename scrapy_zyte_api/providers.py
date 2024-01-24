@@ -71,7 +71,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                 results.append(item)
                 to_provide.remove(cls)
 
-            # BrowserResponse takes precedence than HttpResponse
+            # BrowserResponse takes precedence over HttpResponse
             elif cls == AnyResponse and BrowserResponse not in to_provide:
                 http_response = self.injector.weak_cache.get(request, {}).get(
                     HttpResponse
@@ -138,7 +138,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             if item_type not in to_provide_stripped and options_name in zyte_api_meta:
                 del zyte_api_meta[options_name]
             elif options_name in zyte_api_meta:
-                extract_from = zyte_api_meta[options_name]["extractFrom"]
+                extract_from = zyte_api_meta[options_name].get("extractFrom")
             elif item_type in to_provide_stripped and http_response_needed:
                 zyte_api_meta[options_name] = {"extractFrom": "httpResponseBody"}
 
@@ -152,6 +152,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                 del http_request_params["url"]
                 zyte_api_meta.update(http_request_params)
 
+        # TODO: Map out RequestHeaders similar to httpResponseBody
         if html_requested:
             zyte_api_meta["browserHtml"] = True
 
