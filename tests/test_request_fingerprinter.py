@@ -12,7 +12,7 @@ from scrapy.utils.misc import create_instance
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
 
-from . import SETTINGS, get_crawler
+from . import get_crawler
 
 
 def test_cache():
@@ -45,7 +45,7 @@ def test_fallback_custom(caplog):
     request = Request("https://example.com", meta={"zyte_api": True})
     assert fingerprinter.fingerprint(request) != b"foo"
     try:
-        import scrapy_poet
+        import scrapy_poet  # noqa: F401
     except ImportError:
         pass
     else:
@@ -56,7 +56,7 @@ def test_fallback_custom(caplog):
 
 
 def test_fallback_default():
-    crawler = get_crawler(SETTINGS)
+    crawler = get_crawler()
     fingerprinter = crawler.request_fingerprinter
     fallback_fingerprinter = (
         crawler.request_fingerprinter._fallback_request_fingerprinter
@@ -223,13 +223,12 @@ def test_only_end_parameters_matter():
     sent to Zyte API are the same."""
 
     settings: Dict[str, Any] = {
-        **SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
     crawler = get_crawler(settings)
     transparent_fingerprinter = crawler.request_fingerprinter
 
-    crawler = get_crawler(SETTINGS)
+    crawler = get_crawler()
     default_fingerprinter = crawler.request_fingerprinter
 
     request = Request("https://example.com")

@@ -30,7 +30,6 @@ from scrapy_zyte_api.responses import _process_response
 
 from . import (
     DEFAULT_CLIENT_CONCURRENCY,
-    SETTINGS,
     get_crawler,
     get_download_handler,
     get_downloader_middleware,
@@ -252,7 +251,6 @@ async def test_higher_concurrency():
 
         crawler = get_crawler(
             {
-                **SETTINGS,
                 "CONCURRENT_REQUESTS": concurrency,
                 "CONCURRENT_REQUESTS_PER_DOMAIN": concurrency,
                 "ZYTE_API_URL": server.urljoin("/"),
@@ -432,7 +430,7 @@ def test_transparent_mode_toggling(setting, meta, expected):
     :func:`~scrapy_zyte_api.handler._get_api_params` parameter.
     """
     request = Request(url="https://example.com", meta=meta)
-    settings = {**SETTINGS, "ZYTE_API_TRANSPARENT_MODE": setting}
+    settings = {"ZYTE_API_TRANSPARENT_MODE": setting}
     crawler = get_crawler(settings)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -487,7 +485,7 @@ async def test_job_id(meta, mockserver):
     """
     request = Request(url="https://example.com", meta={meta: True})
     with set_env(SHUB_JOBKEY="1/2/3"):
-        crawler = get_crawler(SETTINGS)
+        crawler = get_crawler()
         handler = get_download_handler(crawler, "https")
         param_parser = handler._param_parser
         api_params = param_parser.parse(request)
@@ -572,8 +570,7 @@ def test_default_params_merging(
     """
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
-    settings = {**SETTINGS, setting_key: setting}
-    crawler = get_crawler(settings)
+    crawler = get_crawler({setting_key: setting})
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
@@ -626,8 +623,7 @@ def test_default_params_immutability(setting_key, meta_key, setting, meta):
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
     default_params = copy(setting)
-    settings = {**SETTINGS, setting_key: setting}
-    crawler = get_crawler(settings)
+    crawler = get_crawler({setting_key: setting})
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
     param_parser.parse(request)
@@ -639,7 +635,7 @@ def _test_automap(
 ):
     request = Request(url="https://example.com", **request_kwargs)
     request.meta["zyte_api_automap"] = meta
-    settings = {**SETTINGS, **settings, "ZYTE_API_TRANSPARENT_MODE": True}
+    settings = {**settings, "ZYTE_API_TRANSPARENT_MODE": True}
     crawler = get_crawler(settings)
     if "cookies" in request_kwargs:
         try:
@@ -2149,7 +2145,6 @@ def test_automap_all_cookies(meta):
     Zyte API requests should include all cookie jar cookies, regardless of
     the target URL domain."""
     settings: Dict[str, Any] = {
-        **SETTINGS,
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2257,7 +2252,6 @@ def test_automap_cookie_jar(meta):
     )
     request4 = Request(url="https://example.com/4", meta={**meta, "cookiejar": "a"})
     settings: Dict[str, Any] = {
-        **SETTINGS,
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2309,7 +2303,6 @@ def test_automap_cookie_jar(meta):
 )
 def test_automap_cookie_limit(meta, caplog):
     settings: Dict[str, Any] = {
-        **SETTINGS,
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_MAX_COOKIES": 1,
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -2439,7 +2432,6 @@ class CustomCookieMiddleware(CookiesMiddleware):
 def test_automap_custom_cookie_middleware():
     mw_cls = CustomCookieMiddleware
     settings = {
-        **SETTINGS,
         "DOWNLOADER_MIDDLEWARES": {
             "scrapy.downloadermiddlewares.cookies.CookiesMiddleware": None,
             f"{mw_cls.__module__}.{mw_cls.__qualname__}": 700,
@@ -2638,7 +2630,6 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
     request = Request(url="https://example.com")
     request.meta["zyte_api_automap"] = meta
     settings = {
-        **SETTINGS,
         "ZYTE_API_AUTOMAP_PARAMS": default_params,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -2668,7 +2659,6 @@ def test_default_params_false(default_params):
     request = Request(url="https://example.com")
     request.meta["zyte_api_default_params"] = False
     settings = {
-        **SETTINGS,
         "ZYTE_API_DEFAULT_PARAMS": default_params,
     }
     crawler = get_crawler(settings)
