@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING
 
 logger = getLogger(__name__)
 
-try:
-    from scrapy.utils.request import RequestFingerprinter  # NOQA
+try:  # noqa: C901
+    from scrapy.utils.request import RequestFingerprinter as _  # noqa: F401
 except ImportError:
     if not TYPE_CHECKING:
         ScrapyZyteAPIRequestFingerprinter = None
