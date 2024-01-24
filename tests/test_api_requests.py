@@ -1573,6 +1573,120 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             ["cannot be mapped"],
         ),
+        # Zyte Smart Proxy Manager special header handling for HTTP requests.
+        (
+            {"X-Crawlera-Foo": "Bar"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Client": "Custom client string"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "enable"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["To achieve the same behavior with Zyte API, do not set request cookies"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "disable"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["it is the default behavior of Zyte API"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "discard"},
+            {},
+            {
+                "cookieManagement": "discard",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "foo"},
+            {
+                "cookieManagement": "bar",
+            },
+            {
+                "cookieManagement": "bar",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["has already been defined on the request"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "foo"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped to a Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-JobId": "foo"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "jobId": "foo",
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-JobId": "foo"},
+            {
+                "jobId": "bar",
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "jobId": "bar",
+            },
+            ["has already been defined on the request"],
+        ),
+        (
+            {"X-Crawlera-Max-Retries": "1"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-No-Bancheck": "1"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        # TODO: Cover all scenarios from
+        # https://docs.zyte.com/zyte-api/migration/zyte/smartproxy.html#parameter-mapping
+        # for HTTP requests, including scenarios with unexpected header values
+        # and values that would override already-defined parameters.
+        # TODO: Browser support, it should behave as similar as possible to
+        # HTTP support.
     ],
 )
 def test_automap_headers(headers, meta, expected, warnings, caplog):
