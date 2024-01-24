@@ -6,7 +6,7 @@ Unreleased
 
 * Updated requirement versions:
 
-  * scrapy-poet >= 0.20.0
+  * scrapy-poet >= 0.20.1
 
 
 0.14.1 (2024-01-17)
