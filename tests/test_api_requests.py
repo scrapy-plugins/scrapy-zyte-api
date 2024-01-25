@@ -1573,6 +1573,456 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             ["cannot be mapped"],
         ),
+        # Zyte Smart Proxy Manager special header handling.
+        (
+            {"X-Crawlera-Foo": "Bar"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Client": "Custom client string"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "enable"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["To achieve the same behavior with Zyte API, do not set request cookies"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "disable"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["it is the default behavior of Zyte API"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "discard"},
+            {},
+            {
+                "cookieManagement": "discard",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "foo"},
+            {
+                "cookieManagement": "bar",
+            },
+            {
+                "cookieManagement": "bar",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["has already been defined on the request"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "foo"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped to a Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-JobId": "foo"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "jobId": "foo",
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-JobId": "foo"},
+            {
+                "jobId": "bar",
+            },
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "jobId": "bar",
+            },
+            ["has already been defined on the request"],
+        ),
+        (
+            {"X-Crawlera-Max-Retries": "1"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-No-Bancheck": "1"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Profile": "pass"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-Profile": "desktop"},
+            {},
+            {
+                "device": "desktop",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-Profile": "mobile"},
+            {},
+            {
+                "device": "mobile",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-Profile": "foo"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["cannot be mapped to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-Profile": "foo"},
+            {
+                "device": "bar",
+            },
+            {
+                "device": "bar",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["has already been defined on the request"],
+        ),
+        (
+            {"X-Crawlera-Profile-Pass": "foo"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Region": "foo"},
+            {},
+            {
+                "geolocation": "foo",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-Region": "foo"},
+            {
+                "geolocation": "bar",
+            },
+            {
+                "geolocation": "bar",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["has already been defined on the request"],
+        ),
+        (
+            {"X-Crawlera-Session": "foo"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Timeout": "40000"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Use-Https": "1"},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Foo": "Bar"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Client": "Custom client string"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "enable"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["To achieve the same behavior with Zyte API, do not set request cookies"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "disable"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["it is the default behavior of Zyte API"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "discard"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+                "cookieManagement": "discard",
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "foo"},
+            {
+                "browserHtml": True,
+                "cookieManagement": "bar",
+            },
+            {
+                "browserHtml": True,
+                "cookieManagement": "bar",
+            },
+            ["has already been defined on the request"],
+        ),
+        (
+            {"X-Crawlera-Cookies": "foo"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["cannot be mapped to a Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-JobId": "foo"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+                "jobId": "foo",
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-JobId": "foo"},
+            {
+                "browserHtml": True,
+                "jobId": "bar",
+            },
+            {
+                "browserHtml": True,
+                "jobId": "bar",
+            },
+            ["has already been defined on the request"],
+        ),
+        (
+            {"X-Crawlera-Max-Retries": "1"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-No-Bancheck": "1"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Profile": "pass"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Profile": "desktop"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Profile": "mobile"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Profile": "foo"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Profile": "foo"},
+            {
+                # Zyte API does not support it, it will trigger a 400 response,
+                # but we allow it for forward compatibility, i.e. in case it is
+                # supported in the future.
+                "device": "bar",
+                "browserHtml": True,
+            },
+            {
+                "device": "bar",
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Profile-Pass": "foo"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Region": "foo"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+                "geolocation": "foo",
+            },
+            ["has been assigned to the matching Zyte API request parameter"],
+        ),
+        (
+            {"X-Crawlera-Region": "foo"},
+            {
+                "browserHtml": True,
+                "geolocation": "bar",
+            },
+            {
+                "browserHtml": True,
+                "geolocation": "bar",
+            },
+            ["has already been defined on the request"],
+        ),
+        (
+            {"X-Crawlera-Session": "foo"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Timeout": "40000"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"X-Crawlera-Use-Https": "1"},
+            {
+                "browserHtml": True,
+            },
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
     ],
 )
 def test_automap_headers(headers, meta, expected, warnings, caplog):
