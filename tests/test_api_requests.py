@@ -1573,7 +1573,7 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             ["cannot be mapped"],
         ),
-        # Zyte Smart Proxy Manager special header handling for HTTP requests.
+        # Zyte Smart Proxy Manager special header handling.
         (
             {"X-Crawlera-Foo": "Bar"},
             {},
