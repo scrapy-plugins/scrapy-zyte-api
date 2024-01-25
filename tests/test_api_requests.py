@@ -1789,8 +1789,6 @@ def test_automap_method(method, meta, expected, warnings, caplog):
             },
             ["This header has been dropped"],
         ),
-        # TODO: Browser support, it should behave as similar as possible to
-        # HTTP support.
         (
             {"X-Crawlera-Foo": "Bar"},
             {
