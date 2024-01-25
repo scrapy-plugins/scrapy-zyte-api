@@ -303,34 +303,9 @@ def _iter_headers(
         if not v:
             continue
         decoded_v = b",".join(v).decode()
-        lowercase_k = k.strip().lower()
-        yield k, lowercase_k, decoded_v
-
-
-def _map_custom_http_request_headers(
-    *,
-    api_params: Dict[str, Any],
-    request: Request,
-    skip_headers: Set[str],
-):
-    headers = []
-    for k, lowercase_k, decoded_v in _iter_headers(
-        api_params=api_params,
-        request=request,
-        header_parameter="customHttpRequestHeaders",
-    ):
         decoded_k = k.decode()
-        if lowercase_k in skip_headers:
-            if not (
-                lowercase_k == b"cookie"
-                or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
-            ):
-                logger.warning(
-                    f"Request {request} defines header {decoded_k}, which "
-                    f"cannot be mapped into the Zyte API "
-                    f"customHttpRequestHeaders parameter."
-                )
-            continue
+        lowercase_k = k.strip().lower()
+
         if lowercase_k.startswith(b"x-crawlera-"):
             for spm_header_suffix, zapi_request_param in (
                 (b"region", "geolocation"),
@@ -360,7 +335,15 @@ def _map_custom_http_request_headers(
             else:
                 if lowercase_k == b"x-crawlera-profile":
                     zapi_request_param = "device"
-                    if zapi_request_param in api_params:
+                    if header_parameter == "requestHeaders":
+                        # Browser request, no support for the device param.
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers."
+                        )
+                    elif zapi_request_param in api_params:
                         logger.warning(
                             f"Request {request} defines header {decoded_k}. "
                             f"This header has been dropped, the HTTP API of "
@@ -447,6 +430,34 @@ def _map_custom_http_request_headers(
                         f"header has been dropped, the HTTP API of Zyte API "
                         f"does not support Zyte Smart Proxy Manager headers."
                     )
+            continue
+
+        yield k, lowercase_k, decoded_v
+
+
+def _map_custom_http_request_headers(
+    *,
+    api_params: Dict[str, Any],
+    request: Request,
+    skip_headers: Set[str],
+):
+    headers = []
+    for k, lowercase_k, decoded_v in _iter_headers(
+        api_params=api_params,
+        request=request,
+        header_parameter="customHttpRequestHeaders",
+    ):
+        decoded_k = k.decode()
+        if lowercase_k in skip_headers:
+            if not (
+                lowercase_k == b"cookie"
+                or (lowercase_k == b"user-agent" and decoded_v == DEFAULT_USER_AGENT)
+            ):
+                logger.warning(
+                    f"Request {request} defines header {decoded_k}, which "
+                    f"cannot be mapped into the Zyte API "
+                    f"customHttpRequestHeaders parameter."
+                )
             continue
         headers.append({"name": decoded_k, "value": decoded_v})
     if headers:
