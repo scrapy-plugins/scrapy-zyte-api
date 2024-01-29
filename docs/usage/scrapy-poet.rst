@@ -72,3 +72,21 @@ supported one is :class:`scrapy_zyte_api.ExtractFrom`:
 The provider will set the extraction options based on the annotations, so for
 this code ``extractFrom`` will be set to ``httpResponseBody`` in
 ``productOptions``.
+
+Geolocation
+===========
+
+You can specify the geolocation field by adding a
+:class:`scrapy_zyte_api.Geolocation` dependency and annotating it with a
+country code:
+
+.. code-block:: python
+
+    from typing import Annotated
+
+    from scrapy_zyte_api import Geolocation
+
+    @attrs.define
+    class MyPageObject(BasePage):
+        product: Product
+        geolocation: Annotated[Geolocation, "DE"]

@@ -18,7 +18,7 @@ from zyte_common_items import (
     ProductNavigation,
 )
 
-from scrapy_zyte_api._annotations import ExtractFrom
+from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -41,6 +41,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         ArticleList,
         ArticleNavigation,
         JobPosting,
+        Geolocation,
     }
 
     def __init__(self, injector):
@@ -91,26 +92,32 @@ class ZyteApiProvider(PageObjectInputProvider):
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
-            kw = item_keywords.get(cls_stripped)
-            if not kw:
-                continue
+            if cls_stripped is not Geolocation:
+                kw = item_keywords.get(cls_stripped)
+                if not kw:
+                    continue
+                zyte_api_meta[kw] = True
+            else:
+                kw = None
             to_provide_stripped.add(cls_stripped)
-            zyte_api_meta[kw] = True
             if not is_typing_annotated(cls):
                 continue
             metadata = cls.__metadata__  # type: ignore[attr-defined]
-            for extract_from in ExtractFrom:
-                if extract_from in metadata:
-                    prev_extract_from = extract_from_seen.get(kw)
-                    if prev_extract_from and prev_extract_from != extract_from:
-                        raise ValueError(
-                            f"Multiple different extractFrom specified for {kw}"
-                        )
-                    extract_from_seen[kw] = extract_from
-                    options = zyte_api_meta.setdefault(f"{kw}Options", {})
-                    # TODO better logic for overwriting the value
-                    options["extractFrom"] = extract_from.value
-                    break
+            if cls_stripped is Geolocation and metadata:
+                zyte_api_meta["geolocation"] = metadata[0]
+            if kw:
+                for extract_from in ExtractFrom:
+                    if extract_from in metadata:
+                        prev_extract_from = extract_from_seen.get(kw)
+                        if prev_extract_from and prev_extract_from != extract_from:
+                            raise ValueError(
+                                f"Multiple different extractFrom specified for {kw}"
+                            )
+                        extract_from_seen[kw] = extract_from
+                        options = zyte_api_meta.setdefault(f"{kw}Options", {})
+                        # TODO better logic for overwriting the value
+                        options["extractFrom"] = extract_from.value
+                        break
 
         for item_type, kw in item_keywords.items():
             options_name = f"{kw}Options"
@@ -150,12 +157,16 @@ class ZyteApiProvider(PageObjectInputProvider):
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
             kw = item_keywords.get(cls_stripped)
-            if not kw:
-                continue
-            assert issubclass(cls_stripped, Item)
-            item = cls_stripped.from_dict(api_response.raw_api_response[kw])
+            if cls_stripped is not Geolocation:
+                if not kw:
+                    continue
+                assert issubclass(cls_stripped, Item)
+                item = cls_stripped.from_dict(api_response.raw_api_response[kw])
+            else:
+                item = Geolocation()
             if is_typing_annotated(cls):
                 item = AnnotatedResult(item, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(item)
-            self.update_cache(request, {cls: item})
+            if cls_stripped is not Geolocation:
+                self.update_cache(request, {cls: item})
         return results

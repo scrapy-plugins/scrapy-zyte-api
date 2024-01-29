@@ -15,7 +15,7 @@ from twisted.web.client import Agent, readBody
 from web_poet import BrowserHtml, BrowserResponse, ItemPage, field, handle_urls
 from zyte_common_items import BasePage, Product
 
-from scrapy_zyte_api._annotations import ExtractFrom
+from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
 from scrapy_zyte_api.providers import ZyteApiProvider
 
 from . import SETTINGS
@@ -263,3 +263,29 @@ async def test_provider_extractfrom_double(mockserver, caplog):
     item, _, _ = await crawl_single_item(AnnotatedZyteAPISpider, HtmlResource, settings)
     assert item is None
     assert "Multiple different extractFrom specified for product" in caplog.text
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@ensureDeferred
+async def test_provider_geolocation(mockserver):
+    from typing import Annotated
+
+    @attrs.define
+    class GeoProductPage(BasePage):
+        product: Product
+        geolocation: Annotated[Geolocation, "DE"]
+
+    class GeoZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: GeoProductPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
+    assert item["product"].name == "Product name (country DE)"

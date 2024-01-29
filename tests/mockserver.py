@@ -149,14 +149,19 @@ class DefaultResource(Resource):
                 "price": "10",
                 "currency": "USD",
             }
+            assert isinstance(response_data["product"], dict)
+            assert isinstance(response_data["product"]["name"], str)
             extract_from = request_data.get("productOptions", {}).get("extractFrom")
             if extract_from:
                 from scrapy_zyte_api.providers import ExtractFrom
 
                 if extract_from == ExtractFrom.httpResponseBody:
-                    assert isinstance(response_data["product"], dict)
-                    assert isinstance(response_data["product"]["name"], str)
                     response_data["product"]["name"] += " (from httpResponseBody)"
+
+            if "geolocation" in request_data:
+                response_data["product"][
+                    "name"
+                ] += f" (country {request_data['geolocation']})"
 
         return json.dumps(response_data).encode()
 
