@@ -73,6 +73,8 @@ The provider will set the extraction options based on the annotations, so for
 this code ``extractFrom`` will be set to ``httpResponseBody`` in
 ``productOptions``.
 
+.. note:: Dependency annotations require Python 3.9+.
+
 Geolocation
 ===========
 
@@ -90,3 +92,6 @@ country code:
     class MyPageObject(BasePage):
         product: Product
         geolocation: Annotated[Geolocation, "DE"]
+
+.. note:: As :class:`~.Geolocation` is only useful when annotated, using it
+    requires Python 3.9+.
