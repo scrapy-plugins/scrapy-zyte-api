@@ -24,7 +24,6 @@ from zyte_common_items import (
 )
 
 from scrapy_zyte_api._annotations import ExtractFrom
-from scrapy_zyte_api._params import _ParamParser
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -146,13 +145,9 @@ class ZyteApiProvider(PageObjectInputProvider):
             if extract_from == "browserHtml":
                 html_requested = True
             elif extract_from == "httpResponseBody" or http_response_needed:
-                param_parser = _ParamParser(crawler)
-                param_parser._transparent_mode = True
-                http_request_params = param_parser.parse(request)
-                del http_request_params["url"]
-                zyte_api_meta.update(http_request_params)
+                zyte_api_meta["httpResponseBody"] = True
+                zyte_api_meta["httpResponseHeaders"] = True
 
-        # TODO: Map out RequestHeaders similar to httpResponseBody
         if html_requested:
             zyte_api_meta["browserHtml"] = True
 

@@ -416,14 +416,6 @@ CUSTOM_HTTP_REQUEST_HEADERS = [
         "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     },
     {"name": "Accept-Language", "value": "en"},
-]
-
-CUSTOM_HTTP_REQUEST_HEADERS_2 = [
-    {
-        "name": "Accept",
-        "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-    {"name": "Accept-Language", "value": "en"},
     {"name": "Accept-Encoding", "value": "gzip, deflate, br"},
 ]
 
@@ -450,7 +442,6 @@ async def test_provider_any_response_only(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert type(item["page"].response) == AnyResponse
     assert type(item["page"].response.response) == HttpResponse
@@ -481,7 +472,6 @@ async def test_provider_any_response_product(mockserver):
         "productOptions": {"extractFrom": "httpResponseBody"},
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert type(item["page"].response) == AnyResponse
     assert type(item["page"].response.response) == HttpResponse
@@ -617,7 +607,6 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
         "httpResponseBody": True,
         "productOptions": product_options,
         "httpResponseHeaders": True,
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
 
     assert type(item["page"].response) == AnyResponse
@@ -639,9 +628,8 @@ async def test_provider_any_response_product_options_empty(mockserver):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
-    product_options = {}
     settings = provider_settings(mockserver)
-    settings["ZYTE_API_PROVIDER_PARAMS"] = {"productOptions": product_options}
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {"productOptions": {}}
     item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
@@ -652,7 +640,6 @@ async def test_provider_any_response_product_options_empty(mockserver):
         "httpResponseBody": True,
         "productOptions": {"extractFrom": "httpResponseBody"},
         "httpResponseHeaders": True,
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
 
     assert type(item["page"].response) == AnyResponse
@@ -692,7 +679,6 @@ async def test_provider_any_response_product_extract_from_http_response_2(mockse
         "httpResponseBody": True,
         "httpResponseHeaders": True,
         "productOptions": product_options,
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
 
     assert type(item["page"].response) == AnyResponse
@@ -804,7 +790,8 @@ async def test_provider_any_response_http_response(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS_2,
+        # This is actually set by HttpResponseProvider
+        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
 
     assert type(item["page"].response) == AnyResponse
@@ -836,7 +823,8 @@ async def test_provider_any_response_browser_http_response(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS_2,
+        # This is actually set by HttpResponseProvider
+        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert params[1] == {"url": url, "browserHtml": True}
 
@@ -875,7 +863,8 @@ async def test_provider_any_response_http_response_multiple_pages(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS_2,
+        # This is actually set by HttpResponseProvider
+        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert type(item["page1"].http_response) == HttpResponse
     assert type(item["page2"].http_response) == HttpResponse
@@ -910,7 +899,8 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS_2,
+        # This is actually set by HttpResponseProvider
+        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert params[1] == {"url": url, "browserHtml": True}
 
