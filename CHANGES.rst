@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.15.0 (unreleased)
+0.15.0 (2024-01-31)
 -------------------
 
 * Updated requirement versions:
