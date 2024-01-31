@@ -1,6 +1,38 @@
 Changes
 =======
 
+0.15.0 (2024-01-31)
+-------------------
+
+* Updated requirement versions:
+
+  * :doc:`scrapy-poet <scrapy-poet:index>` >= 0.20.1
+
+* Dependency injection :ref:`through scrapy-poet <scrapy-poet>` is now taken
+  into account for request fingerprinting.
+
+  Now, when scrapy-poet is installed, the default value of the
+  :ref:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` setting is
+  :class:`scrapy_poet.ScrapyPoetRequestFingerprinter`, and a warning will be
+  issued if a custom value is not a subclass of
+  :class:`~scrapy_poet.ScrapyPoetRequestFingerprinter`.
+
+* :ref:`Zyte Smart Proxy Manager special headers <spm-request-headers>` will
+  now be dropped automatically when using :ref:`transparent mode <transparent>`
+  or :ref:`automatic request parameters <automap>`. Where possible, they will
+  be replaced with equivalent Zyte API parameters. In all cases, a warning will
+  be issued.
+
+* Covered the configuration of
+  :class:`scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware` in the :ref:`setup
+  documentation <setup>`.
+
+  :class:`~scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware` was added in
+  scrapy-zyte-api 0.13.0, and is required to automatically close spiders when
+  all start requests fail because they are pointing to domains forbidden by
+  Zyte API.
+
+
 0.14.1 (2024-01-17)
 -------------------
 
