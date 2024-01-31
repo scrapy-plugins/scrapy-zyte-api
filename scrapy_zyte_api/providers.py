@@ -137,8 +137,8 @@ class ZyteApiProvider(PageObjectInputProvider):
             options_name = f"{kw}Options"
             if item_type not in to_provide_stripped and options_name in zyte_api_meta:
                 del zyte_api_meta[options_name]
-            elif options_name in zyte_api_meta:
-                extract_from = zyte_api_meta[options_name].get("extractFrom")
+            elif zyte_api_meta.get(options_name, {}).get("extractFrom"):
+                extract_from = zyte_api_meta[options_name]["extractFrom"]
             elif item_type in to_provide_stripped and http_response_needed:
                 zyte_api_meta[options_name] = {"extractFrom": "httpResponseBody"}
 

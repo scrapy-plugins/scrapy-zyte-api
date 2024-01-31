@@ -625,6 +625,41 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
     assert type(item["page"].product) == Product
 
 
+@ensureDeferred
+async def test_provider_any_response_product_options_empty(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        product: Product
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    product_options = {}
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {"productOptions": product_options}
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0] == {
+        "url": url,
+        "product": True,
+        "httpResponseBody": True,
+        "productOptions": {"extractFrom": "httpResponseBody"},
+        "httpResponseHeaders": True,
+        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
+    }
+
+    assert type(item["page"].response) == AnyResponse
+    assert type(item["page"].response.response) == HttpResponse
+    assert type(item["page"].product) == Product
+
+
 # The issue here is that HttpResponseProvider runs earlier than ScrapyZyteAPI.
 # HttpResponseProvider doesn't know that it should not run since ScrapyZyteAPI
 # could provide HttpResponse in anycase.
