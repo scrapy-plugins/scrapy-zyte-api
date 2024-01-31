@@ -33,8 +33,7 @@ setuptools.setup(
             "andi>=0.6.0",
             # "scrapy-poet>=0.19.0",
             "scrapy-poet @ git+https://git@github.com/scrapinghub/scrapy-poet@weak-cache#egg=scrapy-poet",
-            # "web-poet>=0.15.1",
-            "web-poet @ git+https://git@github.com/scrapinghub/web-poet@response#egg=web-poet",
+            "web-poet>=0.16.0",
             "zyte-common-items>=0.8.0",
         ]
     },
