@@ -289,3 +289,26 @@ async def test_provider_geolocation(mockserver):
 
     item, url, _ = await crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
     assert item["product"].name == "Product name (country DE)"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@ensureDeferred
+async def test_provider_geolocation_unannotated(mockserver, caplog):
+    @attrs.define
+    class GeoProductPage(BasePage):
+        product: Product
+        geolocation: Geolocation
+
+    class GeoZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: GeoProductPage):  # type: ignore[override]
+            pass
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
+    assert item is None
+    assert "Geolocation dependencies must be annotated" in caplog.text

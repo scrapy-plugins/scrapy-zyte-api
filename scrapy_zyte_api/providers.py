@@ -92,7 +92,9 @@ class ZyteApiProvider(PageObjectInputProvider):
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
-            if cls_stripped is Geolocation and is_typing_annotated(cls):
+            if cls_stripped is Geolocation:
+                if not is_typing_annotated(cls):
+                    raise ValueError("Geolocation dependencies must be annotated.")
                 zyte_api_meta["geolocation"] = cls.__metadata__[0]  # type: ignore[attr-defined]
                 continue
             kw = item_keywords.get(cls_stripped)
@@ -153,11 +155,11 @@ class ZyteApiProvider(PageObjectInputProvider):
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
-            kw = item_keywords.get(cls_stripped)
             if cls_stripped is Geolocation and is_typing_annotated(cls):
                 item = AnnotatedResult(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
                 results.append(item)
                 continue
+            kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
             assert issubclass(cls_stripped, Item)
