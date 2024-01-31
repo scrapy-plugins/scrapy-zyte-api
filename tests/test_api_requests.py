@@ -549,7 +549,7 @@ async def test_default_params_none(mockserver, caplog):
         (
             "ZYTE_API_AUTOMAP_PARAMS",
             "zyte_api_automap",
-            {"httpResponseBody", "httpResponseHeaders"},
+            set(DEFAULT_AUTOMAP_PARAMS),
         ),
     ],
 )
@@ -747,6 +747,18 @@ def _test_automap(
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
+            [],
+        ),
+        # To request httpResponseHeaders on their own, you must disable
+        # httpResponseBody.
+        (
+            {"httpResponseHeaders": True},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {"httpResponseBody": False, "httpResponseHeaders": True},
+            {"httpResponseHeaders": True},
             [],
         ),
     ],
