@@ -35,7 +35,7 @@ from .mockserver import get_ephemeral_port
 
 
 def create_scrapy_settings():
-    settings = _create_scrapy_settings(None)
+    settings = _create_scrapy_settings()
     for setting, value in SETTINGS.items():
         if setting.endswith("_MIDDLEWARES") and settings[setting]:
             settings[setting].update(value)
