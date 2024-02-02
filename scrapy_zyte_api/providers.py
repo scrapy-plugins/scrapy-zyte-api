@@ -23,7 +23,7 @@ from zyte_common_items import (
     ProductNavigation,
 )
 
-from scrapy_zyte_api._annotations import ExtractFrom
+from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -47,6 +47,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         ArticleNavigation,
         AnyResponse,
         JobPosting,
+        Geolocation,
     }
 
     def is_provided(self, type_: Callable) -> bool:
@@ -103,6 +104,11 @@ class ZyteApiProvider(PageObjectInputProvider):
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
+            if cls_stripped is Geolocation:
+                if not is_typing_annotated(cls):
+                    raise ValueError("Geolocation dependencies must be annotated.")
+                zyte_api_meta["geolocation"] = cls.__metadata__[0]  # type: ignore[attr-defined]
+                continue
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
@@ -216,6 +222,10 @@ class ZyteApiProvider(PageObjectInputProvider):
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
+            if cls_stripped is Geolocation and is_typing_annotated(cls):
+                item = AnnotatedResult(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
+                results.append(item)
+                continue
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
