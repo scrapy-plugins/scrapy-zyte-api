@@ -16,9 +16,13 @@ Inputs
 -   :class:`web_poet.AnyResponse`
 
     This re-uses either :class:`web_poet.BrowserResponse` *(takes priority)*
-    or :class:`web_poet.HttpResponse` if they're available. If neither is
-    available, it would use :class:`web_poet.HttpResponse` requested from Zyte
-    API.
+    or :class:`web_poet.HttpResponse` if they're available.
+
+    If neither is available, it would use :class:`web_poet.HttpResponse`
+    requested from Zyte API. However, if other item inputs (e.g.
+    :class:`zyte_common_items.Product`) are present, it would request
+    :class:`web_poet.BrowserResponse` from Zyte API unless an extraction
+    source is provided.
 
 -   :class:`zyte_common_items.Article`
 

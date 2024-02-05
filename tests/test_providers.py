@@ -367,7 +367,7 @@ def test_provider_any_response(mockserver):
     assert type(results[0]) == AnyResponse
     assert type(results[0].response) == HttpResponse
 
-    # Same case as above, HttpResopnse is used by default
+    # Same case as above, HttpResponse is used by default
     results = yield provide({AnyResponse, Product})
     assert len(results) == 2
     assert type(results[0]) == AnyResponse
@@ -518,12 +518,10 @@ async def test_provider_any_response_product(mockserver):
     assert params[0] == {
         "url": url,
         "product": True,
-        "productOptions": {"extractFrom": "httpResponseBody"},
-        "httpResponseBody": True,
-        "httpResponseHeaders": True,
+        "browserHtml": True,
     }
     assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == HttpResponse
+    assert type(item["page"].response.response) == BrowserResponse
     assert type(item["page"].product) == Product
 
 
@@ -686,13 +684,11 @@ async def test_provider_any_response_product_options_empty(mockserver):
     assert params[0] == {
         "url": url,
         "product": True,
-        "httpResponseBody": True,
-        "productOptions": {"extractFrom": "httpResponseBody"},
-        "httpResponseHeaders": True,
+        "browserHtml": True,
     }
 
     assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == HttpResponse
+    assert type(item["page"].response.response) == BrowserResponse
     assert type(item["page"].product) == Product
 
 

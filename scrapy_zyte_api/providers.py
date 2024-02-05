@@ -100,6 +100,7 @@ class ZyteApiProvider(PageObjectInputProvider):
 
         to_provide_stripped: Set[type] = set()
         extract_from_seen: Dict[str, str] = {}
+        item_requested: bool = False
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
@@ -112,6 +113,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
+            item_requested = True
             to_provide_stripped.add(cls_stripped)
             zyte_api_meta[kw] = True
             if not is_typing_annotated(cls):
@@ -144,11 +146,11 @@ class ZyteApiProvider(PageObjectInputProvider):
                 del zyte_api_meta[options_name]
             elif zyte_api_meta.get(options_name, {}).get("extractFrom"):
                 extract_from = zyte_api_meta[options_name]["extractFrom"]
-            elif item_type in to_provide_stripped and http_response_needed:
-                zyte_api_meta[options_name] = {"extractFrom": "httpResponseBody"}
 
         if AnyResponse in to_provide:
-            if extract_from == "browserHtml":
+            if (
+                item_requested and extract_from != "httpResponseBody"
+            ) or extract_from == "browserHtml":
                 html_requested = True
             elif extract_from == "httpResponseBody" or http_response_needed:
                 zyte_api_meta["httpResponseBody"] = True
