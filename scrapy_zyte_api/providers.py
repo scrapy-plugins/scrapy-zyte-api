@@ -1,5 +1,4 @@
 from typing import Any, Callable, Dict, List, Sequence, Set
-from weakref import WeakKeyDictionary
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
@@ -44,17 +43,8 @@ class ZyteApiProvider(PageObjectInputProvider):
         Geolocation,
     }
 
-    def __init__(self, injector):
-        super().__init__(injector)
-        self._cached_instances: WeakKeyDictionary[Request, Dict] = WeakKeyDictionary()
-
     def is_provided(self, type_: Callable) -> bool:
         return super().is_provided(strip_annotated(type_))
-
-    def update_cache(self, request: Request, mapping: Dict[Any, Any]) -> None:
-        if request not in self._cached_instances:
-            self._cached_instances[request] = {}
-        self._cached_instances[request].update(mapping)
 
     async def __call__(  # noqa: C901
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
@@ -62,14 +52,6 @@ class ZyteApiProvider(PageObjectInputProvider):
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
         # TODO what if ``response`` is already from Zyte API and contains something we need
         results: List[Any] = []
-
-        for cls in list(to_provide):
-            item = self._cached_instances.get(request, {}).get(cls)
-            if item:
-                results.append(item)
-                to_provide.remove(cls)
-        if not to_provide:
-            return results
 
         html_requested = BrowserResponse in to_provide or BrowserHtml in to_provide
         item_keywords: Dict[type, str] = {
@@ -142,7 +124,6 @@ class ZyteApiProvider(PageObjectInputProvider):
             html = None
         if BrowserHtml in to_provide:
             results.append(html)
-            self.update_cache(request, {BrowserHtml: html})
         if BrowserResponse in to_provide:
             response = BrowserResponse(
                 url=api_response.url,
@@ -150,7 +131,6 @@ class ZyteApiProvider(PageObjectInputProvider):
                 html=html,
             )
             results.append(response)
-            self.update_cache(request, {BrowserResponse: response})
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
@@ -167,5 +147,4 @@ class ZyteApiProvider(PageObjectInputProvider):
             if is_typing_annotated(cls):
                 item = AnnotatedResult(item, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(item)
-            self.update_cache(request, {cls: item})
         return results
