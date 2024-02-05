@@ -304,8 +304,137 @@ def _iter_headers(
     for k, v in request.headers.items():
         if not v:
             continue
-        v = b",".join(v)
+        decoded_k = k.decode()
         lowercase_k = k.strip().lower()
+        v = b",".join(v)
+        decoded_v = v.decode()
+
+        if lowercase_k.startswith(b"x-crawlera-"):
+            for spm_header_suffix, zapi_request_param in (
+                (b"region", "geolocation"),
+                (b"jobid", "jobId"),
+            ):
+                if lowercase_k == b"x-crawlera-" + spm_header_suffix:
+                    if zapi_request_param in api_params:
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and the matching Zyte API "
+                            f"request parameter, {zapi_request_param!r}, has "
+                            f"already been defined on the request."
+                        )
+                    else:
+                        api_params[zapi_request_param] = decoded_v
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and its value ({decoded_v!r}) "
+                            f"has been assigned to the matching Zyte API "
+                            f"request parameter, {zapi_request_param!r}."
+                        )
+                    break
+            else:
+                if lowercase_k == b"x-crawlera-profile":
+                    zapi_request_param = "device"
+                    if header_parameter == "requestHeaders":
+                        # Browser request, no support for the device param.
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers."
+                        )
+                    elif zapi_request_param in api_params:
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and the matching Zyte API "
+                            f"request parameter, {zapi_request_param!r}, has "
+                            f"already been defined on the request."
+                        )
+                    elif decoded_v in ("desktop", "mobile"):
+                        api_params[zapi_request_param] = decoded_v
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and its value ({decoded_v!r}) "
+                            f"has been assigned to the matching Zyte API "
+                            f"request parameter, {zapi_request_param!r}."
+                        )
+                    else:
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and its value ({decoded_v!r}) "
+                            f"cannot be mapped to the matching Zyte API "
+                            f"request parameter, {zapi_request_param!r}."
+                        )
+                elif lowercase_k == b"x-crawlera-cookies":
+                    zapi_request_param = "cookieManagement"
+                    if zapi_request_param in api_params:
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and the matching Zyte API "
+                            f"request parameter, {zapi_request_param!r}, has "
+                            f"already been defined on the request."
+                        )
+                    elif decoded_v == "discard":
+                        api_params[zapi_request_param] = decoded_v
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and its value ({decoded_v!r}) "
+                            f"has been assigned to the matching Zyte API "
+                            f"request parameter, {zapi_request_param!r}."
+                        )
+                    elif decoded_v == "enable":
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and its value ({decoded_v!r}) "
+                            f"does not require mapping to a Zyte API request "
+                            f"parameter. To achieve the same behavior with "
+                            f"Zyte API, do not set request cookies. You can "
+                            f"disable cookies setting the COOKIES_ENABLED "
+                            f"setting to False or setting the "
+                            f"dont_merge_cookies Request.meta key to True."
+                        )
+                    elif decoded_v == "disable":
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and its value ({decoded_v!r}) "
+                            f"does not require mapping to a Zyte API request "
+                            f"parameter, because it is the default behavior "
+                            f"of Zyte API."
+                        )
+                    else:
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support Zyte Smart Proxy "
+                            f"Manager headers, and its value ({decoded_v!r}) "
+                            f"cannot be mapped to a Zyte API request "
+                            f"parameter."
+                        )
+                else:
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. This "
+                        f"header has been dropped, the HTTP API of Zyte API "
+                        f"does not support Zyte Smart Proxy Manager headers."
+                    )
+            continue
+
         yield k, lowercase_k, v
 
 

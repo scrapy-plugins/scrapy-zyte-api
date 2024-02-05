@@ -12,12 +12,13 @@ from zyte_common_items import (
     ArticleList,
     ArticleNavigation,
     Item,
+    JobPosting,
     Product,
     ProductList,
     ProductNavigation,
 )
 
-from scrapy_zyte_api._annotations import ExtractFrom
+from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -39,6 +40,8 @@ class ZyteApiProvider(PageObjectInputProvider):
         Article,
         ArticleList,
         ArticleNavigation,
+        JobPosting,
+        Geolocation,
     }
 
     def __init__(self, injector):
@@ -76,6 +79,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             Article: "article",
             ArticleList: "articleList",
             ArticleNavigation: "articleNavigation",
+            JobPosting: "jobPosting",
         }
 
         zyte_api_meta = crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS")
@@ -88,6 +92,11 @@ class ZyteApiProvider(PageObjectInputProvider):
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
+            if cls_stripped is Geolocation:
+                if not is_typing_annotated(cls):
+                    raise ValueError("Geolocation dependencies must be annotated.")
+                zyte_api_meta["geolocation"] = cls.__metadata__[0]  # type: ignore[attr-defined]
+                continue
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
@@ -146,6 +155,10 @@ class ZyteApiProvider(PageObjectInputProvider):
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
+            if cls_stripped is Geolocation and is_typing_annotated(cls):
+                item = AnnotatedResult(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
+                results.append(item)
+                continue
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue

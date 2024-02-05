@@ -29,6 +29,13 @@ SETTINGS: SETTINGS_T = {
     "ZYTE_API_KEY": _API_KEY,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
 }
+try:
+    import scrapy_poet  # noqa: F401
+except ImportError:
+    pass
+else:
+    assert isinstance(SETTINGS["DOWNLOADER_MIDDLEWARES"], dict)
+    SETTINGS["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
 UNSET = object()
 
 
@@ -38,6 +45,7 @@ class DummySpider(Spider):
 
 def get_crawler(settings=None, spider_cls=DummySpider, setup_engine=True):
     settings = settings or {}
+    settings = {**SETTINGS, **settings}
     crawler = _get_crawler(settings_dict=settings, spidercls=spider_cls)
     if setup_engine:
         setup_crawler_engine(crawler)

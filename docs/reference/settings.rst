@@ -117,7 +117,8 @@ See :ref:`request-automatic`.
 ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS
 =============================================
 
-Default: :class:`scrapy.utils.request.RequestFingerprinter`
+Default: :class:`scrapy_poet.ScrapyPoetRequestFingerprinter` if scrapy-poet is
+installed, else :class:`scrapy.utils.request.RequestFingerprinter`
 
 :ref:`Request fingerprinter <request-fingerprints>` to for requests that do not
 go through Zyte API. See :ref:`fingerprint`.

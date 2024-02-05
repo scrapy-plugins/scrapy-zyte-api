@@ -1,14 +1,19 @@
 from typing import Any, Dict, cast
 from unittest import SkipTest
 
+import pytest
 from packaging.version import Version
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
+from scrapy.http.response import Response
 from scrapy.item import Item
 from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 
-from scrapy_zyte_api import ScrapyZyteAPIDownloaderMiddleware
+from scrapy_zyte_api import (
+    ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPISpiderMiddleware,
+)
 
 from . import SETTINGS
 from .mockserver import DelayedResource, MockServer
@@ -18,22 +23,43 @@ class NamedSpider(Spider):
     name = "named"
 
 
+def request_processor(middleware, request, spider):
+    assert middleware.process_request(request, spider) is None
+
+
+def start_request_processor(middleware, request, spider):
+    assert list(middleware.process_start_requests([request], spider)) == [request]
+
+
+def spider_output_processor(middleware, request, spider):
+    response = Response("https://example.com")
+    assert list(middleware.process_spider_output(response, [request], spider)) == [
+        request
+    ]
+
+
+@pytest.mark.parametrize(
+    "mw_cls,processor",
+    [
+        (ScrapyZyteAPIDownloaderMiddleware, request_processor),
+        (ScrapyZyteAPISpiderMiddleware, start_request_processor),
+        (ScrapyZyteAPISpiderMiddleware, spider_output_processor),
+    ],
+)
 @ensureDeferred
-async def test_autothrottle_handling():
+async def test_autothrottle_handling(mw_cls, processor):
     crawler = get_crawler()
     await crawler.crawl("a")
     spider = crawler.spider
 
-    middleware = create_instance(
-        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
-    )
+    middleware = create_instance(mw_cls, settings=crawler.settings, crawler=crawler)
 
     # AutoThrottle does this.
     spider.download_delay = 5
 
     # No effect on non-Zyte-API requests
     request = Request("https://example.com")
-    assert middleware.process_request(request, spider) is None
+    processor(middleware, request, spider)
     assert "download_slot" not in request.meta
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == spider.download_delay
@@ -41,7 +67,7 @@ async def test_autothrottle_handling():
     # On Zyte API requests, the download slot is changed, and its delay is set
     # to 0.
     request = Request("https://example.com", meta={"zyte_api": {}})
-    assert middleware.process_request(request, spider) is None
+    processor(middleware, request, spider)
     assert request.meta["download_slot"] == "zyte-api@example.com"
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == 0
@@ -50,7 +76,7 @@ async def test_autothrottle_handling():
     # work the same.
     meta = {"download_slot": "zyte-api@example.com", "zyte_api": True}
     request = Request("https://example.com", meta=meta)
-    assert middleware.process_request(request, spider) is None
+    processor(middleware, request, spider)
     assert request.meta["download_slot"] == "zyte-api@example.com"
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == 0
@@ -60,7 +86,7 @@ async def test_autothrottle_handling():
     # middleware will reset it to 0 again the next time it processes a request.
     slot.delay = 10
     request = Request("https://example.com", meta={"zyte_api": {}})
-    assert middleware.process_request(request, spider) is None
+    processor(middleware, request, spider)
     assert request.meta["download_slot"] == "zyte-api@example.com"
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == 0
@@ -83,7 +109,6 @@ async def test_cookies():
         "https://example.com", cookies={"a": "b"}, meta={"zyte_api_automap": True}
     )
     assert middleware.process_request(request, spider) is None
-    assert request.meta["download_slot"] == "zyte-api@example.com"
 
 
 @ensureDeferred

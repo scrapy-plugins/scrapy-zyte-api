@@ -13,18 +13,35 @@ logger = logging.getLogger(__name__)
 _start_requests_processed = object()
 
 
-class ScrapyZyteAPIDownloaderMiddleware:
+class _BaseMiddleware:
     _slot_prefix = "zyte-api@"
 
     @classmethod
     def from_crawler(cls, crawler):
         return cls(crawler)
 
-    def __init__(self, crawler) -> None:
-        self._forbidden_domain_start_request_count = 0
-        self._total_start_request_count = 0
+    def __init__(self, crawler):
         self._param_parser = _ParamParser(crawler, cookies_enabled=False)
         self._crawler = crawler
+
+    def slot_request(self, request, spider, force=False):
+        if not force and self._param_parser.parse(request) is None:
+            return
+
+        downloader = self._crawler.engine.downloader
+        slot_id = downloader._get_slot_key(request, spider)
+        if not isinstance(slot_id, str) or not slot_id.startswith(self._slot_prefix):
+            slot_id = f"{self._slot_prefix}{slot_id}"
+            request.meta["download_slot"] = slot_id
+        _, slot = downloader._get_slot(request, spider)
+        slot.delay = 0
+
+
+class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
+    def __init__(self, crawler) -> None:
+        super().__init__(crawler)
+        self._forbidden_domain_start_request_count = 0
+        self._total_start_request_count = 0
 
         self._max_requests = crawler.settings.getint("ZYTE_API_MAX_REQUESTS")
         if self._max_requests:
@@ -99,15 +116,9 @@ class ScrapyZyteAPIDownloaderMiddleware:
         if self._param_parser.parse(request) is None:
             return
 
-        downloader = self._crawler.engine.downloader
-        slot_id = downloader._get_slot_key(request, spider)
-        if not isinstance(slot_id, str) or not slot_id.startswith(self._slot_prefix):
-            slot_id = f"{self._slot_prefix}{slot_id}"
-            request.meta["download_slot"] = slot_id
-        _, slot = downloader._get_slot(request, spider)
-        slot.delay = 0
+        self.slot_request(request, spider, force=True)
 
-        if self._max_requests_reached(downloader):
+        if self._max_requests_reached(self._crawler.engine.downloader):
             self._crawler.engine.close_spider(spider, "closespider_max_zapi_requests")
             raise IgnoreRequest(
                 f"The request {request} is skipped as {self._max_requests} max "
@@ -154,12 +165,9 @@ class ScrapyZyteAPIDownloaderMiddleware:
         )
 
 
-class ScrapyZyteAPISpiderMiddleware:
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(crawler)
-
+class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
     def __init__(self, crawler):
+        super().__init__(crawler)
         self._send_signal = crawler.signals.send_catch_log
 
     @staticmethod
@@ -172,23 +180,26 @@ class ScrapyZyteAPISpiderMiddleware:
         count = 0
         for request in start_requests:
             request.meta["is_start_request"] = True
-            request.meta["_pre_mw_headers"] = self._get_header_set(request)
+            self._process_output_request(request, spider)
             yield request
             count += 1
         self._send_signal(_start_requests_processed, count=count)
 
-    def _process_output_item_or_request(self, item_or_request):
+    def _process_output_request(self, request, spider):
+        request.meta["_pre_mw_headers"] = self._get_header_set(request)
+        self.slot_request(request, spider)
+
+    def _process_output_item_or_request(self, item_or_request, spider):
         if not isinstance(item_or_request, Request):
             return
-        request = item_or_request
-        request.meta["_pre_mw_headers"] = self._get_header_set(request)
+        self._process_output_request(item_or_request, spider)
 
     def process_spider_output(self, response, result, spider):
         for item_or_request in result:
-            self._process_output_item_or_request(item_or_request)
+            self._process_output_item_or_request(item_or_request, spider)
             yield item_or_request
 
     async def process_spider_output_async(self, response, result, spider):
         async for item_or_request in result:
-            self._process_output_item_or_request(item_or_request)
+            self._process_output_item_or_request(item_or_request, spider)
             yield item_or_request
