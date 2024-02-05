@@ -18,13 +18,11 @@ You need at least:
 -   A :ref:`Zyte API <zyte-api>` subscription (there’s a :ref:`free trial
     <zyte-api-trial>`).
 
--   Python 3.7+
+-   Python 3.8+
 
 -   Scrapy 2.0.1+
 
 :doc:`scrapy-poet <scrapy-poet:index>` integration requires higher versions:
-
--   Python 3.8+
 
 -   Scrapy 2.6+
 
