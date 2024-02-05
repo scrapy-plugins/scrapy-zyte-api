@@ -1,6 +1,5 @@
 import json
 import re
-import sys
 from copy import deepcopy
 from inspect import isclass
 from typing import Any, Dict
@@ -188,7 +187,6 @@ assert RETRY_POLICY_A != RETRY_POLICY_B
 
 
 @ensureDeferred
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
 @pytest.mark.parametrize(
     "settings,meta,expected",
     [
@@ -343,7 +341,6 @@ async def test_log_request_toggle(
 
 
 @ensureDeferred
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
 @pytest.mark.parametrize(
     "settings,short_str,long_str,truncated_str",
     [

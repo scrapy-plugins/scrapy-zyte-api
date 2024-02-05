@@ -1,4 +1,3 @@
-import sys
 from asyncio import iscoroutine
 from collections import defaultdict
 from copy import copy
@@ -315,7 +314,6 @@ async def test_param_parser_input_custom(mockserver):
 
 
 @ensureDeferred
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
 @pytest.mark.parametrize(
     "output,uses_zyte_api",
     [

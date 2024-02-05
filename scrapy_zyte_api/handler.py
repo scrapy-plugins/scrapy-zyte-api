@@ -206,7 +206,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         # Define url by default
         retrying = request.meta.get("zyte_api_retry_policy")
         if retrying:
-            retrying = load_object(retrying)
+            if isinstance(retrying, str):  # Scrapy < 2.4 doesn't have this check
+                retrying = load_object(retrying)
         else:
             retrying = self._retry_policy
         self._log_request(api_params)
