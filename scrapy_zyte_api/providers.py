@@ -53,11 +53,6 @@ class ZyteApiProvider(PageObjectInputProvider):
     def is_provided(self, type_: Callable) -> bool:
         return super().is_provided(strip_annotated(type_))
 
-    def update_cache(self, request: Request, mapping: Dict[Any, Any]) -> None:
-        if request not in self.injector.weak_cache:
-            self.injector.weak_cache[request] = {}
-        self.injector.weak_cache[request].update(mapping)
-
     async def __call__(  # noqa: C901
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
@@ -79,7 +74,6 @@ class ZyteApiProvider(PageObjectInputProvider):
                 if http_response:
                     any_response = AnyResponse(response=http_response)
                     results.append(any_response)
-                    self.update_cache(request, {AnyResponse: any_response})
                     to_provide.remove(cls)
 
         if not to_provide:
@@ -178,7 +172,6 @@ class ZyteApiProvider(PageObjectInputProvider):
             html = None
         if BrowserHtml in to_provide:
             results.append(html)
-            self.update_cache(request, {BrowserHtml: html})
 
         browser_response = None
         if BrowserResponse in to_provide:
@@ -188,7 +181,6 @@ class ZyteApiProvider(PageObjectInputProvider):
                 html=html,
             )
             results.append(browser_response)
-            self.update_cache(request, {BrowserResponse: browser_response})
 
         if AnyResponse in to_provide:
             any_response = None  # type: ignore[assignment]
@@ -219,7 +211,6 @@ class ZyteApiProvider(PageObjectInputProvider):
 
             if any_response:
                 results.append(any_response)
-                self.update_cache(request, {AnyResponse: any_response})
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
@@ -236,5 +227,4 @@ class ZyteApiProvider(PageObjectInputProvider):
             if is_typing_annotated(cls):
                 item = AnnotatedResult(item, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(item)
-            self.update_cache(request, {cls: item})
         return results
