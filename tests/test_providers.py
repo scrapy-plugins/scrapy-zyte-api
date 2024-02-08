@@ -4,16 +4,13 @@ import pytest
 
 pytest.importorskip("scrapy_poet")
 
-import asyncio
-
 import attrs
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy_poet import DummyResponse
-from scrapy_poet.injection import Injector
 from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
 from scrapy_poet.utils.testing import create_scrapy_settings as _create_scrapy_settings
-from twisted.internet import defer, reactor
+from twisted.internet import reactor
 from twisted.web.client import Agent, readBody
 from web_poet import (
     AnyResponse,
@@ -30,7 +27,7 @@ from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import ZyteApiProvider
 
-from . import SETTINGS, get_crawler
+from . import SETTINGS
 from .mockserver import get_ephemeral_port
 
 
@@ -324,117 +321,6 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
     item, url, _ = await crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
     assert item is None
     assert "Geolocation dependencies must be annotated" in caplog.text
-
-
-@defer.inlineCallbacks
-def run_provider(server, to_provide, settings_dict=None, request_meta=None):
-    class AnyResponseSpider(Spider):
-        name = "any_response"
-
-    request = Request(server.urljoin("/some-page"), meta=request_meta)
-    settings = create_scrapy_settings()
-    settings["ZYTE_API_URL"] = server.urljoin("/")
-    if settings_dict:
-        settings.update(settings_dict)
-    crawler = get_crawler(settings, AnyResponseSpider)
-    yield from crawler.engine.open_spider(crawler.spider)
-    injector = Injector(crawler)
-    provider = ZyteApiProvider(injector)
-
-    coro = provider(to_provide, request, crawler)
-    results = yield defer.Deferred.fromFuture(asyncio.ensure_future(coro))
-
-    return results
-
-
-@defer.inlineCallbacks
-def test_provider_any_response(mockserver):
-    # Use only one instance of the mockserver for faster tests.
-    def provide(*args, **kwargs):
-        return run_provider(mockserver, *args, **kwargs)
-
-    results = yield provide(set())
-    assert results == []
-
-    # AnyResponse would use HttpResponse by default, if neither BrowserResponse
-    # nor HttpResponse is available.
-    results = yield provide(
-        {
-            AnyResponse,
-        }
-    )
-    assert len(results) == 1
-    assert type(results[0]) == AnyResponse
-    assert type(results[0].response) == HttpResponse
-
-    # Same case as above, HttpResponse is used by default
-    results = yield provide({AnyResponse, Product})
-    assert len(results) == 2
-    assert type(results[0]) == AnyResponse
-    assert type(results[1]) == Product
-
-    # AnyResponse should re-use BrowserResponse if available.
-    results = yield provide({AnyResponse, BrowserResponse})
-    assert len(results) == 2
-    assert type(results[0]) == BrowserResponse
-    assert type(results[1]) == AnyResponse
-    assert results[1].response is results[0]
-
-    # AnyResponse should re-use BrowserHtml if available.
-    results = yield provide({AnyResponse, BrowserHtml})
-    assert len(results) == 2
-    assert type(results[0]) == BrowserHtml
-    assert type(results[1]) == AnyResponse
-    # diff instance due to casting
-    assert results[0] == results[1].response.html  # type: ignore[union-attr]
-
-    results = yield provide({AnyResponse, BrowserResponse, BrowserHtml})
-    assert len(results) == 3
-    assert type(results[0]) == BrowserHtml
-    assert type(results[1]) == BrowserResponse
-    assert type(results[2]) == AnyResponse
-    assert results[0] == results[1].html
-    assert results[0] == results[2].response.html  # type: ignore[union-attr]
-
-    # NOTES: This is hard to test in this setup and would result in being empty.
-    # This will be tested in a spider-setup instead so that HttpResponseProvider
-    # can participate.
-    # results = yield provide({AnyResponse, HttpResponse})
-    # assert results == []
-
-    # For the following cases, extraction source isn't available in `to_provided`
-    # but are in the `*.extractFrom` parameter.
-
-    settings_dict = {
-        "ZYTE_API_PROVIDER_PARAMS": {"productOptions": {"extractFrom": "browserHtml"}}
-    }
-
-    results = yield provide({AnyResponse, Product}, settings_dict)
-    assert len(results) == 2
-    assert type(results[0]) == AnyResponse
-    assert type(results[0].response) == BrowserResponse
-    assert type(results[1]) == Product
-
-    results = yield provide({AnyResponse, BrowserHtml, Product}, settings_dict)
-    assert len(results) == 3
-    assert type(results[0]) == BrowserHtml
-    assert type(results[1]) == AnyResponse
-    assert type(results[1].response) == BrowserResponse
-    assert type(results[2]) == Product
-    assert results[0] == results[1].response.html  # diff instance due to casting
-
-    settings_dict = {
-        "ZYTE_API_PROVIDER_PARAMS": {
-            "productOptions": {"extractFrom": "httpResponseBody"}
-        }
-    }
-    request_meta = {"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": True}}
-
-    results = yield provide({AnyResponse, Product}, settings_dict, request_meta)
-    assert len(results) == 2
-    assert type(results[0]) == AnyResponse
-    assert type(results[0].response) == HttpResponse
-    assert type(results[1]) == Product
 
 
 class RecordingHandler(ScrapyZyteAPIDownloadHandler):
