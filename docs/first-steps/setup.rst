@@ -60,6 +60,9 @@ Then, set up scrapy-zyte-api integration in ``settings.py``:
     DOWNLOADER_MIDDLEWARES = {
         "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
     }
+    SPIDER_MIDDLEWARES = {
+        "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
+    }
     REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
     SPIDER_MIDDLEWARES = {
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,

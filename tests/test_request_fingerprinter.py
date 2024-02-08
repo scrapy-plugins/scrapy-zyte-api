@@ -1,5 +1,3 @@
-from typing import Any, Dict
-
 import pytest
 from packaging.version import Version
 from scrapy import __version__ as SCRAPY_VERSION
@@ -236,7 +234,7 @@ def test_only_end_parameters_matter():
     parameters, that the fingerprint is the same if the parameters actually
     sent to Zyte API are the same."""
 
-    settings: Dict[str, Any] = {
+    settings = {
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
     crawler = get_crawler(settings)
