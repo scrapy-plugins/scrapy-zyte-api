@@ -1,12 +1,17 @@
 from typing import Any, Callable, Dict, List, Sequence, Set
-from weakref import WeakKeyDictionary
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
 from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import AnnotatedResult, PageObjectInputProvider
-from web_poet import BrowserHtml, BrowserResponse
+from web_poet import (
+    AnyResponse,
+    BrowserHtml,
+    BrowserResponse,
+    HttpResponse,
+    HttpResponseHeaders,
+)
 from zyte_common_items import (
     Article,
     ArticleList,
@@ -40,34 +45,37 @@ class ZyteApiProvider(PageObjectInputProvider):
         Article,
         ArticleList,
         ArticleNavigation,
+        AnyResponse,
         JobPosting,
         Geolocation,
     }
 
-    def __init__(self, injector):
-        super().__init__(injector)
-        self._cached_instances: WeakKeyDictionary[Request, Dict] = WeakKeyDictionary()
-
     def is_provided(self, type_: Callable) -> bool:
         return super().is_provided(strip_annotated(type_))
-
-    def update_cache(self, request: Request, mapping: Dict[Any, Any]) -> None:
-        if request not in self._cached_instances:
-            self._cached_instances[request] = {}
-        self._cached_instances[request].update(mapping)
 
     async def __call__(  # noqa: C901
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
-        # TODO what if ``response`` is already from Zyte API and contains something we need
         results: List[Any] = []
 
+        http_response = None
         for cls in list(to_provide):
-            item = self._cached_instances.get(request, {}).get(cls)
+            item = self.injector.weak_cache.get(request, {}).get(cls)
             if item:
                 results.append(item)
                 to_provide.remove(cls)
+
+            # BrowserResponse takes precedence over HttpResponse
+            elif cls == AnyResponse and BrowserResponse not in to_provide:
+                http_response = self.injector.weak_cache.get(request, {}).get(
+                    HttpResponse
+                )
+                if http_response:
+                    any_response = AnyResponse(response=http_response)
+                    results.append(any_response)
+                    to_provide.remove(cls)
+
         if not to_provide:
             return results
 
@@ -83,11 +91,10 @@ class ZyteApiProvider(PageObjectInputProvider):
         }
 
         zyte_api_meta = crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS")
-        if html_requested:
-            zyte_api_meta["browserHtml"] = True
 
         to_provide_stripped: Set[type] = set()
         extract_from_seen: Dict[str, str] = {}
+        item_requested: bool = False
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
@@ -100,6 +107,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
+            item_requested = True
             to_provide_stripped.add(cls_stripped)
             zyte_api_meta[kw] = True
             if not is_typing_annotated(cls):
@@ -118,10 +126,32 @@ class ZyteApiProvider(PageObjectInputProvider):
                     options["extractFrom"] = extract_from.value
                     break
 
+        http_response_needed = (
+            AnyResponse in to_provide
+            and BrowserResponse not in to_provide
+            and BrowserHtml not in to_provide
+            and not http_response
+        )
+
+        extract_from = None  # type: ignore[assignment]
         for item_type, kw in item_keywords.items():
             options_name = f"{kw}Options"
             if item_type not in to_provide_stripped and options_name in zyte_api_meta:
                 del zyte_api_meta[options_name]
+            elif zyte_api_meta.get(options_name, {}).get("extractFrom"):
+                extract_from = zyte_api_meta[options_name]["extractFrom"]
+
+        if AnyResponse in to_provide:
+            if (
+                item_requested and extract_from != "httpResponseBody"
+            ) or extract_from == "browserHtml":
+                html_requested = True
+            elif extract_from == "httpResponseBody" or http_response_needed:
+                zyte_api_meta["httpResponseBody"] = True
+                zyte_api_meta["httpResponseHeaders"] = True
+
+        if html_requested:
+            zyte_api_meta["browserHtml"] = True
 
         api_request = Request(
             url=request.url,
@@ -142,15 +172,45 @@ class ZyteApiProvider(PageObjectInputProvider):
             html = None
         if BrowserHtml in to_provide:
             results.append(html)
-            self.update_cache(request, {BrowserHtml: html})
+
+        browser_response = None
         if BrowserResponse in to_provide:
-            response = BrowserResponse(
+            browser_response = BrowserResponse(
                 url=api_response.url,
                 status=api_response.status,
                 html=html,
             )
-            results.append(response)
-            self.update_cache(request, {BrowserResponse: response})
+            results.append(browser_response)
+
+        if AnyResponse in to_provide:
+            any_response = None  # type: ignore[assignment]
+
+            if "browserHtml" in api_response.raw_api_response:
+                any_response = AnyResponse(
+                    response=browser_response
+                    or BrowserResponse(
+                        url=api_response.url,
+                        status=api_response.status,
+                        html=html,
+                    )
+                )
+            elif (
+                "httpResponseBody" in api_response.raw_api_response
+                and "httpResponseHeaders" in api_response.raw_api_response
+            ):
+                any_response = AnyResponse(
+                    response=HttpResponse(
+                        url=api_response.url,
+                        body=api_response.body,
+                        status=api_response.status,
+                        headers=HttpResponseHeaders.from_bytes_dict(
+                            api_response.headers
+                        ),
+                    )
+                )
+
+            if any_response:
+                results.append(any_response)
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
@@ -163,9 +223,8 @@ class ZyteApiProvider(PageObjectInputProvider):
             if not kw:
                 continue
             assert issubclass(cls_stripped, Item)
-            item = cls_stripped.from_dict(api_response.raw_api_response[kw])
+            item = cls_stripped.from_dict(api_response.raw_api_response[kw])  # type: ignore[attr-defined]
             if is_typing_annotated(cls):
                 item = AnnotatedResult(item, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(item)
-            self.update_cache(request, {cls: item})
         return results
