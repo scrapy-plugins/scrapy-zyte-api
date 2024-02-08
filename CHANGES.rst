@@ -1,6 +1,21 @@
 Changes
 =======
 
+0.16.0 (YYYY-MM-DD)
+-------------------
+
+* Removed support for Python 3.7.
+* Updated requirement versions:
+
+  * :doc:`scrapy-poet <scrapy-poet:index>` >= 0.21.0
+  * :doc:`web-poet <web-poet:index>` >= 0.16.0
+
+* Added support for :class:`web_poet.AnyResponse` dependency.
+* Added support to specify the country code via :class:`typing.Annotated` and
+  :class:`scrapy_zyte_api.Geolocation` dependency *(supported only on Python
+  3.9+)*.
+* Improved tests.
+
 0.15.0 (2024-01-31)
 -------------------
 
