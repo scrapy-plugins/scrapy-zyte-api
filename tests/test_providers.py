@@ -378,7 +378,7 @@ def test_provider_any_response(mockserver):
     assert len(results) == 2
     assert type(results[0]) == BrowserResponse
     assert type(results[1]) == AnyResponse
-    assert id(results[0]) == id(results[1].response)
+    assert results[1].response is results[0]
 
     # AnyResponse should re-use BrowserHtml if available.
     results = yield provide({AnyResponse, BrowserHtml})
