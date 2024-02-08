@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.16.0 (YYYY-MM-DD)
+0.16.0 (2024-02-08)
 -------------------
 
 * Removed support for Python 3.7.
