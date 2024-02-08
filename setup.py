@@ -31,8 +31,7 @@ setuptools.setup(
         # Sync with [testenv:pinned-provider] @ tox.ini
         "provider": [
             "andi>=0.6.0",
-            # "scrapy-poet>=0.19.0",
-            "scrapy-poet @ git+https://git@github.com/scrapinghub/scrapy-poet@master#egg=scrapy-poet",
+            "scrapy-poet>=0.21.0",
             "web-poet>=0.16.0",
             "zyte-common-items>=0.8.0",
         ]
