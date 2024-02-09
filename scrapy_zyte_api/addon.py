@@ -56,3 +56,10 @@ class Addon:
             "addon",
         )
         settings.set("ZYTE_API_TRANSPARENT_MODE", True, "addon")
+
+        try:
+            import scrapy_poet  # noqa: F401
+        except ImportError:
+            pass
+        else:
+            settings["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
