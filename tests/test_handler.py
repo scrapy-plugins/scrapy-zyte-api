@@ -651,3 +651,22 @@ async def test_addon_matching_settings():
     crawler = get_crawler_zyte_api({"ZYTE_API_TRANSPARENT_MODE": True})
     addon_crawler = get_crawler_zyte_api(use_addon=True)
     assert serialize(crawler.settings) == serialize(addon_crawler.settings)
+
+
+@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy < 2.10")
+@ensureDeferred
+async def test_addon_custom_fingerprint():
+    class CustomRequestFingerprinter:
+        pass
+
+    crawler = get_crawler_zyte_api(
+        {"REQUEST_FINGERPRINTER_CLASS": CustomRequestFingerprinter}, use_addon=True
+    )
+    assert (
+        crawler.settings["ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS"]
+        == CustomRequestFingerprinter
+    )
+    assert (
+        crawler.settings["REQUEST_FINGERPRINTER_CLASS"]
+        == "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
+    )

@@ -36,6 +36,17 @@ class Addon:
                 settings.get("REQUEST_FINGERPRINTER_CLASS"),
                 "addon",
             )
+            settings.set(
+                "REQUEST_FINGERPRINTER_CLASS",
+                "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
+                settings.getpriority("REQUEST_FINGERPRINTER_CLASS"),
+            )
+        else:
+            settings.set(
+                "REQUEST_FINGERPRINTER_CLASS",
+                "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
+                "addon",
+            )
 
         settings["DOWNLOAD_HANDLERS"][
             "http"
@@ -45,11 +56,6 @@ class Addon:
         ] = "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler"
         settings["DOWNLOADER_MIDDLEWARES"][ScrapyZyteAPIDownloaderMiddleware] = 1000
         settings["SPIDER_MIDDLEWARES"][ScrapyZyteAPISpiderMiddleware] = 100
-        settings.set(
-            "REQUEST_FINGERPRINTER_CLASS",
-            "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
-            "addon",
-        )
         settings.set(
             "TWISTED_REACTOR",
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
