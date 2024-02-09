@@ -1,6 +1,13 @@
 from scrapy.settings import BaseSettings
+from scrapy.settings.default_settings import (
+    REQUEST_FINGERPRINTER_CLASS as _SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS,
+)
+from scrapy.utils.misc import load_object
 
-from scrapy_zyte_api import ScrapyZyteAPIDownloaderMiddleware
+from scrapy_zyte_api import (
+    ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPISpiderMiddleware,
+)
 
 
 class Addon:
@@ -19,7 +26,10 @@ class Addon:
                 settings.getwithbase("DOWNLOAD_HANDLERS")["https"],
                 "addon",
             )
-        if not settings.get("ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS"):
+        if not settings.get("ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS") and (
+            load_object(settings.get("REQUEST_FINGERPRINTER_CLASS"))
+            is not load_object(_SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS)
+        ):
             settings.set(
                 "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS",
                 settings.get("REQUEST_FINGERPRINTER_CLASS"),
@@ -33,6 +43,7 @@ class Addon:
             "https"
         ] = "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler"
         settings["DOWNLOADER_MIDDLEWARES"][ScrapyZyteAPIDownloaderMiddleware] = 1000
+        settings["SPIDER_MIDDLEWARES"][ScrapyZyteAPISpiderMiddleware] = 100
         settings.set(
             "REQUEST_FINGERPRINTER_CLASS",
             "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",

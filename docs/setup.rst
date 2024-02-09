@@ -50,9 +50,6 @@ To configure scrapy-zyte-api, :ref:`set your API key <config-api-key>` and
 either :ref:`enable the add-on <config-addon>` (Scrapy ≥ 2.10) or
 :ref:`configure all components separately <config-components>`.
 
-You might also want to :ref:`enable transparent mode
-<config-transparent-mode>`.
-
 .. warning:: :ref:`reactor-change`.
 
 .. _config-api-key:
@@ -88,6 +85,8 @@ priority:
         "scrapy_zyte_api.Addon": 500,
     }
 
+.. note:: The addon enables :ref:`transparent mode <transparent>` by default.
+
 
 .. _config-components:
 
@@ -113,6 +112,14 @@ scrapy-zyte-api integration as follows:
     }
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
+By default, scrapy-zyte-api doesn't change the spider behavior. To switch your
+spider to use Zyte API for all requests, set the following setting as well:
+
+.. code-block:: python
+    :caption: settings.py
+
+    ZYTE_API_TRANSPARENT_MODE = True
+
 For :ref:`scrapy-poet integration <scrapy-poet>`, add the following provider to
 the ``SCRAPY_POET_PROVIDERS`` setting:
 
@@ -131,20 +138,6 @@ If you already had a custom value for :setting:`REQUEST_FINGERPRINTER_CLASS
     :caption: settings.py
 
     ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS = "myproject.CustomRequestFingerprinter"
-
-
-.. _config-transparent-mode:
-
-Enabling transparent mode
--------------------------
-
-By default, scrapy-zyte-api doesn't change the spider behavior. To switch your
-spider to use Zyte API for all requests, set the following setting as well:
-
-.. code-block:: python
-    :caption: settings.py
-
-    ZYTE_API_TRANSPARENT_MODE = True
 
 
 .. _reactor-change:

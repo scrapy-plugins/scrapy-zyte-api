@@ -14,7 +14,7 @@ from scrapy.core.downloader.handlers.http import (
 )
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
-from scrapy.utils.misc import create_instance
+from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
 from zyte_api.aio.retry import RetryFactory
@@ -616,3 +616,33 @@ async def test_addon_fallback_explicit():
     handler = get_download_handler(crawler, "http")
     assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
     assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
+
+
+@ensureDeferred
+async def test_addon_matching_settings():
+    def serialize(settings):
+        result = dict(settings)
+        for setting in (
+            "ADDONS",
+            "ZYTE_API_FALLBACK_HTTP_HANDLER",
+            "ZYTE_API_FALLBACK_HTTPS_HANDLER",
+        ):
+            if setting in settings:
+                del result[setting]
+        for setting in (
+            "DOWNLOADER_MIDDLEWARES",
+            "SPIDER_MIDDLEWARES",
+        ):
+            for key in list(result[setting]):
+                if isinstance(key, str):
+                    obj = load_object(key)
+                    result[setting][obj] = result[setting].pop(key)
+        for key in result["DOWNLOAD_HANDLERS"]:
+            result["DOWNLOAD_HANDLERS"][key] = result["DOWNLOAD_HANDLERS"][
+                key
+            ].__class__
+        return result
+
+    crawler = get_crawler_zyte_api({"ZYTE_API_TRANSPARENT_MODE": True})
+    addon_crawler = get_crawler_zyte_api(use_addon=True)
+    assert serialize(crawler.settings) == serialize(addon_crawler.settings)
