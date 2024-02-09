@@ -1,7 +1,4 @@
 from scrapy.settings import BaseSettings
-from scrapy.settings.default_settings import (
-    REQUEST_FINGERPRINTER_CLASS as _SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS,
-)
 from scrapy.utils.misc import load_object
 
 from scrapy_zyte_api import (
@@ -12,6 +9,10 @@ from scrapy_zyte_api import (
 
 class Addon:
     def update_settings(self, settings: BaseSettings) -> None:
+        from scrapy.settings.default_settings import (
+            REQUEST_FINGERPRINTER_CLASS as _SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS,
+        )
+
         # Read the current values of the settings and store them in the fallback settings,
         # unless those fallback settings are already set.
         if not settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER"):

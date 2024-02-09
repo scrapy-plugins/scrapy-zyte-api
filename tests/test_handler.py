@@ -24,7 +24,7 @@ from scrapy_zyte_api.handler import (
     ScrapyZyteAPIDownloadHandler,
     ScrapyZyteAPIHTTPDownloadHandler,
 )
-from scrapy_zyte_api.utils import USER_AGENT
+from scrapy_zyte_api.utils import _ADDON_SUPPORT, USER_AGENT
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET
 from . import get_crawler as get_crawler_zyte_api
@@ -571,6 +571,7 @@ def test_fallback_setting():
     assert isinstance(handler._fallback_handler, HTTPDownloadHandler)
 
 
+@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy ≤ 2.10")
 @ensureDeferred
 async def test_addon(mockserver):
     async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
@@ -579,6 +580,7 @@ async def test_addon(mockserver):
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
+@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy ≤ 2.10")
 @ensureDeferred
 async def test_addon_disable_transparent(mockserver):
     async with make_handler(
@@ -594,6 +596,7 @@ async def test_addon_disable_transparent(mockserver):
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
+@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy ≤ 2.10")
 @ensureDeferred
 async def test_addon_fallback():
     settings = {
@@ -607,6 +610,7 @@ async def test_addon_fallback():
     assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
 
 
+@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy ≤ 2.10")
 @ensureDeferred
 async def test_addon_fallback_explicit():
     settings = {
@@ -618,6 +622,7 @@ async def test_addon_fallback_explicit():
     assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
 
 
+@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy ≤ 2.10")
 @ensureDeferred
 async def test_addon_matching_settings():
     def serialize(settings):
