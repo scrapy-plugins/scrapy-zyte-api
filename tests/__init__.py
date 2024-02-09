@@ -38,7 +38,7 @@ else:
     SETTINGS["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
 SETTINGS_ADDON: Dict[str, Any] = {
     "ADDONS": {
-        Addon: 1,
+        Addon: 500,
     },
     "ZYTE_API_KEY": _API_KEY,
 }
