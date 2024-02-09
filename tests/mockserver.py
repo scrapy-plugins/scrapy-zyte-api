@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 from pytest_twisted import ensureDeferred
 from scrapy import Request
@@ -67,12 +68,47 @@ class DefaultResource(Resource):
             b"Content-Type",
             [b"application/json"],
         )
+        request.responseHeaders.setRawHeaders(
+            b"request-id",
+            [b"abcd1234"],
+        )
 
         response_data: _API_RESPONSE = {}
+
         if "url" not in request_data:
             request.setResponseCode(400)
             return json.dumps(response_data).encode()
         response_data["url"] = request_data["url"]
+
+        domain = urlparse(request_data["url"]).netloc
+        if "bad-key" in domain:
+            request.setResponseCode(401)
+            response_data = {
+                "status": 401,
+                "type": "/auth/key-not-found",
+                "title": "Authentication Key Not Found",
+                "detail": "The authentication key is not valid or can't be matched.",
+            }
+            return json.dumps(response_data).encode()
+        if "forbidden" in domain:
+            request.setResponseCode(451)
+            response_data = {
+                "status": 451,
+                "type": "/download/domain-forbidden",
+                "title": "Domain Forbidden",
+                "detail": "Extraction for the domain is forbidden.",
+                "blockedDomain": domain,
+            }
+            return json.dumps(response_data).encode()
+        if "suspended-account" in domain:
+            request.setResponseCode(403)
+            response_data = {
+                "status": 403,
+                "type": "/auth/account-suspended",
+                "title": "Account Suspended",
+                "detail": "Account is suspended, check billing details.",
+            }
+            return json.dumps(response_data).encode()
 
         html = "<html><body>Hello<h1>World!</h1></body></html>"
         if "browserHtml" in request_data:
@@ -113,6 +149,19 @@ class DefaultResource(Resource):
                 "price": "10",
                 "currency": "USD",
             }
+            assert isinstance(response_data["product"], dict)
+            assert isinstance(response_data["product"]["name"], str)
+            extract_from = request_data.get("productOptions", {}).get("extractFrom")
+            if extract_from:
+                from scrapy_zyte_api.providers import ExtractFrom
+
+                if extract_from == ExtractFrom.httpResponseBody:
+                    response_data["product"]["name"] += " (from httpResponseBody)"
+
+            if "geolocation" in request_data:
+                response_data["product"][
+                    "name"
+                ] += f" (country {request_data['geolocation']})"
 
         return json.dumps(response_data).encode()
 

@@ -18,10 +18,24 @@ SETTINGS: Dict[str, Any] = {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
     },
+    "DOWNLOADER_MIDDLEWARES": {
+        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+    },
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
+    "REQUEST_FINGERPRINTER_IMPLEMENTATION": "2.7",  # Silence deprecation warning
+    "SPIDER_MIDDLEWARES": {
+        "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
+    },
     "ZYTE_API_KEY": _API_KEY,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
 }
+try:
+    import scrapy_poet  # noqa: F401
+except ImportError:
+    pass
+else:
+    assert isinstance(SETTINGS["DOWNLOADER_MIDDLEWARES"], dict)
+    SETTINGS["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
 SETTINGS_ADDON: Dict[str, Any] = {
     "ADDONS": {
         Addon: 1,
@@ -35,8 +49,11 @@ class DummySpider(Spider):
     name = "dummy"
 
 
-def get_crawler(settings=None, spider_cls=DummySpider, setup_engine=True):
+def get_crawler(
+    settings=None, spider_cls=DummySpider, setup_engine=True, use_addon=False
+):
     settings = settings or {}
+    settings = {**(SETTINGS if not use_addon else SETTINGS_ADDON), **settings}
     crawler = _get_crawler(settings_dict=settings, spidercls=spider_cls)
     if setup_engine:
         setup_crawler_engine(crawler)
@@ -59,10 +76,9 @@ def get_download_handler(crawler, schema):
 async def make_handler(
     settings: Dict[str, Any], api_url: Optional[str] = None, *, use_addon: bool = False
 ):
-    settings = {**(SETTINGS if not use_addon else SETTINGS_ADDON), **settings}
     if api_url is not None:
         settings["ZYTE_API_URL"] = api_url
-    crawler = get_crawler(settings)
+    crawler = get_crawler(settings, use_addon=use_addon)
     handler = get_download_handler(crawler, "https")
     if not isinstance(handler, _ScrapyZyteAPIBaseDownloadHandler):
         # i.e. ZYTE_API_ENABLED=False

@@ -19,6 +19,7 @@ from zyte_api.constants import API_URL
 
 from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
+from .utils import USER_AGENT
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 def _truncate_str(obj, index, text, limit):
     if len(text) <= limit:
         return
-    obj[index] = text[: limit - 1] + "…"
+    obj[index] = text[: limit - 1] + "..."
 
 
 def _truncate(obj, limit):
@@ -133,6 +134,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 api_key=settings.get("ZYTE_API_KEY") or None,
                 api_url=settings.get("ZYTE_API_URL") or API_URL,
                 n_conn=settings.getint("CONCURRENT_REQUESTS"),
+                user_agent=settings.get("_ZYTE_API_USER_AGENT", default=USER_AGENT),
             )
         except NoApiKey:
             logger.warning(
@@ -156,8 +158,14 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         assert self._fallback_handler
         return self._fallback_handler.download_request(request, spider)
 
-    def _update_stats(self):
+    def _update_stats(self, api_params):
         prefix = "scrapy-zyte-api"
+        for arg in api_params:
+            if arg == "experimental":
+                for subarg in api_params[arg]:
+                    self._stats.inc_value(f"{prefix}/request_args/{arg}.{subarg}")
+            else:
+                self._stats.inc_value(f"{prefix}/request_args/{arg}")
         for stat in (
             "429",
             "attempts",
@@ -207,22 +215,20 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         # Define url by default
         retrying = request.meta.get("zyte_api_retry_policy")
         if retrying:
-            retrying = load_object(retrying)
+            if isinstance(retrying, str):  # Scrapy < 2.4 doesn't have this check
+                retrying = load_object(retrying)
         else:
             retrying = self._retry_policy
         self._log_request(api_params)
+
         try:
             api_response = await self._client.request_raw(
                 api_params,
                 session=self._session,
                 retrying=retrying,
             )
-        except RequestError as er:
-            error_detail = (er.parsed.data or {}).get("detail", er.message)
-            logger.error(
-                f"Got Zyte API error (status={er.status}, type={er.parsed.type!r}) "
-                f"while processing URL ({request.url}): {error_detail}"
-            )
+        except RequestError as error:
+            self._process_request_error(request, error)
             raise
         except Exception as er:
             logger.error(
@@ -230,9 +236,24 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
             raise
         finally:
-            self._update_stats()
+            self._update_stats(api_params)
 
         return _process_response(api_response, request, self._cookie_jars)
+
+    def _process_request_error(self, request, error):
+        detail = (error.parsed.data or {}).get("detail", error.message)
+        logger.error(
+            f"Got Zyte API error (status={error.status}, "
+            f"type={error.parsed.type!r}, request_id={error.request_id!r}) "
+            f"while processing URL ({request.url}): {detail}"
+        )
+        for status, error_type, close_reason in (
+            (401, "/auth/key-not-found", "zyte_api_bad_key"),
+            (403, "/auth/account-suspended", "zyte_api_suspended_account"),
+        ):
+            if error.status == status and error.parsed.type == error_type:
+                self._crawler.engine.close_spider(self._crawler.spider, close_reason)
+                return
 
     def _log_request(self, params):
         if not self._must_log_request:

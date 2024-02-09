@@ -5,7 +5,11 @@ if _NEEDS_EARLY_REACTOR:
 
     install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
-from ._downloader_middleware import ScrapyZyteAPIDownloaderMiddleware  # NOQA
-from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter  # NOQA
-from .addon import Addon  # NOQA
-from .handler import ScrapyZyteAPIDownloadHandler  # NOQA
+from ._annotations import ExtractFrom, Geolocation
+from ._middlewares import (
+    ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPISpiderMiddleware,
+)
+from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter
+from .addon import Addon
+from .handler import ScrapyZyteAPIDownloadHandler
