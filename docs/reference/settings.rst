@@ -36,9 +36,8 @@ Determines how to handle Zyte API responses that contain an action error:
 
 -   ``"ignore"``: Responses are dropped, i.e. they will not reach your spider.
 
--   ``"err"``: :class:`~scrapy_zyte_api.exceptions.ActionError` is raised. It
-    will be processed by downloader middlewares as an exception, and will reach
-    your spider errback if you set one.
+-   ``"err"``: :class:`~scrapy_zyte_api.exceptions.ActionError` is raised, and
+    will reach your spider errback if you set one.
 
 .. autoexception:: scrapy_zyte_api.exceptions.ActionError
     :members:
