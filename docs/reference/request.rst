@@ -21,11 +21,14 @@ Automatic mapping
 -   If :attr:`Request.method <scrapy.http.Request.method>` is something other
     than ``"GET"``, it becomes :http:`request:httpRequestMethod`.
 
--   :attr:`Request.headers <scrapy.http.Request.headers>` become
-    :http:`request:customHttpRequestHeaders`.
-
 -   :attr:`Request.body <scrapy.http.Request.body>` becomes
     :http:`request:httpRequestBody`.
+
+-   :attr:`Request.headers <scrapy.http.Request.headers>` become
+    :http:`request:customHttpRequestHeaders` if requesting
+    :http:`response:httpResponseBody` (implicitly of explicitly) or
+    :ref:`automatic extraction from it <zyte-api-extract-from>`, or
+    :http:`request:requestHeaders` otherwise.
 
 -   If :ref:`ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED` is ``True``,
     :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` is ``True`` (default),
@@ -170,14 +173,17 @@ combinations that Zyte API does not currently support, and may never support:
     unset.
 
 -   You can set :http:`request:httpResponseBody` to ``False`` (which unsets the
-    parameter), and not set :http:`request:browserHtml` or
-    :http:`request:screenshot` to ``True``. In this case,
-    :attr:`Request.headers <scrapy.http.Request.headers>` is mapped as
-    :http:`request:requestHeaders`.
+    parameter), and not set :http:`request:browserHtml`, not set
+    :http:`request:screenshot` to ``True``, and not request automatic
+    extraction either. In this case, :attr:`Request.headers
+    <scrapy.http.Request.headers>` is mapped as :http:`request:requestHeaders`.
 
--   You can set :http:`request:httpResponseBody` to ``True`` and also set
-    :http:`request:browserHtml` or :http:`request:screenshot` to ``True``. In
-    this case, :attr:`Request.headers <scrapy.http.Request.headers>` is mapped
-    both as :http:`request:customHttpRequestHeaders` and as
+-   You can set :http:`request:httpResponseBody` to ``True`` or use
+    :ref:`automatic extraction from httpResponseBody <zyte-api-extract-from>`,
+    and also set :http:`request:browserHtml` or :http:`request:screenshot` to
+    ``True`` or use :ref:`automatic extraction from browserHtml
+    <zyte-api-extract-from>`. In this case, :attr:`Request.headers
+    <scrapy.http.Request.headers>` is mapped both as
+    :http:`request:customHttpRequestHeaders` and as
     :http:`request:requestHeaders`, and :http:`request:browserHtml` is used as
     :class:`response.body <scrapy_zyte_api.responses.ZyteAPIResponse.body>`.

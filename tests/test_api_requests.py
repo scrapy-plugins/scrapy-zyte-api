@@ -37,7 +37,9 @@ from . import (
 from .mockserver import DelayedResource, MockServer, produce_request_response
 
 # Pick one of the automatic extraction keys for testing purposes.
-EXTRACT_KEY = next(iter(_EXTRACT_KEYS))
+EXTRACT_KEYS_ITER = iter(_EXTRACT_KEYS)
+EXTRACT_KEY = next(EXTRACT_KEYS_ITER)
+EXTRACT_KEY_2 = next(EXTRACT_KEYS_ITER)
 
 
 def sort_dict_list(dict_list):
@@ -2028,6 +2030,110 @@ def test_automap_method(method, meta, expected, warnings, caplog):
                 "browserHtml": True,
             },
             ["This header has been dropped"],
+        ),
+        # The extraction source affects header mapping.
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        # Only *Options parameters matching enabled extraction outputs are
+        # taken into account.
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "httpResponseBody"},
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "httpResponseBody"},
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        # Combining 2 matching extractFrom works as a single one.
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                EXTRACT_KEY_2: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "httpResponseBody"},
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                EXTRACT_KEY_2: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "httpResponseBody"},
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+            },
+            [],
+        ),
+        # Combining 2 conflicting extractFrom causes request headers to be
+        # mapped both ways.
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                EXTRACT_KEY_2: True,
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                EXTRACT_KEY_2: True,
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                EXTRACT_KEY_2: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                EXTRACT_KEY_2: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
         ),
     ],
 )
