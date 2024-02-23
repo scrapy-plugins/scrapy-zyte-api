@@ -1,6 +1,14 @@
 Changes
 =======
 
+0.16.1 (unreleased)
+-------------------
+
+* Fix ``"extractFrom": "httpResponseBody"`` causing both
+  :http:`request:customHttpRequestHeaders` and :http:`request:requestHeaders`,
+  which are incompatible with each other, to be set when using automatic
+  request mapping.
+
 0.16.0 (2024-02-08)
 -------------------
 
@@ -46,7 +54,6 @@ Changes
   scrapy-zyte-api 0.13.0, and is required to automatically close spiders when
   all start requests fail because they are pointing to domains forbidden by
   Zyte API.
-
 
 0.14.1 (2024-01-17)
 -------------------
