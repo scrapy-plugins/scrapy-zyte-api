@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.16.1 (unreleased)
+0.16.1 (2024-02-23)
 -------------------
 
 * Fix ``"extractFrom": "httpResponseBody"`` causing both
