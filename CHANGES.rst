@@ -4,8 +4,15 @@ Changes
 0.17.0 (YYYY-MM-DD)
 -------------------
 
+* Added support for Python 3.12.
+* Updated requirement versions:
+
+  * :doc:`scrapy-poet <scrapy-poet:index>` >= 0.22.0
+  * :doc:`web-poet <web-poet:index>` >= 0.17.0
+
 * Added a Scrapy add-on, :class:`scrapy_zyte_api.Addon`, which simplifies
   configuring Scrapy projects to work with ``scrapy-zyte-api``.
+* CI improvements.
 
 0.16.1 (2024-02-23)
 -------------------
