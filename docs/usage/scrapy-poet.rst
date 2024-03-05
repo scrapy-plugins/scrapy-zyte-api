@@ -4,8 +4,9 @@
 scrapy-poet integration
 =======================
 
-After you :ref:`set up scrapy-poet integration <scrapy-poet-setup>`, you can
-request :ref:`supported page inputs <inputs>` in your page objects::
+If during the :ref:`initial setup <setup>` you followed the required steps for
+scrapy-poet integration, you can request :ref:`supported page inputs <inputs>`
+in your page objects::
 
     @attrs.define
     class ProductPage(BasePage):

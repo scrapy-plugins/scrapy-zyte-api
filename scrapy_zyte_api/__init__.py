@@ -11,4 +11,5 @@ from ._middlewares import (
     ScrapyZyteAPISpiderMiddleware,
 )
 from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter
+from .addon import Addon
 from .handler import ScrapyZyteAPIDownloadHandler

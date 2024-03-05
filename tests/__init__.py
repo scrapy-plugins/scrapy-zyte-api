@@ -1,18 +1,19 @@
 from contextlib import asynccontextmanager, contextmanager
 from os import environ
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from scrapy import Spider
 from scrapy.crawler import Crawler
 from scrapy.utils.test import get_crawler as _get_crawler
 from zyte_api.aio.client import AsyncClient
 
-from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
+from scrapy_zyte_api.addon import Addon
+from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 
 _API_KEY = "a"
 
 DEFAULT_CLIENT_CONCURRENCY = AsyncClient(api_key=_API_KEY).n_conn
-SETTINGS = {
+SETTINGS: Dict[str, Any] = {
     "DOWNLOAD_HANDLERS": {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
@@ -35,6 +36,12 @@ except ImportError:
 else:
     assert isinstance(SETTINGS["DOWNLOADER_MIDDLEWARES"], dict)
     SETTINGS["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
+SETTINGS_ADDON: Dict[str, Any] = {
+    "ADDONS": {
+        Addon: 500,
+    },
+    "ZYTE_API_KEY": _API_KEY,
+}
 UNSET = object()
 
 
@@ -42,9 +49,11 @@ class DummySpider(Spider):
     name = "dummy"
 
 
-def get_crawler(settings=None, spider_cls=DummySpider, setup_engine=True):
+def get_crawler(
+    settings=None, spider_cls=DummySpider, setup_engine=True, use_addon=False
+):
     settings = settings or {}
-    settings = {**SETTINGS, **settings}
+    settings = {**(SETTINGS if not use_addon else SETTINGS_ADDON), **settings}
     crawler = _get_crawler(settings_dict=settings, spidercls=spider_cls)
     if setup_engine:
         setup_crawler_engine(crawler)
@@ -64,13 +73,14 @@ def get_download_handler(crawler, schema):
 
 
 @asynccontextmanager
-async def make_handler(settings: dict, api_url: Optional[str] = None):
-    settings = {**SETTINGS, **settings}
+async def make_handler(
+    settings: Dict[str, Any], api_url: Optional[str] = None, *, use_addon: bool = False
+):
     if api_url is not None:
         settings["ZYTE_API_URL"] = api_url
-    crawler = get_crawler(settings)
+    crawler = get_crawler(settings, use_addon=use_addon)
     handler = get_download_handler(crawler, "https")
-    if not isinstance(handler, ScrapyZyteAPIDownloadHandler):
+    if not isinstance(handler, _ScrapyZyteAPIBaseDownloadHandler):
         # i.e. ZYTE_API_ENABLED=False
         handler = None
     try:
