@@ -70,7 +70,7 @@ async def test_provider(mockserver):
     item, url, _ = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
     assert item["html"] == "<html><body>Hello<h1>World!</h1></body></html>"
     assert item["response_html"] == "<html><body>Hello<h1>World!</h1></body></html>"
-    assert item["product"] is Product.from_dict(
+    assert item["product"] == Product.from_dict(
         dict(
             url=url,
             name="Product name",
@@ -237,7 +237,7 @@ async def test_provider_extractfrom(mockserver):
     item, url, _ = await crawl_single_item(
         AnnotatedZyteAPISpider, HtmlResource, settings
     )
-    assert item["product"] is Product.from_dict(
+    assert item["product"] == Product.from_dict(
         dict(
             url=url,
             name="Product name (from httpResponseBody)",
