@@ -378,8 +378,8 @@ async def test_provider_any_response_only(mockserver):
         "httpResponseBody": True,
         "httpResponseHeaders": True,
     }
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == HttpResponse
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is HttpResponse
 
 
 @ensureDeferred
@@ -406,9 +406,9 @@ async def test_provider_any_response_product(mockserver):
         "product": True,
         "browserHtml": True,
     }
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
-    assert type(item["page"].product) == Product
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+    assert type(item["page"].product) is Product
 
 
 @ensureDeferred
@@ -439,9 +439,9 @@ async def test_provider_any_response_product_extract_from_browser_html(mockserve
         "productOptions": product_options,
     }
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
-    assert type(item["page"].product) == Product
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+    assert type(item["page"].product) is Product
 
 
 @ensureDeferred
@@ -471,9 +471,9 @@ async def test_provider_any_response_product_item_extract_from_browser_html(mock
         "productOptions": product_options,
     }
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
-    assert type(item["product"]) == Product
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+    assert type(item["product"]) is Product
 
 
 @ensureDeferred
@@ -505,10 +505,10 @@ async def test_provider_any_response_product_extract_from_browser_html_2(mockser
         "productOptions": product_options,
     }
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
-    assert type(item["page"].browser_response) == BrowserResponse
-    assert type(item["page"].product) == Product
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+    assert type(item["page"].browser_response) is BrowserResponse
+    assert type(item["page"].product) is Product
 
     assert id(item["page"].browser_response) == id(item["page"].response.response)
 
@@ -542,9 +542,9 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
         "httpResponseHeaders": True,
     }
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == HttpResponse
-    assert type(item["page"].product) == Product
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is HttpResponse
+    assert type(item["page"].product) is Product
 
 
 @ensureDeferred
@@ -573,9 +573,9 @@ async def test_provider_any_response_product_options_empty(mockserver):
         "browserHtml": True,
     }
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
-    assert type(item["page"].product) == Product
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+    assert type(item["page"].product) is Product
 
 
 # The issue here is that HttpResponseProvider runs earlier than ScrapyZyteAPI.
@@ -612,10 +612,10 @@ async def test_provider_any_response_product_extract_from_http_response_2(mockse
         "productOptions": product_options,
     }
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == HttpResponse
-    assert type(item["page"].product) == Product
-    assert type(item["page"].http_response) == HttpResponse
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is HttpResponse
+    assert type(item["page"].product) is Product
+    assert type(item["page"].http_response) is HttpResponse
 
 
 @ensureDeferred
@@ -639,9 +639,9 @@ async def test_provider_any_response_browser_html(mockserver):
     assert len(params) == 1
     assert params[0] == {"url": url, "browserHtml": True}
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
-    assert type(item["page"].html) == BrowserHtml
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+    assert type(item["page"].html) is BrowserHtml
 
 
 @ensureDeferred
@@ -665,9 +665,9 @@ async def test_provider_any_response_browser_response(mockserver):
     assert len(params) == 1
     assert params[0] == {"url": url, "browserHtml": True}
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
-    assert type(item["page"].browser_response) == BrowserResponse
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+    assert type(item["page"].browser_response) is BrowserResponse
 
 
 @ensureDeferred
@@ -692,10 +692,10 @@ async def test_provider_any_response_browser_html_response(mockserver):
     assert len(params) == 1
     assert params[0] == {"url": url, "browserHtml": True}
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
-    assert type(item["page"].browser_response) == BrowserResponse
-    assert type(item["page"].html) == BrowserHtml
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+    assert type(item["page"].browser_response) is BrowserResponse
+    assert type(item["page"].html) is BrowserHtml
 
 
 @ensureDeferred
@@ -725,9 +725,9 @@ async def test_provider_any_response_http_response(mockserver):
         "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == HttpResponse
-    assert type(item["page"].http_response) == HttpResponse
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is HttpResponse
+    assert type(item["page"].http_response) is HttpResponse
 
 
 @ensureDeferred
@@ -759,10 +759,10 @@ async def test_provider_any_response_browser_http_response(mockserver):
     }
     assert params[1] == {"url": url, "browserHtml": True}
 
-    assert type(item["page"].response) == AnyResponse
-    assert type(item["page"].response.response) == BrowserResponse
-    assert type(item["page"].browser_response) == BrowserResponse
-    assert type(item["page"].http_response) == HttpResponse
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+    assert type(item["page"].browser_response) is BrowserResponse
+    assert type(item["page"].http_response) is HttpResponse
 
     assert id(item["page"].browser_response) == id(item["page"].response.response)
 
@@ -797,10 +797,10 @@ async def test_provider_any_response_http_response_multiple_pages(mockserver):
         # This is actually set by HttpResponseProvider
         "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
-    assert type(item["page1"].http_response) == HttpResponse
-    assert type(item["page2"].http_response) == HttpResponse
-    assert type(item["page2"].response) == AnyResponse
-    assert type(item["page2"].response.response) == HttpResponse
+    assert type(item["page1"].http_response) is HttpResponse
+    assert type(item["page2"].http_response) is HttpResponse
+    assert type(item["page2"].response) is AnyResponse
+    assert type(item["page2"].response.response) is HttpResponse
 
 
 @ensureDeferred
@@ -835,7 +835,7 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
     }
     assert params[1] == {"url": url, "browserHtml": True}
 
-    assert type(item["page1"].browser_response) == BrowserResponse
-    assert type(item["page2"].http_response) == HttpResponse
-    assert type(item["page2"].response) == AnyResponse
-    assert type(item["page2"].response.response) == BrowserResponse
+    assert type(item["page1"].browser_response) is BrowserResponse
+    assert type(item["page2"].http_response) is HttpResponse
+    assert type(item["page2"].response) is AnyResponse
+    assert type(item["page2"].response.response) is BrowserResponse

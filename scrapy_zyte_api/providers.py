@@ -4,7 +4,7 @@ from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
 from scrapy.utils.defer import maybe_deferred_to_future
-from scrapy_poet import AnnotatedResult, PageObjectInputProvider
+from scrapy_poet import PageObjectInputProvider
 from web_poet import (
     AnyResponse,
     BrowserHtml,
@@ -12,6 +12,7 @@ from web_poet import (
     HttpResponse,
     HttpResponseHeaders,
 )
+from web_poet.annotated import AnnotatedInstance
 from zyte_common_items import (
     Article,
     ArticleList,
@@ -216,7 +217,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
             if cls_stripped is Geolocation and is_typing_annotated(cls):
-                item = AnnotatedResult(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
+                item = AnnotatedInstance(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
                 results.append(item)
                 continue
             kw = item_keywords.get(cls_stripped)
@@ -225,6 +226,6 @@ class ZyteApiProvider(PageObjectInputProvider):
             assert issubclass(cls_stripped, Item)
             item = cls_stripped.from_dict(api_response.raw_api_response[kw])  # type: ignore[attr-defined]
             if is_typing_annotated(cls):
-                item = AnnotatedResult(item, cls.__metadata__)  # type: ignore[attr-defined]
+                item = AnnotatedInstance(item, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(item)
         return results
