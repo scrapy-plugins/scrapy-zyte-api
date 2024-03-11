@@ -1,4 +1,3 @@
-from base64 import b64decode
 from typing import Any, Callable, Dict, List, Sequence, Set
 
 from andi.typeutils import is_typing_annotated, strip_annotated
@@ -196,7 +195,7 @@ class ZyteApiProvider(PageObjectInputProvider):
 
         if screenshot_requested:
             screenshot_b64 = api_response.raw_api_response["screenshot"]
-            screenshot = Screenshot(body=b64decode(screenshot_b64.encode()))
+            screenshot = Screenshot.from_base64(screenshot_b64)
             results.append(screenshot)
 
         if AnyResponse in to_provide:
