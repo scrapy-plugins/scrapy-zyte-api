@@ -37,3 +37,21 @@ Inputs
 -   :class:`zyte_common_items.ProductList`
 
 -   :class:`zyte_common_items.ProductNavigation`
+
+Additional inputs and input annotations are also provided:
+
+Built-in inputs
+===============
+
+.. autoclass:: scrapy_zyte_api.Geolocation
+    :members:
+
+.. autoclass:: scrapy_zyte_api.Screenshot
+    :members:
+
+
+Built-in input annotations
+==========================
+
+.. autoenum:: scrapy_zyte_api.ExtractFrom
+    :members:

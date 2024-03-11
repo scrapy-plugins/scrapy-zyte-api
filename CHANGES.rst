@@ -1,6 +1,12 @@
 Changes
 =======
 
+0.17.1 (unreleased)
+-------------------
+
+* Added a :class:`scrapy_zyte_api.Screenshot` dependency.
+
+
 0.17.0 (2024-03-05)
 -------------------
 
