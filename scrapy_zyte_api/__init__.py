@@ -13,4 +13,10 @@ from ._middlewares import (
 from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter
 from .addon import Addon
 from .handler import ScrapyZyteAPIDownloadHandler
-from .page_inputs import Screenshot
+
+try:
+    import web_poet
+except ImportError:
+    pass
+else:
+    from .page_inputs import Screenshot
