@@ -5,7 +5,7 @@ if _NEEDS_EARLY_REACTOR:
 
     install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
-from ._annotations import ExtractFrom, Geolocation
+from ._annotations import ExtractFrom, Geolocation, Screenshot
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
@@ -13,10 +13,3 @@ from ._middlewares import (
 from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter
 from .addon import Addon
 from .handler import ScrapyZyteAPIDownloadHandler
-
-try:
-    import web_poet
-except ImportError:
-    pass
-else:
-    from .page_inputs import Screenshot
