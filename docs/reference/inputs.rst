@@ -6,7 +6,7 @@ Inputs
 
 :ref:`scrapy-poet integration <scrapy-poet>`, if enabled during the
 :ref:`initial setup <setup>`, allows obtaining the following :ref:`inputs
-<web-poet:inputs>` from :doc:`web-poet <web-poet:index>`,
+<web-poet:inputs>` from :doc:`web-poet <web-poet:index>` and
 :doc:`zyte-common-items <zyte-common-items:index>` through Zyte API:
 
 -   :class:`web_poet.BrowserHtml`
