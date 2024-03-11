@@ -24,8 +24,7 @@ from zyte_common_items import (
     ProductNavigation,
 )
 
-from scrapy_zyte_api import Screenshot
-from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
+from scrapy_zyte_api import ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:

@@ -28,8 +28,7 @@ from web_poet import (
 )
 from zyte_common_items import BasePage, Product
 
-from scrapy_zyte_api import Screenshot
-from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
+from scrapy_zyte_api import ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import ZyteApiProvider
 from scrapy_zyte_api.responses import ZyteAPITextResponse
