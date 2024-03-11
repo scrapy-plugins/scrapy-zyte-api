@@ -9,6 +9,7 @@ release = "0.17.0"
 sys.path.insert(0, str(Path(__file__).parent.absolute()))  # _ext
 extensions = [
     "_ext",
+    "enum_tools.autoenum",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",

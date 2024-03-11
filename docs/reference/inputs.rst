@@ -6,7 +6,7 @@ Inputs
 
 :ref:`scrapy-poet integration <scrapy-poet>`, if enabled during the
 :ref:`initial setup <setup>`, allows obtaining the following :ref:`inputs
-<web-poet:inputs>` from :doc:`web-poet <web-poet:index>` and
+<web-poet:inputs>` from :doc:`web-poet <web-poet:index>`,
 :doc:`zyte-common-items <zyte-common-items:index>` through Zyte API:
 
 -   :class:`web_poet.BrowserHtml`
@@ -37,3 +37,21 @@ Inputs
 -   :class:`zyte_common_items.ProductList`
 
 -   :class:`zyte_common_items.ProductNavigation`
+
+Additional inputs and input annotations are also provided:
+
+Built-in inputs
+===============
+
+.. autoclass:: scrapy_zyte_api.Geolocation
+    :members:
+
+.. autoclass:: scrapy_zyte_api.Screenshot
+    :members:
+
+
+Built-in input annotations
+==========================
+
+.. autoenum:: scrapy_zyte_api.ExtractFrom
+    :members:

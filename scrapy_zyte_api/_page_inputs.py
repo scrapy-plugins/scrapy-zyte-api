@@ -4,6 +4,12 @@ import attrs
 
 
 class Geolocation:
+    """A page input that forces a given geolocation for all other page inputs.
+
+    The target geolocation must be :ref:`specified with an annotation
+    <geolocation>`.
+    """
+
     pass
 
 
@@ -11,6 +17,7 @@ class Geolocation:
 class Screenshot:
     """A container for holding the screenshot of a webpage."""
 
+    #: Body.
     body: bytes
 
     @classmethod

@@ -54,6 +54,8 @@ set the default options for various extraction types, e.g.::
         "productNavigationOptions": {"extractFrom": "httpResponseBody"},
     }
 
+.. _annotations:
+
 Dependency annotations
 ======================
 
@@ -75,6 +77,8 @@ this code ``extractFrom`` will be set to ``httpResponseBody`` in
 ``productOptions``.
 
 .. note:: Dependency annotations require Python 3.9+.
+
+.. _geolocation:
 
 Geolocation
 ===========
