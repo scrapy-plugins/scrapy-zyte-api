@@ -854,7 +854,7 @@ async def test_screenshot():
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     crawler = get_crawler(settings_dict=settings)
     injection_mw = InjectionMiddleware.from_crawler(crawler)
-    d = Deferred()
+    d: Deferred = Deferred()
     crawler._apply_settings()
     crawler.engine = crawler._create_engine()
     crawler.engine.download = Mock(return_value=d)
