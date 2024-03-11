@@ -855,7 +855,8 @@ async def test_screenshot():
     crawler = get_crawler(settings_dict=settings)
     injection_mw = InjectionMiddleware.from_crawler(crawler)
     d: Deferred = Deferred()
-    crawler._apply_settings()
+    if hasattr(crawler, "_apply_settings"):  # Scrapy ≥ 2.11
+        crawler._apply_settings()
     crawler.engine = crawler._create_engine()
     crawler.engine.download = Mock(return_value=d)
 
