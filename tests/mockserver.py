@@ -123,6 +123,10 @@ class DefaultResource(Resource):
                     }
                 ).encode()
             response_data["browserHtml"] = html
+        if "screenshot" in request_data:
+            response_data["screenshot"] = b64encode(
+                b"screenshot-body-contents"
+            ).decode()
         if "httpResponseBody" in request_data:
             headers = request_data.get("customHttpRequestHeaders", [])
             for header in headers:

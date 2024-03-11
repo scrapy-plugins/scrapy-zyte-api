@@ -23,7 +23,7 @@ from web_poet import (
 )
 from zyte_common_items import BasePage, Product
 
-from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
+from scrapy_zyte_api import ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import ZyteApiProvider
 
@@ -839,3 +839,23 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
     assert type(item["page2"].http_response) is HttpResponse
     assert type(item["page2"].response) is AnyResponse
     assert type(item["page2"].response.response) is BrowserResponse
+
+
+@ensureDeferred
+async def test_screenshot(mockserver):
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, screenshot: Screenshot):
+            yield {"screenshot": screenshot}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0] == {"url": url, "screenshot": True}
+
+    assert type(item["screenshot"]) is Screenshot
+    assert item["screenshot"].body == b"screenshot-body-contents"

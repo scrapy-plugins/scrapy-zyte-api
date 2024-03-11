@@ -24,7 +24,7 @@ from zyte_common_items import (
     ProductNavigation,
 )
 
-from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
+from scrapy_zyte_api import ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -38,17 +38,18 @@ class ZyteApiProvider(PageObjectInputProvider):
     name = "zyte_api"
 
     provided_classes = {
-        BrowserResponse,
-        BrowserHtml,
-        Product,
-        ProductList,
-        ProductNavigation,
+        AnyResponse,
         Article,
         ArticleList,
         ArticleNavigation,
-        AnyResponse,
-        JobPosting,
+        BrowserHtml,
+        BrowserResponse,
         Geolocation,
+        JobPosting,
+        Product,
+        ProductList,
+        ProductNavigation,
+        Screenshot,
     }
 
     def is_provided(self, type_: Callable) -> bool:
@@ -61,6 +62,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         results: List[Any] = []
 
         http_response = None
+        screenshot_requested = Screenshot in to_provide
         for cls in list(to_provide):
             item = self.injector.weak_cache.get(request, {}).get(cls)
             if item:
@@ -68,7 +70,11 @@ class ZyteApiProvider(PageObjectInputProvider):
                 to_provide.remove(cls)
 
             # BrowserResponse takes precedence over HttpResponse
-            elif cls == AnyResponse and BrowserResponse not in to_provide:
+            elif (
+                cls == AnyResponse
+                and BrowserResponse not in to_provide
+                and not screenshot_requested
+            ):
                 http_response = self.injector.weak_cache.get(request, {}).get(
                     HttpResponse
                 )
@@ -131,6 +137,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             AnyResponse in to_provide
             and BrowserResponse not in to_provide
             and BrowserHtml not in to_provide
+            and not screenshot_requested
             and not http_response
         )
 
@@ -153,6 +160,8 @@ class ZyteApiProvider(PageObjectInputProvider):
 
         if html_requested:
             zyte_api_meta["browserHtml"] = True
+        if screenshot_requested:
+            zyte_api_meta["screenshot"] = True
 
         api_request = Request(
             url=request.url,
@@ -182,6 +191,11 @@ class ZyteApiProvider(PageObjectInputProvider):
                 html=html,
             )
             results.append(browser_response)
+
+        if screenshot_requested:
+            screenshot_b64 = api_response.raw_api_response["screenshot"]
+            screenshot = Screenshot.from_base64(screenshot_b64)
+            results.append(screenshot)
 
         if AnyResponse in to_provide:
             any_response = None  # type: ignore[assignment]
