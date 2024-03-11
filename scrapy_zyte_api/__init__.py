@@ -13,3 +13,4 @@ from ._middlewares import (
 from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter
 from .addon import Addon
 from .handler import ScrapyZyteAPIDownloadHandler
+from .page_inputs import Screenshot

@@ -1,4 +1,6 @@
 import sys
+from base64 import b64encode
+from unittest.mock import Mock
 
 import pytest
 
@@ -7,10 +9,13 @@ pytest.importorskip("scrapy_poet")
 import attrs
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
+from scrapy.utils.test import get_crawler
 from scrapy_poet import DummyResponse
+from scrapy_poet.downloadermiddlewares import InjectionMiddleware
 from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
 from scrapy_poet.utils.testing import create_scrapy_settings as _create_scrapy_settings
 from twisted.internet import reactor
+from twisted.internet.defer import Deferred
 from twisted.web.client import Agent, readBody
 from web_poet import (
     AnyResponse,
@@ -23,9 +28,11 @@ from web_poet import (
 )
 from zyte_common_items import BasePage, Product
 
+from scrapy_zyte_api import Screenshot
 from scrapy_zyte_api._annotations import ExtractFrom, Geolocation
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import ZyteApiProvider
+from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 from . import SETTINGS
 from .mockserver import get_ephemeral_port
@@ -839,3 +846,38 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
     assert type(item["page2"].http_response) is HttpResponse
     assert type(item["page2"].response) is AnyResponse
     assert type(item["page2"].response.response) is BrowserResponse
+
+
+@ensureDeferred
+async def test_screenshot():
+    settings = create_scrapy_settings()
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    crawler = get_crawler(settings_dict=settings)
+    injection_mw = InjectionMiddleware.from_crawler(crawler)
+    d = Deferred()
+    crawler._apply_settings()
+    crawler.engine = crawler._create_engine()
+    crawler.engine.download = Mock(return_value=d)
+
+    url = "https://example.com"
+    params = {
+        "url": url,
+        "screenshot": b64encode(b"foo").decode(),
+    }
+    api_response = ZyteAPITextResponse.from_api_response(params)
+    d.callback(api_response)
+
+    def callback(screenshot: Screenshot):
+        pass
+
+    request = Request(url, callback=callback)
+    dummy_response = DummyResponse(url)
+    response = await injection_mw.process_response(request, dummy_response, spider=None)
+    assert len(crawler.engine.download.mock_calls) == 1
+    internal_request = crawler.engine.download.call_args.args[0]
+    assert internal_request.meta["zyte_api"] == {"screenshot": True}
+
+    assert response == dummy_response
+    screenshot = request.cb_kwargs["screenshot"]
+    assert isinstance(screenshot, Screenshot)
+    assert screenshot.body == b"foo"
