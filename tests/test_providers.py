@@ -23,7 +23,7 @@ from web_poet import (
 )
 from zyte_common_items import BasePage, Product
 
-from scrapy_zyte_api import ExtractFrom, Geolocation, Screenshot, actions_list, Actions
+from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot, actions_list
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import ZyteApiProvider
 

@@ -23,8 +23,10 @@ follows:
     from tenacity import stop_after_attempt
     from zyte_api.aio.retry import RetryFactory
 
+
     class CustomRetryFactory(RetryFactory):
         temporary_download_error_stop = stop_after_attempt(10)
+
 
     CUSTOM_RETRY_POLICY = CustomRetryFactory().build()
 
@@ -42,15 +44,14 @@ as HTTP 520 errors, you can implement:
     from zyte_api.aio.errors import RequestError
     from zyte_api.aio.retry import RetryFactory
 
+
     def is_http_521(exc: BaseException) -> bool:
         return isinstance(exc, RequestError) and exc.status == 521
 
+
     class CustomRetryFactory(RetryFactory):
 
-        retry_condition = (
-            RetryFactory.retry_condition
-            | retry_if_exception(is_http_521)
-        )
+        retry_condition = RetryFactory.retry_condition | retry_if_exception(is_http_521)
         temporary_download_error_stop = stop_after_attempt(10)
 
         def wait(self, retry_state: RetryCallState) -> float:
@@ -62,6 +63,7 @@ as HTTP 520 errors, you can implement:
             if is_http_521(retry_state.outcome.exception()):
                 return self.temporary_download_error_stop(retry_state)
             return super().stop(retry_state)
+
 
     CUSTOM_RETRY_POLICY = CustomRetryFactory().build()
 
