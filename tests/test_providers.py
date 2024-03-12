@@ -23,7 +23,7 @@ from web_poet import (
 )
 from zyte_common_items import BasePage, Product
 
-from scrapy_zyte_api import ExtractFrom, Geolocation, Screenshot
+from scrapy_zyte_api import ExtractFrom, Geolocation, Screenshot, actions_list, Actions
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import ZyteApiProvider
 
@@ -859,3 +859,46 @@ async def test_screenshot(mockserver):
 
     assert type(item["screenshot"]) is Screenshot
     assert item["screenshot"].body == b"screenshot-body-contents"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@ensureDeferred
+async def test_provider_actions(mockserver, caplog):
+    from typing import Annotated
+
+    @attrs.define
+    class ActionProductPage(BasePage):
+        product: Product
+        actions: Annotated[
+            Actions, actions_list([{"action": "foo"}, {"action": "bar"}])
+        ]
+
+    class ActionZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: ActionProductPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+                "action_results": page.actions,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(ActionZyteAPISpider, HtmlResource, settings)
+    assert isinstance(item["product"], Product)
+    assert item["action_results"] == Actions(
+        [
+            {
+                "action": "foo",
+                "elapsedTime": 1.0,
+                "status": "success",
+            },
+            {
+                "action": "bar",
+                "elapsedTime": 1.0,
+                "status": "success",
+            },
+        ]
+    )

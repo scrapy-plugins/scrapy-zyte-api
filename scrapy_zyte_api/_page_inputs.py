@@ -1,6 +1,21 @@
 from base64 import b64decode
+from typing import List, Optional
 
 import attrs
+
+from ._annotations import _ActionResult
+
+
+@attrs.define
+class Actions:
+    """A page input that specifies browser actions and contains their results.
+
+    The actions must be :ref:`specified with an annotation
+    <browser-actions>` using :func:`~scrapy_zyte_api.actions_list`.
+    """
+
+    #: Results of actions.
+    results: Optional[List[_ActionResult]]
 
 
 class Geolocation:
