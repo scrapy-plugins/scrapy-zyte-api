@@ -7,7 +7,7 @@ from base64 import b64encode
 from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 from pytest_twisted import ensureDeferred
@@ -18,6 +18,7 @@ from twisted.internet.task import deferLater
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET, Site
 
+from scrapy_zyte_api._annotations import _ActionResult
 from scrapy_zyte_api.responses import _API_RESPONSE
 
 from . import SETTINGS, make_handler
@@ -141,6 +142,19 @@ class DefaultResource(Resource):
             response_data["httpResponseHeaders"] = [
                 {"name": "test_header", "value": "test_value"}
             ]
+
+        actions = request_data.get("actions")
+        if actions:
+            results: List[_ActionResult] = []
+            for action in actions:
+                results.append(
+                    {
+                        "action": action["action"],
+                        "elapsedTime": 1.0,
+                        "status": "success",
+                    }
+                )
+            response_data["actions"] = results  # type: ignore[assignment]
 
         if request_data.get("product") is True:
             response_data["product"] = {
