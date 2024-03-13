@@ -59,4 +59,4 @@ Built-in input annotations
 .. autoenum:: scrapy_zyte_api.ExtractFrom
     :members:
 
-.. autofunction:: scrapy_zyte_api.actions_list
+.. autofunction:: scrapy_zyte_api.actions

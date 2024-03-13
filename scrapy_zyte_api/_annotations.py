@@ -56,7 +56,7 @@ class _ActionResult(TypedDict, total=False):
     error: Optional[str]
 
 
-def actions_list(actions: Iterable[Action]):
+def actions(value: Iterable[Action]):
     """Convert an iterable of :class:`~scrapy_zyte_api.Action` dicts into a hashable value."""
     # both lists and dicts are not hashable and we need dep types to be hashable
-    return tuple(frozenset(action.items()) for action in actions)
+    return tuple(frozenset(action.items()) for action in value)

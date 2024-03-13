@@ -113,13 +113,13 @@ Browser actions
 
 You can specify browser actions by adding a :class:`scrapy_zyte_api.Actions`
 dependency and annotating it with actions passed to the
-:func:`scrapy_zyte_api.actions_list` function:
+:func:`scrapy_zyte_api.actions` function:
 
 .. code-block:: python
 
     from typing import Annotated
 
-    from scrapy_zyte_api import Actions, actions_list
+    from scrapy_zyte_api import Actions, actions
 
 
     @attrs.define
@@ -127,7 +127,7 @@ dependency and annotating it with actions passed to the
         product: Product
         actions: Annotated[
             Actions,
-            actions_list(
+            actions(
                 [
                     {
                         "action": "click",
@@ -143,4 +143,12 @@ dependency and annotating it with actions passed to the
 
 You can access the results of these actions in the
 :attr:`.Actions.results` attribute of the dependency in the
-resulting page object.
+resulting page object:
+
+.. code-block:: python
+
+    def validate_input(self):
+        for action_result in self.actions.result:
+            if action_result["status"] != "success":
+                return Product(is_valid=False)
+        return None

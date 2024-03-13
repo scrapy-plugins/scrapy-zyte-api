@@ -11,7 +11,7 @@ class Actions:
     """A page input that specifies browser actions and contains their results.
 
     The actions must be :ref:`specified with an annotation
-    <browser-actions>` using :func:`~scrapy_zyte_api.actions_list`.
+    <browser-actions>` using :func:`~scrapy_zyte_api.actions`.
     """
 
     #: Results of actions.

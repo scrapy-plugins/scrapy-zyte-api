@@ -115,7 +115,10 @@ class ZyteApiProvider(PageObjectInputProvider):
                 continue
             if cls_stripped is Actions:
                 if not is_typing_annotated(cls):
-                    raise ValueError("Actions dependencies must be annotated.")
+                    raise ValueError(
+                        "Actions dependencies must be annotated, "
+                        "e.g. Annotated[Actions, actions([...list of actions...])]."
+                    )
                 zyte_api_meta["actions"] = [dict(action) for action in cls.__metadata__[0]]  # type: ignore[attr-defined]
                 continue
             kw = item_keywords.get(cls_stripped)
@@ -238,8 +241,8 @@ class ZyteApiProvider(PageObjectInputProvider):
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
             if cls_stripped is Geolocation and is_typing_annotated(cls):
-                item = AnnotatedInstance(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
-                results.append(item)
+                result = AnnotatedInstance(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
+                results.append(result)
                 continue
             if cls_stripped is Actions and is_typing_annotated(cls):
                 actions_result: Optional[List[_ActionResult]]
@@ -250,15 +253,15 @@ class ZyteApiProvider(PageObjectInputProvider):
                     ]
                 else:
                     actions_result = None
-                item = AnnotatedInstance(Actions(actions_result), cls.__metadata__)  # type: ignore[attr-defined]
-                results.append(item)
+                result = AnnotatedInstance(Actions(actions_result), cls.__metadata__)  # type: ignore[attr-defined]
+                results.append(result)
                 continue
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
             assert issubclass(cls_stripped, Item)
-            item = cls_stripped.from_dict(api_response.raw_api_response[kw])  # type: ignore[attr-defined]
+            result = cls_stripped.from_dict(api_response.raw_api_response[kw])  # type: ignore[attr-defined]
             if is_typing_annotated(cls):
-                item = AnnotatedInstance(item, cls.__metadata__)  # type: ignore[attr-defined]
-            results.append(item)
+                result = AnnotatedInstance(result, cls.__metadata__)  # type: ignore[attr-defined]
+            results.append(result)
         return results

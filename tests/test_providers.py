@@ -23,7 +23,7 @@ from web_poet import (
 )
 from zyte_common_items import BasePage, Product
 
-from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot, actions_list
+from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot, actions
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import ZyteApiProvider
 
@@ -871,9 +871,7 @@ async def test_provider_actions(mockserver, caplog):
     @attrs.define
     class ActionProductPage(BasePage):
         product: Product
-        actions: Annotated[
-            Actions, actions_list([{"action": "foo"}, {"action": "bar"}])
-        ]
+        actions: Annotated[Actions, actions([{"action": "foo"}, {"action": "bar"}])]
 
     class ActionZyteAPISpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: ActionProductPage):  # type: ignore[override]

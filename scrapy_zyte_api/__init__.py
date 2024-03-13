@@ -5,7 +5,7 @@ if _NEEDS_EARLY_REACTOR:
 
     install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
-from ._annotations import ExtractFrom, actions_list
+from ._annotations import ExtractFrom, actions
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
