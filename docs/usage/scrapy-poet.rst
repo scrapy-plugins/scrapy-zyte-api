@@ -59,14 +59,23 @@ set the default options for various extraction types, e.g.::
 Dependency annotations
 ======================
 
-``ZyteApiProvider`` understands some dependency annotations. The only currently
-supported one is :class:`scrapy_zyte_api.ExtractFrom`:
+``ZyteApiProvider`` understands and makes use of some dependency annotations.
+
+.. note:: Dependency annotations require Python 3.9+.
+
+Item annotations
+----------------
+
+Item dependencies such as :class:`zyte_common_items.Product` can be annotated
+directly. The only currently supported annotation is
+:class:`scrapy_zyte_api.ExtractFrom`:
 
 .. code-block:: python
 
     from typing import Annotated
 
     from scrapy_zyte_api import ExtractFrom
+
 
     @attrs.define
     class MyPageObject(BasePage):
@@ -76,12 +85,10 @@ The provider will set the extraction options based on the annotations, so for
 this code ``extractFrom`` will be set to ``httpResponseBody`` in
 ``productOptions``.
 
-.. note:: Dependency annotations require Python 3.9+.
-
 .. _geolocation:
 
 Geolocation
-===========
+-----------
 
 You can specify the geolocation field by adding a
 :class:`scrapy_zyte_api.Geolocation` dependency and annotating it with a
@@ -93,10 +100,55 @@ country code:
 
     from scrapy_zyte_api import Geolocation
 
+
     @attrs.define
     class MyPageObject(BasePage):
         product: Product
         geolocation: Annotated[Geolocation, "DE"]
 
-.. note:: As :class:`~.Geolocation` is only useful when annotated, using it
-    requires Python 3.9+.
+.. _browser-actions:
+
+Browser actions
+---------------
+
+You can specify browser actions by adding a :class:`scrapy_zyte_api.Actions`
+dependency and annotating it with actions passed to the
+:func:`scrapy_zyte_api.actions` function:
+
+.. code-block:: python
+
+    from typing import Annotated
+
+    from scrapy_zyte_api import Actions, actions
+
+
+    @attrs.define
+    class MyPageObject(BasePage):
+        product: Product
+        actions: Annotated[
+            Actions,
+            actions(
+                [
+                    {
+                        "action": "click",
+                        "selector": {"type": "css", "value": "button#openDescription"},
+                        "delay": 0,
+                        "button": "left",
+                        "onError": "return",
+                    },
+                    {"action": "waitForTimeout", "timeout": 5, "onError": "return"},
+                ]
+            ),
+        ]
+
+You can access the results of these actions in the
+:attr:`.Actions.results` attribute of the dependency in the
+resulting page object:
+
+.. code-block:: python
+
+    def validate_input(self):
+        for action_result in self.actions.result:
+            if action_result["status"] != "success":
+                return Product(is_valid=False)
+        return None

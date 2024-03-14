@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Sequence, Set
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
@@ -24,7 +24,8 @@ from zyte_common_items import (
     ProductNavigation,
 )
 
-from scrapy_zyte_api import ExtractFrom, Geolocation, Screenshot
+from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
+from scrapy_zyte_api._annotations import _ActionResult
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -38,6 +39,7 @@ class ZyteApiProvider(PageObjectInputProvider):
     name = "zyte_api"
 
     provided_classes = {
+        Actions,
         AnyResponse,
         Article,
         ArticleList,
@@ -110,6 +112,14 @@ class ZyteApiProvider(PageObjectInputProvider):
                 if not is_typing_annotated(cls):
                     raise ValueError("Geolocation dependencies must be annotated.")
                 zyte_api_meta["geolocation"] = cls.__metadata__[0]  # type: ignore[attr-defined]
+                continue
+            if cls_stripped is Actions:
+                if not is_typing_annotated(cls):
+                    raise ValueError(
+                        "Actions dependencies must be annotated, "
+                        "e.g. Annotated[Actions, actions([...list of actions...])]."
+                    )
+                zyte_api_meta["actions"] = [dict(action) for action in cls.__metadata__[0]]  # type: ignore[attr-defined]
                 continue
             kw = item_keywords.get(cls_stripped)
             if not kw:
@@ -231,15 +241,27 @@ class ZyteApiProvider(PageObjectInputProvider):
             cls_stripped = strip_annotated(cls)
             assert isinstance(cls_stripped, type)
             if cls_stripped is Geolocation and is_typing_annotated(cls):
-                item = AnnotatedInstance(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
-                results.append(item)
+                result = AnnotatedInstance(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
+                results.append(result)
+                continue
+            if cls_stripped is Actions and is_typing_annotated(cls):
+                actions_result: Optional[List[_ActionResult]]
+                if "actions" in api_response.raw_api_response:
+                    actions_result = [
+                        _ActionResult(**action_result)
+                        for action_result in api_response.raw_api_response["actions"]
+                    ]
+                else:
+                    actions_result = None
+                result = AnnotatedInstance(Actions(actions_result), cls.__metadata__)  # type: ignore[attr-defined]
+                results.append(result)
                 continue
             kw = item_keywords.get(cls_stripped)
             if not kw:
                 continue
             assert issubclass(cls_stripped, Item)
-            item = cls_stripped.from_dict(api_response.raw_api_response[kw])  # type: ignore[attr-defined]
+            result = cls_stripped.from_dict(api_response.raw_api_response[kw])  # type: ignore[attr-defined]
             if is_typing_annotated(cls):
-                item = AnnotatedInstance(item, cls.__metadata__)  # type: ignore[attr-defined]
-            results.append(item)
+                result = AnnotatedInstance(result, cls.__metadata__)  # type: ignore[attr-defined]
+            results.append(result)
         return results

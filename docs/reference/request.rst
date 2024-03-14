@@ -99,7 +99,7 @@ For example, the following Scrapy request:
 .. code-block:: python
 
     Request(
-        method="POST"
+        method="POST",
         url="https://httpbin.org/anything",
         headers={"Content-Type": "application/json"},
         body=b'{"foo": "bar"}',

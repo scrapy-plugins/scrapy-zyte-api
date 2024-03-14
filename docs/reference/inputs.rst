@@ -43,6 +43,9 @@ Additional inputs and input annotations are also provided:
 Built-in inputs
 ===============
 
+.. autoclass:: scrapy_zyte_api.Actions
+    :members:
+
 .. autoclass:: scrapy_zyte_api.Geolocation
     :members:
 
@@ -55,3 +58,5 @@ Built-in input annotations
 
 .. autoenum:: scrapy_zyte_api.ExtractFrom
     :members:
+
+.. autofunction:: scrapy_zyte_api.actions
