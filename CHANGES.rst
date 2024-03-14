@@ -1,11 +1,15 @@
 Changes
 =======
 
+0.17.2 (YYYY-MM-DD)
+-------------------
+
+* Added a :class:`scrapy_zyte_api.Actions` dependency.
+
 0.17.1 (2024-03-11)
 -------------------
 
 * Added a :class:`scrapy_zyte_api.Screenshot` dependency.
-
 
 0.17.0 (2024-03-05)
 -------------------
