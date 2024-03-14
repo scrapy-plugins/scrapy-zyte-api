@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.17.2 (YYYY-MM-DD)
+0.17.2 (2024-03-14)
 -------------------
 
 * Added a :class:`scrapy_zyte_api.Actions` dependency.
