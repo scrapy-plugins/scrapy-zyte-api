@@ -6,6 +6,8 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 
+pytest.importorskip("scrapy.addons")
+
 try:
     from scrapy_poet import InjectionMiddleware
 except ImportError:
