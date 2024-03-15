@@ -1,6 +1,5 @@
 from scrapy.settings import BaseSettings
 from scrapy.utils.misc import load_object
-from scrapy.utils.python import global_object_name
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
@@ -15,9 +14,11 @@ def _setdefault(settings, setting, cls, pos):
         return
     if cls in setting_value:
         return
-    path = global_object_name(cls)
-    if path in setting_value:
-        return
+    for cls_or_path in setting_value:
+        if isinstance(cls_or_path, str):
+            _cls = load_object(cls_or_path)
+            if _cls == cls:
+                return
     settings[setting][cls] = pos
 
 

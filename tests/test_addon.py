@@ -82,13 +82,13 @@ BASE_EXPECTED = {
         (
             {
                 "DOWNLOADER_MIDDLEWARES": {
-                    "foo": 123,
+                    "builtins.str": 123,
                 },
             },
             {
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
-                    "foo": 123,
+                    "builtins.str": 123,
                     ScrapyZyteAPIDownloaderMiddleware: 1000,
                 },
             },
@@ -103,6 +103,19 @@ BASE_EXPECTED = {
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
                     ScrapyZyteAPIDownloaderMiddleware: 999,
+                },
+            },
+        ),
+        (
+            {
+                "DOWNLOADER_MIDDLEWARES": {
+                    "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 999,
+                },
+            },
+            {
+                **BASE_EXPECTED,
+                "DOWNLOADER_MIDDLEWARES": {
+                    "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 999,
                 },
             },
         ),
