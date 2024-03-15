@@ -1,10 +1,20 @@
+from typing import Optional, Type
+
 import pytest
+from pytest_twisted import ensureDeferred
+from scrapy import Request
+from scrapy.core.downloader.handlers.http import HTTP10DownloadHandler
+from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
+from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
+
+from . import get_crawler as get_crawler_zyte_api
+from . import get_download_handler, make_handler
 
 pytest.importorskip("scrapy.addons")
 
@@ -13,7 +23,7 @@ try:
 except ImportError:
     POET = False
     InjectionMiddleware = None
-    ZyteApiProvider = None
+    ZyteApiProvider: Optional[Type] = None
 else:
     POET = True
     from scrapy_zyte_api.providers import ZyteApiProvider
@@ -22,7 +32,104 @@ _crawler = get_crawler()
 BASELINE_SETTINGS = _crawler.settings.copy_to_dict()
 
 
-def _test(initial_settings, expected_settings):
+@ensureDeferred
+async def test_addon(mockserver):
+    async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
+        request = Request("https://example.com")
+        await handler.download_request(request, None)
+        assert handler._stats.get_value("scrapy-zyte-api/success") == 1
+
+
+@ensureDeferred
+async def test_addon_disable_transparent(mockserver):
+    async with make_handler(
+        {"ZYTE_API_TRANSPARENT_MODE": False}, mockserver.urljoin("/"), use_addon=True
+    ) as handler:
+        request = Request("https://toscrape.com")
+        await handler.download_request(request, None)
+        assert handler._stats.get_value("scrapy-zyte-api/success") is None
+
+        meta = {"zyte_api": {"foo": "bar"}}
+        request = Request("https://toscrape.com", meta=meta)
+        await handler.download_request(request, None)
+        assert handler._stats.get_value("scrapy-zyte-api/success") == 1
+
+
+@ensureDeferred
+async def test_addon_fallback():
+    settings = {
+        "DOWNLOAD_HANDLERS": {
+            "http": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler"
+        },
+    }
+    crawler = get_crawler_zyte_api(settings, use_addon=True)
+    handler = get_download_handler(crawler, "http")
+    assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
+    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
+
+
+@ensureDeferred
+async def test_addon_fallback_explicit():
+    settings = {
+        "ZYTE_API_FALLBACK_HTTP_HANDLER": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler",
+    }
+    crawler = get_crawler_zyte_api(settings, use_addon=True)
+    handler = get_download_handler(crawler, "http")
+    assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
+    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
+
+
+@ensureDeferred
+async def test_addon_matching_settings():
+    def serialize(settings):
+        result = dict(settings)
+        for setting in (
+            "ADDONS",
+            "ZYTE_API_FALLBACK_HTTP_HANDLER",
+            "ZYTE_API_FALLBACK_HTTPS_HANDLER",
+        ):
+            if setting in settings:
+                del result[setting]
+        for setting in (
+            "DOWNLOADER_MIDDLEWARES",
+            "SCRAPY_POET_PROVIDERS",
+            "SPIDER_MIDDLEWARES",
+        ):
+            if setting in result:
+                for key in list(result[setting]):
+                    if isinstance(key, str):
+                        obj = load_object(key)
+                        result[setting][obj] = result[setting].pop(key)
+        for key in result["DOWNLOAD_HANDLERS"]:
+            result["DOWNLOAD_HANDLERS"][key] = result["DOWNLOAD_HANDLERS"][
+                key
+            ].__class__
+        return result
+
+    crawler = get_crawler_zyte_api({"ZYTE_API_TRANSPARENT_MODE": True})
+    addon_crawler = get_crawler_zyte_api(use_addon=True)
+    assert serialize(crawler.settings) == serialize(addon_crawler.settings)
+
+
+@ensureDeferred
+async def test_addon_custom_fingerprint():
+    class CustomRequestFingerprinter:
+        pass
+
+    crawler = get_crawler_zyte_api(
+        {"REQUEST_FINGERPRINTER_CLASS": CustomRequestFingerprinter}, use_addon=True
+    )
+    assert (
+        crawler.settings["ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS"]
+        == CustomRequestFingerprinter
+    )
+    assert (
+        crawler.settings["REQUEST_FINGERPRINTER_CLASS"]
+        == "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
+    )
+
+
+def _test_setting_changes(initial_settings, expected_settings):
     settings = {
         **initial_settings,
         "ADDONS": {
@@ -123,8 +230,8 @@ BASE_EXPECTED = {
         ),
     ),
 )
-def test_no_poet(initial_settings, expected_settings):
-    _test(initial_settings, expected_settings)
+def test_no_poet_setting_changes(initial_settings, expected_settings):
+    _test_setting_changes(initial_settings, expected_settings)
 
 
 @pytest.mark.skipif(
@@ -148,5 +255,5 @@ def test_no_poet(initial_settings, expected_settings):
         ),
     ),
 )
-def test_poet(initial_settings, expected_settings):
-    _test(initial_settings, expected_settings)
+def test_poet_setting_changes(initial_settings, expected_settings):
+    _test_setting_changes(initial_settings, expected_settings)

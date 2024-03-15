@@ -8,23 +8,17 @@ from unittest import mock
 import pytest
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
-from scrapy.core.downloader.handlers.http import (
-    HTTP10DownloadHandler,
-    HTTPDownloadHandler,
-)
+from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
-from scrapy.utils.misc import create_instance, load_object
+from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
 from zyte_api.aio.retry import RetryFactory
 from zyte_api.constants import API_URL
 
-from scrapy_zyte_api.handler import (
-    ScrapyZyteAPIDownloadHandler,
-    ScrapyZyteAPIHTTPDownloadHandler,
-)
-from scrapy_zyte_api.utils import _ADDON_SUPPORT, USER_AGENT
+from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
+from scrapy_zyte_api.utils import USER_AGENT
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET
 from . import get_crawler as get_crawler_zyte_api
@@ -569,104 +563,3 @@ def test_fallback_setting():
     handler = get_download_handler(crawler, "https")
     assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
     assert isinstance(handler._fallback_handler, HTTPDownloadHandler)
-
-
-@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy < 2.10")
-@ensureDeferred
-async def test_addon(mockserver):
-    async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
-        request = Request("https://example.com")
-        await handler.download_request(request, None)
-        assert handler._stats.get_value("scrapy-zyte-api/success") == 1
-
-
-@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy < 2.10")
-@ensureDeferred
-async def test_addon_disable_transparent(mockserver):
-    async with make_handler(
-        {"ZYTE_API_TRANSPARENT_MODE": False}, mockserver.urljoin("/"), use_addon=True
-    ) as handler:
-        request = Request("https://toscrape.com")
-        await handler.download_request(request, None)
-        assert handler._stats.get_value("scrapy-zyte-api/success") is None
-
-        meta = {"zyte_api": {"foo": "bar"}}
-        request = Request("https://toscrape.com", meta=meta)
-        await handler.download_request(request, None)
-        assert handler._stats.get_value("scrapy-zyte-api/success") == 1
-
-
-@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy < 2.10")
-@ensureDeferred
-async def test_addon_fallback():
-    settings = {
-        "DOWNLOAD_HANDLERS": {
-            "http": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler"
-        },
-    }
-    crawler = get_crawler_zyte_api(settings, use_addon=True)
-    handler = get_download_handler(crawler, "http")
-    assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
-    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
-
-
-@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy < 2.10")
-@ensureDeferred
-async def test_addon_fallback_explicit():
-    settings = {
-        "ZYTE_API_FALLBACK_HTTP_HANDLER": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler",
-    }
-    crawler = get_crawler_zyte_api(settings, use_addon=True)
-    handler = get_download_handler(crawler, "http")
-    assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
-    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
-
-
-@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy < 2.10")
-@ensureDeferred
-async def test_addon_matching_settings():
-    def serialize(settings):
-        result = dict(settings)
-        for setting in (
-            "ADDONS",
-            "ZYTE_API_FALLBACK_HTTP_HANDLER",
-            "ZYTE_API_FALLBACK_HTTPS_HANDLER",
-        ):
-            if setting in settings:
-                del result[setting]
-        for setting in (
-            "DOWNLOADER_MIDDLEWARES",
-            "SPIDER_MIDDLEWARES",
-        ):
-            for key in list(result[setting]):
-                if isinstance(key, str):
-                    obj = load_object(key)
-                    result[setting][obj] = result[setting].pop(key)
-        for key in result["DOWNLOAD_HANDLERS"]:
-            result["DOWNLOAD_HANDLERS"][key] = result["DOWNLOAD_HANDLERS"][
-                key
-            ].__class__
-        return result
-
-    crawler = get_crawler_zyte_api({"ZYTE_API_TRANSPARENT_MODE": True})
-    addon_crawler = get_crawler_zyte_api(use_addon=True)
-    assert serialize(crawler.settings) == serialize(addon_crawler.settings)
-
-
-@pytest.mark.skipif(not _ADDON_SUPPORT, reason="No addon support in Scrapy < 2.10")
-@ensureDeferred
-async def test_addon_custom_fingerprint():
-    class CustomRequestFingerprinter:
-        pass
-
-    crawler = get_crawler_zyte_api(
-        {"REQUEST_FINGERPRINTER_CLASS": CustomRequestFingerprinter}, use_addon=True
-    )
-    assert (
-        crawler.settings["ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS"]
-        == CustomRequestFingerprinter
-    )
-    assert (
-        crawler.settings["REQUEST_FINGERPRINTER_CLASS"]
-        == "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
-    )
