@@ -11,7 +11,6 @@ _SCRAPY_2_1_0 = Version("2.1.0")
 _SCRAPY_2_4_0 = Version("2.4.0")
 _SCRAPY_2_5_0 = Version("2.5.0")
 _SCRAPY_2_6_0 = Version("2.6.0")
-_SCRAPY_2_10_0 = Version("2.10.0")
 
 # Need to install an asyncio reactor before download handler imports to work
 # around:
@@ -23,4 +22,3 @@ _NEEDS_EARLY_REACTOR = _SCRAPY_2_4_0 <= _SCRAPY_VERSION < _SCRAPY_2_6_0
 _RESPONSE_HAS_ATTRIBUTES = _SCRAPY_VERSION >= _SCRAPY_2_6_0
 _RESPONSE_HAS_IP_ADDRESS = _SCRAPY_VERSION >= _SCRAPY_2_1_0
 _RESPONSE_HAS_PROTOCOL = _SCRAPY_VERSION >= _SCRAPY_2_5_0
-_ADDON_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_10_0

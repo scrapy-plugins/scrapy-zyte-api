@@ -7,6 +7,21 @@ from scrapy_zyte_api import (
 )
 
 
+def _setdefault(settings, setting, cls, pos):
+    setting_value = settings[setting]
+    if not setting_value:
+        settings[setting] = {cls: pos}
+        return
+    if cls in setting_value:
+        return
+    for cls_or_path in setting_value:
+        if isinstance(cls_or_path, str):
+            _cls = load_object(cls_or_path)
+            if _cls == cls:
+                return
+    settings[setting][cls] = pos
+
+
 class Addon:
     def update_settings(self, settings: BaseSettings) -> None:
         from scrapy.settings.default_settings import (
@@ -54,8 +69,10 @@ class Addon:
         settings["DOWNLOAD_HANDLERS"][
             "https"
         ] = "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler"
-        settings["DOWNLOADER_MIDDLEWARES"][ScrapyZyteAPIDownloaderMiddleware] = 1000
-        settings["SPIDER_MIDDLEWARES"][ScrapyZyteAPISpiderMiddleware] = 100
+        _setdefault(
+            settings, "DOWNLOADER_MIDDLEWARES", ScrapyZyteAPIDownloaderMiddleware, 1000
+        )
+        _setdefault(settings, "SPIDER_MIDDLEWARES", ScrapyZyteAPISpiderMiddleware, 100)
         settings.set(
             "TWISTED_REACTOR",
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
@@ -64,8 +81,11 @@ class Addon:
         settings.set("ZYTE_API_TRANSPARENT_MODE", True, "addon")
 
         try:
-            import scrapy_poet  # noqa: F401
+            from scrapy_poet import InjectionMiddleware
         except ImportError:
             pass
         else:
-            settings["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
+            from scrapy_zyte_api.providers import ZyteApiProvider
+
+            _setdefault(settings, "DOWNLOADER_MIDDLEWARES", InjectionMiddleware, 543)
+            _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiProvider, 1100)

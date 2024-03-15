@@ -36,6 +36,9 @@ except ImportError:
 else:
     assert isinstance(SETTINGS["DOWNLOADER_MIDDLEWARES"], dict)
     SETTINGS["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
+    SETTINGS["SCRAPY_POET_PROVIDERS"] = {
+        "scrapy_zyte_api.providers.ZyteApiProvider": 1100
+    }
 SETTINGS_ADDON: Dict[str, Any] = {
     "ADDONS": {
         Addon: 500,
