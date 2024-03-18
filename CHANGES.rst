@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.17.3 (unreleased)
+0.17.3 (2024-03-18)
 -------------------
 
 * :class:`scrapy_zyte_api.Addon` now adds
