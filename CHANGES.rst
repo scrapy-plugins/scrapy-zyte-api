@@ -1,6 +1,14 @@
 Changes
 =======
 
+0.17.3 (unreleased)
+-------------------
+
+* :class:`scrapy_zyte_api.Addon` now adds
+  :class:`scrapy_zyte_api.providers.ZyteApiProvider` to the
+  ``SCRAPY_POET_PROVIDERS`` :ref:`scrapy-poet setting <scrapy-poet:settings>`
+  if :doc:`scrapy-poet <scrapy-poet:index>` is installed.
+
 0.17.2 (2024-03-14)
 -------------------
 
