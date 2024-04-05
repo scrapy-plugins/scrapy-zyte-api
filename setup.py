@@ -25,7 +25,7 @@ setuptools.setup(
     install_requires=[
         "packaging>=20.0",
         "scrapy>=2.0.1",
-        "zyte-api @ git+https://github.com/zytedata/python-zyte-api.git",  # TODO: 0.5.0
+        "zyte-api>=0.5.0",
     ],
     extras_require={
         # Sync with [testenv:pinned-provider] @ tox.ini
