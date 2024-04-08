@@ -294,51 +294,49 @@ async def test_forbidden_domain_with_partial_start_request_consumption():
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
 
 
-@ensureDeferred
-async def test_spm_conflict_smartproxy():
-    try:
-        import scrapy_zyte_smartproxy  # noqa: F401
-    except ImportError:
-        raise SkipTest("scrapy-zyte-smartproxy missing")
-
-    for setting, attribute, conflict in (
+@pytest.mark.parametrize(
+    "setting,attribute,conflict",
+    [
         (None, None, False),
         (None, False, False),
-        (None, True, True),
+        (None, True, True),  # TODO: Fix hang on reactor.callLater (_middlewares.py:107)
         (False, None, False),
         (False, False, False),
         (False, True, True),
         (True, None, True),
         (True, False, False),
         (True, True, True),
-    ):
+    ],
+)
+@ensureDeferred
+async def test_spm_conflict_smartproxy(setting, attribute, conflict):
+    try:
+        import scrapy_zyte_smartproxy  # noqa: F401
+    except ImportError:
+        raise SkipTest("scrapy-zyte-smartproxy missing")
 
-        class SPMSpider(Spider):
-            name = "spm_spider"
+    class SPMSpider(Spider):
+        name = "spm_spider"
 
-        if attribute is not None:
-            SPMSpider.zyte_smartproxy_enabled = attribute
+    if attribute is not None:
+        SPMSpider.zyte_smartproxy_enabled = attribute
 
-        settings = {
-            "ZYTE_API_TRANSPARENT_MODE": True,
-            "ZYTE_SMARTPROXY_APIKEY": "foo",
-            **SETTINGS,
-        }
-        mws = dict(cast(Dict[Any, int], settings["DOWNLOADER_MIDDLEWARES"]))
-        mws["scrapy_zyte_smartproxy.ZyteSmartProxyMiddleware"] = 610
-        settings["DOWNLOADER_MIDDLEWARES"] = mws
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_SMARTPROXY_APIKEY": "foo",
+        **SETTINGS,
+    }
+    mws = dict(cast(Dict[Any, int], settings["DOWNLOADER_MIDDLEWARES"]))
+    mws["scrapy_zyte_smartproxy.ZyteSmartProxyMiddleware"] = 610
+    settings["DOWNLOADER_MIDDLEWARES"] = mws
 
-        if setting is not None:
-            settings["ZYTE_SMARTPROXY_ENABLED"] = setting
+    if setting is not None:
+        settings["ZYTE_SMARTPROXY_ENABLED"] = setting
 
-        crawler = get_crawler(SPMSpider, settings_dict=settings)
-        await crawler.crawl()
-        expected = "plugin_conflict" if conflict else "finished"
-        assert crawler.stats.get_value("finish_reason") == expected, (
-            setting,
-            attribute,
-            conflict,
-        )
+    crawler = get_crawler(SPMSpider, settings_dict=settings)
+    await crawler.crawl()
+    expected = "plugin_conflict" if conflict else "finished"
+    assert crawler.stats.get_value("finish_reason") == expected
 
 
 @ensureDeferred
