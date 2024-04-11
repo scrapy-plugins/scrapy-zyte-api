@@ -1,7 +1,7 @@
 import logging
 from typing import cast
 
-from scrapy import Request, signals
+from scrapy import Request
 from scrapy.exceptions import IgnoreRequest
 from zyte_api.aio.errors import RequestError
 
@@ -51,7 +51,6 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
                 f"reached."
             )
 
-        crawler.signals.connect(self.open_spider, signal=signals.spider_opened)
         crawler.signals.connect(
             self._start_requests_processed, signal=_start_requests_processed
         )
@@ -79,7 +78,11 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
                 return middleware
         return None
 
-    def open_spider(self, spider):
+    def _check_spm_conflict(self, spider):
+        checked = getattr(self, "_checked_spm_conflict", False)
+        if checked:
+            return
+        self._checked_spm_conflict = True
         settings = self._crawler.settings
         in_transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         spm_mw = self._get_spm_mw()
@@ -113,6 +116,8 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         self._maybe_close()
 
     def process_request(self, request, spider):
+        self._check_spm_conflict(spider)
+
         if self._param_parser.parse(request) is None:
             return
 
