@@ -30,6 +30,8 @@ from scrapy_zyte_api.providers import ZyteApiProvider
 from . import SETTINGS
 from .mockserver import get_ephemeral_port
 
+PROVIDER_PARAMS = {"geolocation": "IE"}
+
 
 def create_scrapy_settings():
     settings = _create_scrapy_settings()
@@ -53,6 +55,22 @@ class ZyteAPISpider(Spider):
 
     def start_requests(self):
         yield Request(self.url, callback=self.parse_)
+
+    def parse_(self, response: DummyResponse, page: ProductPage):
+        yield {
+            "html": page.html,
+            "response_html": page.response.html,
+            "product": page.product,
+        }
+
+
+class ZyteAPIProviderMetaSpider(Spider):
+    url: str
+
+    def start_requests(self):
+        yield Request(
+            self.url, callback=self.parse_, meta={"zyte_api_provider": PROVIDER_PARAMS}
+        )
 
     def parse_(self, response: DummyResponse, page: ProductPage):
         yield {
@@ -183,12 +201,24 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
 
 
 @ensureDeferred
-async def test_provider_params(mockserver):
+async def test_provider_params_setting(mockserver):
     settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ZYTE_API_PROVIDER_PARAMS"] = {"geolocation": "IE"}
+    settings["ZYTE_API_PROVIDER_PARAMS"] = PROVIDER_PARAMS
     _, _, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    assert crawler.stats.get_value("scrapy-zyte-api/request_args/browserHtml") == 1
+    assert crawler.stats.get_value("scrapy-zyte-api/request_args/geolocation") == 1
+
+
+@ensureDeferred
+async def test_provider_params_meta(mockserver):
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    _, _, crawler = await crawl_single_item(
+        ZyteAPIProviderMetaSpider, HtmlResource, settings
+    )
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/browserHtml") == 1
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/geolocation") == 1
 

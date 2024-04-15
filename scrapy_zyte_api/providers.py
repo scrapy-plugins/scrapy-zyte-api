@@ -99,7 +99,10 @@ class ZyteApiProvider(PageObjectInputProvider):
             JobPosting: "jobPosting",
         }
 
-        zyte_api_meta = crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS")
+        zyte_api_meta = {
+            **crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS"),
+            **request.meta.get("zyte_api_provider", {}),
+        }
 
         to_provide_stripped: Set[type] = set()
         extract_from_seen: Dict[str, str] = {}
