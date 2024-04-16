@@ -121,7 +121,11 @@ class ZyteApiProvider(PageObjectInputProvider):
                     )
                 zyte_api_meta["actions"] = [
                     {
-                        k: dict(v) if isinstance(v, frozenset) else v
+                        k: (
+                            dict(v)
+                            if isinstance(v, frozenset)
+                            else list(v) if isinstance(v, tuple) else v
+                        )
                         for k, v in cls.__metadata__[0][0]  # type: ignore[attr-defined]
                     }
                 ]
