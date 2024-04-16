@@ -32,22 +32,49 @@ Or request them directly in the callback::
                        ):
             ...
 
-Default parameters
-==================
+Custom parameters
+=================
 
-scrapy-poet integration ignores :ref:`default parameters <default>`.
+scrapy-poet integration ignores both :ref:`manual <manual>` and :ref:`automatic
+<automap>` Zyte API parameters.
 
-To add extra parameters to all Zyte API requests sent by the provider, set them
-as a dictionary through the :ref:`ZYTE_API_PROVIDER_PARAMS` setting, for
-example in ``settings.py``::
+To add Zyte API parameters to requests made by the scrapy-poet integration, use
+the ``zyte_api_provider`` request meta key:
 
-    ZYTE_API_PROVIDER_PARAMS = {"geolocation": "IE"}
+.. code-block:: python
 
-When :ref:`ZYTE_API_PROVIDER_PARAMS` includes one of the Zyte API extraction
-options (e.g. ``productOptions`` for ``product``), but the final Zyte API
-request doesn't include the corresponding data type, the unused options are
-automatically removed. So, it's safe to use :ref:`ZYTE_API_PROVIDER_PARAMS` to
-set the default options for various extraction types, e.g.::
+    Request(
+        "https://example.com",
+        meta={
+            "zyte_api_provider": {
+                "requestCookies": [
+                    {"name": "a", "value": "b", "domain": "example.com"},
+                ],
+            }
+        },
+    )
+
+To add Zyte API parameters to all requests sent by the scrapy-poet integration,
+use the :ref:`ZYTE_API_PROVIDER_PARAMS` setting:
+
+.. code-block:: python
+    :caption: settings.py
+
+    ZYTE_API_PROVIDER_PARAMS = {
+        "requestCookies": [
+            {"name": "a", "value": "b", "domain": "example.com"},
+        ],
+    }
+
+When ``zyte_api_provider`` or :ref:`ZYTE_API_PROVIDER_PARAMS` include one of
+the Zyte API extraction option parameters (e.g. ``productOptions`` for
+``product``), but the final Zyte API request does not include the corresponding
+extraction type, the unused options are automatically removed. So, it is safe
+to use :ref:`ZYTE_API_PROVIDER_PARAMS` to set the default options for various
+extraction types:
+
+.. code-block:: python
+    :caption: setting.py
 
     ZYTE_API_PROVIDER_PARAMS = {
         "productOptions": {"extractFrom": "httpResponseBody"},
