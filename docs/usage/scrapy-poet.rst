@@ -32,55 +32,6 @@ Or request them directly in the callback::
                        ):
             ...
 
-Custom parameters
-=================
-
-scrapy-poet integration ignores both :ref:`manual <manual>` and :ref:`automatic
-<automap>` Zyte API parameters.
-
-To add Zyte API parameters to requests made by the scrapy-poet integration, use
-the ``zyte_api_provider`` request meta key:
-
-.. code-block:: python
-
-    Request(
-        "https://example.com",
-        meta={
-            "zyte_api_provider": {
-                "requestCookies": [
-                    {"name": "a", "value": "b", "domain": "example.com"},
-                ],
-            }
-        },
-    )
-
-To add Zyte API parameters to all requests sent by the scrapy-poet integration,
-use the :ref:`ZYTE_API_PROVIDER_PARAMS` setting:
-
-.. code-block:: python
-    :caption: settings.py
-
-    ZYTE_API_PROVIDER_PARAMS = {
-        "requestCookies": [
-            {"name": "a", "value": "b", "domain": "example.com"},
-        ],
-    }
-
-When ``zyte_api_provider`` or :ref:`ZYTE_API_PROVIDER_PARAMS` include one of
-the Zyte API extraction option parameters (e.g. ``productOptions`` for
-``product``), but the final Zyte API request does not include the corresponding
-extraction type, the unused options are automatically removed. So, it is safe
-to use :ref:`ZYTE_API_PROVIDER_PARAMS` to set the default options for various
-extraction types:
-
-.. code-block:: python
-    :caption: setting.py
-
-    ZYTE_API_PROVIDER_PARAMS = {
-        "productOptions": {"extractFrom": "httpResponseBody"},
-        "productNavigationOptions": {"extractFrom": "httpResponseBody"},
-    }
-
 .. _annotations:
 
 Dependency annotations
@@ -179,3 +130,37 @@ resulting page object:
             if action_result["status"] != "success":
                 return Product(is_valid=False)
         return None
+
+
+Custom parameters
+=================
+
+scrapy-poet integration ignores both :ref:`manual <manual>` and :ref:`automatic
+<automap>` Zyte API parameters.
+
+Whenever you can, use :ref:`inputs <inputs>` and :ref:`dependency annotations
+<annotations>` to get additional Zyte API parameters into Zyte API requests
+made by the scrapy-poet integration.
+
+If that is not possible, you can add Zyte API parameters to requests made by
+the scrapy-poet integration with the :reqmeta:`zyte_api_provider` request
+metadata key or the :setting:`ZYTE_API_PROVIDER_PARAMS` setting.
+
+When :reqmeta:`zyte_api_provider` or :setting:`ZYTE_API_PROVIDER_PARAMS`
+include one of the Zyte API extraction option parameters (e.g.
+``productOptions`` for ``product``), but the final Zyte API request does not
+include the corresponding extraction type, the unused options are automatically
+removed. So, it is safe to use :setting:`ZYTE_API_PROVIDER_PARAMS` to set the
+default options for various extraction types:
+
+.. code-block:: python
+    :caption: setting.py
+
+    ZYTE_API_PROVIDER_PARAMS = {
+        "productOptions": {"extractFrom": "httpResponseBody"},
+        "productNavigationOptions": {"extractFrom": "httpResponseBody"},
+    }
+
+When both :reqmeta:`zyte_api_provider` and :setting:`ZYTE_API_PROVIDER_PARAMS`
+are defined, they are combined, with :reqmeta:`zyte_api_provider` taking
+precedence in case of conflict.

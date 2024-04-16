@@ -132,7 +132,7 @@ the ``SCRAPY_POET_PROVIDERS`` setting:
 
 If you already had a custom value for :setting:`REQUEST_FINGERPRINTER_CLASS
 <scrapy:REQUEST_FINGERPRINTER_CLASS>`, set that value on
-:ref:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` instead.
+:setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` instead.
 
 .. code-block:: python
     :caption: settings.py

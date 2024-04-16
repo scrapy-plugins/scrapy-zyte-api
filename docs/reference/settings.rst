@@ -6,7 +6,7 @@ Settings
 
 :ref:`Settings <topics-settings>` for scrapy-zyte-api.
 
-.. _ZYTE_API_AUTOMAP_PARAMS:
+.. setting:: ZYTE_API_AUTOMAP_PARAMS
 
 ZYTE_API_AUTOMAP_PARAMS
 =======================
@@ -16,8 +16,8 @@ Default: ``{}``
 :class:`dict` of parameters to be combined with :ref:`automatic request
 parameters <automap>`.
 
-These parameters are merged with :ref:`zyte_api_automap` parameters.
-:ref:`zyte_api_automap` parameters take precedence.
+These parameters are merged with :reqmeta:`zyte_api_automap` parameters.
+:reqmeta:`zyte_api_automap` parameters take precedence.
 
 This setting has no effect on requests with :ref:`manual request parameters
 <manual>`.
@@ -31,14 +31,14 @@ those for ``robots.txt`` files when :setting:`ROBOTSTXT_OBEY
 :http:`request:browserHtml` or :http:`request:screenshot`, are not meant to be
 used for every single request.
 
-If :ref:`zyte_api_default_params <zyte_api_default_params_meta>` in
-:attr:`Request.meta <scrapy.http.Request.meta>` is set to ``False``, this
-setting is ignored for that request.
+If :reqmeta:`zyte_api_default_params` in :attr:`Request.meta
+<scrapy.http.Request.meta>` is set to ``False``, this setting is ignored for
+that request.
 
 See :ref:`default`.
 
 
-.. _ZYTE_API_BROWSER_HEADERS:
+.. setting:: ZYTE_API_BROWSER_HEADERS
 
 ZYTE_API_BROWSER_HEADERS
 ========================
@@ -51,7 +51,7 @@ It is a :class:`dict`, where keys are header names and values are the key that
 represents them in :http:`request:requestHeaders`.
 
 
-.. _ZYTE_API_COOKIE_MIDDLEWARE:
+.. setting:: ZYTE_API_COOKIE_MIDDLEWARE
 
 ZYTE_API_COOKIE_MIDDLEWARE
 ==========================
@@ -66,7 +66,7 @@ Your cookie downloader middleware must have a ``jars`` property with the same
 signature as in the built-in Scrapy downloader middleware for cookie handling.
 
 
-.. _ZYTE_API_DEFAULT_PARAMS:
+.. setting:: ZYTE_API_DEFAULT_PARAMS
 
 ZYTE_API_DEFAULT_PARAMS
 =======================
@@ -76,23 +76,23 @@ Default: ``{}``
 :class:`dict` of parameters to be combined with :ref:`manual request parameters
 <manual>`.
 
-You may set :ref:`zyte_api` to an empty :class:`dict` to only use the
+You may set :reqmeta:`zyte_api` to an empty :class:`dict` to only use the
 parameters defined here for that request.
 
-These parameters are merged with :ref:`zyte_api` parameters. :ref:`zyte_api`
-parameters take precedence.
+These parameters are merged with :reqmeta:`zyte_api` parameters.
+:reqmeta:`zyte_api` parameters take precedence.
 
 This setting has no effect on requests with :ref:`automatic request parameters
 <automap>`.
 
-If :ref:`zyte_api_default_params <zyte_api_default_params_meta>` in
-:attr:`Request.meta <scrapy.http.Request.meta>` is set to ``False``, this
-setting is ignored for that request.
+If :reqmeta:`zyte_api_default_params` in :attr:`Request.meta
+<scrapy.http.Request.meta>` is set to ``False``, this setting is ignored for
+that request.
 
 See :ref:`default`.
 
 
-.. _ZYTE_API_ENABLED:
+.. setting:: ZYTE_API_ENABLED
 
 ZYTE_API_ENABLED
 ================
@@ -102,7 +102,7 @@ Default: ``True``
 Can be set to ``False`` to disable scrapy-zyte-api.
 
 
-.. _ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED:
+.. setting:: ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED
 
 ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED
 =====================================
@@ -112,7 +112,7 @@ Default: ``False``
 See :ref:`request-automatic`.
 
 
-.. _ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS:
+.. setting:: ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS
 
 ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS
 =============================================
@@ -124,7 +124,7 @@ installed, else :class:`scrapy.utils.request.RequestFingerprinter`
 go through Zyte API. See :ref:`fingerprint`.
 
 
-.. _ZYTE_API_KEY:
+.. setting:: ZYTE_API_KEY
 
 ZYTE_API_KEY
 ============
@@ -141,7 +141,7 @@ You can alternatively define an environment variable with the same name.
     automatically.
 
 
-.. _ZYTE_API_LOG_REQUESTS:
+.. setting:: ZYTE_API_LOG_REQUESTS
 
 ZYTE_API_LOG_REQUESTS
 =====================
@@ -156,10 +156,10 @@ For example::
 
    Sending Zyte API extract request: {"url": "https://example.com", "httpResponseBody": true}
 
-See also: :ref:`ZYTE_API_LOG_REQUESTS_TRUNCATE`.
+See also: :setting:`ZYTE_API_LOG_REQUESTS_TRUNCATE`.
 
 
-.. _ZYTE_API_LOG_REQUESTS_TRUNCATE:
+.. setting:: ZYTE_API_LOG_REQUESTS_TRUNCATE
 
 ZYTE_API_LOG_REQUESTS_TRUNCATE
 ==============================
@@ -167,12 +167,12 @@ ZYTE_API_LOG_REQUESTS_TRUNCATE
 Default: ``64``
 
 Determines the maximum length of any string value in the JSON object logged
-when :ref:`ZYTE_API_LOG_REQUESTS` is enabled, excluding object keys.
+when :setting:`ZYTE_API_LOG_REQUESTS` is enabled, excluding object keys.
 
 To disable truncation, set this to ``0``.
 
 
-.. _ZYTE_API_MAX_COOKIES:
+.. setting:: ZYTE_API_MAX_COOKIES
 
 ZYTE_API_MAX_COOKIES
 ====================
@@ -190,7 +190,7 @@ Alternatively, if :http:`request:experimental.requestCookies` starts supporting
 more than 100 cookies, update this setting accordingly.
 
 
-.. _ZYTE_API_MAX_REQUESTS:
+.. setting:: ZYTE_API_MAX_REQUESTS
 
 ZYTE_API_MAX_REQUESTS
 =====================
@@ -204,7 +204,7 @@ Note that requests with error responses that cannot be retried or exceed their
 retry limit also count here.
 
 
-.. _ZYTE_API_PROVIDER_PARAMS:
+.. setting:: ZYTE_API_PROVIDER_PARAMS
 
 ZYTE_API_PROVIDER_PARAMS
 ========================
@@ -214,8 +214,19 @@ Default: ``{}``
 Defines additional request parameters to use in Zyte API requests sent by the
 :ref:`scrapy-poet integration <scrapy-poet>`.
 
+For example:
 
-.. _ZYTE_API_RETRY_POLICY:
+.. code-block:: python
+    :caption: settings.py
+
+    ZYTE_API_PROVIDER_PARAMS = {
+        "requestCookies": [
+            {"name": "a", "value": "b", "domain": "example.com"},
+        ],
+    }
+
+
+.. setting:: ZYTE_API_RETRY_POLICY
 
 ZYTE_API_RETRY_POLICY
 =====================
@@ -235,7 +246,7 @@ subclass.
 See :ref:`retry`.
 
 
-.. _ZYTE_API_SKIP_HEADERS:
+.. setting:: ZYTE_API_SKIP_HEADERS
 
 ZYTE_API_SKIP_HEADERS
 =====================
@@ -246,7 +257,7 @@ Determines headers that must *not* be mapped as
 :http:`request:customHttpRequestHeaders`.
 
 
-.. _ZYTE_API_TRANSPARENT_MODE:
+.. setting:: ZYTE_API_TRANSPARENT_MODE
 
 ZYTE_API_TRANSPARENT_MODE
 =========================
@@ -256,7 +267,7 @@ Default: ``False``
 See :ref:`transparent`.
 
 
-.. _ZYTE_API_USE_ENV_PROXY:
+.. setting:: ZYTE_API_USE_ENV_PROXY
 
 ZYTE_API_USE_ENV_PROXY
 ======================

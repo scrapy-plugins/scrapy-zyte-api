@@ -9,9 +9,10 @@ API requests are retried automatically using the default retry policy of
 API requests that exceed retries are dropped. You cannot manage API request
 retries through :ref:`downloader middlewares <topics-downloader-middleware>`.
 
-Use the :ref:`ZYTE_API_RETRY_POLICY` setting or the :ref:`zyte_api_retry_policy
-<zyte_api_retry_policy_meta>` :attr:`Request.meta <scrapy.http.Request.meta>`
-key to override the default retry policy with a custom retry policy.
+Use the :setting:`ZYTE_API_RETRY_POLICY` setting or the
+:reqmeta:`zyte_api_retry_policy`
+:attr:`Request.meta <scrapy.http.Request.meta>` key to override the default
+retry policy with a custom retry policy.
 
 For example, to increase the maximum number of retries to 10 before dropping
 the API request, you can subclass :class:`~zyte_api.aio.retry.RetryFactory` as

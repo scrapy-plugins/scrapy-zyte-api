@@ -30,7 +30,7 @@ Automatic mapping
     :ref:`automatic extraction from it <zyte-api-extract-from>`, or
     :http:`request:requestHeaders` otherwise.
 
--   If :ref:`ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED` is ``True``,
+-   If :setting:`ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED` is ``True``,
     :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` is ``True`` (default),
     and :attr:`Request.meta <scrapy.http.Request.meta>` does not set
     :reqmeta:`dont_merge_cookies <scrapy:dont_merge_cookies>` to ``True``:
@@ -45,8 +45,8 @@ Automatic mapping
         different domains (e.g. when following cross-domain redirects, or
         during browser rendering).
 
-        See also: :ref:`ZYTE_API_MAX_COOKIES`,
-        :ref:`ZYTE_API_COOKIE_MIDDLEWARE`.
+        See also: :setting:`ZYTE_API_MAX_COOKIES`,
+        :setting:`ZYTE_API_COOKIE_MIDDLEWARE`.
 
 -   :http:`request:httpResponseBody` and :http:`request:httpResponseHeaders`
     are set to ``True``.
@@ -141,8 +141,8 @@ Header mapping
 When mapping headers, headers not supported by Zyte API are excluded from the
 mapping by default.
 
-Use :ref:`ZYTE_API_SKIP_HEADERS` and :ref:`ZYTE_API_BROWSER_HEADERS` to change
-which headers are included or excluded from header mapping.
+Use :setting:`ZYTE_API_SKIP_HEADERS` and :setting:`ZYTE_API_BROWSER_HEADERS` to
+change which headers are included or excluded from header mapping.
 
 
 .. _request-unsupported:
