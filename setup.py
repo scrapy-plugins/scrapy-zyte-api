@@ -25,7 +25,7 @@ setuptools.setup(
     install_requires=[
         "packaging>=20.0",
         "scrapy>=2.0.1",
-        "zyte-api>=0.4.8",
+        "zyte-api>=0.5.1",
     ],
     extras_require={
         # Sync with [testenv:pinned-provider] @ tox.ini

@@ -249,7 +249,7 @@ async def test_higher_concurrency():
                 response_indexes.append(response.meta["index"])
                 raise CloseSpider
 
-        crawler = get_crawler(
+        crawler = await get_crawler(
             {
                 "CONCURRENT_REQUESTS": concurrency,
                 "CONCURRENT_REQUESTS_PER_DOMAIN": concurrency,
@@ -416,7 +416,8 @@ DEFAULT_AUTOMAP_PARAMS: Dict[str, Any] = {
         (True, {"zyte_api": {"a": "b"}, "zyte_api_automap": {"a": "b"}}, ValueError),
     ],
 )
-def test_transparent_mode_toggling(setting, meta, expected):
+@ensureDeferred
+async def test_transparent_mode_toggling(setting, meta, expected):
     """Test how the value of the ``ZYTE_API_TRANSPARENT_MODE`` setting
     (*setting*) in combination with request metadata (*meta*) determines what
     Zyte API parameters are used (*expected*).
@@ -429,7 +430,7 @@ def test_transparent_mode_toggling(setting, meta, expected):
     """
     request = Request(url="https://example.com", meta=meta)
     settings = {"ZYTE_API_TRANSPARENT_MODE": setting}
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
     func = partial(param_parser.parse, request)
@@ -444,13 +445,14 @@ def test_transparent_mode_toggling(setting, meta, expected):
 
 
 @pytest.mark.parametrize("meta", [None, 0, "", b"", [], ()])
-def test_api_disabling_deprecated(meta):
+@ensureDeferred
+async def test_api_disabling_deprecated(meta):
     """Test how undocumented falsy values of the ``zyte_api`` request metadata
     key (*meta*) can be used to disable the use of Zyte API, but trigger a
     deprecation warning asking to replace them with False."""
     request = Request(url="https://example.com")
     request.meta["zyte_api"] = meta
-    crawler = get_crawler()
+    crawler = await get_crawler()
     param_parser = _ParamParser(crawler)
     with pytest.warns(DeprecationWarning, match=r".* Use False instead\.$"):
         api_params = param_parser.parse(request)
@@ -459,12 +461,13 @@ def test_api_disabling_deprecated(meta):
 
 @pytest.mark.parametrize("key", ["zyte_api", "zyte_api_automap"])
 @pytest.mark.parametrize("value", [1, ["a", "b"]])
-def test_bad_meta_type(key, value):
+@ensureDeferred
+async def test_bad_meta_type(key, value):
     """Test how undocumented truthy values (*value*) for the ``zyte_api`` and
     ``zyte_api_automap`` request metadata keys (*key*) trigger a
     :exc:`ValueError` exception."""
     request = Request(url="https://example.com", meta={key: value})
-    crawler = get_crawler()
+    crawler = await get_crawler()
     param_parser = _ParamParser(crawler)
     with pytest.raises(ValueError):
         param_parser.parse(request)
@@ -483,7 +486,7 @@ async def test_job_id(meta, mockserver):
     """
     request = Request(url="https://example.com", meta={meta: True})
     with set_env(SHUB_JOBKEY="1/2/3"):
-        crawler = get_crawler()
+        crawler = await get_crawler()
         handler = get_download_handler(crawler, "https")
         param_parser = handler._param_parser
         api_params = param_parser.parse(request)
@@ -551,7 +554,8 @@ async def test_default_params_none(mockserver, caplog):
         ),
     ],
 )
-def test_default_params_merging(
+@ensureDeferred
+async def test_default_params_merging(
     setting_key, meta_key, ignore_keys, setting, meta, expected, warnings, caplog
 ):
     """Test how Zyte API parameters defined in the *arg_key* _get_api_params
@@ -568,7 +572,7 @@ def test_default_params_merging(
     """
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
-    crawler = get_crawler({setting_key: setting})
+    crawler = await get_crawler({setting_key: setting})
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
@@ -614,27 +618,28 @@ def test_default_params_merging(
         ),
     ],
 )
-def test_default_params_immutability(setting_key, meta_key, setting, meta):
+@ensureDeferred
+async def test_default_params_immutability(setting_key, meta_key, setting, meta):
     """Make sure that the merging of Zyte API parameters from the *arg_key*
     _get_api_params parameter with those from the *meta_key* request metadata
     key does not affect the contents of the setting for later requests."""
     request = Request(url="https://example.com")
     request.meta[meta_key] = meta
     default_params = copy(setting)
-    crawler = get_crawler({setting_key: setting})
+    crawler = await get_crawler({setting_key: setting})
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
     param_parser.parse(request)
     assert default_params == setting
 
 
-def _test_automap(
+async def _test_automap(
     settings, request_kwargs, meta, expected, warnings, caplog, cookie_jar=None
 ):
     request = Request(url="https://example.com", **request_kwargs)
     request.meta["zyte_api_automap"] = meta
     settings = {**settings, "ZYTE_API_TRANSPARENT_MODE": True}
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     if "cookies" in request_kwargs:
         try:
             cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
@@ -761,8 +766,9 @@ def _test_automap(
         ),
     ],
 )
-def test_automap_main_outputs(meta, expected, warnings, caplog):
-    _test_automap({}, {}, meta, expected, warnings, caplog)
+@ensureDeferred
+async def test_automap_main_outputs(meta, expected, warnings, caplog):
+    await _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -898,8 +904,9 @@ def test_automap_main_outputs(meta, expected, warnings, caplog):
         ),
     ],
 )
-def test_automap_header_output(meta, expected, warnings, caplog):
-    _test_automap({}, {}, meta, expected, warnings, caplog)
+@ensureDeferred
+async def test_automap_header_output(meta, expected, warnings, caplog):
+    await _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -1022,8 +1029,9 @@ def test_automap_header_output(meta, expected, warnings, caplog):
         ),
     ],
 )
-def test_automap_method(method, meta, expected, warnings, caplog):
-    _test_automap({}, {"method": method}, meta, expected, warnings, caplog)
+@ensureDeferred
+async def test_automap_method(method, meta, expected, warnings, caplog):
+    await _test_automap({}, {"method": method}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -2135,8 +2143,9 @@ def test_automap_method(method, meta, expected, warnings, caplog):
         ),
     ],
 )
-def test_automap_headers(headers, meta, expected, warnings, caplog):
-    _test_automap({}, {"headers": headers}, meta, expected, warnings, caplog)
+@ensureDeferred
+async def test_automap_headers(headers, meta, expected, warnings, caplog):
+    await _test_automap({}, {"headers": headers}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -2182,8 +2191,13 @@ def test_automap_headers(headers, meta, expected, warnings, caplog):
         ),
     ],
 )
-def test_automap_header_settings(settings, headers, meta, expected, warnings, caplog):
-    _test_automap(settings, {"headers": headers}, meta, expected, warnings, caplog)
+@ensureDeferred
+async def test_automap_header_settings(
+    settings, headers, meta, expected, warnings, caplog
+):
+    await _test_automap(
+        settings, {"headers": headers}, meta, expected, warnings, caplog
+    )
 
 
 REQUEST_INPUT_COOKIES_EMPTY: Dict[str, str] = {}
@@ -2683,10 +2697,11 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         ),
     ],
 )
-def test_automap_cookies(
+@ensureDeferred
+async def test_automap_cookies(
     settings, cookies, meta, params, expected, warnings, cookie_jar, caplog
 ):
-    _test_automap(
+    await _test_automap(
         settings,
         {"cookies": cookies, "meta": meta},
         params,
@@ -2704,7 +2719,8 @@ def test_automap_cookies(
         {"zyte_api_automap": {"browserHtml": True}},
     ],
 )
-def test_automap_all_cookies(meta):
+@ensureDeferred
+async def test_automap_all_cookies(meta):
     """Because of scenarios like cross-domain redirects and browser rendering,
     Zyte API requests should include all cookie jar cookies, regardless of
     the target URL domain."""
@@ -2712,7 +2728,7 @@ def test_automap_all_cookies(meta):
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -2805,7 +2821,8 @@ def test_automap_all_cookies(meta):
         {"zyte_api_automap": {"browserHtml": True}},
     ],
 )
-def test_automap_cookie_jar(meta):
+@ensureDeferred
+async def test_automap_cookie_jar(meta):
     """Test that cookies from the right jar are used."""
     request1 = Request(
         url="https://example.com/1", meta={**meta, "cookiejar": "a"}, cookies={"z": "y"}
@@ -2819,7 +2836,7 @@ def test_automap_cookie_jar(meta):
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -2865,13 +2882,14 @@ def test_automap_cookie_jar(meta):
         {"zyte_api_automap": {"browserHtml": True}},
     ],
 )
-def test_automap_cookie_limit(meta, caplog):
+@ensureDeferred
+async def test_automap_cookie_limit(meta, caplog):
     settings: Dict[str, Any] = {
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_MAX_COOKIES": 1,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -2993,7 +3011,8 @@ class CustomCookieMiddleware(CookiesMiddleware):
         self.jars = defaultdict(CustomCookieJar)
 
 
-def test_automap_custom_cookie_middleware():
+@ensureDeferred
+async def test_automap_custom_cookie_middleware():
     mw_cls = CustomCookieMiddleware
     settings = {
         "DOWNLOADER_MIDDLEWARES": {
@@ -3004,7 +3023,7 @@ def test_automap_custom_cookie_middleware():
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     cookie_middleware = get_downloader_middleware(crawler, mw_cls)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -3088,8 +3107,9 @@ def test_automap_custom_cookie_middleware():
         ),
     ],
 )
-def test_automap_body(body, meta, expected, warnings, caplog):
-    _test_automap({}, {"body": body}, meta, expected, warnings, caplog)
+@ensureDeferred
+async def test_automap_body(body, meta, expected, warnings, caplog):
+    await _test_automap({}, {"body": body}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -3161,8 +3181,9 @@ def test_automap_body(body, meta, expected, warnings, caplog):
         ),
     ],
 )
-def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
-    _test_automap({}, {}, meta, expected, warnings, caplog)
+@ensureDeferred
+async def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
+    await _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -3187,7 +3208,8 @@ def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
         ),
     ],
 )
-def test_default_params_automap(default_params, meta, expected, warnings, caplog):
+@ensureDeferred
+async def test_default_params_automap(default_params, meta, expected, warnings, caplog):
     """Warnings about unneeded parameters should not apply if those parameters
     are needed to extend or override parameters set in the
     ``ZYTE_API_AUTOMAP_PARAMS`` setting."""
@@ -3197,7 +3219,7 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
         "ZYTE_API_AUTOMAP_PARAMS": default_params,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
@@ -3218,14 +3240,15 @@ def test_default_params_automap(default_params, meta, expected, warnings, caplog
         {},
     ],
 )
-def test_default_params_false(default_params):
+@ensureDeferred
+async def test_default_params_false(default_params):
     """If zyte_api_default_params=False is passed, ZYTE_API_DEFAULT_PARAMS is ignored."""
     request = Request(url="https://example.com")
     request.meta["zyte_api_default_params"] = False
     settings = {
         "ZYTE_API_DEFAULT_PARAMS": default_params,
     }
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
     api_params = param_parser.parse(request)

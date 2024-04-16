@@ -12,8 +12,7 @@ from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
-from zyte_api.aio.client import AsyncClient, create_session
-from zyte_api.aio.errors import RequestError
+from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
 from zyte_api.constants import API_URL
 
@@ -56,7 +55,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     lazy = False
 
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
     ):
         if not settings.getbool("ZYTE_API_ENABLED", True):
             raise NotConfigured(
@@ -69,7 +68,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             # duplicate clients with the same settings to be used.
             # https://github.com/scrapy-plugins/scrapy-zyte-api/issues/58
             crawler.zyte_api_client = client
-        self._client: AsyncClient = crawler.zyte_api_client
+        self._client: AsyncZyteAPI = crawler.zyte_api_client
         logger.info("Using a Zyte API key starting with %r", self._client.api_key[:7])
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
@@ -85,10 +84,6 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self._param_parser = _ParamParser(crawler)
         self._retry_policy = _load_retry_policy(settings)
         self._stats = crawler.stats
-        self._session = create_session(
-            connection_pool_size=self._client.n_conn,
-            trust_env=settings.getbool("ZYTE_API_USE_ENV_PROXY"),
-        )
         self._must_log_request = settings.getbool("ZYTE_API_LOG_REQUESTS", False)
         self._truncate_limit = settings.getint("ZYTE_API_LOG_REQUESTS_TRUNCATE", 64)
         if self._truncate_limit < 0:
@@ -100,12 +95,14 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         crawler.signals.connect(self.engine_started, signal=signals.engine_started)
         self._crawler = crawler
         self._fallback_handler = None
+        self._trust_env = settings.getbool("ZYTE_API_USE_ENV_PROXY")
 
     @classmethod
     def from_crawler(cls, crawler):
         return cls(crawler.settings, crawler)
 
-    def engine_started(self):
+    async def engine_started(self):
+        self._session = self._client.session(trust_env=self._trust_env)
         if not self._cookies_enabled:
             return
         for middleware in self._crawler.engine.downloader.middleware.middlewares:
@@ -124,7 +121,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     @staticmethod
     def _build_client(settings):
         try:
-            return AsyncClient(
+            return AsyncZyteAPI(
                 # To allow users to have a key defined in Scrapy settings and
                 # in a environment variable, and be able to cause the
                 # environment variable to be used instead of the setting by
@@ -222,11 +219,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self._log_request(api_params)
 
         try:
-            api_response = await self._client.request_raw(
-                api_params,
-                session=self._session,
-                retrying=retrying,
-            )
+            api_response = await self._session.get(api_params, retrying=retrying)
         except RequestError as error:
             self._process_request_error(request, error)
             raise
@@ -280,7 +273,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
 class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
@@ -290,7 +283,7 @@ class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
 
 class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
@@ -300,7 +293,7 @@ class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
 
 class ScrapyZyteAPIHTTPSDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
