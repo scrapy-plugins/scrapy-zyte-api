@@ -3107,8 +3107,9 @@ async def test_automap_custom_cookie_middleware():
         ),
     ],
 )
-def test_automap_body(body, meta, expected, warnings, caplog):
-    _test_automap({}, {"body": body}, meta, expected, warnings, caplog)
+@ensureDeferred
+async def test_automap_body(body, meta, expected, warnings, caplog):
+    await _test_automap({}, {"body": body}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(
@@ -3180,8 +3181,9 @@ def test_automap_body(body, meta, expected, warnings, caplog):
         ),
     ],
 )
-def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
-    _test_automap({}, {}, meta, expected, warnings, caplog)
+@ensureDeferred
+async def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
+    await _test_automap({}, {}, meta, expected, warnings, caplog)
 
 
 @pytest.mark.parametrize(

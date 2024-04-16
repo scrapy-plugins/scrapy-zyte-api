@@ -102,9 +102,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         return cls(crawler.settings, crawler)
 
     async def engine_started(self):
-        self._session = await self._client.session(
-            trust_env=self._trust_env
-        ).__aenter__()
+        self._session = self._client.session(trust_env=self._trust_env)
         if not self._cookies_enabled:
             return
         for middleware in self._crawler.engine.downloader.middleware.middlewares:
@@ -270,7 +268,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         yield deferred_from_coro(self._close())
 
     async def _close(self) -> None:  # NOQA
-        await self._session.__aexit__(None, None, None)
+        await self._session.close()
 
 
 class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
