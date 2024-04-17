@@ -1,8 +1,15 @@
 import logging
+from asyncio import create_task, sleep
+from collections import deque
 from typing import cast
+from uuid import uuid4
 
 from scrapy import Request
+from scrapy.downloadermiddlewares.retry import get_retry_request
 from scrapy.exceptions import IgnoreRequest
+from scrapy.http.request import NO_CALLBACK
+from scrapy.utils.defer import deferred_to_future
+from scrapy.utils.misc import create_instance, load_object
 from zyte_api.aio.errors import RequestError
 
 from ._params import _ParamParser
@@ -197,3 +204,216 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
             if isinstance(item_or_request, Request):
                 self.slot_request(item_or_request, spider)
             yield item_or_request
+
+
+class _DummyChecker:
+
+    def check(self, response):
+        return True
+
+
+_ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
+_SESSION_INIT_META_KEY = "_is_session_init_request"
+
+
+class _SessionManager:
+
+    def __init__(self, crawler):
+        settings = crawler.settings
+
+        # Scrapy component to check responses to determine whether sessions
+        # have expired or not.
+        checker = settings.get("ZYTE_API_SESSION_CHECKER", None)
+        if checker:
+            self._checker = create_instance(
+                load_object(checker), settings=None, crawler=crawler
+            )
+        else:
+            self._checker = _DummyChecker()
+
+        # Maximum number of concurrent sessions to use.
+        self._max_count = settings.getint("ZYTE_API_SESSION_COUNT", 8)
+
+        # Zyte API parameters for session initialization.
+        self._params = settings.getdict("ZYTE_API_SESSION_PARAMS", {})
+
+        # URL to use for session initialization.
+        self._url = settings.get("ZYTE_API_SESSION_URL", None)
+
+        self._crawler = crawler
+
+        # The pool contains the IDs of sessions that have not expired yet.
+        #
+        # While the pool is smaller than the number of desired sessions, for
+        # every request needing a session a new session ID is added to the pool
+        # and its session initialization starts.
+        #
+        # Once the pool is full, sessions are picked from the queue, which
+        # should contain all pool sessions that have been initialized.
+        #
+        # As soon as a session expires, it is removed from the pool and
+        # replaced with a new session ID, and a task to initialize that new
+        # session is started.
+        self._pool = set()
+
+        # The queue is a rotating list of session IDs to use.
+        #
+        # The way to use the queue is to get a session ID with popleft(), and
+        # put it back to the end of the queue with append().
+        #
+        # The queue may contain session IDs from expired sessions. If the
+        # popped session ID cannot be found in the pool, then it should be
+        # discarded instead of being put back in the queue.
+        #
+        # When a new session ID is added to the pool, it is still not added to
+        # the queue until the session is actually initialized, when it is
+        # appended to the queue.
+        #
+        # If the queue is empty, sleep and try again. Sessions from the pool
+        # will be appended to the queue as they are initialized and ready to
+        # use.
+        self._queue = deque()
+
+        # Contains the on-going tasks to create new sessions.
+        #
+        # Keeping a reference to those tasks until they are done is necessary
+        # to prevent garbage collection to remove the tasks.
+        self._init_tasks = set()
+
+    async def _init_session(self, session_id, request):
+        url = self._url or request.url
+        session_init_request = Request(
+            url,
+            meta={
+                _SESSION_INIT_META_KEY: True,
+                "zyte_api": {**self._params, "session": {"id": session_id}},
+            },
+            callback=NO_CALLBACK,
+        )
+        deferred = self._crawler.engine.download(session_init_request)
+        try:
+            response = await deferred_to_future(deferred)
+        except Exception:
+            return False
+        return self._checker.check(session_init_request, response)
+
+    async def _create_session(self, request):
+        session_init_succeeded = False
+        while not session_init_succeeded:
+            session_id = str(uuid4())
+            self._pool.add(session_id)
+            session_init_succeeded = await self._init_session(session_id, request)
+            if not session_init_succeeded:
+                self._pool.remove(session_id)
+        self._queue.append(session_id)
+        return session_id
+
+    async def _next_from_queue(self):
+        session_id = None
+        while session_id not in self._pool:  # After 1st loop: invalid session.
+            try:
+                session_id = self._queue.popleft()
+            except IndexError:  # No ready-to-use session available.
+                await sleep(1)
+        self._queue.append(session_id)
+        return session_id
+
+    async def _next(self, request):
+        """Return the ID of the next working session in the session pool
+        rotation.
+
+        *request* is needed to determine the URL to use for request
+        initialization if the :setting:`ZYTE_API_SESSION_URL` setting is not
+        defined.
+        """
+        if len(self._pool) < self._max_count:
+            session_id = await self._create_session(request)
+        else:
+            session_id = await self._next_from_queue()
+        return session_id
+
+    def _is_session_init_request(self, request):
+        """Return ``True`` if the request is one of the requests being used
+        to initialize a session, or ``False`` otherwise.
+
+        If ``True`` is returned for a request, the session ID of that request
+        should not be modified, or it will break the session management logic.
+        """
+        return request.meta.get(_SESSION_INIT_META_KEY, False)
+
+    def _get_request_session_id(self, request):
+        for meta_key in _ZYTE_API_META_KEYS:
+            if meta_key not in request.meta:
+                continue
+            session_id = request.meta[meta_key].get("session", {}).get("id", None)
+            if session_id:
+                return session_id
+        return None
+
+    def _start_session_refresh(self, session_id, request):
+        self._pool.discard(session_id)
+        task = create_task(self._create_session(request))
+        self._init_tasks.add(task)
+        task.add_done_callback(self._init_tasks.discard)
+
+    async def check(self, request, response):
+        """Check the response for signs of session expiration, update the
+        internal session pool accordingly, and return ``False`` if the session
+        has expired or ``True`` if the session passed validation."""
+        if self._is_session_init_request(request):
+            return True
+
+        passed = self._checker.check(request, response)
+        if passed:
+            return True
+
+        session_id = self._get_request_session_id(request)
+        if session_id is None:
+            logger.warning(
+                f"Request {request} had no session ID assigned, "
+                f"unexpectedly. Please report this issue to the "
+                f"scrapy-zyte-api maintainers, providing a minimal, "
+                f"reproducible example."
+            )
+            return True
+
+        self._start_session_refresh(session_id, request)
+        return False
+
+    async def assign(self, request):
+        """Assign a working session to *request*."""
+        if self._is_session_init_request(request):
+            return
+
+        session_id = await self._sessions._next(request)
+        for meta_key in _ZYTE_API_META_KEYS:
+            if meta_key not in request.meta:
+                continue
+            # Note: If there is a session set already (e.g. a request being
+            # retried), it is overridden.
+            request.meta[meta_key]["session"] = {"id": session_id}
+
+
+class ScrapyZyteAPISessionDownloaderMiddleware:
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        self._sessions = _SessionManager(crawler)
+
+    async def process_request(self, request, spider):
+        await self._sessions.assign(request)
+
+    async def process_response(self, request, response, spider):
+        passed = await self._sessions.check(request, response)
+        if not passed:
+            new_request_or_none = get_retry_request(
+                request,
+                spider=spider,
+                reason="session_expired",
+            )
+            if not new_request_or_none:
+                raise IgnoreRequest
+            return new_request_or_none

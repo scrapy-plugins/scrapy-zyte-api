@@ -8,6 +8,7 @@ if _NEEDS_EARLY_REACTOR:
 from ._annotations import ExtractFrom, actions
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPISessionDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
 from ._page_inputs import Actions, Geolocation, Screenshot

@@ -246,6 +246,75 @@ subclass.
 See :ref:`retry`.
 
 
+.. setting:: ZYTE_API_SESSION_CHECKER
+
+ZYTE_API_SESSION_CHECKER
+========================
+
+Default: ``None``
+
+A :ref:`Scrapy component <topics-components>` (or its import path as a string)
+that defines a ``check`` function.
+
+When defined, :ref:`sessions managed by scrapy-zyte-api <plugin-sessions>` are
+enabled, and the ``check`` function is called on every response. If ``check``
+returns ``True``, the response session is considered valid; if ``check``
+returns ``False``, the response session is considered invalid, and will be
+expired.
+
+For example:
+
+.. code-block:: python
+
+    class MySessionChecker:
+
+        def check(self, request, response):
+            return bool(response.css(".is_valid"))
+
+
+.. setting:: ZYTE_API_SESSION_COUNT
+
+ZYTE_API_SESSION_COUNT
+======================
+
+Default: ``8``
+
+The number of concurrent sessions to maintain when using
+:ref:`scrapy-zyte-api’s session API <plugin-sessions>`.
+
+
+.. setting:: ZYTE_API_SESSION_PARAMS
+
+ZYTE_API_SESSION_PARAMS
+=======================
+
+Default: ``{}``
+
+Parameters to use for session initialization.
+
+It works similarly to :http:`request:sessionContextParams` from
+:ref:`server-managed sessions <zyte-api-session-contexts>`, but it supports
+arbitrary Zyte API parameters instead of a specific subset.
+
+It can be left undefined if no specific parameters are needed to initialize a
+session. If so, :ref:`sessions managed by scrapy-zyte-api <plugin-sessions>`
+will still be used as long as :setting:`ZYTE_API_SESSION_CHECKER` is defined.
+
+
+.. setting:: ZYTE_API_SESSION_URL
+
+ZYTE_API_SESSION_URL
+====================
+
+Default: ``None``
+
+A specific URL to use for session initialization when using
+:ref:`scrapy-zyte-api’s session API <plugin-sessions>`.
+
+If not set, the URL of the request being processed upon session creation is
+used.
+
+
 .. setting:: ZYTE_API_SKIP_HEADERS
 
 ZYTE_API_SKIP_HEADERS

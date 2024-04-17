@@ -3,6 +3,7 @@ from scrapy.utils.misc import load_object
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPISessionDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
 
@@ -71,6 +72,12 @@ class Addon:
         ] = "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler"
         _setdefault(
             settings, "DOWNLOADER_MIDDLEWARES", ScrapyZyteAPIDownloaderMiddleware, 1000
+        )
+        _setdefault(
+            settings,
+            "DOWNLOADER_MIDDLEWARES",
+            ScrapyZyteAPISessionDownloaderMiddleware,
+            1100,
         )
         _setdefault(settings, "SPIDER_MIDDLEWARES", ScrapyZyteAPISpiderMiddleware, 100)
         settings.set(

@@ -130,6 +130,17 @@ the ``SCRAPY_POET_PROVIDERS`` setting:
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
     }
 
+For :ref:`session management support <session>`, add the following downloader
+middleware to the :setting:`DOWNLOADER_MIDDLEWARES
+<scrapy:DOWNLOADER_MIDDLEWARES>` setting:
+
+.. code-block:: python
+    :caption: settings.py
+
+    DOWNLOADER_MIDDLEWARES = {
+        "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 1100,
+    }
+
 If you already had a custom value for :setting:`REQUEST_FINGERPRINTER_CLASS
 <scrapy:REQUEST_FINGERPRINTER_CLASS>`, set that value on
 :setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` instead.
