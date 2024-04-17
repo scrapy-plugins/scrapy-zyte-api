@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.18.0 (unreleased)
+0.18.0 (2024-04-17)
 -------------------
 
 * Updated requirement versions:
