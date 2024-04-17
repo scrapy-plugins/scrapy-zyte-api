@@ -1,6 +1,20 @@
 Changes
 =======
 
+0.18.0 (2024-04-17)
+-------------------
+
+* Updated requirement versions:
+
+  * :doc:`zyte-api <python-zyte-api:index>` >= 0.5.1
+
+* A new :reqmeta:`zyte_api_provider` request metadata key offers the same
+  functionality as the :setting:`ZYTE_API_PROVIDER_PARAMS` setting on a
+  per-request basis.
+
+* Fixed support for nested dicts, tuples and lists when defining :ref:`browser
+  actions <browser-actions>`.
+
 0.17.3 (2024-03-18)
 -------------------
 
@@ -66,7 +80,7 @@ Changes
   into account for request fingerprinting.
 
   Now, when scrapy-poet is installed, the default value of the
-  :ref:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` setting is
+  :setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` setting is
   :class:`scrapy_poet.ScrapyPoetRequestFingerprinter`, and a warning will be
   issued if a custom value is not a subclass of
   :class:`~scrapy_poet.ScrapyPoetRequestFingerprinter`.
