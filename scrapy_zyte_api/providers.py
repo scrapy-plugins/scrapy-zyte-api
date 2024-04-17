@@ -122,7 +122,18 @@ class ZyteApiProvider(PageObjectInputProvider):
                         "Actions dependencies must be annotated, "
                         "e.g. Annotated[Actions, actions([...list of actions...])]."
                     )
-                zyte_api_meta["actions"] = [dict(action) for action in cls.__metadata__[0]]  # type: ignore[attr-defined]
+                zyte_api_meta["actions"] = []
+                for action in cls.__metadata__[0]:  # type: ignore[attr-defined]
+                    zyte_api_meta["actions"].append(
+                        {
+                            k: (
+                                dict(v)
+                                if isinstance(v, frozenset)
+                                else list(v) if isinstance(v, tuple) else v
+                            )
+                            for k, v in action
+                        }
+                    )
                 continue
             kw = item_keywords.get(cls_stripped)
             if not kw:
