@@ -12,6 +12,9 @@ Changes
   functionality as the :setting:`ZYTE_API_PROVIDER_PARAMS` setting on a
   per-request basis.
 
+* Fixed support for nested dicts, tuples and lists when defining :ref:`browser
+  actions <browser-actions>`.
+
 0.17.3 (2024-03-18)
 -------------------
 
