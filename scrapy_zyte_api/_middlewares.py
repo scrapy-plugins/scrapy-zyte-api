@@ -1,20 +1,114 @@
 import logging
 from asyncio import create_task, sleep
 from collections import deque
-from typing import cast
+from typing import Deque, cast
 from uuid import uuid4
 
 from scrapy import Request
-from scrapy.downloadermiddlewares.retry import get_retry_request
 from scrapy.exceptions import IgnoreRequest
-from scrapy.http.request import NO_CALLBACK
-from scrapy.utils.defer import deferred_to_future
 from scrapy.utils.misc import create_instance, load_object
+from scrapy.utils.python import global_object_name
 from zyte_api.aio.errors import RequestError
 
 from ._params import _ParamParser
 
 logger = logging.getLogger(__name__)
+
+try:
+    from scrapy.downloadermiddlewares.retry import get_retry_request
+except ImportError:
+    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/downloadermiddlewares/retry.py#L57-L142
+    def get_retry_request(
+        request,
+        *,
+        spider,
+        reason="unspecified",
+        max_retry_times=None,
+        priority_adjust=None,
+        stats_base_key="retry",
+    ):
+        settings = spider.crawler.settings
+        assert spider.crawler.stats
+        stats = spider.crawler.stats
+        retry_times = request.meta.get("retry_times", 0) + 1
+        if max_retry_times is None:
+            max_retry_times = request.meta.get("max_retry_times")
+            if max_retry_times is None:
+                max_retry_times = settings.getint("RETRY_TIMES")
+        if retry_times <= max_retry_times:
+            logger.debug(
+                "Retrying %(request)s (failed %(retry_times)d times): %(reason)s",
+                {"request": request, "retry_times": retry_times, "reason": reason},
+                extra={"spider": spider},
+            )
+            new_request: Request = request.copy()
+            new_request.meta["retry_times"] = retry_times
+            new_request.dont_filter = True
+            if priority_adjust is None:
+                priority_adjust = settings.getint("RETRY_PRIORITY_ADJUST")
+            new_request.priority = request.priority + priority_adjust
+
+            if callable(reason):
+                reason = reason()
+            if isinstance(reason, Exception):
+                reason = global_object_name(reason.__class__)
+
+            stats.inc_value(f"{stats_base_key}/count")
+            stats.inc_value(f"{stats_base_key}/reason_count/{reason}")
+            return new_request
+        stats.inc_value(f"{stats_base_key}/max_reached")
+        logger.error(
+            "Gave up retrying %(request)s (failed %(retry_times)d times): "
+            "%(reason)s",
+            {"request": request, "retry_times": retry_times, "reason": reason},
+            extra={"spider": spider},
+        )
+        return None
+
+
+try:
+    from scrapy.http.request import NO_CALLBACK
+except ImportError:
+    NO_CALLBACK = "parse"
+
+try:
+    from scrapy.utils.defer import deferred_to_future
+except ImportError:
+    import asyncio
+    from warnings import catch_warnings, filterwarnings
+
+    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/reactor.py#L119-L147
+    def set_asyncio_event_loop():
+        try:
+            with catch_warnings():
+                # In Python 3.10.9, 3.11.1, 3.12 and 3.13, a DeprecationWarning
+                # is emitted about the lack of a current event loop, because in
+                # Python 3.14 and later `get_event_loop` will raise a
+                # RuntimeError in that event. Because our code is already
+                # prepared for that future behavior, we ignore the deprecation
+                # warning.
+                filterwarnings(
+                    "ignore",
+                    message="There is no current event loop",
+                    category=DeprecationWarning,
+                )
+                event_loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # `get_event_loop` raises RuntimeError when called with no asyncio
+            # event loop yet installed in the following scenarios:
+            # - Previsibly on Python 3.14 and later.
+            #   https://github.com/python/cpython/issues/100160#issuecomment-1345581902
+            event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(event_loop)
+        return event_loop
+
+    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/reactor.py#L115-L116
+    def _get_asyncio_event_loop():
+        return set_asyncio_event_loop()
+
+    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/defer.py#L360-L379
+    def deferred_to_future(d):
+        return d.asFuture(_get_asyncio_event_loop())
 
 
 _start_requests_processed = object()
@@ -272,7 +366,7 @@ class _SessionManager:
         # If the queue is empty, sleep and try again. Sessions from the pool
         # will be appended to the queue as they are initialized and ready to
         # use.
-        self._queue = deque()
+        self._queue: Deque[str] = deque()
 
         # Contains the on-going tasks to create new sessions.
         #
@@ -315,6 +409,7 @@ class _SessionManager:
                 session_id = self._queue.popleft()
             except IndexError:  # No ready-to-use session available.
                 await sleep(1)
+        assert session_id is not None
         self._queue.append(session_id)
         return session_id
 
@@ -385,7 +480,7 @@ class _SessionManager:
         if self._is_session_init_request(request):
             return
 
-        session_id = await self._sessions._next(request)
+        session_id = await self._next(request)
         for meta_key in _ZYTE_API_META_KEYS:
             if meta_key not in request.meta:
                 continue
