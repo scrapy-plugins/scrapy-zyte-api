@@ -51,8 +51,16 @@ Often it makes sense to define both. For example:
 
     class MySessionChecker:
 
+        @classmethod
+        def from_crawler(cls, crawler):
+            return cls(crawler)
+
+        def __init__(self, crawler):
+            params = crawler.settings["ZYTE_API_SESSION_PARAMS"]
+            self.zip_code = params["actions"][0]["address"]["postalCode"]
+
         def check_session(self, request: Request, response: Response) -> bool:
-            return response.css(".zip_code::text").get() == "04662"
+            return response.css(".zip_code::text").get() == self.zip_code
 
 
     ZYTE_API_SESSION_CHECKER = MySessionChecker
