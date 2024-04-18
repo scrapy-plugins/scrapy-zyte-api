@@ -5,7 +5,7 @@ from typing import Deque, cast
 from uuid import uuid4
 
 from scrapy import Request
-from scrapy.exceptions import IgnoreRequest
+from scrapy.exceptions import IgnoreRequest, NotConfigured
 from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.python import global_object_name
 from zyte_api.aio.errors import RequestError
@@ -300,7 +300,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
             yield item_or_request
 
 
-class _DummyChecker:
+class DummyChecker:
 
     def check(self, response):
         return True
@@ -319,17 +319,17 @@ class _SessionManager:
         # have expired or not.
         checker = settings.get("ZYTE_API_SESSION_CHECKER", None)
         if checker:
-            self._checker = create_instance(
+            self.checker = create_instance(
                 load_object(checker), settings=None, crawler=crawler
             )
         else:
-            self._checker = _DummyChecker()
+            self.checker = DummyChecker()
 
         # Maximum number of concurrent sessions to use.
         self._max_count = settings.getint("ZYTE_API_SESSION_COUNT", 8)
 
         # Zyte API parameters for session initialization.
-        self._params = settings.getdict("ZYTE_API_SESSION_PARAMS", {})
+        self.params = settings.getdict("ZYTE_API_SESSION_PARAMS", {})
 
         # URL to use for session initialization.
         self._url = settings.get("ZYTE_API_SESSION_URL", None)
@@ -380,7 +380,7 @@ class _SessionManager:
             url,
             meta={
                 _SESSION_INIT_META_KEY: True,
-                "zyte_api": {**self._params, "session": {"id": session_id}},
+                "zyte_api": {**self.params, "session": {"id": session_id}},
             },
             callback=NO_CALLBACK,
         )
@@ -389,7 +389,7 @@ class _SessionManager:
             response = await deferred_to_future(deferred)
         except Exception:
             return False
-        return self._checker.check(session_init_request, response)
+        return self.checker.check(session_init_request, response)
 
     async def _create_session(self, request):
         session_init_succeeded = False
@@ -458,7 +458,7 @@ class _SessionManager:
         if self._is_session_init_request(request):
             return True
 
-        passed = self._checker.check(request, response)
+        passed = self.checker.check(request, response)
         if passed:
             return True
 
@@ -497,6 +497,13 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
 
     def __init__(self, crawler):
         self._sessions = _SessionManager(crawler)
+        if not self._sessions.params and isinstance(
+            self._sessions.checker, DummyChecker
+        ):
+            raise NotConfigured(
+                "Neither ZYTE_API_SESSION_CHECKER nor ZYTE_API_SESSION_PARAMS "
+                "are defined."
+            )
 
     async def process_request(self, request, spider):
         await self._sessions.assign(request)
