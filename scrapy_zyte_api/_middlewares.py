@@ -334,6 +334,10 @@ class _SessionManager:
         # URL to use for session initialization.
         self._url = settings.get("ZYTE_API_SESSION_URL", None)
 
+        # Transparent mode, needed to determine whether to set the session
+        # using ``zyte_api`` or ``zyte_api_automap``.
+        self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
+
         self._crawler = crawler
 
         # The pool contains the IDs of sessions that have not expired yet.
@@ -481,12 +485,21 @@ class _SessionManager:
             return
 
         session_id = await self._next(request)
-        for meta_key in _ZYTE_API_META_KEYS:
-            if meta_key not in request.meta:
-                continue
-            # Note: If there is a session set already (e.g. a request being
-            # retried), it is overridden.
-            request.meta[meta_key]["session"] = {"id": session_id}
+        # Note: If there is a session set already (e.g. a request being
+        # retried), it is overridden.
+        request.meta.setdefault("zyte_api_provider", {})["session"] = {"id": session_id}
+        if (
+            "zyte_api" in request.meta
+            or request.meta.get("zyte_api_automap", None) is False
+            or (
+                "zyte_api_automap" not in request.meta
+                and self._transparent_mode is False
+            )
+        ):
+            meta_key = "zyte_api"
+        else:
+            meta_key = "zyte_api_automap"
+        request.meta.setdefault(meta_key, {})["session"] = {"id": session_id}
 
 
 class ScrapyZyteAPISessionDownloaderMiddleware:
