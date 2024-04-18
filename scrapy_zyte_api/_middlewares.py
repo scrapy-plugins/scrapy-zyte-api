@@ -331,9 +331,6 @@ class _SessionManager:
         # Zyte API parameters for session initialization.
         self.params = settings.getdict("ZYTE_API_SESSION_PARAMS", {})
 
-        # URL to use for session initialization.
-        self._url = settings.get("ZYTE_API_SESSION_URL", None)
-
         # Transparent mode, needed to determine whether to set the session
         # using ``zyte_api`` or ``zyte_api_automap``.
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
@@ -379,9 +376,8 @@ class _SessionManager:
         self._init_tasks = set()
 
     async def _init_session(self, session_id, request):
-        url = self._url or request.url
         session_init_request = Request(
-            url,
+            request.url,
             meta={
                 _SESSION_INIT_META_KEY: True,
                 "zyte_api": {**self.params, "session": {"id": session_id}},
@@ -422,8 +418,7 @@ class _SessionManager:
         rotation.
 
         *request* is needed to determine the URL to use for request
-        initialization if the :setting:`ZYTE_API_SESSION_URL` setting is not
-        defined.
+        initialization.
         """
         if len(self._pool) < self._max_count:
             session_id = await self._create_session(request)

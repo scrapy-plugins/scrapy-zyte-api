@@ -58,5 +58,4 @@ Often it makes sense to define both. For example:
     ZYTE_API_SESSION_CHECKER = MySessionChecker
 
 You can also use :setting:`ZYTE_API_SESSION_COUNT` to customize the number of
-concurrent sessions to use, and :setting:`ZYTE_API_SESSION_URL` to set a
-specific URL to use for session initialization.
+concurrent sessions to use.

@@ -305,20 +305,6 @@ session. If so, :ref:`sessions managed by scrapy-zyte-api <plugin-sessions>`
 will still be used as long as :setting:`ZYTE_API_SESSION_CHECKER` is defined.
 
 
-.. setting:: ZYTE_API_SESSION_URL
-
-ZYTE_API_SESSION_URL
-====================
-
-Default: ``None``
-
-A specific URL to use for session initialization when using
-:ref:`scrapy-zyte-api’s session API <plugin-sessions>`.
-
-If not set, the URL of the request being processed upon session creation is
-used.
-
-
 .. setting:: ZYTE_API_SKIP_HEADERS
 
 ZYTE_API_SKIP_HEADERS
