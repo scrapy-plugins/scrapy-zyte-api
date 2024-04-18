@@ -40,12 +40,13 @@ Often it makes sense to define both. For example:
     from scrapy.http.response import Response
 
     ZYTE_API_SESSION_PARAMS = {
+        "browserHtml": True,
         "actions": [
             {
                 "action": "setLocation",
                 "address": {"postalCode": "04662"},
             }
-        ]
+        ],
     }
 
 
