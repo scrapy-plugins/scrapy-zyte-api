@@ -8,7 +8,7 @@ from scrapy import Request
 from scrapy.exceptions import IgnoreRequest, NotConfigured
 from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.python import global_object_name
-from zyte_api.aio.errors import RequestError
+from zyte_api import RequestError
 
 from ._params import _ParamParser
 
@@ -452,17 +452,7 @@ class _SessionManager:
         self._init_tasks.add(task)
         task.add_done_callback(self._init_tasks.discard)
 
-    async def check(self, request, response):
-        """Check the response for signs of session expiration, update the
-        internal session pool accordingly, and return ``False`` if the session
-        has expired or ``True`` if the session passed validation."""
-        if self._is_session_init_request(request):
-            return True
-
-        passed = self.checker.check_session(request, response)
-        if passed:
-            return True
-
+    def start_request_session_refresh(self, request):
         session_id = self._get_request_session_id(request)
         if session_id is None:
             logger.warning(
@@ -475,6 +465,17 @@ class _SessionManager:
 
         self._start_session_refresh(session_id, request)
         return False
+
+    async def check(self, request, response):
+        """Check the response for signs of session expiration, update the
+        internal session pool accordingly, and return ``False`` if the session
+        has expired or ``True`` if the session passed validation."""
+        if self._is_session_init_request(request):
+            return True
+        passed = self.checker.check_session(request, response)
+        if passed:
+            return True
+        return self.start_request_session_refresh(request)
 
     async def assign(self, request):
         """Assign a working session to *request*."""
@@ -530,3 +531,14 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
                 raise IgnoreRequest
             return new_request_or_none
         return response
+
+    def process_exception(self, request, exception, spider):
+        if not isinstance(exception, RequestError):
+            return None
+
+        self._sessions.start_request_session_refresh(request)
+        return get_retry_request(
+            request,
+            spider=spider,
+            reason="unsuccessful_response",
+        )
