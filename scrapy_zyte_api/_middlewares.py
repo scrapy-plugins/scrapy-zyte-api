@@ -387,7 +387,8 @@ class _SessionManager:
         deferred = self._crawler.engine.download(session_init_request)
         try:
             response = await deferred_to_future(deferred)
-        except Exception:
+        except Exception as e:
+            logger.debug(f"{e} when initializing session {session_id}")
             return False
         return self.checker.check_session(session_init_request, response)
 
@@ -528,3 +529,4 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             if not new_request_or_none:
                 raise IgnoreRequest
             return new_request_or_none
+        return response
