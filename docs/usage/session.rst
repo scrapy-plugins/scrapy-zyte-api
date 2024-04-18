@@ -36,6 +36,9 @@ Often it makes sense to define both. For example:
 .. code-block:: python
     :caption: settings.py
 
+    from scrapy import Request
+    from scrapy.http.response import Response
+
     ZYTE_API_SESSION_PARAMS = {
         "actions": [
             {
@@ -48,7 +51,7 @@ Often it makes sense to define both. For example:
 
     class MySessionChecker:
 
-        def check(self, request, response):
+        def check_session(self, request: Request, response: Response) -> bool:
             return response.css(".zip_code::text").get() == "04662"
 
 

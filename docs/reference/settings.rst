@@ -266,9 +266,13 @@ For example:
 
 .. code-block:: python
 
+    from scrapy import Request
+    from scrapy.http.response import Response
+
+
     class MySessionChecker:
 
-        def check(self, request, response):
+        def check_session(self, request: Request, response: Response) -> bool:
             return bool(response.css(".is_valid"))
 
 

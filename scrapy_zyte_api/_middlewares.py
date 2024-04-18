@@ -302,7 +302,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
 
 class DummyChecker:
 
-    def check(self, response):
+    def check_session(self, response):
         return True
 
 
@@ -393,7 +393,7 @@ class _SessionManager:
             response = await deferred_to_future(deferred)
         except Exception:
             return False
-        return self.checker.check(session_init_request, response)
+        return self.checker.check_session(session_init_request, response)
 
     async def _create_session(self, request):
         session_init_succeeded = False
@@ -462,7 +462,7 @@ class _SessionManager:
         if self._is_session_init_request(request):
             return True
 
-        passed = self.checker.check(request, response)
+        passed = self.checker.check_session(request, response)
         if passed:
             return True
 
