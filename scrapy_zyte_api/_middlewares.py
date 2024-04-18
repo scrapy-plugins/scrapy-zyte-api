@@ -326,7 +326,7 @@ class _SessionManager:
             self.checker = DummyChecker()
 
         # Maximum number of concurrent sessions to use.
-        self._max_count = settings.getint("ZYTE_API_SESSION_COUNT", 8)
+        self._pending_initial_sessions = settings.getint("ZYTE_API_SESSION_COUNT", 8)
 
         # Zyte API parameters for session initialization.
         self.params = settings.getdict("ZYTE_API_SESSION_PARAMS", {})
@@ -420,7 +420,8 @@ class _SessionManager:
         *request* is needed to determine the URL to use for request
         initialization.
         """
-        if len(self._pool) < self._max_count:
+        if self._pending_initial_sessions:
+            self._pending_initial_sessions -= 1
             session_id = await self._create_session(request)
         else:
             session_id = await self._next_from_queue()
