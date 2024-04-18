@@ -251,6 +251,7 @@ def test_no_poet_setting_changes(initial_settings, expected_settings):
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
                     ScrapyZyteAPIDownloaderMiddleware: 1000,
+                    ScrapyZyteAPISessionDownloaderMiddleware: 1100,
                     InjectionMiddleware: 543,
                 },
                 "SCRAPY_POET_PROVIDERS": {
