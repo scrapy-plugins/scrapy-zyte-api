@@ -308,6 +308,43 @@ async def test_provider_extractfrom_double(mockserver, caplog):
     sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
 )
 @ensureDeferred
+async def test_provider_extractfrom_override(mockserver):
+    from typing import Annotated
+
+    @attrs.define
+    class AnnotatedProductPage(BasePage):
+        product: Annotated[Product, ExtractFrom.httpResponseBody]
+
+    class AnnotatedZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "productOptions": {"extractFrom": "browserHtml"}
+    }
+
+    item, url, _ = await crawl_single_item(
+        AnnotatedZyteAPISpider, HtmlResource, settings
+    )
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
+        )
+    )
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@ensureDeferred
 async def test_provider_geolocation(mockserver):
     from typing import Annotated
 
