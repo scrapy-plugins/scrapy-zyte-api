@@ -3304,6 +3304,24 @@ async def test_middleware_headers_cb_requests():
 
 
 @ensureDeferred
+async def test_middleware_headers_cb_requests_disable():
+    """Callback requests will not include the Referer parameter if the Referer
+    middleware is disabled."""
+    settings = {
+        "REFERER_ENABLED": False,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = await get_crawler(settings)
+    request = Request(url="https://example.com")
+    await _process_request(crawler, request)
+
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    api_params = param_parser.parse(request)
+    assert "customHttpRequestHeaders" not in api_params
+
+
+@ensureDeferred
 async def test_middleware_headers_cb_requests_skip():
     """Callback requests will not include the Referer parameter if the Referer
     header is configured to be skipped."""
