@@ -11,11 +11,10 @@ either :ref:`globally <transparent>` or :ref:`per request <automap>`, or
 :ref:`manually per request <manual>`.
 
 .. toctree::
-   :caption: First steps
+   :caption: Setup
    :hidden:
 
-   first-steps/setup
-   first-steps/scrapy-poet
+   setup
 
 .. toctree::
    :caption: Usage

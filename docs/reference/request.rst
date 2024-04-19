@@ -29,7 +29,7 @@ Automatic mapping
     :http:`request:requestHeaders` for browser requests. See
     :ref:`header-mapping` and :ref:`request-unsupported` for details.
 
--   If :ref:`ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED` is ``True``,
+-   If :setting:`ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED` is ``True``,
     :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` is ``True`` (default),
     and :attr:`Request.meta <scrapy.http.Request.meta>` does not set
     :reqmeta:`dont_merge_cookies <scrapy:dont_merge_cookies>` to ``True``:
@@ -44,8 +44,8 @@ Automatic mapping
         different domains (e.g. when following cross-domain redirects, or
         during browser rendering).
 
-        See also: :ref:`ZYTE_API_MAX_COOKIES`,
-        :ref:`ZYTE_API_COOKIE_MIDDLEWARE`.
+        See also: :setting:`ZYTE_API_MAX_COOKIES`,
+        :setting:`ZYTE_API_COOKIE_MIDDLEWARE`.
 
 -   :http:`request:httpResponseBody` and :http:`request:httpResponseHeaders`
     are set to ``True``.
@@ -98,7 +98,7 @@ For example, the following Scrapy request:
 .. code-block:: python
 
     Request(
-        method="POST"
+        method="POST",
         url="https://httpbin.org/anything",
         headers={"Content-Type": "application/json"},
         body=b'{"foo": "bar"}',
@@ -141,10 +141,11 @@ Header mapping
 ==============
 
 When mapping headers, some headers are dropped based on the values of the
-:ref:`ZYTE_API_SKIP_HEADERS` and :ref:`ZYTE_API_BROWSER_HEADERS` settings.
-Their default values cause the drop of headers not supported by Zyte API.
+:setting:`ZYTE_API_SKIP_HEADERS` and :setting:`ZYTE_API_BROWSER_HEADERS`
+settings. Their default values cause the drop of headers not supported by Zyte
+API.
 
-Even if not defined in :ref:`ZYTE_API_SKIP_HEADERS`, additional headers may
+Even if not defined in :setting:`ZYTE_API_SKIP_HEADERS`, additional headers may
 be dropped from HTTP requests (:http:`request:customHttpRequestHeaders`):
 
 -   The ``Accept`` and ``Accept-Language`` headers are dropped if their values
@@ -159,10 +160,9 @@ be dropped from HTTP requests (:http:`request:customHttpRequestHeaders`):
     :class:`~scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware`.
 
 -   The ``User-Agent`` header is dropped if its value is not user-defined, i.e.
-    it comes from the :ref:`default global value
-    <populating-settings>` (setting :meth:`priority
-    <scrapy.settings.BaseSettings.getpriority>` of 0) of the
-    :setting:`USER_AGENT <scrapy:USER_AGENT>` setting.
+    it comes from the :ref:`default global value <populating-settings>`
+    (setting :meth:`priority <scrapy.settings.BaseSettings.getpriority>` of 0)
+    of the :setting:`USER_AGENT <scrapy:USER_AGENT>` setting.
 
 To force the mapping of these headers, define the corresponding setting
 (if any), set them in the :setting:`DEFAULT_REQUEST_HEADERS
@@ -176,14 +176,16 @@ downloader middleware, which is responsible for the mapping, processes the
 request. Here “before” means a lower value in the
 :setting:`DOWNLOADER_MIDDLEWARES <scrapy:DOWNLOADER_MIDDLEWARES>` setting.
 
-Similarly, you can add any of those headers to the :ref:`ZYTE_API_SKIP_HEADERS`
-setting to prevent their mapping.
+Similarly, you can add any of those headers to the
+:setting:`ZYTE_API_SKIP_HEADERS` setting to prevent their mapping.
 
 Also note that Scrapy sets the ``Referer`` header by default in all requests
 that come from spider callbacks. To unset the header on a given request, set
 the header value to ``None`` on that request. To unset it from all requests,
-add it to the :ref:`ZYTE_API_SKIP_HEADERS` setting and remove it from the
-:ref:`ZYTE_API_BROWSER_HEADERS` setting.
+set the :setting:`REFERER_ENABLED <scrapy:REFERER_ENABLED>` setting to
+``False``. To unset it only from Zyte API requests, add it to the
+:setting:`ZYTE_API_SKIP_HEADERS` setting and remove it from the
+:setting:`ZYTE_API_BROWSER_HEADERS` setting.
 
 
 .. _request-unsupported:
@@ -219,9 +221,12 @@ combinations that Zyte API does not currently support, and may never support:
     case, :attr:`Request.headers <scrapy.http.Request.headers>` is mapped as
     :http:`request:requestHeaders`.
 
--   You can set :http:`request:httpResponseBody` to ``True`` and also set
-    :http:`request:browserHtml` or :http:`request:screenshot` to ``True``. In
-    this case, :attr:`Request.headers <scrapy.http.Request.headers>` is mapped
-    both as :http:`request:customHttpRequestHeaders` and as
+-   You can set :http:`request:httpResponseBody` to ``True`` or use
+    :ref:`automatic extraction from httpResponseBody <zyte-api-extract-from>`,
+    and also set :http:`request:browserHtml` or :http:`request:screenshot` to
+    ``True`` or use :ref:`automatic extraction from browserHtml
+    <zyte-api-extract-from>`. In this case, :attr:`Request.headers
+    <scrapy.http.Request.headers>` is mapped both as
+    :http:`request:customHttpRequestHeaders` and as
     :http:`request:requestHeaders`, and :http:`request:browserHtml` is used as
     :class:`response.body <scrapy_zyte_api.responses.ZyteAPIResponse.body>`.

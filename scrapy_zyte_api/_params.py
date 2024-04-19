@@ -2,7 +2,7 @@ from base64 import b64decode, b64encode
 from copy import copy
 from logging import getLogger
 from os import environ
-from typing import Any, Dict, List, Mapping, Optional, Union
+from typing import Any, Dict, List, Mapping, Optional, Set, Union
 from warnings import warn
 
 from scrapy import Request
@@ -485,6 +485,16 @@ def _map_request_headers(
         api_params["requestHeaders"] = request_headers
 
 
+def _get_extract_froms(api_params: Dict[str, Any]) -> Set[str]:
+    result = set()
+    for key in _EXTRACT_KEYS:
+        if not api_params.get(key, False):
+            continue
+        options = api_params.get(f"{key}Options", {})
+        result.add(options.get("extractFrom", "browserHtml"))
+    return result
+
+
 def _set_request_headers_from_request(
     *,
     api_params: Dict[str, Any],
@@ -497,12 +507,12 @@ def _set_request_headers_from_request(
     custom_http_request_headers = api_params.get("customHttpRequestHeaders")
     request_headers = api_params.get("requestHeaders")
     response_body = api_params.get("httpResponseBody")
+    extract_froms = _get_extract_froms(api_params)
 
     if (
-        response_body
+        (response_body or "httpResponseBody" in extract_froms)
         and custom_http_request_headers is not False
-        or custom_http_request_headers is True
-    ):
+    ) or custom_http_request_headers is True:
         _map_custom_http_request_headers(
             api_params=api_params,
             request=request,
@@ -512,10 +522,13 @@ def _set_request_headers_from_request(
         api_params.pop("customHttpRequestHeaders")
 
     if (
-        (not response_body or any(api_params.get(k) for k in _BROWSER_OR_EXTRACT_KEYS))
-        and request_headers is not False
-        or request_headers is True
-    ):
+        request_headers is not False
+        and (
+            (not response_body and "httpResponseBody" not in extract_froms)
+            or any(api_params.get(k) for k in _BROWSER_KEYS)
+            or "browserHtml" in extract_froms
+        )
+    ) or request_headers is True:
         _map_request_headers(
             api_params=api_params,
             request=request,

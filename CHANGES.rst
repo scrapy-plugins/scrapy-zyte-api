@@ -1,6 +1,81 @@
 Changes
 =======
 
+0.18.1 (2024-04-19)
+-------------------
+
+* ``extractFrom`` in :reqmeta:`zyte_api_provider` or
+  :setting:`ZYTE_API_PROVIDER_PARAMS` overrides
+  :class:`~scrapy_zyte_api.ExtractFrom` annotations.
+
+0.18.0 (2024-04-17)
+-------------------
+
+* Updated requirement versions:
+
+  * :doc:`zyte-api <python-zyte-api:index>` >= 0.5.1
+
+* A new :reqmeta:`zyte_api_provider` request metadata key offers the same
+  functionality as the :setting:`ZYTE_API_PROVIDER_PARAMS` setting on a
+  per-request basis.
+
+* Fixed support for nested dicts, tuples and lists when defining :ref:`browser
+  actions <browser-actions>`.
+
+0.17.3 (2024-03-18)
+-------------------
+
+* :class:`scrapy_zyte_api.Addon` now adds
+  :class:`scrapy_zyte_api.providers.ZyteApiProvider` to the
+  ``SCRAPY_POET_PROVIDERS`` :ref:`scrapy-poet setting <scrapy-poet:settings>`
+  if :doc:`scrapy-poet <scrapy-poet:index>` is installed.
+
+0.17.2 (2024-03-14)
+-------------------
+
+* Added a :class:`scrapy_zyte_api.Actions` dependency.
+
+0.17.1 (2024-03-11)
+-------------------
+
+* Added a :class:`scrapy_zyte_api.Screenshot` dependency.
+
+0.17.0 (2024-03-05)
+-------------------
+
+* Added support for Python 3.12.
+* Updated requirement versions:
+
+  * :doc:`scrapy-poet <scrapy-poet:index>` >= 0.22.0
+  * :doc:`web-poet <web-poet:index>` >= 0.17.0
+
+* Added a Scrapy add-on, :class:`scrapy_zyte_api.Addon`, which simplifies
+  configuring Scrapy projects to work with ``scrapy-zyte-api``.
+* CI improvements.
+
+0.16.1 (2024-02-23)
+-------------------
+
+* Fix ``"extractFrom": "httpResponseBody"`` causing both
+  :http:`request:customHttpRequestHeaders` and :http:`request:requestHeaders`,
+  which are incompatible with each other, to be set when using automatic
+  request mapping.
+
+0.16.0 (2024-02-08)
+-------------------
+
+* Removed support for Python 3.7.
+* Updated requirement versions:
+
+  * :doc:`scrapy-poet <scrapy-poet:index>` >= 0.21.0
+  * :doc:`web-poet <web-poet:index>` >= 0.16.0
+
+* Added support for :class:`web_poet.AnyResponse` dependency.
+* Added support to specify the country code via :class:`typing.Annotated` and
+  :class:`scrapy_zyte_api.Geolocation` dependency *(supported only on Python
+  3.9+)*.
+* Improved tests.
+
 0.15.0 (2024-01-31)
 -------------------
 
@@ -12,7 +87,7 @@ Changes
   into account for request fingerprinting.
 
   Now, when scrapy-poet is installed, the default value of the
-  :ref:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` setting is
+  :setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` setting is
   :class:`scrapy_poet.ScrapyPoetRequestFingerprinter`, and a warning will be
   issued if a custom value is not a subclass of
   :class:`~scrapy_poet.ScrapyPoetRequestFingerprinter`.
@@ -31,7 +106,6 @@ Changes
   scrapy-zyte-api 0.13.0, and is required to automatically close spiders when
   all start requests fail because they are pointing to domains forbidden by
   Zyte API.
-
 
 0.14.1 (2024-01-17)
 -------------------

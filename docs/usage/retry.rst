@@ -9,9 +9,10 @@ API requests are retried automatically using the default retry policy of
 API requests that exceed retries are dropped. You cannot manage API request
 retries through :ref:`downloader middlewares <topics-downloader-middleware>`.
 
-Use the :ref:`ZYTE_API_RETRY_POLICY` setting or the :ref:`zyte_api_retry_policy
-<zyte_api_retry_policy_meta>` :attr:`Request.meta <scrapy.http.Request.meta>`
-key to override the default retry policy with a custom retry policy.
+Use the :setting:`ZYTE_API_RETRY_POLICY` setting or the
+:reqmeta:`zyte_api_retry_policy`
+:attr:`Request.meta <scrapy.http.Request.meta>` key to override the default
+retry policy with a custom retry policy.
 
 For example, to increase the maximum number of retries to 10 before dropping
 the API request, you can subclass :class:`~zyte_api.aio.retry.RetryFactory` as
@@ -23,8 +24,10 @@ follows:
     from tenacity import stop_after_attempt
     from zyte_api.aio.retry import RetryFactory
 
+
     class CustomRetryFactory(RetryFactory):
         temporary_download_error_stop = stop_after_attempt(10)
+
 
     CUSTOM_RETRY_POLICY = CustomRetryFactory().build()
 
@@ -42,15 +45,14 @@ as HTTP 520 errors, you can implement:
     from zyte_api.aio.errors import RequestError
     from zyte_api.aio.retry import RetryFactory
 
+
     def is_http_521(exc: BaseException) -> bool:
         return isinstance(exc, RequestError) and exc.status == 521
 
+
     class CustomRetryFactory(RetryFactory):
 
-        retry_condition = (
-            RetryFactory.retry_condition
-            | retry_if_exception(is_http_521)
-        )
+        retry_condition = RetryFactory.retry_condition | retry_if_exception(is_http_521)
         temporary_download_error_stop = stop_after_attempt(10)
 
         def wait(self, retry_state: RetryCallState) -> float:
@@ -62,6 +64,7 @@ as HTTP 520 errors, you can implement:
             if is_http_521(retry_state.outcome.exception()):
                 return self.temporary_download_error_stop(retry_state)
             return super().stop(retry_state)
+
 
     CUSTOM_RETRY_POLICY = CustomRetryFactory().build()
 
