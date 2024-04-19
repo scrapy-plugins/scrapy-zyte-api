@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.18.1 (YYYY-MM-DD)
+0.18.1 (2024-04-19)
 -------------------
 
 * ``extractFrom`` in :reqmeta:`zyte_api_provider` or
