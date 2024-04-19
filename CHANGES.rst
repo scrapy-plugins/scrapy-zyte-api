@@ -1,6 +1,13 @@
 Changes
 =======
 
+0.18.1 (2024-04-19)
+-------------------
+
+* ``extractFrom`` in :reqmeta:`zyte_api_provider` or
+  :setting:`ZYTE_API_PROVIDER_PARAMS` overrides
+  :class:`~scrapy_zyte_api.ExtractFrom` annotations.
+
 0.18.0 (2024-04-17)
 -------------------
 
