@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.18.2 (2024-04-DD)
+0.18.2 (2024-04-25)
 -------------------
 
 * The ``Accept``, ``Accept-Encoding``, ``Accept-Language``, and ``User-Agent``
