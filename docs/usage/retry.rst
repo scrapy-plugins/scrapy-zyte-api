@@ -1,7 +1,46 @@
 .. _retry:
 
+=======
 Retries
 =======
+
+To make :ref:`error handling <zyte-api-errors>` easier, scrapy-zyte-api lets
+you :ref:`handle successful Zyte API responses as usual <retry-successful>`,
+but :ref:`implements a more advance retry mechanism for rate-limiting and
+unsuccessful responses <retry-non-successful>`.
+
+.. _retry-successful:
+
+Retrying successful Zyte API responses
+======================================
+
+When a :ref:`successful Zyte API response <zyte-api-successful-responses>` is
+received, a Scrapy response object is built based on the upstream website
+response (see :ref:`response`), and passed to your :ref:`downloader middlewares
+<topics-downloader-middleware>` and :ref:`spider callbacks <topics-spiders>`.
+
+These responses are the ones reflected in regular Scrapy stats, like
+``downloader/response_status_count/<STATUS CODE>``.
+
+Usually, these responses do not need to be retried. If they do, you can retry
+them using Scrapy’s built-in retry middleware
+(:class:`~scrapy.downloadermiddlewares.retry.RetryMiddleware`) or its
+:func:`~scrapy.downloadermiddlewares.retry.get_retry_request` function.
+
+
+.. _retry-non-successful:
+
+Retrying rate-limiting and unsuccessful Zyte API responses
+==========================================================
+
+When a :ref:`rate-limiting <zyte-api-rate-limit>` or an :ref:`unsuccessful
+<zyte-api-unsuccessful-responses>` Zyte API response is received, no Scrapy
+response object is built. Instead, a :class:`zyte_api.RequestError` exception
+is raised, and passed to the ``process_exception`` method of your
+:ref:`downloader middlewares <topics-downloader-middleware>` and :ref:`spider
+errbacks <topics-spiders>`.
+
+
 
 API requests are retried automatically using the default retry policy of
 :doc:`python-zyte-api <python-zyte-api:index>`.
