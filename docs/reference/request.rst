@@ -167,13 +167,13 @@ be dropped from HTTP requests (:http:`request:customHttpRequestHeaders`):
 To force the mapping of these headers, define the corresponding setting
 (if any), set them in the :setting:`DEFAULT_REQUEST_HEADERS
 <scrapy:DEFAULT_REQUEST_HEADERS>` setting, or set them in
-:attr:`Request.headers <scrapy.http.Request.headers>`. They will be mapped
-even if defined with their default value.
+:attr:`Request.headers <scrapy.http.Request.headers>` from a spider callback.
+They will be mapped even if defined with their default value.
 
 Headers will also be mapped if set to a non-default value elsewhere, e.g. in a
 custom downloader middleware, as long as it is done before the scrapy-zyte-api
 downloader middleware, which is responsible for the mapping, processes the
-request. Here “before” means a lower value in the
+request. Here “before” means a lower value than ``1000`` in the
 :setting:`DOWNLOADER_MIDDLEWARES <scrapy:DOWNLOADER_MIDDLEWARES>` setting.
 
 Similarly, you can add any of those headers to the
