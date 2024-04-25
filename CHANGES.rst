@@ -1,6 +1,15 @@
 Changes
 =======
 
+0.18.2 (2024-04-DD)
+-------------------
+
+* The ``Accept``, ``Accept-Encoding``, ``Accept-Language``, and ``User-Agent``
+  headers are now dropped automatically during :ref:`header mapping
+  <header-mapping>` unless they have user-defined values. This fix can improve
+  success rates on some websites when using :ref:`HTTP requests
+  <zyte-api-http>`.
+
 0.18.1 (2024-04-19)
 -------------------
 
