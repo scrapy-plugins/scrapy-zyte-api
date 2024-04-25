@@ -412,16 +412,6 @@ def provider_settings(server):
     return settings
 
 
-CUSTOM_HTTP_REQUEST_HEADERS = [
-    {
-        "name": "Accept",
-        "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-    {"name": "Accept-Language", "value": "en"},
-    {"name": "Accept-Encoding", "value": "gzip, deflate, br"},
-]
-
-
 @ensureDeferred
 async def test_provider_any_response_only(mockserver):
     @attrs.define
@@ -788,8 +778,6 @@ async def test_provider_any_response_http_response(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        # This is actually set by HttpResponseProvider
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
 
     assert type(item["page"].response) is AnyResponse
@@ -821,8 +809,6 @@ async def test_provider_any_response_browser_http_response(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        # This is actually set by HttpResponseProvider
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert params[1] == {"url": url, "browserHtml": True}
 
@@ -861,8 +847,6 @@ async def test_provider_any_response_http_response_multiple_pages(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        # This is actually set by HttpResponseProvider
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert type(item["page1"].http_response) is HttpResponse
     assert type(item["page2"].http_response) is HttpResponse
@@ -897,8 +881,6 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        # This is actually set by HttpResponseProvider
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert params[1] == {"url": url, "browserHtml": True}
 

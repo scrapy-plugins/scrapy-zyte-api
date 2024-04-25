@@ -21,3 +21,6 @@ testpaths = [
     "tests/"
 ]
 minversion = "6.0"
+filterwarnings = [
+    "ignore::DeprecationWarning:twisted.web.http",
+]

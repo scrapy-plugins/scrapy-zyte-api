@@ -2,7 +2,7 @@ import json
 import re
 from copy import deepcopy
 from inspect import isclass
-from typing import Any, Dict
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -20,7 +20,7 @@ from zyte_api.constants import API_URL
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.utils import USER_AGENT
 
-from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET
+from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_T, UNSET
 from . import get_crawler as get_crawler_zyte_api
 from . import get_download_handler, make_handler, set_env
 from .mockserver import MockServer
@@ -36,7 +36,7 @@ from .mockserver import MockServer
 )
 @ensureDeferred
 async def test_concurrency_configuration(concurrency):
-    settings = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "CONCURRENT_REQUESTS": concurrency,
     }
@@ -115,7 +115,7 @@ def test_api_key(env_var, setting, expected):
     env = {}
     if env_var is not UNSET:
         env["ZYTE_API_KEY"] = env_var
-    settings = {}
+    settings: SETTINGS_T = {}
     if setting is not UNSET:
         settings["ZYTE_API_KEY"] = setting
     with set_env(**env):
@@ -162,7 +162,7 @@ def test_api_key(env_var, setting, expected):
     ),
 )
 def test_api_url(setting, expected):
-    settings = {"ZYTE_API_KEY": "a"}
+    settings: SETTINGS_T = {"ZYTE_API_KEY": "a"}
     if setting is not UNSET:
         settings["ZYTE_API_URL"] = setting
     crawler = get_crawler(settings_dict=settings)
@@ -216,8 +216,8 @@ assert RETRY_POLICY_A != RETRY_POLICY_B
     ],
 )
 async def test_retry_policy(
-    settings: Dict[str, Any],
-    meta: Dict[str, Any],
+    settings: SETTINGS_T,
+    meta: SETTINGS_T,
     expected: Any,
 ):
     meta = {"zyte_api": {"browserHtml": True}, **meta}
@@ -324,7 +324,7 @@ def test_single_client():
     ],
 )
 async def test_log_request_toggle(
-    settings: Dict[str, Any],
+    settings: SETTINGS_T,
     enabled: bool,
     mockserver,
 ):
@@ -350,7 +350,7 @@ async def test_log_request_toggle(
     ],
 )
 async def test_log_request_truncate(
-    settings: Dict[str, Any],
+    settings: SETTINGS_T,
     short_str: str,
     long_str: str,
     truncated_str: str,
@@ -427,7 +427,7 @@ async def test_log_request_truncate(
 
 @pytest.mark.parametrize("enabled", [True, False])
 def test_log_request_truncate_negative(enabled):
-    settings: Dict[str, Any] = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_LOG_REQUESTS": enabled,
         "ZYTE_API_LOG_REQUESTS_TRUNCATE": -1,
@@ -444,7 +444,7 @@ def test_log_request_truncate_negative(enabled):
 @pytest.mark.parametrize("enabled", [True, False, None])
 @ensureDeferred
 async def test_trust_env(enabled):
-    settings: Dict[str, Any] = {
+    settings: SETTINGS_T = {
         **SETTINGS,
     }
     if enabled is not None:
@@ -470,7 +470,7 @@ async def test_trust_env(enabled):
     ),
 )
 def test_user_agent_for_build_client(user_agent, expected):
-    settings = Settings(
+    settings: SETTINGS_T = Settings(
         {
             **SETTINGS,
             "_ZYTE_API_USER_AGENT": user_agent,
@@ -489,7 +489,7 @@ async def test_bad_key():
         def parse(self, response):
             pass
 
-    settings = {
+    settings: SETTINGS_T = {
         "ZYTE_API_TRANSPARENT_MODE": True,
         **SETTINGS,
     }
@@ -516,7 +516,7 @@ async def test_suspended_account_start_urls():
         def parse(self, response):
             pass
 
-    settings = {
+    settings: SETTINGS_T = {
         "ZYTE_API_TRANSPARENT_MODE": True,
         **SETTINGS,
     }
@@ -538,7 +538,7 @@ async def test_suspended_account_callback():
         def parse(self, response):
             yield response.follow("https://suspended-account.example")
 
-    settings = {
+    settings: SETTINGS_T = {
         "ZYTE_API_TRANSPARENT_MODE": True,
         **SETTINGS,
     }
