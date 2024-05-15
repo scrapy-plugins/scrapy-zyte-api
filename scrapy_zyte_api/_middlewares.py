@@ -16,7 +16,7 @@ try:
     from scrapy_poet import DummyResponse
 except ImportError:
 
-    class DummyResponse:
+    class DummyResponse:  # type: ignore[no-redef]
         pass
 
 
@@ -546,6 +546,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         return cls(crawler)
 
     def __init__(self, crawler):
+        self._crawler = crawler
         self._sessions = _SessionManager(crawler)
         if not self._sessions.params and isinstance(
             self._sessions.checker, DummyChecker
