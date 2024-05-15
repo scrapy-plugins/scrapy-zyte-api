@@ -6,7 +6,8 @@ Session management
 
 Zyte API provides powerful session APIs:
 
--   Client-managed sessions give you full control over session management.
+-   :ref:`Client-managed sessions <zyte-api-session-id>` give you full control
+    over session management.
 
 -   :ref:`Server-managed sessions <zyte-api-session-contexts>` let Zyte API
     handle session management for you.
@@ -24,9 +25,9 @@ scrapy-zyte-api’s session API
 =============================
 
 scrapy-zyte-api’s session API offers a higher-level API on top of
-client-managed sessions, to enjoy some of the advantages of client-managed
-sessions (e.g. expiring specific sessions) while removing some of their
-drawbacks (management overhead).
+:ref:`client-managed sessions <zyte-api-session-id>`, to enjoy some of the
+advantages of client-managed sessions (e.g. expiring specific sessions) while
+removing some of their drawbacks (management overhead).
 
 To use scrapy-zyte-api’s session API, define
 :setting:`ZYTE_API_SESSION_PARAMS` or :setting:`ZYTE_API_SESSION_CHECKER`.

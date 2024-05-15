@@ -254,10 +254,10 @@ ZYTE_API_SESSION_CHECKER
 Default: ``None``
 
 A :ref:`Scrapy component <topics-components>` (or its import path as a string)
-that defines a ``check`` function.
+that defines a ``check`` method.
 
 When defined, :ref:`sessions managed by scrapy-zyte-api <plugin-sessions>` are
-enabled, and the ``check`` function is called on every response. If ``check``
+enabled, and the ``check`` method is called on every response. If ``check``
 returns ``True``, the response session is considered valid; if ``check``
 returns ``False``, the response session is considered invalid, and will be
 expired.
