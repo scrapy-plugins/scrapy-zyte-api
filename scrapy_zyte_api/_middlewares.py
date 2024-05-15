@@ -12,6 +12,14 @@ from zyte_api import RequestError
 
 from ._params import _ParamParser
 
+try:
+    from scrapy_poet import DummyResponse
+except ImportError:
+
+    class DummyResponse:
+        pass
+
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -310,6 +318,10 @@ _ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
 _SESSION_INIT_META_KEY = "_is_session_init_request"
 
 
+class TooManyBadSessionInits(RuntimeError):
+    pass
+
+
 class _SessionManager:
 
     def __init__(self, crawler):
@@ -327,6 +339,9 @@ class _SessionManager:
 
         # Maximum number of concurrent sessions to use.
         self._pending_initial_sessions = settings.getint("ZYTE_API_SESSION_COUNT", 8)
+
+        self._max_bad_session_inits = self._pending_initial_sessions
+        self._bad_session_inits = 0
 
         # Zyte API parameters for session initialization.
         self.params = settings.getdict("ZYTE_API_SESSION_PARAMS", {})
@@ -375,6 +390,10 @@ class _SessionManager:
         # to prevent garbage collection to remove the tasks.
         self._init_tasks = set()
 
+        self._warn_on_no_body = settings.getbool(
+            "ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY", True
+        )
+
     async def _init_session(self, session_id, request):
         session_init_request = Request(
             request.url,
@@ -388,7 +407,7 @@ class _SessionManager:
         try:
             response = await deferred_to_future(deferred)
         except Exception as e:
-            logger.debug(f"{e} when initializing session {session_id}")
+            logger.debug(f"Error while initializing session {session_id}: {e}")
             return False
         return self.checker.check_session(session_init_request, response)
 
@@ -400,6 +419,11 @@ class _SessionManager:
             session_init_succeeded = await self._init_session(session_id, request)
             if not session_init_succeeded:
                 self._pool.remove(session_id)
+                self._bad_session_inits += 1
+                if self._bad_session_inits >= self._max_bad_session_inits:
+                    raise TooManyBadSessionInits
+            else:
+                self._bad_session_inits = 0
         self._queue.append(session_id)
         return session_id
 
@@ -472,9 +496,24 @@ class _SessionManager:
         has expired or ``True`` if the session passed validation."""
         if self._is_session_init_request(request):
             return True
+        if isinstance(response, DummyResponse):
+            return True
         passed = self.checker.check_session(request, response)
         if passed:
             return True
+        if (
+            self._warn_on_no_body
+            and not response.body
+            and "httpResponseBody" not in request.raw_api_response
+            and "browserHtml" not in request.raw_api_response
+        ):
+            logger.warning(
+                f"Validation failed for {response}, which lacks both "
+                f"httpResponseBody and browserHtml. Does your session "
+                f"checking code rely on inspecting the response body? If not, "
+                f"set ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY to False to "
+                f"silence this warning."
+            )
         return self.start_request_session_refresh(request)
 
     async def assign(self, request):
@@ -517,7 +556,16 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             )
 
     async def process_request(self, request, spider):
-        await self._sessions.assign(request)
+        try:
+            await self._sessions.assign(request)
+        except TooManyBadSessionInits:
+            from twisted.internet import reactor
+            from twisted.internet.interfaces import IReactorCore
+
+            reactor = cast(IReactorCore, reactor)
+            reactor.callLater(
+                0, self._crawler.engine.close_spider, spider, "bad_session_inits"
+            )
 
     async def process_response(self, request, response, spider):
         passed = await self._sessions.check(request, response)
