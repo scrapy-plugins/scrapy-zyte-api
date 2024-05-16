@@ -422,15 +422,14 @@ class _SessionManager:
         session_init_succeeded = False
         while not session_init_succeeded:
             session_id = str(uuid4())
-            self._pool.add(session_id)
             session_init_succeeded = await self._init_session(session_id, request)
-            if not session_init_succeeded:
-                self._pool.remove(session_id)
+            if session_init_succeeded:
+                self._pool.add(session_id)
+                self._bad_session_inits = 0
+            else:
                 self._bad_session_inits += 1
                 if self._bad_session_inits >= self._max_bad_session_inits:
                     raise TooManyBadSessionInits
-            else:
-                self._bad_session_inits = 0
         self._queue.append(session_id)
         return session_id
 
