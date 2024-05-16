@@ -419,17 +419,16 @@ class _SessionManager:
         return self.check_session(session_init_request, response)
 
     async def _create_session(self, request):
-        session_init_succeeded = False
-        while not session_init_succeeded:
+        while True:
             session_id = str(uuid4())
             session_init_succeeded = await self._init_session(session_id, request)
             if session_init_succeeded:
                 self._pool.add(session_id)
                 self._bad_session_inits = 0
-            else:
-                self._bad_session_inits += 1
-                if self._bad_session_inits >= self._max_bad_session_inits:
-                    raise TooManyBadSessionInits
+                break
+            self._bad_session_inits += 1
+            if self._bad_session_inits >= self._max_bad_session_inits:
+                raise TooManyBadSessionInits
         self._queue.append(session_id)
         return session_id
 
