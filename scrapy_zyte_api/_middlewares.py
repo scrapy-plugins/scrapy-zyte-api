@@ -394,7 +394,14 @@ class _SessionManager:
             "ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY", True
         )
 
+    def check_session(self, request, response):
+        result = self.checker.check_session(request, response)
+        outcome = "passed" if result else "failed"
+        self._crawler.stats.inc_value(f"zyte-api-session/checks/{outcome}")
+        return result
+
     async def _init_session(self, session_id, request):
+        self._crawler.stats.inc_value("zyte-api-session/sessions")
         session_init_request = Request(
             request.url,
             meta={
@@ -409,7 +416,7 @@ class _SessionManager:
         except Exception as e:
             logger.debug(f"Error while initializing session {session_id}: {e}")
             return False
-        return self.checker.check_session(session_init_request, response)
+        return self.check_session(session_init_request, response)
 
     async def _create_session(self, request):
         session_init_succeeded = False
@@ -498,7 +505,7 @@ class _SessionManager:
             return True
         if isinstance(response, DummyResponse):
             return True
-        passed = self.checker.check_session(request, response)
+        passed = self.check_session(request, response)
         if passed:
             return True
         if (
