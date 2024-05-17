@@ -12,6 +12,10 @@ from ._middlewares import (
 )
 from ._page_inputs import Actions, Geolocation, Screenshot
 from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter
-from ._session import ScrapyZyteAPISessionDownloaderMiddleware
+from ._session import (
+    ScrapyZyteAPISessionDownloaderMiddleware,
+    SessionConfig,
+    session_config,
+)
 from .addon import Addon
 from .handler import ScrapyZyteAPIDownloadHandler

@@ -1,15 +1,19 @@
 from asyncio import create_task, sleep
-from collections import deque
+from collections import defaultdict, deque
 from logging import getLogger
-from typing import Deque, Optional, Union, cast
+from typing import Any, Deque, Dict, Optional, Set, Type, TypeVar, Union, cast
 from uuid import uuid4
 
 from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy.exceptions import IgnoreRequest, NotConfigured
 from scrapy.http import Response
+from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.python import global_object_name
+from url_matcher import Patterns
+from web_poet import ApplyRule
+from web_poet.rules import Strings
 from zyte_api import RequestError
 
 logger = getLogger(__name__)
@@ -121,9 +125,26 @@ except ImportError:
         return d.asFuture(_get_asyncio_event_loop())
 
 
-class DummyChecker:
+try:
+    from scrapy.utils.misc import build_from_crawler
+except ImportError:
+    T = TypeVar("T")
 
-    def check_session(self, response):
+    def build_from_crawler(
+        objcls: Type[T], crawler: Crawler, /, *args: Any, **kwargs: Any
+    ) -> T:
+        return create_instance(objcls, settings=None, crawler=crawler, *args, **kwargs)
+
+
+class DefaultChecker:
+
+    def check(self, response: Response, request: Request):
+        # TODO: Basic check for the session init only: check if setLocation
+        # worked, return False if not. If we can tell when setLocation simply
+        # failed once versus when it is not implemented for the target website,
+        # raise some exception in the latter case, to indicate that sessions
+        # for the target website are not supported, avoiding additional
+        # retries.
         return True
 
 
@@ -131,49 +152,148 @@ class TooManyBadSessionInits(RuntimeError):
     pass
 
 
+# To do: add automatically to the registry by default.
+class SessionConfig:
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        self.crawler = crawler
+
+        settings = crawler.settings
+        self._fallback_location = settings.getdict("ZYTE_API_SESSION_LOCATION")
+        self._fallback_params = settings.getdict("ZYTE_API_SESSION_PARAMS")
+
+        checker_cls = settings.get("ZYTE_API_SESSION_CHECKER", None)
+        if checker_cls:
+            checker = build_from_crawler(load_object(checker_cls), crawler)
+        else:
+            checker = DefaultChecker()
+        self.check = checker.check
+
+    def pool(self, request: Request) -> str:
+        return urlparse_cached(request).netloc
+
+    def location(self, request: Request) -> Dict[str, str]:
+        return request.meta.get("zyte_api_session_location") or self._fallback_location
+
+    def params(self, request: Request) -> Optional[Dict[str, str]]:
+        location = self.location(request)
+        if not location:
+            return request.meta.get("zyte_api_session_params") or self._fallback_params
+        return {
+            "browserHtml": True,
+            "actions": [
+                {
+                    "action": "setLocation",
+                    "address": location,
+                }
+            ],
+        }
+
+
+try:
+    from web_poet import RulesRegistry
+except ImportError:
+
+    class SessionConfigRulesRegistry:
+
+        def session_config_cls(self, request: Request) -> Type[SessionConfig]:
+            return SessionConfig
+
+        def session_config(
+            self,
+            include: Strings,
+            *,
+            instead_of: Optional[Type] = SessionConfig,
+            exclude: Optional[Strings] = None,
+            priority: int = 500,
+            **kwargs,
+        ):
+            raise RuntimeError(
+                "To use the @session_config decorator you first must install "
+                "web-poet."
+            )
+
+else:
+
+    class SessionConfigRulesRegistry(RulesRegistry):
+
+        def __init__(self):
+            rules = [ApplyRule(for_patterns=Patterns(include=[""]), use=SessionConfig)]
+            super().__init__(rules=rules)
+
+        def session_config_cls(self, request: Request) -> Type[SessionConfig]:
+            cls = SessionConfig
+            overrides = self.overrides_for(request.url)
+            while cls in overrides:
+                cls = overrides[cls]
+            return cls
+
+        def session_config(
+            self,
+            include: Strings,
+            *,
+            instead_of: Optional[Type[SessionConfig]] = SessionConfig,
+            exclude: Optional[Strings] = None,
+            priority: int = 500,
+            **kwargs,
+        ):
+            return self.handle_urls(
+                include=include,
+                instead_of=instead_of,
+                exclude=exclude,
+                priority=priority,
+                **kwargs,
+            )
+
+
+session_config_registry = SessionConfigRulesRegistry()
+session_config = session_config_registry.session_config
+
+
 class _SessionManager:
 
     def __init__(self, crawler: Crawler):
+        self._crawler = crawler
+
         settings = crawler.settings
 
-        # Scrapy component to check responses to determine whether sessions
-        # have expired or not.
-        checker = settings.get("ZYTE_API_SESSION_CHECKER", None)
-        if checker:
-            self.checker = create_instance(
-                load_object(checker), settings=None, crawler=crawler
-            )
-        else:
-            self.checker = DummyChecker()
+        pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
+        self._pending_initial_sessions = defaultdict(lambda: pool_size)
+        pool_sizes = settings.getdict("ZYTE_API_SESSION_POOL_SIZES", {})
+        for pool, size in pool_sizes.items():
+            self._pending_initial_sessions[pool] = size
 
-        # Maximum number of concurrent sessions to use.
-        self._pending_initial_sessions = settings.getint("ZYTE_API_SESSION_COUNT", 8)
-
-        self._max_bad_session_inits = self._pending_initial_sessions
-        self._bad_session_inits = 0
-
-        # Zyte API parameters for session initialization.
-        self.params = settings.getdict("ZYTE_API_SESSION_PARAMS", {})
+        max_bad_inits = settings.getint("ZYTE_API_SESSION_MAX_BAD_INITS", 8)
+        self._max_bad_inits = defaultdict(lambda: max_bad_inits)
+        max_bad_inits_per_pool = settings.getdict(
+            "ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL", {}
+        )
+        for pool, pool_max_bad_inits in max_bad_inits_per_pool.items():
+            self._max_bad_inits[pool] = pool_max_bad_inits
+        self._bad_inits = defaultdict(int)
 
         # Transparent mode, needed to determine whether to set the session
         # using ``zyte_api`` or ``zyte_api_automap``.
-        self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
+        self._transparent_mode: bool = settings.getbool(
+            "ZYTE_API_TRANSPARENT_MODE", False
+        )
 
-        self._crawler = crawler
-
-        # The pool contains the IDs of sessions that have not expired yet.
+        # Each pool contains the IDs of sessions that have not expired yet.
         #
-        # While the pool is smaller than the number of desired sessions, for
-        # every request needing a session a new session ID is added to the pool
-        # and its session initialization starts.
+        # While the initial sessions of a pool have not all been started, for
+        # every request needing a session, a new session is initialized and
+        # then added to the pool.
         #
-        # Once the pool is full, sessions are picked from the queue, which
+        # Once a pool is full, sessions are picked from the pool queue, which
         # should contain all pool sessions that have been initialized.
         #
-        # As soon as a session expires, it is removed from the pool and
-        # replaced with a new session ID, and a task to initialize that new
-        # session is started.
-        self._pool = set()
+        # As soon as a session expires, it is removed from its pool, and a task
+        # to initialize that new session is started.
+        self._pools: Dict[str, Set[str]] = defaultdict(set)
 
         # The queue is a rotating list of session IDs to use.
         #
@@ -191,7 +311,7 @@ class _SessionManager:
         # If the queue is empty, sleep and try again. Sessions from the pool
         # will be appended to the queue as they are initialized and ready to
         # use.
-        self._queue: Deque[str] = deque()
+        self._queues: Dict[str, Deque[str]] = defaultdict(deque)
 
         # Contains the on-going tasks to create new sessions.
         #
@@ -203,19 +323,25 @@ class _SessionManager:
             "ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY", True
         )
 
-    def check_session(self, request: Request, response: Response) -> bool:
-        result = self.checker.check_session(request, response)
-        outcome = "passed" if result else "failed"
-        self._crawler.stats.inc_value(f"zyte-api-session/checks/{outcome}")
-        return result
+        self._session_config_map = {}
+
+    def _get_session_config(self, request: Request) -> SessionConfig:
+        cls = session_config_registry.session_config_cls(request)
+        if cls not in self._session_config_map:
+            self._session_config_map[cls] = build_from_crawler(cls, self._crawler)
+        return self._session_config_map[cls]
 
     async def _init_session(self, session_id: str, request: Request) -> bool:
-        self._crawler.stats.inc_value("zyte-api-session/sessions")
+        session_config = self._get_session_config(request)
+        pool = session_config.pool(request)
+
+        session_params = session_config.params(request)
+        session_init_url = session_params.pop("url", request.url)
         session_init_request = Request(
-            request.url,
+            session_init_url,
             meta={
                 SESSION_INIT_META_KEY: True,
-                "zyte_api": {**self.params, "session": {"id": session_id}},
+                "zyte_api": {**session_params, "session": {"id": session_id}},
             },
             callback=NO_CALLBACK,
         )
@@ -224,32 +350,40 @@ class _SessionManager:
             response = await deferred_to_future(deferred)
         except Exception as e:
             logger.debug(f"Error while initializing session {session_id}: {e}")
-            return False
-        return self.check_session(session_init_request, response)
+            result = False
+        else:
+            result = session_config.check(response, session_init_request)
+        outcome = "passed" if result else "failed"
+        self._crawler.stats.inc_value(f"zyte-api-session/init/{pool}/{outcome}")
+        return result
 
     async def _create_session(self, request: Request) -> str:
+        session_config = self._get_session_config(request)
+        pool = session_config.pool(request)
         while True:
             session_id = str(uuid4())
             session_init_succeeded = await self._init_session(session_id, request)
             if session_init_succeeded:
-                self._pool.add(session_id)
-                self._bad_session_inits = 0
+                self._pools[pool].add(session_id)
+                self._bad_inits[pool] = 0
                 break
-            self._bad_session_inits += 1
-            if self._bad_session_inits >= self._max_bad_session_inits:
+            self._bad_inits[pool] += 1
+            if self._bad_inits[pool] >= self._max_bad_inits[pool]:
                 raise TooManyBadSessionInits
-        self._queue.append(session_id)
+        self._queues[pool].append(session_id)
         return session_id
 
-    async def _next_from_queue(self) -> str:
+    async def _next_from_queue(self, request: Request) -> str:
         session_id = None
-        while session_id not in self._pool:  # After 1st loop: invalid session.
+        session_config = self._get_session_config(request)
+        pool = session_config.pool(request)
+        while session_id not in self._pools[pool]:  # After 1st loop: invalid session.
             try:
-                session_id = self._queue.popleft()
+                session_id = self._queues[pool].popleft()
             except IndexError:  # No ready-to-use session available.
                 await sleep(1)
         assert session_id is not None
-        self._queue.append(session_id)
+        self._queues[pool].append(session_id)
         return session_id
 
     async def _next(self, request) -> str:
@@ -259,14 +393,16 @@ class _SessionManager:
         *request* is needed to determine the URL to use for request
         initialization.
         """
-        if self._pending_initial_sessions:
-            self._pending_initial_sessions -= 1
+        session_config = self._get_session_config(request)
+        pool = session_config.pool(request)
+        if self._pending_initial_sessions[pool]:
+            self._pending_initial_sessions[pool] -= 1
             session_id = await self._create_session(request)
         else:
-            session_id = await self._next_from_queue()
+            session_id = await self._next_from_queue(request)
         return session_id
 
-    def _is_session_init_request(self, request: Request) -> bool:
+    def is_init_request(self, request: Request) -> bool:
         """Return ``True`` if the request is one of the requests being used
         to initialize a session, or ``False`` otherwise.
 
@@ -285,7 +421,9 @@ class _SessionManager:
         return None
 
     def _start_session_refresh(self, session_id: str, request: Request) -> bool:
-        self._pool.discard(session_id)
+        session_config = self._get_session_config(request)
+        pool = session_config.pool(request)
+        self._pools[pool].discard(session_id)
         task = create_task(self._create_session(request))
         self._init_tasks.add(task)
         task.add_done_callback(self._init_tasks.discard)
@@ -304,22 +442,22 @@ class _SessionManager:
         self._start_session_refresh(session_id, request)
         return False
 
-    async def check(self, request: Request, response: Response) -> bool:
+    async def check(self, response: Response, request: Request) -> bool:
         """Check the response for signs of session expiration, update the
         internal session pool accordingly, and return ``False`` if the session
         has expired or ``True`` if the session passed validation."""
-        if self._is_session_init_request(request):
-            return True
-        if isinstance(response, DummyResponse):
-            return True
-        passed = self.check_session(request, response)
+        session_config = self._get_session_config(request)
+        passed = session_config.check(response, request)
+        pool = session_config.pool(request)
+        outcome = "passed" if passed else "failed"
+        self._crawler.stats.inc_value(f"zyte-api-session/checks/{pool}/{outcome}")
         if passed:
             return True
         if (
             self._warn_on_no_body
             and not response.body
-            and "httpResponseBody" not in request.raw_api_response
-            and "browserHtml" not in request.raw_api_response
+            and "httpResponseBody" not in response.raw_api_response
+            and "browserHtml" not in response.raw_api_response
         ):
             logger.warning(
                 f"Validation failed for {response}, which lacks both "
@@ -332,9 +470,6 @@ class _SessionManager:
 
     async def assign(self, request: Request):
         """Assign a working session to *request*."""
-        if self._is_session_init_request(request):
-            return
-
         session_id = await self._next(request)
         # Note: If there is a session set already (e.g. a request being
         # retried), it is overridden.
@@ -360,17 +495,14 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         return cls(crawler)
 
     def __init__(self, crawler: Crawler):
+        if not crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False):
+            raise NotConfigured
         self._crawler = crawler
         self._sessions = _SessionManager(crawler)
-        if not self._sessions.params and isinstance(
-            self._sessions.checker, DummyChecker
-        ):
-            raise NotConfigured(
-                "Neither ZYTE_API_SESSION_CHECKER nor ZYTE_API_SESSION_PARAMS "
-                "are defined."
-            )
 
     async def process_request(self, request: Request, spider: Spider) -> None:
+        if self._sessions.is_init_request(request):
+            return
         try:
             await self._sessions.assign(request)
         except TooManyBadSessionInits:
@@ -385,7 +517,11 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
     async def process_response(
         self, request: Request, response: Response, spider: Spider
     ) -> Union[Request, Response, None]:
-        passed = await self._sessions.check(request, response)
+        if isinstance(response, DummyResponse) or self._sessions.is_init_request(
+            request
+        ):
+            return response
+        passed = await self._sessions.check(response, request)
         if not passed:
             new_request_or_none = get_retry_request(
                 request,
@@ -400,8 +536,10 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
     def process_exception(
         self, request: Request, exception: Exception, spider: Spider
     ) -> Union[Request, None]:
-        if not isinstance(exception, RequestError):
-            return None
+        if not isinstance(exception, RequestError) or self._sessions.is_init_request(
+            request
+        ):
+            return
 
         self._sessions.start_request_session_refresh(request)
         return get_retry_request(
