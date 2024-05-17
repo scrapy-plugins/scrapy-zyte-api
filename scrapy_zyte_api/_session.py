@@ -139,12 +139,6 @@ except ImportError:
 class DefaultChecker:
 
     def check(self, response: Response, request: Request):
-        # TODO: Basic check for the session init only: check if setLocation
-        # worked, return False if not. If we can tell when setLocation simply
-        # failed once versus when it is not implemented for the target website,
-        # raise some exception in the latter case, to indicate that sessions
-        # for the target website are not supported, avoiding additional
-        # retries.
         return True
 
 
@@ -152,7 +146,6 @@ class TooManyBadSessionInits(RuntimeError):
     pass
 
 
-# To do: add automatically to the registry by default.
 class SessionConfig:
 
     @classmethod
