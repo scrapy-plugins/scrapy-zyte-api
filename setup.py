@@ -1,8 +1,19 @@
+import os
+
 import setuptools
+
+
+def get_version():
+    about = {}
+    here = os.path.abspath(os.path.dirname(__file__))
+    with open(os.path.join(here, "scrapy_zyte_api/__version__.py")) as f:
+        exec(f.read(), about)
+    return about["__version__"]
+
 
 setuptools.setup(
     name="scrapy-zyte-api",
-    version="0.11.1",
+    version=get_version(),
     description="Client library to process URLs through Zyte API",
     long_description=open("README.rst").read(),
     long_description_content_type="text/x-rst",
@@ -14,14 +25,15 @@ setuptools.setup(
     install_requires=[
         "packaging>=20.0",
         "scrapy>=2.0.1",
-        "zyte-api>=0.4.0",
+        "zyte-api>=0.5.1",
     ],
     extras_require={
-        # Sync with [testenv:provider-pinned] @ tox.ini
+        # Sync with [testenv:pinned-provider] @ tox.ini
         "provider": [
-            "scrapy-poet>=0.10.0",
-            "web-poet>=0.13.0",
-            "zyte-common-items>=0.7.0",
+            "andi>=0.6.0",
+            "scrapy-poet>=0.22.3",
+            "web-poet>=0.17.0",
+            "zyte-common-items>=0.8.0",
         ]
     },
     classifiers=[
@@ -31,10 +43,10 @@ setuptools.setup(
         "Natural Language :: English",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
 )

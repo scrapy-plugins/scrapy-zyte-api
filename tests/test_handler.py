@@ -1,15 +1,16 @@
 import json
 import re
-import sys
 from copy import deepcopy
 from inspect import isclass
-from typing import Any, Dict
+from typing import Any
 from unittest import mock
 
 import pytest
 from pytest_twisted import ensureDeferred
-from scrapy import Request
+from scrapy import Request, Spider
+from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.exceptions import NotConfigured
+from scrapy.settings import Settings
 from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
@@ -17,8 +18,12 @@ from zyte_api.aio.retry import RetryFactory
 from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
+from scrapy_zyte_api.utils import USER_AGENT
 
-from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET, make_handler, set_env
+from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_T, UNSET
+from . import get_crawler as get_crawler_zyte_api
+from . import get_download_handler, make_handler, set_env
+from .mockserver import MockServer
 
 
 @pytest.mark.parametrize(
@@ -29,18 +34,16 @@ from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, UNSET, make_handler, set_env
         DEFAULT_CLIENT_CONCURRENCY + 1,
     ),
 )
-def test_concurrency_configuration(concurrency):
-    settings = {
+@ensureDeferred
+async def test_concurrency_configuration(concurrency):
+    settings: SETTINGS_T = {
         **SETTINGS,
         "CONCURRENT_REQUESTS": concurrency,
     }
-    crawler = get_crawler(settings_dict=settings)
-    handler = ScrapyZyteAPIDownloadHandler(
-        settings=crawler.settings,
-        crawler=crawler,
-    )
+    crawler = await get_crawler_zyte_api(settings=settings)
+    handler = get_download_handler(crawler, "https")
     assert handler._client.n_conn == concurrency
-    assert handler._session.connector.limit == concurrency
+    assert handler._session._session.connector.limit == concurrency
 
 
 @pytest.mark.parametrize(
@@ -112,7 +115,7 @@ def test_api_key(env_var, setting, expected):
     env = {}
     if env_var is not UNSET:
         env["ZYTE_API_KEY"] = env_var
-    settings = {}
+    settings: SETTINGS_T = {}
     if setting is not UNSET:
         settings["ZYTE_API_KEY"] = setting
     with set_env(**env):
@@ -159,7 +162,7 @@ def test_api_key(env_var, setting, expected):
     ),
 )
 def test_api_url(setting, expected):
-    settings = {"ZYTE_API_KEY": "a"}
+    settings: SETTINGS_T = {"ZYTE_API_KEY": "a"}
     if setting is not UNSET:
         settings["ZYTE_API_URL"] = setting
     crawler = get_crawler(settings_dict=settings)
@@ -185,7 +188,6 @@ assert RETRY_POLICY_A != RETRY_POLICY_B
 
 
 @ensureDeferred
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
 @pytest.mark.parametrize(
     "settings,meta,expected",
     [
@@ -214,28 +216,26 @@ assert RETRY_POLICY_A != RETRY_POLICY_B
     ],
 )
 async def test_retry_policy(
-    settings: Dict[str, Any],
-    meta: Dict[str, Any],
+    settings: SETTINGS_T,
+    meta: SETTINGS_T,
     expected: Any,
 ):
     meta = {"zyte_api": {"browserHtml": True}, **meta}
     async with make_handler(settings) as handler:
         req = Request("https://example.com", meta=meta)
-        unmocked_client = handler._client
-        handler._client = mock.AsyncMock(unmocked_client)
-        handler._client.request_raw.return_value = {
+        unmocked_session = handler._session
+        handler._session = mock.AsyncMock(unmocked_session)
+        handler._session.get.return_value = {
             "browserHtml": "",
             "url": "",
         }
         await handler.download_request(req, None)
 
         # What we're interested in is the Request call in the API
-        request_call = [
-            c for c in handler._client.mock_calls if "request_raw(" in str(c)
-        ]
+        request_call = [c for c in handler._session.mock_calls if "get(" in str(c)]
 
         if not request_call:
-            pytest.fail("The client's request_raw() method was not called.")
+            pytest.fail("The session's get() method was not called.")
 
         actual = request_call[0].kwargs["retrying"]
         assert actual == expected
@@ -247,7 +247,9 @@ async def test_stats(mockserver):
         scrapy_stats = handler._stats
         assert scrapy_stats.get_stats() == {}
 
-        meta = {"zyte_api": {"a": "…", "b": {"b0": "…"}, "experimental": {"c0": "…"}}}
+        meta = {
+            "zyte_api": {"a": "...", "b": {"b0": "..."}, "experimental": {"c0": "..."}}
+        }
         request = Request("https://example.com", meta=meta)
         await handler.download_request(request, None)
 
@@ -322,7 +324,7 @@ def test_single_client():
     ],
 )
 async def test_log_request_toggle(
-    settings: Dict[str, Any],
+    settings: SETTINGS_T,
     enabled: bool,
     mockserver,
 ):
@@ -338,18 +340,17 @@ async def test_log_request_toggle(
 
 
 @ensureDeferred
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="unittest.mock.AsyncMock")
 @pytest.mark.parametrize(
     "settings,short_str,long_str,truncated_str",
     [
-        ({}, "a" * 64, "a" * 65, "a" * 63 + "…"),
+        ({}, "a" * 64, "a" * 65, "a" * 63 + "..."),
         ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 0}, "a" * 64, "a" * 65, "a" * 65),
-        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 1}, "a", "aa", "…"),
-        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 2}, "aa", "aaa", "a…"),
+        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 1}, "a", "aa", "..."),
+        ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 2}, "aa", "aaa", "a..."),
     ],
 )
 async def test_log_request_truncate(
-    settings: Dict[str, Any],
+    settings: SETTINGS_T,
     short_str: str,
     long_str: str,
     truncated_str: str,
@@ -400,9 +401,9 @@ async def test_log_request_truncate(
     async with make_handler(settings, mockserver.urljoin("/")) as handler:
         meta = {"zyte_api": input_params}
         request = Request("https://example.com", meta=meta)
-        unmocked_client = handler._client
-        handler._client = mock.AsyncMock(unmocked_client)
-        handler._client.request_raw.return_value = {
+        unmocked_session = handler._session
+        handler._session = mock.AsyncMock(unmocked_session)
+        handler._session.get.return_value = {
             "browserHtml": "",
             "url": "",
         }
@@ -419,14 +420,14 @@ async def test_log_request_truncate(
         assert logged_params == expected_logged_params
 
         # Check that the actual params are *not* truncated.
-        actual_api_params = handler._client.request_raw.call_args[0][0]
+        actual_api_params = handler._session.get.call_args[0][0]
         del actual_api_params["url"]
         assert actual_api_params == expected_api_params
 
 
 @pytest.mark.parametrize("enabled", [True, False])
 def test_log_request_truncate_negative(enabled):
-    settings: Dict[str, Any] = {
+    settings: SETTINGS_T = {
         **SETTINGS,
         "ZYTE_API_LOG_REQUESTS": enabled,
         "ZYTE_API_LOG_REQUESTS_TRUNCATE": -1,
@@ -441,18 +442,118 @@ def test_log_request_truncate_negative(enabled):
 
 
 @pytest.mark.parametrize("enabled", [True, False, None])
-def test_trust_env(enabled):
-    settings: Dict[str, Any] = {
+@ensureDeferred
+async def test_trust_env(enabled):
+    settings: SETTINGS_T = {
         **SETTINGS,
     }
     if enabled is not None:
         settings["ZYTE_API_USE_ENV_PROXY"] = enabled
     else:
         enabled = False
-    crawler = get_crawler(settings_dict=settings)
-    handler = create_instance(
-        ScrapyZyteAPIDownloadHandler,
-        settings=None,
-        crawler=crawler,
+    crawler = await get_crawler_zyte_api(settings=settings)
+    handler = get_download_handler(crawler, "https")
+    assert handler._session._session._trust_env == enabled
+
+
+@pytest.mark.parametrize(
+    "user_agent,expected",
+    (
+        (
+            None,
+            USER_AGENT,
+        ),
+        (
+            "zyte-crawlers/0.0.1",
+            "zyte-crawlers/0.0.1",
+        ),
+    ),
+)
+def test_user_agent_for_build_client(user_agent, expected):
+    settings: SETTINGS_T = Settings(
+        {
+            **SETTINGS,
+            "_ZYTE_API_USER_AGENT": user_agent,
+        }
     )
-    assert handler._session._trust_env == enabled
+    client = ScrapyZyteAPIDownloadHandler._build_client(settings)
+    assert client.user_agent == expected
+
+
+@ensureDeferred
+async def test_bad_key():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://bad-key.example"]
+
+        def parse(self, response):
+            pass
+
+    settings: SETTINGS_T = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "zyte_api_bad_key"
+
+
+# NOTE: Under the assumption that a case of bad key will happen since the
+# beginning of a crawl, we only test the start_urls scenario, and not also the
+# case of follow-up responses suddenly giving such an error.
+
+
+@ensureDeferred
+async def test_suspended_account_start_urls():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://suspended-account.example"]
+
+        def parse(self, response):
+            pass
+
+    settings: SETTINGS_T = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
+
+
+@ensureDeferred
+async def test_suspended_account_callback():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            yield response.follow("https://suspended-account.example")
+
+    settings: SETTINGS_T = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
+
+
+@ensureDeferred
+async def test_fallback_setting():
+    crawler = await get_crawler_zyte_api(settings=SETTINGS)
+    handler = get_download_handler(crawler, "https")
+    assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
+    assert isinstance(handler._fallback_handler, HTTPDownloadHandler)

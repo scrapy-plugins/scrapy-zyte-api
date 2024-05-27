@@ -1,31 +1,42 @@
-from typing import Any, Dict
-
 import pytest
 from packaging.version import Version
+from pytest_twisted import ensureDeferred
 from scrapy import __version__ as SCRAPY_VERSION
 
 if Version(SCRAPY_VERSION) < Version("2.7"):
     pytest.skip("Skipping tests for Scrapy ≥ 2.7", allow_module_level=True)
 
-from scrapy import Request
+from scrapy import Request, Spider
 from scrapy.utils.misc import create_instance
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
 
-from . import SETTINGS, get_crawler
+from . import get_crawler
+
+try:
+    import scrapy_poet
+except ImportError:
+    scrapy_poet = None
 
 
-def test_cache():
-    crawler = get_crawler()
+@ensureDeferred
+async def test_cache():
+    crawler = await get_crawler()
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
     request = Request("https://example.com", meta={"zyte_api": True})
     fingerprint = fingerprinter.fingerprint(request)
+
+    fingerprinter._param_parser = None  # Prevent later calls from working
+    cached_fingerprint = fingerprinter.fingerprint(request)
+
+    assert fingerprint == cached_fingerprint
     assert fingerprint == fingerprinter._cache[request]
 
 
-def test_fallback_custom():
+@ensureDeferred
+async def test_fallback_custom(caplog):
     class CustomFingerprinter:
         def fingerprint(self, request):
             return b"foo"
@@ -33,18 +44,31 @@ def test_fallback_custom():
     settings = {
         "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS": CustomFingerprinter,
     }
-    crawler = get_crawler(settings)
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    crawler = await get_crawler(settings)
+    with caplog.at_level("WARNING"):
+        fingerprinter = create_instance(
+            ScrapyZyteAPIRequestFingerprinter,
+            settings=crawler.settings,
+            crawler=crawler,
+        )
     request = Request("https://example.com")
     assert fingerprinter.fingerprint(request) == b"foo"
     request = Request("https://example.com", meta={"zyte_api": True})
     assert fingerprinter.fingerprint(request) != b"foo"
+    try:
+        import scrapy_poet  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        assert (
+            "does not point to a subclass of scrapy_poet.ScrapyPoetRequestFingerprinter"
+            in caplog.text
+        )
 
 
-def test_fallback_default():
-    crawler = get_crawler(SETTINGS)
+@ensureDeferred
+async def test_fallback_default():
+    crawler = await get_crawler()
     fingerprinter = crawler.request_fingerprinter
     fallback_fingerprinter = (
         crawler.request_fingerprinter._fallback_request_fingerprinter
@@ -61,8 +85,9 @@ def test_fallback_default():
     assert new_fingerprint != old_fingerprint
 
 
-def test_headers():
-    crawler = get_crawler()
+@ensureDeferred
+async def test_headers():
+    crawler = await get_crawler()
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
@@ -166,10 +191,11 @@ def test_headers():
         ),
     ),
 )
-def test_known_fingerprints(url, params, fingerprint):
+@ensureDeferred
+async def test_known_fingerprints(url, params, fingerprint):
     """Test that known fingerprints remain the same, i.e. make sure that we do
     not accidentally modify fingerprints with future implementation changes."""
-    crawler = get_crawler()
+    crawler = await get_crawler()
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
@@ -178,14 +204,15 @@ def test_known_fingerprints(url, params, fingerprint):
     assert actual_fingerprint == fingerprint
 
 
-def test_metadata():
+@ensureDeferred
+async def test_metadata():
     settings = {"JOB": "1/2/3"}
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     job_fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
 
-    crawler = get_crawler()
+    crawler = await get_crawler()
     no_job_fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
@@ -198,24 +225,30 @@ def test_metadata():
     fingerprint3 = no_job_fingerprinter.fingerprint(request1)
     fingerprint4 = no_job_fingerprinter.fingerprint(request2)
 
-    assert fingerprint1 == fingerprint2
-    assert fingerprint3 == fingerprint4
+    assert fingerprint1 != fingerprint2
+    assert fingerprint2 != fingerprint3
+    assert fingerprint3 != fingerprint4
     assert fingerprint1 == fingerprint3
+    assert fingerprint2 == fingerprint4
 
 
-def test_only_end_parameters_matter():
+@pytest.mark.skipif(
+    scrapy_poet is not None,
+    reason=("scrapy-poet is installed, and test_deps already covers these scenarios"),
+)
+@ensureDeferred
+async def test_only_end_parameters_matter():
     """Test that it does not matter how a request comes to use some Zyte API
     parameters, that the fingerprint is the same if the parameters actually
     sent to Zyte API are the same."""
 
-    settings: Dict[str, Any] = {
-        **SETTINGS,
+    settings = {
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = get_crawler(settings)
+    crawler = await get_crawler(settings)
     transparent_fingerprinter = crawler.request_fingerprinter
 
-    crawler = get_crawler(SETTINGS)
+    crawler = await get_crawler()
     default_fingerprinter = crawler.request_fingerprinter
 
     request = Request("https://example.com")
@@ -295,8 +328,9 @@ def test_only_end_parameters_matter():
         ),
     ),
 )
-def test_url(url1, url2, match):
-    crawler = get_crawler()
+@ensureDeferred
+async def test_url(url1, url2, match):
+    crawler = await get_crawler()
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
@@ -318,7 +352,8 @@ def merge_dicts(*dicts):
     "params,match",
     (
         # As long as browserHtml or screenshot are True, different fragments
-        # make for different fingerprints, regardless of other parameters.
+        # make for different fingerprints, regardless of other parameters. Same
+        # for extraction types if browserHtml is set in *Options.extractFrom.
         *(
             (
                 merge_dicts(body, headers, unknown, browser),
@@ -345,10 +380,12 @@ def merge_dicts(*dicts):
                 {"browserHtml": True, "screenshot": False},
                 {"browserHtml": False, "screenshot": True},
                 {"browserHtml": True, "screenshot": True},
+                {"product": True, "productOptions": {"extractFrom": "browserHtml"}},
             )
         ),
         # If neither browserHtml nor screenshot are enabled, different
-        # fragments do *not* make for different fingerprints.
+        # fragments do *not* make for different fingerprints. Same for
+        # extraction types if browserHtml is not set in # *Options.extractFrom.
         *(
             (
                 merge_dicts(body, headers, unknown, browser),
@@ -374,12 +411,18 @@ def merge_dicts(*dicts):
                 {"browserHtml": False},
                 {"screenshot": False},
                 {"browserHtml": False, "screenshot": False},
+                {"product": True},
+                {
+                    "product": True,
+                    "productOptions": {"extractFrom": "httpResponseBody"},
+                },
             )
         ),
     ),
 )
-def test_url_fragments(params, match):
-    crawler = get_crawler()
+@ensureDeferred
+async def test_url_fragments(params, match):
+    crawler = await get_crawler()
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )
@@ -391,3 +434,237 @@ def test_url_fragments(params, match):
         assert fingerprint1 == fingerprint2
     else:
         assert fingerprint1 != fingerprint2
+
+
+@ensureDeferred
+async def test_extract_types():
+    crawler = await get_crawler()
+    fingerprinter = create_instance(
+        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
+    )
+    request1 = Request("https://toscrape.com", meta={"zyte_api": {"product": True}})
+    fingerprint1 = fingerprinter.fingerprint(request1)
+    request2 = Request(
+        "https://toscrape.com", meta={"zyte_api": {"productNavigation": True}}
+    )
+    fingerprint2 = fingerprinter.fingerprint(request2)
+    assert fingerprint1 != fingerprint2
+
+
+@ensureDeferred
+async def test_request_body():
+    crawler = await get_crawler()
+    fingerprinter = create_instance(
+        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
+    )
+    request1 = Request(
+        "https://toscrape.com", meta={"zyte_api": {"httpRequestBody": "Zm9v"}}
+    )
+    fingerprint1 = fingerprinter.fingerprint(request1)
+    request2 = Request(
+        "https://toscrape.com", meta={"zyte_api": {"httpRequestText": "foo"}}
+    )
+    fingerprint2 = fingerprinter.fingerprint(request2)
+    assert fingerprint1 == fingerprint2
+
+
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@ensureDeferred
+async def test_deps():
+    """Test that some injected dependencies do not affect fingerprinting at
+    all (e.g. HttpClient) while others do (e.g. WebPage)."""
+    from web_poet import HttpClient, WebPage
+
+    request = Request("https://example.com")
+    raw_request = Request(
+        "https://example.com",
+        meta={
+            "zyte_api": {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                "experimental": {
+                    "responseCookies": True,
+                },
+            }
+        },
+    )
+    auto_request = Request("https://example.com", meta={"zyte_api_automap": True})
+
+    class DepsSpider(Spider):
+        name = "deps"
+
+        def __init__(self, *args, **kwargs):
+            self.client_request = Request(
+                "https://example.com", callback=self.parse_client
+            )
+            self.client_raw_request = Request(
+                "https://example.com",
+                callback=self.parse_client,
+                meta={
+                    "zyte_api": {
+                        "httpResponseBody": True,
+                        "httpResponseHeaders": True,
+                        "experimental": {
+                            "responseCookies": True,
+                        },
+                    }
+                },
+            )
+            self.client_auto_request = Request(
+                "https://example.com",
+                callback=self.parse_client,
+                meta={"zyte_api_automap": True},
+            )
+
+            self.page_request = Request("https://example.com", callback=self.parse_page)
+            self.page_raw_request = Request(
+                "https://example.com",
+                callback=self.parse_page,
+                meta={
+                    "zyte_api": {
+                        "httpResponseBody": True,
+                        "httpResponseHeaders": True,
+                        "experimental": {
+                            "responseCookies": True,
+                        },
+                    }
+                },
+            )
+            self.page_auto_request = Request(
+                "https://example.com",
+                callback=self.parse_page,
+                meta={"zyte_api_automap": True},
+            )
+
+        async def parse_client(self, response, a: HttpClient):
+            pass
+
+        async def parse_page(self, response, a: WebPage):
+            pass
+
+    default_crawler = await get_crawler(spider_cls=DepsSpider)
+    default_fingerprinter = default_crawler.request_fingerprinter
+    transparent_crawler = await get_crawler(
+        {"ZYTE_API_TRANSPARENT_MODE": True}, spider_cls=DepsSpider
+    )
+    transparent_fingerprinter = transparent_crawler.request_fingerprinter
+
+    request_default_fp = default_fingerprinter.fingerprint(request)
+    request_transparent_fp = transparent_fingerprinter.fingerprint(request)
+    raw_request_default_fp = default_fingerprinter.fingerprint(raw_request)
+    raw_request_transparent_fp = transparent_fingerprinter.fingerprint(raw_request)
+    auto_request_default_fp = default_fingerprinter.fingerprint(auto_request)
+    auto_request_transparent_fp = transparent_fingerprinter.fingerprint(auto_request)
+
+    client_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.client_request
+    )
+    client_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.client_request
+    )
+    client_raw_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.client_raw_request
+    )
+    client_raw_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.client_raw_request
+    )
+    client_auto_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.client_auto_request
+    )
+    client_auto_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.client_auto_request
+    )
+
+    page_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.page_request
+    )
+    page_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.page_request
+    )
+    page_raw_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.page_raw_request
+    )
+    page_raw_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.page_raw_request
+    )
+    page_auto_request_default_fp = default_fingerprinter.fingerprint(
+        default_crawler.spider.page_auto_request
+    )
+    page_auto_request_transparent_fp = transparent_fingerprinter.fingerprint(
+        transparent_crawler.spider.page_auto_request
+    )
+
+    assert request_default_fp != request_transparent_fp
+    assert request_default_fp != raw_request_default_fp
+    assert request_default_fp != raw_request_transparent_fp
+    assert request_default_fp != auto_request_default_fp
+    assert request_default_fp != auto_request_transparent_fp
+    assert request_default_fp == client_request_default_fp
+    assert request_default_fp != client_request_transparent_fp
+    assert request_default_fp != client_raw_request_default_fp
+    assert request_default_fp != client_raw_request_transparent_fp
+    assert request_default_fp != client_auto_request_default_fp
+    assert request_default_fp != client_auto_request_transparent_fp
+    assert request_default_fp != page_request_default_fp
+    assert request_default_fp != page_request_transparent_fp
+    assert request_default_fp != page_raw_request_default_fp
+    assert request_default_fp != page_raw_request_transparent_fp
+    assert request_default_fp != page_auto_request_default_fp
+    assert request_default_fp != page_auto_request_transparent_fp
+
+    assert request_transparent_fp == raw_request_default_fp
+    assert request_transparent_fp == raw_request_transparent_fp
+    assert request_transparent_fp == auto_request_default_fp
+    assert request_transparent_fp == auto_request_transparent_fp
+    assert request_transparent_fp == client_request_transparent_fp
+    assert request_transparent_fp == client_raw_request_default_fp
+    assert request_transparent_fp == client_raw_request_transparent_fp
+    assert request_transparent_fp == client_auto_request_default_fp
+    assert request_transparent_fp == client_auto_request_transparent_fp
+    assert request_transparent_fp != page_request_default_fp
+    assert request_transparent_fp != page_request_transparent_fp
+    assert request_transparent_fp != page_raw_request_default_fp
+    assert request_transparent_fp != page_raw_request_transparent_fp
+    assert request_transparent_fp != page_auto_request_default_fp
+    assert request_transparent_fp != page_auto_request_transparent_fp
+
+    assert page_request_default_fp != page_request_transparent_fp
+    assert page_request_default_fp != page_raw_request_default_fp
+    assert page_request_default_fp != page_raw_request_transparent_fp
+    assert page_request_default_fp != page_auto_request_default_fp
+    assert page_request_default_fp != page_auto_request_transparent_fp
+
+    assert page_request_transparent_fp == page_raw_request_default_fp
+    assert page_request_transparent_fp == page_raw_request_transparent_fp
+    assert page_request_transparent_fp == page_auto_request_default_fp
+    assert page_request_transparent_fp == page_auto_request_transparent_fp
+
+
+@ensureDeferred
+async def test_page_params():
+    no_params_request = Request("https://example.com")
+    empty_params_request = Request("https://example.com", meta={"page_params": {}})
+    some_param_request = Request(
+        "https://example.com", meta={"page_params": {"a": "b"}}
+    )
+    other_param_request = Request(
+        "https://example.com", meta={"page_params": {"c": "d"}}
+    )
+
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
+    fingerprinter = crawler.request_fingerprinter
+
+    no_params_fingerprint = fingerprinter.fingerprint(no_params_request)
+    empty_params_fingerprint = fingerprinter.fingerprint(empty_params_request)
+    some_param_fingerprint = fingerprinter.fingerprint(some_param_request)
+    other_param_fingerprint = fingerprinter.fingerprint(other_param_request)
+
+    if scrapy_poet is None:
+        assert no_params_fingerprint == empty_params_fingerprint
+        assert no_params_fingerprint == some_param_fingerprint
+        assert no_params_fingerprint == other_param_fingerprint
+    else:
+        assert no_params_fingerprint == empty_params_fingerprint
+        assert no_params_fingerprint != some_param_fingerprint
+        assert no_params_fingerprint != other_param_fingerprint
+        assert some_param_fingerprint != other_param_fingerprint

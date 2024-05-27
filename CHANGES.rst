@@ -1,6 +1,229 @@
 Changes
 =======
 
+0.18.2 (2024-04-25)
+-------------------
+
+* The ``Accept``, ``Accept-Encoding``, ``Accept-Language``, and ``User-Agent``
+  headers are now dropped automatically during :ref:`header mapping
+  <header-mapping>` unless they have user-defined values. This fix can improve
+  success rates on some websites when using :ref:`HTTP requests
+  <zyte-api-http>`.
+
+0.18.1 (2024-04-19)
+-------------------
+
+* ``extractFrom`` in :reqmeta:`zyte_api_provider` or
+  :setting:`ZYTE_API_PROVIDER_PARAMS` overrides
+  :class:`~scrapy_zyte_api.ExtractFrom` annotations.
+
+0.18.0 (2024-04-17)
+-------------------
+
+* Updated requirement versions:
+
+  * :doc:`zyte-api <python-zyte-api:index>` >= 0.5.1
+
+* A new :reqmeta:`zyte_api_provider` request metadata key offers the same
+  functionality as the :setting:`ZYTE_API_PROVIDER_PARAMS` setting on a
+  per-request basis.
+
+* Fixed support for nested dicts, tuples and lists when defining :ref:`browser
+  actions <browser-actions>`.
+
+0.17.3 (2024-03-18)
+-------------------
+
+* :class:`scrapy_zyte_api.Addon` now adds
+  :class:`scrapy_zyte_api.providers.ZyteApiProvider` to the
+  ``SCRAPY_POET_PROVIDERS`` :ref:`scrapy-poet setting <scrapy-poet:settings>`
+  if :doc:`scrapy-poet <scrapy-poet:index>` is installed.
+
+0.17.2 (2024-03-14)
+-------------------
+
+* Added a :class:`scrapy_zyte_api.Actions` dependency.
+
+0.17.1 (2024-03-11)
+-------------------
+
+* Added a :class:`scrapy_zyte_api.Screenshot` dependency.
+
+0.17.0 (2024-03-05)
+-------------------
+
+* Added support for Python 3.12.
+* Updated requirement versions:
+
+  * :doc:`scrapy-poet <scrapy-poet:index>` >= 0.22.0
+  * :doc:`web-poet <web-poet:index>` >= 0.17.0
+
+* Added a Scrapy add-on, :class:`scrapy_zyte_api.Addon`, which simplifies
+  configuring Scrapy projects to work with ``scrapy-zyte-api``.
+* CI improvements.
+
+0.16.1 (2024-02-23)
+-------------------
+
+* Fix ``"extractFrom": "httpResponseBody"`` causing both
+  :http:`request:customHttpRequestHeaders` and :http:`request:requestHeaders`,
+  which are incompatible with each other, to be set when using automatic
+  request mapping.
+
+0.16.0 (2024-02-08)
+-------------------
+
+* Removed support for Python 3.7.
+* Updated requirement versions:
+
+  * :doc:`scrapy-poet <scrapy-poet:index>` >= 0.21.0
+  * :doc:`web-poet <web-poet:index>` >= 0.16.0
+
+* Added support for :class:`web_poet.AnyResponse` dependency.
+* Added support to specify the country code via :class:`typing.Annotated` and
+  :class:`scrapy_zyte_api.Geolocation` dependency *(supported only on Python
+  3.9+)*.
+* Improved tests.
+
+0.15.0 (2024-01-31)
+-------------------
+
+* Updated requirement versions:
+
+  * :doc:`scrapy-poet <scrapy-poet:index>` >= 0.20.1
+
+* Dependency injection :ref:`through scrapy-poet <scrapy-poet>` is now taken
+  into account for request fingerprinting.
+
+  Now, when scrapy-poet is installed, the default value of the
+  :setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` setting is
+  :class:`scrapy_poet.ScrapyPoetRequestFingerprinter`, and a warning will be
+  issued if a custom value is not a subclass of
+  :class:`~scrapy_poet.ScrapyPoetRequestFingerprinter`.
+
+* :ref:`Zyte Smart Proxy Manager special headers <spm-request-headers>` will
+  now be dropped automatically when using :ref:`transparent mode <transparent>`
+  or :ref:`automatic request parameters <automap>`. Where possible, they will
+  be replaced with equivalent Zyte API parameters. In all cases, a warning will
+  be issued.
+
+* Covered the configuration of
+  :class:`scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware` in the :ref:`setup
+  documentation <setup>`.
+
+  :class:`~scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware` was added in
+  scrapy-zyte-api 0.13.0, and is required to automatically close spiders when
+  all start requests fail because they are pointing to domains forbidden by
+  Zyte API.
+
+0.14.1 (2024-01-17)
+-------------------
+
+* The assignment of a custom download slot to requests that use Zyte API now
+  also happens in the spider middleware, not only in the downloader middleware.
+
+  This way requests get a download slot assigned before they reach the
+  scheduler, making Zyte API requests work as expected with
+  :class:`scrapy.pqueues.DownloaderAwarePriorityQueue`.
+
+  .. note:: New requests created from downloader middlewares do not get their
+            download slot assigned before they reach the scheduler. So, unless
+            they reuse the metadata from a requests that did get a download
+            slot assigned (e.g. retries, redirects), they will continue not to
+            work as expected with
+            :class:`~scrapy.pqueues.DownloaderAwarePriorityQueue`.
+
+0.14.0 (2024-01-15)
+-------------------
+
+* Updated requirement versions:
+
+  * andi >= 0.6.0
+  * scrapy-poet >= 0.19.0
+  * zyte-common-items >= 0.8.0
+
+* Added support for ``zyte_common_items.JobPosting`` to the scrapy-poet provider.
+
+0.13.0 (2023-12-13)
+-------------------
+
+* Updated requirement versions:
+
+  * andi >= 0.5.0
+  * scrapy-poet >= 0.18.0
+  * web-poet >= 0.15.1
+  * zyte-api >= 0.4.8
+
+* The spider is now closed and the finish reason is set to
+  ``"zyte_api_bad_key"`` or ``"zyte_api_suspended_account"`` when receiving
+  "Authentication Key Not Found" or "Account Suspended" responses from Zyte
+  API.
+
+* The spider is now closed and the finish reason is set to
+  ``"failed_forbidden_domain"`` when all start requests fail because they are
+  pointing to domains forbidden by Zyte API.
+
+* The spider is now closed and the finish reason is set to
+  ``"plugin_conflict"`` if both scrapy-zyte-smartproxy and the transparent mode
+  of scrapy-zyte-api are enabled.
+
+* The ``extractFrom`` extraction option can now be requested by annotating the
+  dependency with a ``scrapy_zyte_api.ExtractFrom`` member (e.g.
+  ``product: typing.Annotated[Product, ExtractFrom.httpResponseBody]``).
+
+* The ``Set-Cookie`` header is now removed from the response if the cookies
+  were returned by Zyte API (as ``"experimental.responseCookies"``).
+
+* The request fingerprinting was improved by refining which parts of the
+  request affect the fingerprint.
+
+* Zyte API Request IDs are now included in the error logs.
+
+* Split README.rst into multiple documentation files and publish them on
+  ReadTheDocs.
+
+* Improve the documentation for the ``ZYTE_API_MAX_REQUESTS`` setting.
+
+* Test and CI improvements.
+
+0.12.2 (2023-10-19)
+-------------------
+
+* Unused ``<data type>Options`` (e.g. ``productOptions``) are now dropped
+  from ``ZYTE_API_PROVIDER_PARAMS`` when sending the Zyte API request
+* When logging Zyte API requests, truncation now uses
+  "..." instead of Unicode ellipsis.
+
+0.12.1 (2023-09-29)
+-------------------
+
+* The new ``_ZYTE_API_USER_AGENT`` setting allows customizing the user agent 
+  string reported to Zyte API.
+  
+  Note that this setting is only meant for libraries and frameworks built on 
+  top of scrapy-zyte-api, to report themselves to Zyte API, for client software 
+  tracking and monitoring purposes. The value of this setting is *not* the 
+  ``User-Agent`` header sent to upstream websites when using Zyte API.
+
+
+0.12.0 (2023-09-26)
+-------------------
+
+* A new ``ZYTE_API_PROVIDER_PARAMS`` setting allows setting Zyte API
+  parameters, like ``geolocation``, to be included in all Zyte API requests by
+  the scrapy-poet provider.
+
+* A new ``scrapy-zyte-api/request_args/<parameter>`` stat, counts the number of
+  requests containing a given Zyte API request parameter. For example,
+  ``scrapy-zyte-api/request_args/url`` counts the number of Zyte API requests
+  with the URL parameter set (which should be all of them).
+
+  Experimental is treated as a namespace, and its parameters are the ones
+  counted, i.e. there is no ``scrapy-zyte-api/request_args/experimental`` stat,
+  but there are stats like
+  ``scrapy-zyte-api/request_args/experimental.responseCookies``.
+
+
 0.11.1 (2023-08-25)
 -------------------
 
@@ -123,7 +346,7 @@ Changes
     cookiejar of the request.
 
   * A new boolean setting, ``ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED``, can be
-    set to ``True`` to enable automated mapping of cookies from a request
+    set to ``True`` to enable automatic mapping of cookies from a request
     cookiejar into the ``experimental.requestCookies`` Zyte API parameter.
 
 * ``ZyteAPITextResponse`` is now a subclass of ``HtmlResponse``, so that the
@@ -195,10 +418,10 @@ When upgrading, you should set the following in your Scrapy settings:
   be set to ``True`` to make all requests use Zyte API by default, with request
   parameters being automatically mapped to Zyte API parameters.
 * Add a Request meta key, ``zyte_api_automap``, that can be used to enable
-  automated request parameter mapping for specific requests, or to modify the
-  outcome of automated request parameter mapping for specific requests.
+  automatic request parameter mapping for specific requests, or to modify the
+  outcome of automatic request parameter mapping for specific requests.
 * Add a ``ZYTE_API_AUTOMAP_PARAMS`` setting, which is a counterpart for
-  ``ZYTE_API_DEFAULT_PARAMS`` that applies to requests where automated request
+  ``ZYTE_API_DEFAULT_PARAMS`` that applies to requests where automatic request
   parameter mapping is enabled.
 * Add the ``ZYTE_API_SKIP_HEADERS`` and ``ZYTE_API_BROWSER_HEADERS`` settings
   to control the automatic mapping of request headers.
