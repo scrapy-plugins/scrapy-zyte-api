@@ -530,6 +530,14 @@ class _SessionManager:
             return
         self._sessions._start_request_session_refresh(request)
 
+    def handle_expiration(self, request: Request):
+        session_config = self._get_session_config(request)
+        pool = session_config.pool(request)
+        self._crawler.stats.inc_value(
+            f"scrapy-zyte-api/sessions/pools/{pool}/use/expired"
+        )
+        self._sessions._start_request_session_refresh(request)
+
 
 class ScrapyZyteAPISessionDownloaderMiddleware:
 
@@ -607,7 +615,10 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         ):
             return
 
-        self._sessions.handle_error(request)
+        if exception.request_info.status == 422:
+            self._sessions.handle_expiration(request)
+        else:
+            self._sessions.handle_error(request)
         return get_retry_request(
             request,
             spider=spider,
