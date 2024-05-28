@@ -261,6 +261,9 @@ class _SessionManager:
         for pool, size in pool_sizes.items():
             self._pending_initial_sessions[pool] = size
 
+        self._max_errors = settings.getdict("ZYTE_API_SESSION_MAX_ERRORS", 1)
+        self._errors = defaultdict(int)
+
         max_bad_inits = settings.getint("ZYTE_API_SESSION_MAX_BAD_INITS", 8)
         self._max_bad_inits = defaultdict(lambda: max_bad_inits)
         max_bad_inits_per_pool = settings.getdict(
@@ -422,17 +425,16 @@ class _SessionManager:
         try:
             self._pools[pool].remove(session_id)
         except KeyError:
-            logger.warning(
-                f"Attempt to remove session {session_id} from a pool a second "
-                f"time. This should not happen. If you can build a minimal "
-                f"example to reproduce this issue, please report it to "
-                f"scrapy-zyte-api developers."
-            )
+            pass
+        try:
+            del self._errors[session_id]
+        except KeyError:
+            pass
         task = create_task(self._create_session(request))
         self._init_tasks.add(task)
         task.add_done_callback(self._init_tasks.discard)
 
-    def start_request_session_refresh(self, request: Request) -> bool:
+    def _start_request_session_refresh(self, request: Request) -> bool:
         session_id = self._get_request_session_id(request)
         if session_id is None:
             logger.warning(
@@ -470,7 +472,7 @@ class _SessionManager:
                 f"set ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY to False to "
                 f"silence this warning."
             )
-        self.start_request_session_refresh(request)
+        self._start_request_session_refresh(request)
         return False
 
     async def assign(self, request: Request):
@@ -492,10 +494,15 @@ class _SessionManager:
             meta_key = "zyte_api_automap"
         request.meta.setdefault(meta_key, {})["session"] = {"id": session_id}
 
-    def count_error(self, request: Request):
+    def handle_error(self, request: Request):
         session_config = self._get_session_config(request)
         pool = session_config.pool(request)
         self._crawler.stats.inc_value(f"zyte-api-session/pools/{pool}/use/failed")
+        session_id = self._get_request_session_id(request)
+        self._errors[session_id] += 1
+        if self._errors[session_id] < self._max_errors:
+            return
+        self._sessions._start_request_session_refresh(request)
 
 
 class ScrapyZyteAPISessionDownloaderMiddleware:
@@ -551,8 +558,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         ):
             return
 
-        self._sessions.count_error(request)
-        self._sessions.start_request_session_refresh(request)
+        self._sessions.handle_error(request)
         return get_retry_request(
             request,
             spider=spider,

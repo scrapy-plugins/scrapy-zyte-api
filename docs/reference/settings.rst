@@ -260,7 +260,7 @@ When defined, :ref:`sessions managed by scrapy-zyte-api <plugin-sessions>` are
 enabled, and the ``check`` method is called on every response. If ``check``
 returns ``True``, the response session is considered valid; if ``check``
 returns ``False``, the response session is considered invalid, and will be
-expired.
+discarded.
 
 For example:
 
@@ -305,6 +305,22 @@ Default: ``8``
 
 The number of concurrent sessions to maintain when using
 :ref:`scrapy-zyte-api’s session API <plugin-sessions>`.
+
+
+.. setting:: ZYTE_API_SESSION_MAX_ERRORS
+
+ZYTE_API_SESSION_MAX_ERRORS
+===========================
+
+Default: ``1``
+
+Maximum number of :ref:`unsuccessful responses
+<zyte-api-unsuccessful-responses> allowed for any given session before
+discarding the session.
+
+.. note:: This setting does not affect session checks
+    (:setting:`ZYTE_API_SESSION_CHECKER`). A session is always discarded the
+    first time it fails its session check.
 
 
 .. setting:: ZYTE_API_SESSION_PARAMS
