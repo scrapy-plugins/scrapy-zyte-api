@@ -106,6 +106,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self._session = self._client.session(trust_env=self._trust_env)
         if not self._cookies_enabled:
             return
+        assert self._crawler.engine
         for middleware in self._crawler.engine.downloader.middleware.middlewares:
             if isinstance(middleware, self._cookie_mw_cls):
                 self._cookie_jars = middleware.jars
@@ -241,6 +242,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             f"type={error.parsed.type!r}, request_id={error.request_id!r}) "
             f"while processing URL ({request.url}): {detail}"
         )
+        assert self._crawler
+        assert self._crawler.engine
+        assert self._crawler.spider
         for status, error_type, close_reason in (
             (401, "/auth/key-not-found", "zyte_api_bad_key"),
             (403, "/auth/account-suspended", "zyte_api_suspended_account"),

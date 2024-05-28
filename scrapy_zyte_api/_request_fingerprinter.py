@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 logger = getLogger(__name__)
 
@@ -49,7 +49,7 @@ else:
                 crawler=crawler,
             )
             if self._has_poet and not isinstance(
-                self._fallback_request_fingerprinter, RequestFingerprinter
+                self._fallback_request_fingerprinter, cast(type, RequestFingerprinter)
             ):
                 logger.warning(
                     f"You have scrapy-poet installed, but your custom value "

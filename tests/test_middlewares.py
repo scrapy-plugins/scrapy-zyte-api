@@ -189,6 +189,7 @@ async def test_forbidden_domain_start_url():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
 
 
@@ -215,6 +216,7 @@ async def test_forbidden_domain_start_urls():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
 
 
@@ -240,6 +242,7 @@ async def test_some_forbidden_domain_start_url():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "finished"
 
 
@@ -264,6 +267,7 @@ async def test_follow_up_forbidden_domain_url():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "finished"
 
 
@@ -294,6 +298,7 @@ async def test_forbidden_domain_with_partial_start_request_consumption():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
 
 
@@ -323,7 +328,7 @@ async def test_spm_conflict_smartproxy(setting, attribute, conflict):
         start_urls = ["data:,"]
 
     if attribute is not None:
-        SPMSpider.zyte_smartproxy_enabled = attribute
+        SPMSpider.zyte_smartproxy_enabled = attribute  # type: ignore[attr-defined]
 
     settings = {
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -340,6 +345,7 @@ async def test_spm_conflict_smartproxy(setting, attribute, conflict):
     crawler = get_crawler(SPMSpider, settings_dict=settings)
     await crawler.crawl()
     expected = "plugin_conflict" if conflict else "finished"
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == expected
 
 
@@ -377,7 +383,7 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
         start_urls = ["data:,"]
 
     if attribute is not None:
-        CrawleraSpider.crawlera_enabled = attribute
+        CrawleraSpider.crawlera_enabled = attribute  # type: ignore[attr-defined]
 
     settings = {
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -394,6 +400,7 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
     crawler = get_crawler(CrawleraSpider, settings_dict=settings)
     await crawler.crawl()
     expected = "plugin_conflict" if conflict else "finished"
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == expected, (
         setting,
         attribute,
