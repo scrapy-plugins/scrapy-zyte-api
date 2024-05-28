@@ -315,7 +315,7 @@ ZYTE_API_SESSION_MAX_ERRORS
 Default: ``1``
 
 Maximum number of :ref:`unsuccessful responses
-<zyte-api-unsuccessful-responses> allowed for any given session before
+<zyte-api-unsuccessful-responses>` allowed for any given session before
 discarding the session.
 
 .. note:: This setting does not affect session checks
