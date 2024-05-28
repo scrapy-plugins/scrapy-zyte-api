@@ -175,9 +175,11 @@ class SessionConfig:
 
     def params(self, request: Request) -> Optional[Dict[str, str]]:
         location = self.location(request)
+        params = request.meta.get("zyte_api_session_params") or self._fallback_params
         if not location:
-            return request.meta.get("zyte_api_session_params") or self._fallback_params
+            return params
         return {
+            "url": params.get("url", request.url),
             "browserHtml": True,
             "actions": [
                 {
