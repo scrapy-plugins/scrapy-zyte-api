@@ -245,9 +245,7 @@ async def test_retry_policy(
 async def test_stats(mockserver):
     async with make_handler({}, mockserver.urljoin("/")) as handler:
         scrapy_stats = handler._stats
-        # The warning comes from the session middleware not being configured by
-        # default.
-        assert scrapy_stats.get_stats() == {"log_count/WARNING": 1}
+        assert scrapy_stats.get_stats() == {}
 
         meta = {
             "zyte_api": {"a": "...", "b": {"b0": "..."}, "experimental": {"c0": "..."}}
@@ -275,7 +273,7 @@ async def test_stats(mockserver):
                 "success",
                 "throttle_ratio",
             )
-        } | {"log_count/WARNING"}
+        }
         for suffix, value in (
             ("429", 0),
             ("attempts", 1),

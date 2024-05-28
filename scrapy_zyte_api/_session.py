@@ -12,9 +12,6 @@ from scrapy.http import Response
 from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.python import global_object_name
-from url_matcher import Patterns
-from web_poet import ApplyRule
-from web_poet.rules import Strings
 from zyte_api import RequestError
 
 logger = getLogger(__name__)
@@ -218,10 +215,10 @@ except ImportError:
 
         def session_config(
             self,
-            include: Strings,
+            include,
             *,
             instead_of: Optional[Type] = SessionConfig,
-            exclude: Optional[Strings] = None,
+            exclude=None,
             priority: int = 500,
             **kwargs,
         ):
@@ -231,6 +228,9 @@ except ImportError:
             )
 
 else:
+    from url_matcher import Patterns
+    from web_poet import ApplyRule
+    from web_poet.rules import Strings
 
     class SessionConfigRulesRegistry(RulesRegistry):
 

@@ -677,11 +677,11 @@ async def _test_automap(
         api_params = param_parser.parse(request)
     api_params.pop("url")
     assert api_params == expected
-    warnings.append(
-        "Neither ZYTE_API_SESSION_CHECKER nor ZYTE_API_SESSION_PARAMS are defined"
-    )
-    for warning in warnings:
-        assert warning in caplog.text
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
 
 
 @pytest.mark.parametrize(
