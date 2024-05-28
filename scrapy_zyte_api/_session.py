@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from scrapy import Request, Spider
 from scrapy.crawler import Crawler
-from scrapy.exceptions import IgnoreRequest, NotConfigured
+from scrapy.exceptions import CloseSpider, IgnoreRequest, NotConfigured
 from scrapy.http import Response
 from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import create_instance, load_object
@@ -139,7 +139,24 @@ except ImportError:
 
 class DefaultChecker:
 
+    def __init__(self, session_config):
+        self._session_config = session_config
+
     def check(self, response: Response, request: Request):
+        location = self.location(request)
+        if not location:
+            return True
+        for action in response.raw_api_response.get("actions", []):
+            if action.get("action", None) != "setLocation":
+                continue
+            if action.get("error", "").startswith("Action setLocation not supported "):
+                logger.error(
+                    f"Stopping the spider, tried to use the setLocation "
+                    f"action on an unsupported website "
+                    f"({urlparse_cached(request).netloc})."
+                )
+                raise CloseSpider("unsupported_set_location")
+            return action.get("status", None) == "success"
         return True
 
 
@@ -164,7 +181,7 @@ class SessionConfig:
         if checker_cls:
             checker = build_from_crawler(load_object(checker_cls), crawler)
         else:
-            checker = DefaultChecker()
+            checker = DefaultChecker(self)
         self.check = checker.check
 
     def pool(self, request: Request) -> str:
@@ -539,6 +556,17 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             reactor.callLater(
                 0, self._crawler.engine.close_spider, spider, "bad_session_inits"
             )
+        except CloseSpider as close_spider_exception:
+            from twisted.internet import reactor
+            from twisted.internet.interfaces import IReactorCore
+
+            reactor = cast(IReactorCore, reactor)
+            reactor.callLater(
+                0,
+                self._crawler.engine.close_spider,
+                spider,
+                close_spider_exception.reason,
+            )
 
     async def process_response(
         self, request: Request, response: Response, spider: Spider
@@ -547,7 +575,19 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             request
         ):
             return response
-        passed = await self._sessions.check(response, request)
+        try:
+            passed = await self._sessions.check(response, request)
+        except CloseSpider as close_spider_exception:
+            from twisted.internet import reactor
+            from twisted.internet.interfaces import IReactorCore
+
+            reactor = cast(IReactorCore, reactor)
+            reactor.callLater(
+                0,
+                self._crawler.engine.close_spider,
+                spider,
+                close_spider_exception.reason,
+            )
         if not passed:
             new_request_or_none = get_retry_request(
                 request,
