@@ -346,13 +346,15 @@ class _SessionManager:
         try:
             response = await deferred_to_future(deferred)
         except Exception:
-            self._crawler.stats.inc_value(f"zyte-api-session/pools/{pool}/init/failed")
+            self._crawler.stats.inc_value(
+                f"scrapy-zyte-api/sessions/pools/{pool}/init/failed"
+            )
             result = False
         else:
             result = session_config.check(response, session_init_request)
             outcome = "passed" if result else "failed"
             self._crawler.stats.inc_value(
-                f"zyte-api-session/pools/{pool}/init/check-{outcome}"
+                f"scrapy-zyte-api/sessions/pools/{pool}/init/check-{outcome}"
             )
         return result
 
@@ -455,7 +457,7 @@ class _SessionManager:
         pool = session_config.pool(request)
         outcome = "passed" if passed else "failed"
         self._crawler.stats.inc_value(
-            f"zyte-api-session/pools/{pool}/use/check-{outcome}"
+            f"scrapy-zyte-api/sessions/pools/{pool}/use/check-{outcome}"
         )
         if passed:
             return True
@@ -497,7 +499,9 @@ class _SessionManager:
     def handle_error(self, request: Request):
         session_config = self._get_session_config(request)
         pool = session_config.pool(request)
-        self._crawler.stats.inc_value(f"zyte-api-session/pools/{pool}/use/failed")
+        self._crawler.stats.inc_value(
+            f"scrapy-zyte-api/sessions/pools/{pool}/use/failed"
+        )
         session_id = self._get_request_session_id(request)
         self._errors[session_id] += 1
         if self._errors[session_id] < self._max_errors:
