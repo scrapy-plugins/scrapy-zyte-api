@@ -427,14 +427,17 @@ class _SessionManager:
         try:
             self._pools[pool].remove(session_id)
         except KeyError:
+            # More than 1 request was using the same session concurrently. Do
+            # not refresh the session again.
             pass
+        else:
+            task = create_task(self._create_session(request))
+            self._init_tasks.add(task)
+            task.add_done_callback(self._init_tasks.discard)
         try:
             del self._errors[session_id]
         except KeyError:
             pass
-        task = create_task(self._create_session(request))
-        self._init_tasks.add(task)
-        task.add_done_callback(self._init_tasks.discard)
 
     def _start_request_session_refresh(self, request: Request) -> bool:
         session_id = self._get_request_session_id(request)
