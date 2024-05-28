@@ -1,4 +1,4 @@
-from asyncio import create_task, sleep
+from asyncio import Task, create_task, sleep
 from collections import defaultdict, deque
 from copy import deepcopy
 from logging import getLogger
@@ -140,7 +140,7 @@ class DefaultChecker:
         self._session_config = session_config
 
     def check(self, response: Response, request: Request):
-        location = self.location(request)
+        location = self._session_config.location(request)
         if not location:
             return True
         for action in response.raw_api_response.get("actions", []):
@@ -187,7 +187,7 @@ class SessionConfig:
     def location(self, request: Request) -> Dict[str, str]:
         return request.meta.get("zyte_api_session_location") or self._fallback_location
 
-    def params(self, request: Request) -> Optional[Dict[str, str]]:
+    def params(self, request: Request) -> Dict[str, Any]:
         location = self.location(request)
         params = request.meta.get("zyte_api_session_params") or self._fallback_params
         if not location:
@@ -232,15 +232,15 @@ else:
     from web_poet import ApplyRule
     from web_poet.rules import Strings
 
-    class SessionConfigRulesRegistry(RulesRegistry):
+    class SessionConfigRulesRegistry(RulesRegistry):  # type: ignore[no-redef]
 
         def __init__(self):
-            rules = [ApplyRule(for_patterns=Patterns(include=[""]), use=SessionConfig)]
+            rules = [ApplyRule(for_patterns=Patterns(include=[""]), use=SessionConfig)]  # type: ignore[arg-type]
             super().__init__(rules=rules)
 
         def session_config_cls(self, request: Request) -> Type[SessionConfig]:
             cls = SessionConfig
-            overrides = self.overrides_for(request.url)
+            overrides: Dict[Type[SessionConfig], Type[SessionConfig]] = self.overrides_for(request.url)  # type: ignore[assignment]
             while cls in overrides:
                 cls = overrides[cls]
             return cls
@@ -256,7 +256,7 @@ else:
         ):
             return self.handle_urls(
                 include=include,
-                instead_of=instead_of,
+                instead_of=instead_of,  # type: ignore[arg-type]
                 exclude=exclude,
                 priority=priority,
                 **kwargs,
@@ -275,22 +275,22 @@ class _SessionManager:
         settings = crawler.settings
 
         pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
-        self._pending_initial_sessions = defaultdict(lambda: pool_size)
+        self._pending_initial_sessions: Dict[str, int] = defaultdict(lambda: pool_size)
         pool_sizes = settings.getdict("ZYTE_API_SESSION_POOL_SIZES", {})
         for pool, size in pool_sizes.items():
             self._pending_initial_sessions[pool] = size
 
         self._max_errors = settings.getdict("ZYTE_API_SESSION_MAX_ERRORS", 1)
-        self._errors = defaultdict(int)
+        self._errors: Dict[str, int] = defaultdict(int)
 
         max_bad_inits = settings.getint("ZYTE_API_SESSION_MAX_BAD_INITS", 8)
-        self._max_bad_inits = defaultdict(lambda: max_bad_inits)
+        self._max_bad_inits: Dict[str, int] = defaultdict(lambda: max_bad_inits)
         max_bad_inits_per_pool = settings.getdict(
             "ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL", {}
         )
         for pool, pool_max_bad_inits in max_bad_inits_per_pool.items():
             self._max_bad_inits[pool] = pool_max_bad_inits
-        self._bad_inits = defaultdict(int)
+        self._bad_inits: Dict[str, int] = defaultdict(int)
 
         # Transparent mode, needed to determine whether to set the session
         # using ``zyte_api`` or ``zyte_api_automap``.
@@ -333,13 +333,13 @@ class _SessionManager:
         #
         # Keeping a reference to those tasks until they are done is necessary
         # to prevent garbage collection to remove the tasks.
-        self._init_tasks = set()
+        self._init_tasks: Set[Task] = set()
 
         self._warn_on_no_body = settings.getbool(
             "ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY", True
         )
 
-        self._session_config_map = {}
+        self._session_config_map: Dict[Type[SessionConfig], SessionConfig] = {}
 
     def _get_session_config(self, request: Request) -> SessionConfig:
         cls = session_config_registry.session_config_cls(request)
@@ -440,7 +440,7 @@ class _SessionManager:
                 return session_id
         return None
 
-    def _start_session_refresh(self, session_id: str, request: Request) -> bool:
+    def _start_session_refresh(self, session_id: str, request: Request):
         session_config = self._get_session_config(request)
         pool = session_config.pool(request)
         try:
@@ -458,7 +458,7 @@ class _SessionManager:
         except KeyError:
             pass
 
-    def _start_request_session_refresh(self, request: Request) -> bool:
+    def _start_request_session_refresh(self, request: Request):
         session_id = self._get_request_session_id(request)
         if session_id is None:
             logger.warning(
@@ -525,10 +525,12 @@ class _SessionManager:
             f"scrapy-zyte-api/sessions/pools/{pool}/use/failed"
         )
         session_id = self._get_request_session_id(request)
-        self._errors[session_id] += 1
-        if self._errors[session_id] < self._max_errors:
+        if session_id is not None:
             return
-        self._sessions._start_request_session_refresh(request)
+            self._errors[session_id] += 1
+            if self._errors[session_id] < self._max_errors:
+                return
+        self._start_request_session_refresh(request)
 
     def handle_expiration(self, request: Request):
         session_config = self._get_session_config(request)
@@ -536,7 +538,7 @@ class _SessionManager:
         self._crawler.stats.inc_value(
             f"scrapy-zyte-api/sessions/pools/{pool}/use/expired"
         )
-        self._sessions._start_request_session_refresh(request)
+        self._start_request_session_refresh(request)
 
 
 class ScrapyZyteAPISessionDownloaderMiddleware:
@@ -613,7 +615,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         if not isinstance(exception, RequestError) or self._sessions.is_init_request(
             request
         ):
-            return
+            return None
 
         if exception.request_info.status == 422:
             self._sessions.handle_expiration(request)
