@@ -372,10 +372,6 @@ class _SessionManager:
         # to prevent garbage collection to remove the tasks.
         self._init_tasks: Set[Task] = set()
 
-        self._warn_on_no_body = settings.getbool(
-            "ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY", True
-        )
-
         self._session_config_map: Dict[Type[SessionConfig], SessionConfig] = {}
 
     def _get_session_config(self, request: Request) -> SessionConfig:
@@ -520,19 +516,6 @@ class _SessionManager:
         )
         if passed:
             return True
-        if (
-            self._warn_on_no_body
-            and not response.body
-            and "httpResponseBody" not in response.raw_api_response
-            and "browserHtml" not in response.raw_api_response
-        ):
-            logger.warning(
-                f"Validation failed for {response}, which lacks both "
-                f"httpResponseBody and browserHtml. Does your session "
-                f"checking code rely on inspecting the response body? If not, "
-                f"set ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY to False to "
-                f"silence this warning."
-            )
         self._start_request_session_refresh(request)
         return False
 

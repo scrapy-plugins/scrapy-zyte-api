@@ -312,27 +312,6 @@ object, for example to read settings:
     ZYTE_API_SESSION_CHECKER = MySessionChecker
 
 
-.. setting:: ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY
-
-ZYTE_API_SESSION_CHECKER_WARN_ON_NO_BODY
-========================================
-
-Default: ``True``
-
-Warn if :setting:`ZYTE_API_SESSION_CHECKER` fails for a response, and that
-response has no body because neither ``httpResponseBody`` nor ``browserHtml``
-were requested to Zyte API.
-
-If your session checking code does not rely on the response body, set this
-setting to ``False`` to silence this warning. Otherwise, find out which request
-is failing to request a response body from Zyte API, and fix that.
-
-You might get this warning, for example, if you are using scrapy-poet, and you
-forget to enable a body-providing field (``httpResponseBody`` or
-``browserHtml``) for provider requests (e.g. through
-:setting:`ZYTE_API_PROVIDER_PARAMS`).
-
-
 .. setting:: ZYTE_API_SESSION_ENABLED
 
 ZYTE_API_SESSION_ENABLED
