@@ -25,7 +25,8 @@ Enabling session management
 ===========================
 
 To enable session management, set :setting:`ZYTE_API_SESSION_ENABLED` to
-``True``.
+``True``, and set :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` to
+``False`` (sessions handle cookies already).
 
 By default, scrapy-zyte-api will maintain up to 8 sessions per domain, each
 initialized with a :ref:`browser request <zyte-api-browser>` targeting the URL
