@@ -139,8 +139,92 @@ class DefaultChecker:
     def __init__(self, session_config):
         self._session_config = session_config
 
-    def check(self, response: Response, request: Request):
-        location = self._session_config.location(request)
+    def check(self, response: Response, request: Request) -> bool:
+        return self._session_config.check(response, request)
+
+
+class TooManyBadSessionInits(RuntimeError):
+    pass
+
+
+class SessionConfig:
+    """Default session configuration for :ref:`scrapy-zyte-api sessions
+    <session>`."""
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        self.crawler = crawler
+
+        settings = crawler.settings
+        self._fallback_location = settings.getdict("ZYTE_API_SESSION_LOCATION")
+        self._fallback_params = settings.getdict(
+            "ZYTE_API_SESSION_PARAMS", {"browserHtml": True}
+        )
+
+        checker_cls = settings.get("ZYTE_API_SESSION_CHECKER", None)
+        if checker_cls:
+            checker = build_from_crawler(load_object(checker_cls), crawler)
+        else:
+            checker = DefaultChecker(self)
+        self.check = checker.check
+
+    def pool(self, request: Request) -> str:
+        """Return the ID of the session pool to use for *request*.
+
+        .. _session-pools:
+
+        The default implementation returns the request URL netloc, e.g.
+        ``"books.toscrape.com"`` for a request targeting
+        https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html.
+
+        scrapy-zyte-api can maintain multiple session pools, each pool with up
+        to :setting:`ZYTE_API_SESSION_POOL_SIZE` sessions.
+        """
+        return urlparse_cached(request).netloc
+
+    def location(self, request: Request) -> Dict[str, str]:
+        """Return the address :class:`dict` to use for ``setLocation``-based
+        session initialization for *request*.
+
+        The default implementation is based on settings and request metadata
+        keys as described in :ref:`session-init`.
+        """
+        return request.meta.get("zyte_api_session_location", self._fallback_location)
+
+    def params(self, request: Request) -> Dict[str, Any]:
+        """Return the Zyte API request parameters to use to initialize a
+        session for *request*.
+
+        The default implementation is based on settings and request metadata
+        keys as described in :ref:`session-init`.
+        """
+        location = self.location(request)
+        params = request.meta.get("zyte_api_session_params", self._fallback_params)
+        if not location:
+            return params
+        return {
+            "url": params.get("url", request.url),
+            "browserHtml": True,
+            "actions": [
+                {
+                    "action": "setLocation",
+                    "address": location,
+                }
+            ],
+        }
+
+    def check(self, response: Response, request: Request) -> bool:
+        """Return ``True`` if the session used to fetch *response* should be
+        kept or ``False`` if it should be discarded.
+
+        The default implementation checks the outcome of the ``setLocation``
+        action if session initialization was location-based, as described in
+        :ref:`session-check`.
+        """
+        location = self.location(request)
         if not location:
             return True
         for action in response.raw_api_response.get("actions", []):
@@ -155,53 +239,6 @@ class DefaultChecker:
                 raise CloseSpider("unsupported_set_location")
             return action.get("status", None) == "success"
         return True
-
-
-class TooManyBadSessionInits(RuntimeError):
-    pass
-
-
-class SessionConfig:
-
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(crawler)
-
-    def __init__(self, crawler):
-        self.crawler = crawler
-
-        settings = crawler.settings
-        self._fallback_location = settings.getdict("ZYTE_API_SESSION_LOCATION")
-        self._fallback_params = settings.getdict("ZYTE_API_SESSION_PARAMS")
-
-        checker_cls = settings.get("ZYTE_API_SESSION_CHECKER", None)
-        if checker_cls:
-            checker = build_from_crawler(load_object(checker_cls), crawler)
-        else:
-            checker = DefaultChecker(self)
-        self.check = checker.check
-
-    def pool(self, request: Request) -> str:
-        return urlparse_cached(request).netloc
-
-    def location(self, request: Request) -> Dict[str, str]:
-        return request.meta.get("zyte_api_session_location") or self._fallback_location
-
-    def params(self, request: Request) -> Dict[str, Any]:
-        location = self.location(request)
-        params = request.meta.get("zyte_api_session_params") or self._fallback_params
-        if not location:
-            return params
-        return {
-            "url": params.get("url", request.url),
-            "browserHtml": True,
-            "actions": [
-                {
-                    "action": "setLocation",
-                    "address": location,
-                }
-            ],
-        }
 
 
 try:

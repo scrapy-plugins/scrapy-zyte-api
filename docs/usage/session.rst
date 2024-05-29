@@ -16,67 +16,185 @@ When using scrapy-zyte-api, you can use these session APIs through the
 corresponding Zyte API fields (:http:`request:session`,
 :http:`request:sessionContext`).
 
-However, scrapy-zyte-api also provides :ref:`its own session API
-<plugin-sessions>`.
+However, scrapy-zyte-api also provides its own session API, which offers an API
+similar to that of :ref:`server-managed sessions <zyte-api-session-contexts>`,
+but built on top of :ref:`client-managed sessions <zyte-api-session-id>`, to
+provide the best of both.
 
-.. _plugin-sessions:
+Enabling session management
+===========================
 
-scrapy-zyte-api’s session API
-=============================
+To enable session management, set :setting:`ZYTE_API_SESSION_ENABLED` to
+``True``.
 
-scrapy-zyte-api’s session API offers an API similar to that of
-:ref:`server-managed sessions <zyte-api-session-contexts>`, but built on top of
-:ref:`client-managed sessions <zyte-api-session-id>`, to provide the best of
-both.
+By default, scrapy-zyte-api will maintain up to 8 sessions per domain, each
+initialized with a :ref:`browser request <zyte-api-browser>` targeting the URL
+of the first request that will use the session. Sessions will be automatically
+rotated among requests, and refreshed as they expire or get banned.
 
-scrapy-zyte-api can automatically build a pool of sessions, rotate them and
-manage their life cycle. You can use the :setting:`ZYTE_API_SESSION_PARAMS`
-setting to define the parameters needed to initialize a session, and the
-:setting:`ZYTE_API_SESSION_CHECKER` setting to define a session validity check,
-so that responses that fail the check have their session discarded and get a
-retry request with a different session.
+.. _session-init:
 
-Often it makes sense to define both settings. For example:
+Initializing sessions
+=====================
 
-.. code-block:: python
-    :caption: settings.py
+To change how sessions are initialized, you have the following options:
 
-    from scrapy import Request
-    from scrapy.http.response import Response
+-   To run the ``setLocation`` :http:`action <request:actions>` for session
+    initialization, use the :setting:`ZYTE_API_SESSION_LOCATION` setting or the
+    :reqmeta:`zyte_api_session_location` request metadata key.
 
-    ZYTE_API_SESSION_PARAMS = {
-        "browserHtml": True,
-        "actions": [
-            {
-                "action": "setLocation",
-                "address": {"postalCode": "04662"},
-            }
-        ],
-    }
+-   For session initialization with arbitrary Zyte API request fields, use the
+    :setting:`ZYTE_API_SESSION_PARAMS` setting or the
+    :reqmeta:`zyte_api_session_params` request metadata key.
 
+-   To customize session initialization per request, define
+    :meth:`~scrapy_zyte_api.SessionConfig.params` in a :ref:`session config
+    override <session-configs>`.
 
-    class MySessionChecker:
+.. _session-check:
 
-        @classmethod
-        def from_crawler(cls, crawler):
-            return cls(crawler)
+Checking sessions
+=================
 
-        def __init__(self, crawler):
-            params = crawler.settings["ZYTE_API_SESSION_PARAMS"]
-            self.zip_code = params["actions"][0]["address"]["postalCode"]
-
-        def check_session(self, request: Request, response: Response) -> bool:
-            return response.css(".zip_code::text").get() == self.zip_code
-
-
-    ZYTE_API_SESSION_CHECKER = MySessionChecker
+Responses from a session can be checked for session validity. If a response
+does not pass a session validity check, the session is discarded, and the
+request is retried with a different session.
 
 Session checking can be useful to work around scenarios where session
 initialization fails, e.g. due to rendering issues, IP-geolocation mismatches,
 A-B tests, etc. It can also help in cases where website sessions expire before
 Zyte API sessions.
 
-scrapy-zyte-api also gives you control over the number of sessions in the pool
-(:setting:`ZYTE_API_SESSION_COUNT`) or the number of :ref:`unsuccessful
-responses <zyte-api-unsuccessful-responses>` needed to discard a session
-(:setting:`ZYTE_API_SESSION_MAX_ERRORS`).
+By default, for sessions that are initialized with a location, the outcome of
+the ``setLocation`` action is checked. If the action fails, the session is
+discarded. If the action is not even available for a given website, the spider
+is closed with ``unsupported_set_location`` as the close reason, so that you
+can set a proper :ref:`session initialization logic <session-init>` for
+requests targeting that website.
+
+For sessions initialized with arbitrary parameters (or no parameters as all),
+no session check is performed, sessions are assumed to be fine until they
+expire or are banned.
+
+To implement your own code to check session responses and determine whether
+their session should be kept or discarded, use the
+:setting:`ZYTE_API_SESSION_CHECKER` setting.
+
+If you need to check session validity for multiple websites, it is better to
+define a separate :ref:`session config override <session-configs>` for each
+website, each with its own implementation of
+:meth:`~scrapy_zyte_api.SessionConfig.check`.
+
+.. _optimize-sessions:
+
+Optimizing sessions
+===================
+
+For faster crawls and lower costs, specially where session initialization
+requests are more expensive than session usage requests (e.g. because
+initialization relies on ``browserHtml`` and usage relies on
+``httpResponseBody``), you should try to make your sessions live as long as
+possible before they are discarded.
+
+Here are some things you can try:
+
+-   On some websites, sending too many requests too fast through a session can
+    cause the target website to ban that session.
+
+    On those websites, you can increase the number of sessions in the pool
+    (:setting:`ZYTE_API_SESSION_POOL_SIZE`). The more different sessions you
+    use, the more slowly you send requests through each session.
+
+    Mind, however, that :ref:`client-managed sessions <zyte-api-session-id>`
+    expire after `15 minutes since creation or 2 minutes since the last request
+    <https://docs.zyte.com/zyte-api/usage/reference.html#operation/extract/request/session>`_.
+    At a certain point, increasing :setting:`ZYTE_API_SESSION_POOL_SIZE`
+    without increasing :setting:`CONCURRENT_REQUESTS
+    <scrapy:CONCURRENT_REQUESTS>` and :setting:`CONCURRENT_REQUESTS_PER_DOMAIN
+    <scrapy:CONCURRENT_REQUESTS_PER_DOMAIN>` accordingly can be
+    counterproductive.
+
+-   By default, sessions are discarded as soon as an :ref:`unsuccessful
+    response <zyte-api-unsuccessful-responses>` is received.
+
+    However, on some websites sessions may remain valid even after a few
+    unsuccessful responses. If that is the case, you might want to increase
+    :setting:`ZYTE_API_SESSION_MAX_ERRORS` to require a higher number of
+    unsuccessful responses before discarding a session.
+
+
+.. _session-configs:
+
+Overriding session configs
+==========================
+
+For spiders that target a single website, using settings and request metadata
+keys for :ref:`session initialization <session-init>` and :ref:`session
+checking <session-check>` should do the job. However, for broad crawls or
+:doc:`multi-website spiders <zyte-spider-templates:index>`, you might want to
+define different session configs for different websites.
+
+The default session config is implemented by the
+:class:`~scrapy_zyte_api.SessionConfig` class:
+
+.. autoclass:: scrapy_zyte_api.SessionConfig
+    :members:
+
+To define a different session config for a given URL pattern, install
+:doc:`web-poet <web-poet:index>` and define a subclass of
+:class:`~scrapy_zyte_api.SessionConfig` decorated with
+:func:`~scrapy_zyte_api.session_config`:
+
+.. code-block:: python
+
+    from scrapy import Request
+    from scrapy.http.response import Response
+    from scrapy_zyte_api import SessionConfig, session_config
+
+
+    @session_config("ecommerce.example")
+    class EcommerceExampleSessionConfig(SessionConfig):
+
+        def check(self, response: Response, request: Request) -> bool:
+            return bool(response.css(".is_valid").get())
+
+        def pool(self, request: Request) -> str:
+            return "ecommerce.example"
+
+Your :class:`~scrapy_zyte_api.SessionConfig` subclass must be defined in a
+module that gets imported at run time. See ``SCRAPY_POET_DISCOVER`` in the
+:ref:`scrapy-poet setting reference <scrapy-poet:settings>`.
+
+.. _session-stats:
+
+Session stats
+=============
+
+The following stats exist for scrapy-zyte-api session management:
+
+``scrapy-zyte-api/sessions/pools/{pool}/init/check-failed``
+    Number of times that a session from pool ``{pool}`` failed its session
+    validation check right after initialization.
+
+``scrapy-zyte-api/sessions/pools/{pool}/init/check-passed``
+    Number of times that a session from pool ``{pool}`` passed its session
+    validation check right after initialization.
+
+``scrapy-zyte-api/sessions/pools/{pool}/init/failed``
+    Number of times that initializing a session for pool ``{pool}`` resulted in
+    an :ref:`unsuccessful response <zyte-api-unsuccessful-responses>`.
+
+``scrapy-zyte-api/sessions/pools/{pool}/use/check-failed``
+    Number of times that a response that used a session from pool ``{pool}``
+    failed its session validation check.
+
+``scrapy-zyte-api/sessions/pools/{pool}/use/check-passed``
+    Number of times that a response that used a session from pool ``{pool}``
+    passed its session validation check.
+
+``scrapy-zyte-api/sessions/pools/{pool}/use/expired``
+    Number of times that a session from pool ``{pool}`` expired.
+
+``scrapy-zyte-api/sessions/pools/{pool}/use/failed``
+    Number of times that a request that used a session from pool ``{pool}``
+    got an :ref:`unsuccessful response <zyte-api-unsuccessful-responses>`.
