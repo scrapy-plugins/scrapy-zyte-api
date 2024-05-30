@@ -88,6 +88,17 @@ string.
 See :ref:`retry`.
 
 
+.. reqmeta:: zyte_api_session_enabled
+
+zyte_api_session_enabled
+=========================
+
+Default: :setting:`ZYTE_API_SESSION_ENABLED`
+
+Whether to use :ref:`scrapy-zyte-api session management <session>` for the
+request (``True``) or not (``False``).
+
+
 .. reqmeta:: zyte_api_session_location
 
 zyte_api_session_location

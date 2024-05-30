@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from scrapy import Request, Spider
 from scrapy.crawler import Crawler
-from scrapy.exceptions import CloseSpider, IgnoreRequest, NotConfigured
+from scrapy.exceptions import CloseSpider, IgnoreRequest
 from scrapy.http import Response
 from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import create_instance, load_object
@@ -622,13 +622,14 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         return cls(crawler)
 
     def __init__(self, crawler: Crawler):
-        if not crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False):
-            raise NotConfigured
+        self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
         self._crawler = crawler
         self._sessions = _SessionManager(crawler)
 
     async def process_request(self, request: Request, spider: Spider) -> None:
-        if self._sessions.is_init_request(request):
+        if not request.meta.get(
+            "zyte_api_session_enabled", self._enabled
+        ) or self._sessions.is_init_request(request):
             return
         try:
             await self._sessions.assign(request)
@@ -655,8 +656,10 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
     async def process_response(
         self, request: Request, response: Response, spider: Spider
     ) -> Union[Request, Response, None]:
-        if isinstance(response, DummyResponse) or self._sessions.is_init_request(
-            request
+        if (
+            isinstance(response, DummyResponse)
+            or not request.meta.get("zyte_api_session_enabled", self._enabled)
+            or self._sessions.is_init_request(request)
         ):
             return response
         try:
@@ -686,8 +689,10 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
     def process_exception(
         self, request: Request, exception: Exception, spider: Spider
     ) -> Union[Request, None]:
-        if not isinstance(exception, RequestError) or self._sessions.is_init_request(
-            request
+        if (
+            not isinstance(exception, RequestError)
+            or not request.meta.get("zyte_api_session_enabled", self._enabled)
+            or self._sessions.is_init_request(request)
         ):
             return None
 
