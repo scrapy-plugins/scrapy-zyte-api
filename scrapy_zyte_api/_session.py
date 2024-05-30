@@ -169,7 +169,7 @@ class SessionConfig:
             checker = build_from_crawler(load_object(checker_cls), crawler)
         else:
             checker = DefaultChecker(self)
-        self.check = checker.check
+        self.check = checker.check  # type: ignore[method-assign]
 
     def pool(self, request: Request) -> str:
         """Return the ID of the session pool to use for *request*.
