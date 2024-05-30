@@ -369,7 +369,7 @@ class _SessionManager:
         for pool, size in pool_sizes.items():
             self._pending_initial_sessions[pool] = size
 
-        self._max_errors = settings.getdict("ZYTE_API_SESSION_MAX_ERRORS", 1)
+        self._max_errors = settings.getint("ZYTE_API_SESSION_MAX_ERRORS", 1)
         self._errors: Dict[str, int] = defaultdict(int)
 
         max_bad_inits = settings.getint("ZYTE_API_SESSION_MAX_BAD_INITS", 8)
