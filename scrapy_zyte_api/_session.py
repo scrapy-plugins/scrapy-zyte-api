@@ -12,11 +12,31 @@ from scrapy.http import Response
 from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.python import global_object_name
-from zyte_api import RequestError
+from tenacity import stop_after_attempt
+from zyte_api import RequestError, RetryFactory
 
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
 ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
+
+
+class SessionRetryFactory(RetryFactory):
+    temporary_download_error_stop = stop_after_attempt(1)
+
+
+SESSION_DEFAULT_RETRY_POLICY = SessionRetryFactory().build()
+
+try:
+    from zyte_api import AggressiveRetryFactory, stop_on_count
+except ImportError:
+    SESSION_AGGRESSIVE_RETRY_POLICY = SESSION_DEFAULT_RETRY_POLICY
+else:
+
+    class AggressiveSessionRetryFactory(AggressiveRetryFactory):
+        download_error_stop = stop_on_count(1)
+
+    SESSION_AGGRESSIVE_RETRY_POLICY = AggressiveSessionRetryFactory().build()
+
 
 try:
     from scrapy_poet import DummyResponse

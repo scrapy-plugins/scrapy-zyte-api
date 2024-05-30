@@ -87,6 +87,22 @@ priority:
 
 .. note:: The addon enables :ref:`transparent mode <transparent>` by default.
 
+If you are using :ref:`scrapy-zyte-api session management <session>`, your
+:setting:`ZYTE_API_RETRY_POLICY` should not retry 520 and 521 responses. For
+:data:`~zyte_api.zyte_api_retrying` and :data:`~zyte_api.aggressive_retrying`,
+if :setting:`ZYTE_API_SESSION_ENABLED` is ``True``, the addon automatically
+switches :setting:`ZYTE_API_RETRY_POLICY` to a matching session-specific retry
+policy:
+
+.. autodata:: scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY
+    :annotation:
+
+.. autodata:: scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY
+    :annotation:
+
+If you are using a custom retry policy, you should modify it yourself to not
+retry 520 and 521 responses.
+
 
 .. _config-components:
 
@@ -130,6 +146,15 @@ the ``SCRAPY_POET_PROVIDERS`` setting:
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
     }
 
+If you already had a custom value for :setting:`REQUEST_FINGERPRINTER_CLASS
+<scrapy:REQUEST_FINGERPRINTER_CLASS>`, set that value on
+:setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` instead.
+
+.. code-block:: python
+    :caption: settings.py
+
+    ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS = "myproject.CustomRequestFingerprinter"
+
 For :ref:`session management support <session>`, add the following downloader
 middleware to the :setting:`DOWNLOADER_MIDDLEWARES
 <scrapy:DOWNLOADER_MIDDLEWARES>` setting:
@@ -141,14 +166,16 @@ middleware to the :setting:`DOWNLOADER_MIDDLEWARES
         "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 1100,
     }
 
-If you already had a custom value for :setting:`REQUEST_FINGERPRINTER_CLASS
-<scrapy:REQUEST_FINGERPRINTER_CLASS>`, set that value on
-:setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` instead.
+To enable session management, set :setting:`ZYTE_API_SESSION_ENABLED` to
+``True``, and set a :setting:`ZYTE_API_RETRY_POLICY` that does not retry 520
+and 521 responses (e.g. :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY`
+or :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY`):
 
 .. code-block:: python
     :caption: settings.py
 
-    ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS = "myproject.CustomRequestFingerprinter"
+    ZYTE_API_SESSION_ENABLED = True
+    ZYTE_API_RETRY_POLICY = "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"
 
 
 .. _reactor-change:

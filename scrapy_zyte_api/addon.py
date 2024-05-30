@@ -1,11 +1,15 @@
 from scrapy.settings import BaseSettings
 from scrapy.utils.misc import load_object
+from zyte_api import zyte_api_retrying
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISessionDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
+
+from ._session import SESSION_DEFAULT_RETRY_POLICY
+from .handler import _load_retry_policy
 
 
 def _setdefault(settings, setting, cls, pos):
@@ -21,6 +25,20 @@ def _setdefault(settings, setting, cls, pos):
             if _cls == cls:
                 return
     settings[setting][cls] = pos
+
+
+_SESSION_RETRY_POLICIES = {
+    zyte_api_retrying: SESSION_DEFAULT_RETRY_POLICY,
+}
+
+try:
+    from zyte_api import aggressive_retrying
+except ImportError:
+    pass
+else:
+    from ._session import SESSION_AGGRESSIVE_RETRY_POLICY
+
+    _SESSION_RETRY_POLICIES[aggressive_retrying] = SESSION_AGGRESSIVE_RETRY_POLICY
 
 
 class Addon:
@@ -96,3 +114,11 @@ class Addon:
 
             _setdefault(settings, "DOWNLOADER_MIDDLEWARES", InjectionMiddleware, 543)
             _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiProvider, 1100)
+
+        if settings.getbool("ZYTE_API_SESSION_ENABLED", False):
+            retry_policy = _load_retry_policy(settings)
+            settings.set(
+                "ZYTE_API_RETRY_POLICY",
+                _SESSION_RETRY_POLICIES.get(retry_policy, retry_policy),
+                settings.getpriority("ZYTE_API_RETRY_POLICY"),
+            )
