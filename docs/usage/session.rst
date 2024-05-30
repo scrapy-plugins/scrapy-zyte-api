@@ -187,25 +187,7 @@ To define a different session config for a given URL pattern, install
 :class:`~scrapy_zyte_api.SessionConfig` decorated with
 :func:`~scrapy_zyte_api.session_config`:
 
-.. code-block:: python
-
-    from scrapy import Request
-    from scrapy.http.response import Response
-    from scrapy_zyte_api import SessionConfig, session_config
-
-
-    @session_config("ecommerce.example")
-    class EcommerceExampleSessionConfig(SessionConfig):
-
-        def check(self, response: Response, request: Request) -> bool:
-            return bool(response.css(".is_valid").get())
-
-        def pool(self, request: Request) -> str:
-            return "ecommerce.example"
-
-Your :class:`~scrapy_zyte_api.SessionConfig` subclass must be defined in a
-module that gets imported at run time. See ``SCRAPY_POET_DISCOVER`` in the
-:ref:`scrapy-poet setting reference <scrapy-poet:settings>`.
+.. autofunction:: scrapy_zyte_api.session_config
 
 .. _session-stats:
 

@@ -279,6 +279,38 @@ except ImportError:
             priority: int = 500,
             **kwargs,
         ):
+            """Mark the decorated :class:`SessionConfig` subclass as the
+            :ref:`session config <session-configs>` to use for the specified
+            URL patterns.
+
+            Usage example:
+
+            .. code-block:: python
+
+                from scrapy import Request
+                from scrapy.http.response import Response
+                from scrapy_zyte_api import SessionConfig, session_config
+
+
+                @session_config("ecommerce.example")
+                class EcommerceExampleSessionConfig(SessionConfig):
+
+                    def check(self, response: Response, request: Request) -> bool:
+                        return bool(response.css(".is_valid").get())
+
+                    def pool(self, request: Request) -> str:
+                        return "ecommerce.example"
+
+            Your :class:`~scrapy_zyte_api.SessionConfig` subclass must be
+            defined in a module that gets imported at run time. See
+            ``SCRAPY_POET_DISCOVER`` in the :ref:`scrapy-poet setting reference
+            <scrapy-poet:settings>`.
+
+            The parameters of this decorator are those of
+            :func:`web_poet.handle_urls`, only *instead_of* is
+            :class:`SessionConfig` by default, *to_return* is not supported,
+            and session configs are registered in their own rule registry.
+            """
             raise RuntimeError(
                 "To use the @session_config decorator you first must install "
                 "web-poet."
