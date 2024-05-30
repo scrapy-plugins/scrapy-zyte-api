@@ -410,6 +410,7 @@ class _SessionManager:
             session_init_url,
             meta={
                 SESSION_INIT_META_KEY: True,
+                "dont_merge_cookies": True,
                 "zyte_api": {**session_params, "session": {"id": session_id}},
             },
             callback=NO_CALLBACK,
@@ -557,6 +558,7 @@ class _SessionManager:
         else:
             meta_key = "zyte_api_automap"
         request.meta.setdefault(meta_key, {})["session"] = {"id": session_id}
+        request.meta.setdefault("dont_merge_cookies", True)
 
     def handle_error(self, request: Request):
         session_config = self._get_session_config(request)

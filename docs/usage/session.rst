@@ -25,13 +25,40 @@ Enabling session management
 ===========================
 
 To enable session management, set :setting:`ZYTE_API_SESSION_ENABLED` to
-``True``, and set :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` to
-``False`` (sessions handle cookies already).
+``True``.
 
 By default, scrapy-zyte-api will maintain up to 8 sessions per domain, each
 initialized with a :ref:`browser request <zyte-api-browser>` targeting the URL
 of the first request that will use the session. Sessions will be automatically
 rotated among requests, and refreshed as they expire or get banned.
+
+For session management to work as expected, your
+:setting:`ZYTE_API_RETRY_POLICY` should not retry 520 and 521 responses:
+
+-   If you are using the default retry policy
+    (:data:`~zyte_api.zyte_api_retrying`) or
+    :data:`~zyte_api.aggressive_retrying`:
+
+    -   If you are :ref:`using the add-on <config-addon>`, they are
+        automatically replaced with a matching session-specific retry policy:
+
+        .. autodata:: scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY
+            :annotation:
+
+        .. autodata:: scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY
+            :annotation:
+
+    -   If you are not using the add-on, set :setting:`ZYTE_API_RETRY_POLICY`
+        manually to the matching session-specific retry policy above. For
+        example:
+
+        .. code-block:: python
+            :caption: settings.py
+
+            ZYTE_API_RETRY_POLICY = "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"
+
+-   If you are using a custom retry policy, modify it to not retry 520 and 521
+    responses.
 
 .. _session-init:
 
@@ -85,6 +112,21 @@ If you need to check session validity for multiple websites, it is better to
 define a separate :ref:`session config override <session-configs>` for each
 website, each with its own implementation of
 :meth:`~scrapy_zyte_api.SessionConfig.check`.
+
+If your session checking implementation relies on the response body (e.g. it
+uses CSS or XPath expressions), you should make sure that you are getting one,
+which might not be the case if you are mostly using :ref:`Zyte API automatic
+extraction <zyte-api-extract>`, e.g. when using :doc:`Zyte spider templates
+<zyte-spider-templates:index>`. For example, you can use
+:setting:`ZYTE_API_AUTOMAP_PARAMS` and :setting:`ZYTE_API_PROVIDER_PARAMS` to
+force :http:`request:browserHtml` or :http:`request:httpResponseBody` to be set
+on every Zyte API request:
+
+.. code-block:: python
+    :caption: setting.py
+
+    ZYTE_API_AUTOMAP_PARAMS = {"browserHtml": True}
+    ZYTE_API_PROVIDER_PARAMS = {"browserHtml": True}
 
 .. _optimize-sessions:
 
