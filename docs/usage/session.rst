@@ -21,6 +21,8 @@ similar to that of :ref:`server-managed sessions <zyte-api-session-contexts>`,
 but built on top of :ref:`client-managed sessions <zyte-api-session-id>`, to
 provide the best of both.
 
+.. _enable-sessions:
+
 Enabling session management
 ===========================
 
@@ -40,17 +42,14 @@ For session management to work as expected, your
     :data:`~zyte_api.aggressive_retrying`:
 
     -   If you are :ref:`using the add-on <config-addon>`, they are
-        automatically replaced with a matching session-specific retry policy:
-
-        .. autodata:: scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY
-            :annotation:
-
-        .. autodata:: scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY
-            :annotation:
+        automatically replaced with a matching session-specific retry policy,
+        either :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` or
+        :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY`.
 
     -   If you are not using the add-on, set :setting:`ZYTE_API_RETRY_POLICY`
-        manually to the matching session-specific retry policy above. For
-        example:
+        manually to either
+        :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` or
+        :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY`. For example:
 
         .. code-block:: python
             :caption: settings.py
@@ -241,3 +240,15 @@ The following stats exist for scrapy-zyte-api session management:
 ``scrapy-zyte-api/sessions/pools/{pool}/use/failed``
     Number of times that a request that used a session from pool ``{pool}``
     got an :ref:`unsuccessful response <zyte-api-unsuccessful-responses>`.
+
+Session retry policies
+======================
+
+The following retry policies are designed to work well with session management
+(see :ref:`enable-sessions`):
+
+.. autodata:: scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY
+    :annotation:
+
+.. autodata:: scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY
+    :annotation:
