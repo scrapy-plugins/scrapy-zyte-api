@@ -154,15 +154,6 @@ except ImportError:
         return create_instance(objcls, settings=None, crawler=crawler, *args, **kwargs)
 
 
-class DefaultChecker:
-
-    def __init__(self, session_config):
-        self._session_config = session_config
-
-    def check(self, response: Response, request: Request) -> bool:
-        return self._session_config.check(response, request)
-
-
 class TooManyBadSessionInits(RuntimeError):
     pass
 
@@ -186,10 +177,9 @@ class SessionConfig:
 
         checker_cls = settings.get("ZYTE_API_SESSION_CHECKER", None)
         if checker_cls:
-            checker = build_from_crawler(load_object(checker_cls), crawler)
+            self._checker = build_from_crawler(load_object(checker_cls), crawler)
         else:
-            checker = DefaultChecker(self)
-        self.check = checker.check  # type: ignore[method-assign]
+            self._checker = None
 
     def pool(self, request: Request) -> str:
         """Return the ID of the session pool to use for *request*.
@@ -244,6 +234,8 @@ class SessionConfig:
         action if session initialization was location-based, as described in
         :ref:`session-check`.
         """
+        if self._checker:
+            return self._checker.check(response, request)
         location = self.location(request)
         if not location:
             return True

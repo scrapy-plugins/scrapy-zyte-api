@@ -128,6 +128,8 @@ class DefaultResource(Resource):
             response_data["screenshot"] = b64encode(
                 b"screenshot-body-contents"
             ).decode()
+        if "session" in request_data:
+            response_data["session"] = request_data["session"]
         if "httpResponseBody" in request_data:
             headers = request_data.get("customHttpRequestHeaders", [])
             for header in headers:
