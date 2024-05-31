@@ -15,6 +15,8 @@ from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
 from zyte_api import RequestError, RetryFactory
 
+from scrapy_zyte_api.utils import _DOWNLOAD_NEEDS_SPIDER
+
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
 ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
@@ -440,7 +442,12 @@ class _SessionManager:
             },
             callback=NO_CALLBACK or spider.parse,
         )
-        deferred = self._crawler.engine.download(session_init_request, spider=spider)
+        if _DOWNLOAD_NEEDS_SPIDER:
+            deferred = self._crawler.engine.download(
+                session_init_request, spider=spider
+            )
+        else:
+            deferred = self._crawler.engine.download(session_init_request)
         try:
             response = await deferred_to_future(deferred)
         except Exception:
