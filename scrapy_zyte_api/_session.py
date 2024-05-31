@@ -101,7 +101,7 @@ except ImportError:
 try:
     from scrapy.http.request import NO_CALLBACK
 except ImportError:
-    NO_CALLBACK = "parse"
+    NO_CALLBACK = None
 
 try:
     from scrapy.utils.defer import deferred_to_future
@@ -430,6 +430,7 @@ class _SessionManager:
 
         session_params = deepcopy(session_config.params(request))
         session_init_url = session_params.pop("url", request.url)
+        spider = self._crawler.spider
         session_init_request = Request(
             session_init_url,
             meta={
@@ -437,9 +438,9 @@ class _SessionManager:
                 "dont_merge_cookies": True,
                 "zyte_api": {**session_params, "session": {"id": session_id}},
             },
-            callback=NO_CALLBACK,
+            callback=NO_CALLBACK or spider.parse,
         )
-        deferred = self._crawler.engine.download(session_init_request)
+        deferred = self._crawler.engine.download(session_init_request, spider=spider)
         try:
             response = await deferred_to_future(deferred)
         except Exception:
