@@ -633,6 +633,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             reactor.callLater(
                 0, self._crawler.engine.close_spider, spider, "bad_session_inits"
             )
+            raise
         except CloseSpider as close_spider_exception:
             from twisted.internet import reactor
             from twisted.internet.interfaces import IReactorCore
@@ -644,6 +645,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
                 spider,
                 close_spider_exception.reason,
             )
+            raise
 
     async def process_response(
         self, request: Request, response: Response, spider: Spider
@@ -667,6 +669,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
                 spider,
                 close_spider_exception.reason,
             )
+            raise
         if not passed:
             new_request_or_none = get_retry_request(
                 request,
@@ -688,7 +691,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         ):
             return None
 
-        if exception.request_info.status == 422:
+        if exception.status == 422:
             self._sessions.handle_expiration(request)
         else:
             self._sessions.handle_error(request)

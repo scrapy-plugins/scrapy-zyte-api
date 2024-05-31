@@ -128,8 +128,19 @@ class DefaultResource(Resource):
             response_data["screenshot"] = b64encode(
                 b"screenshot-body-contents"
             ).decode()
+
         if "session" in request_data:
+            # See test_sessions.py::test_param_precedence
+            if domain.startswith("postal-code-10001"):
+                try:
+                    postal_code = request_data["actions"][0]["address"]["postalCode"]
+                except (KeyError, IndexError, TypeError):
+                    postal_code = None
+                if postal_code != "10001":
+                    request.setResponseCode(500)
+                    return b""
             response_data["session"] = request_data["session"]
+
         if "httpResponseBody" in request_data:
             headers = request_data.get("customHttpRequestHeaders", [])
             for header in headers:
