@@ -6,6 +6,8 @@ from scrapy import Request, Spider
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response
 
+from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT
+
 from . import get_crawler
 
 UNSET = object()
@@ -282,9 +284,24 @@ class CloseSpiderChecker(ConstantChecker):
 @pytest.mark.parametrize(
     ("checker", "close_reason"),
     (
-        (TrueChecker, "finished"),
-        (FalseChecker, "bad_session_inits"),
-        (CloseSpiderChecker, "checker_failed"),
+        *(
+            pytest.param(
+                checker,
+                close_reason,
+                marks=pytest.mark.skipif(
+                    not _RAW_CLASS_SETTING_SUPPORT,
+                    reason=(
+                        "Configuring component classes instead of their import "
+                        "paths requires Scrapy 2.4+."
+                    ),
+                ),
+            )
+            for checker, close_reason in (
+                (TrueChecker, "finished"),
+                (FalseChecker, "bad_session_inits"),
+                (CloseSpiderChecker, "checker_failed"),
+            )
+        ),
         ("tests.test_sessions.TrueChecker", "finished"),
         ("tests.test_sessions.FalseChecker", "bad_session_inits"),
         ("tests.test_sessions.CloseSpiderChecker", "checker_failed"),
