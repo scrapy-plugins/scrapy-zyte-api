@@ -6,6 +6,7 @@ from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response
+from scrapy.utils.httpobj import urlparse_cached
 
 from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT
 
@@ -684,4 +685,48 @@ async def test_max_errors(setting, value, mockserver):
         )
         + 1,
         "scrapy-zyte-api/sessions/pools/example.com/use/failed": retry_times + 1,
+    }
+
+
+class DomainChecker:
+
+    def check(self, request: Request, response: Response) -> bool:
+        domain = urlparse_cached(request).netloc
+        return "fail" not in domain
+
+
+@ensureDeferred
+async def test_check_overrides_error(mockserver):
+    """Max errors are ignored if a session does not pass its session check."""
+    retry_times = 2
+    settings = {
+        "RETRY_TIMES": retry_times,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_CHECKER": "tests.test_sessions.DomainChecker",
+        "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_ERRORS": 2,
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://session-check-fails.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/session-check-fails.com/init/check-passed": retry_times
+        + 2,
+        "scrapy-zyte-api/sessions/pools/session-check-fails.com/use/check-failed": retry_times
+        + 1,
     }
