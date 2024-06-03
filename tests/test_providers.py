@@ -308,6 +308,43 @@ async def test_provider_extractfrom_double(mockserver, caplog):
     sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
 )
 @ensureDeferred
+async def test_provider_extractfrom_override(mockserver):
+    from typing import Annotated
+
+    @attrs.define
+    class AnnotatedProductPage(BasePage):
+        product: Annotated[Product, ExtractFrom.httpResponseBody]
+
+    class AnnotatedZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "productOptions": {"extractFrom": "browserHtml"}
+    }
+
+    item, url, _ = await crawl_single_item(
+        AnnotatedZyteAPISpider, HtmlResource, settings
+    )
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
+        )
+    )
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@ensureDeferred
 async def test_provider_geolocation(mockserver):
     from typing import Annotated
 
@@ -373,16 +410,6 @@ def provider_settings(server):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
     settings["DOWNLOAD_HANDLERS"]["http"] = RecordingHandler
     return settings
-
-
-CUSTOM_HTTP_REQUEST_HEADERS = [
-    {
-        "name": "Accept",
-        "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-    {"name": "Accept-Language", "value": "en"},
-    {"name": "Accept-Encoding", "value": "gzip, deflate, br"},
-]
 
 
 @ensureDeferred
@@ -751,8 +778,6 @@ async def test_provider_any_response_http_response(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        # This is actually set by HttpResponseProvider
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
 
     assert type(item["page"].response) is AnyResponse
@@ -784,8 +809,6 @@ async def test_provider_any_response_browser_http_response(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        # This is actually set by HttpResponseProvider
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert params[1] == {"url": url, "browserHtml": True}
 
@@ -824,8 +847,6 @@ async def test_provider_any_response_http_response_multiple_pages(mockserver):
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        # This is actually set by HttpResponseProvider
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert type(item["page1"].http_response) is HttpResponse
     assert type(item["page2"].http_response) is HttpResponse
@@ -860,8 +881,6 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
         "url": url,
         "httpResponseBody": True,
         "httpResponseHeaders": True,
-        # This is actually set by HttpResponseProvider
-        "customHttpRequestHeaders": CUSTOM_HTTP_REQUEST_HEADERS,
     }
     assert params[1] == {"url": url, "browserHtml": True}
 

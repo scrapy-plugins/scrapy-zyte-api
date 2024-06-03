@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager, contextmanager
 from os import environ
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type, Union
 
 from scrapy import Spider
 from scrapy.crawler import Crawler
@@ -13,7 +13,8 @@ from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 _API_KEY = "a"
 
 DEFAULT_CLIENT_CONCURRENCY = AsyncClient(api_key=_API_KEY).n_conn
-SETTINGS: Dict[str, Any] = {
+SETTINGS_T = Dict[Union[Type, str], Any]
+SETTINGS: SETTINGS_T = {
     "DOWNLOAD_HANDLERS": {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
@@ -40,7 +41,7 @@ else:
     SETTINGS["SCRAPY_POET_PROVIDERS"] = {
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100
     }
-SETTINGS_ADDON: Dict[str, Any] = {
+SETTINGS_ADDON: SETTINGS_T = {
     "ADDONS": {
         Addon: 500,
     },
@@ -57,8 +58,9 @@ async def get_crawler(
     settings=None, spider_cls=DummySpider, setup_engine=True, use_addon=False
 ):
     settings = settings or {}
-    settings = {**(SETTINGS if not use_addon else SETTINGS_ADDON), **settings}
-    crawler = _get_crawler(settings_dict=settings, spidercls=spider_cls)
+    base_settings: SETTINGS_T = SETTINGS if not use_addon else SETTINGS_ADDON
+    final_settings = {**base_settings, **settings}
+    crawler = _get_crawler(settings_dict=final_settings, spidercls=spider_cls)
     if setup_engine:
         await setup_crawler_engine(crawler)
     return crawler
@@ -78,7 +80,7 @@ def get_download_handler(crawler, schema):
 
 @asynccontextmanager
 async def make_handler(
-    settings: Dict[str, Any], api_url: Optional[str] = None, *, use_addon: bool = False
+    settings: SETTINGS_T, api_url: Optional[str] = None, *, use_addon: bool = False
 ):
     if api_url is not None:
         settings["ZYTE_API_URL"] = api_url

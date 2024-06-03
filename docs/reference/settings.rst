@@ -479,7 +479,7 @@ overrides of :setting:`ZYTE_API_SESSION_POOL_SIZE` for those pools.
 ZYTE_API_SKIP_HEADERS
 =====================
 
-Default: ``["User-Agent"]``
+Default: ``["Cookie"]``
 
 Determines headers that must *not* be mapped as
 :http:`request:customHttpRequestHeaders`.

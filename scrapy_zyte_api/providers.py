@@ -153,8 +153,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                         )
                     extract_from_seen[kw] = extract_from
                     options = zyte_api_meta.setdefault(f"{kw}Options", {})
-                    # TODO better logic for overwriting the value
-                    options["extractFrom"] = extract_from.value
+                    options.setdefault("extractFrom", extract_from.value)
                     break
 
         http_response_needed = (

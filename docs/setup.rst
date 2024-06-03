@@ -106,10 +106,10 @@ scrapy-zyte-api integration as follows:
     DOWNLOADER_MIDDLEWARES = {
         "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
     }
-    REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
     SPIDER_MIDDLEWARES = {
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
     }
+    REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 By default, scrapy-zyte-api doesn't change the spider behavior. To switch your

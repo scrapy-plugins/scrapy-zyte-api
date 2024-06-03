@@ -1,6 +1,22 @@
 Changes
 =======
 
+0.18.2 (2024-04-25)
+-------------------
+
+* The ``Accept``, ``Accept-Encoding``, ``Accept-Language``, and ``User-Agent``
+  headers are now dropped automatically during :ref:`header mapping
+  <header-mapping>` unless they have user-defined values. This fix can improve
+  success rates on some websites when using :ref:`HTTP requests
+  <zyte-api-http>`.
+
+0.18.1 (2024-04-19)
+-------------------
+
+* ``extractFrom`` in :reqmeta:`zyte_api_provider` or
+  :setting:`ZYTE_API_PROVIDER_PARAMS` overrides
+  :class:`~scrapy_zyte_api.ExtractFrom` annotations.
+
 0.18.0 (2024-04-17)
 -------------------
 
