@@ -281,6 +281,24 @@ class CloseSpiderChecker(ConstantChecker):
         super().__init__(CloseSpider("checker_failed"))
 
 
+class TrueCrawlerChecker(ConstantChecker):
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        super().__init__(crawler.settings["ZYTE_API_SESSION_ENABLED"])
+
+
+class FalseCrawlerChecker(ConstantChecker):
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        super().__init__(not crawler.settings["ZYTE_API_SESSION_ENABLED"])
+
+
 @pytest.mark.parametrize(
     ("checker", "close_reason", "stats"),
     (
@@ -312,6 +330,19 @@ class CloseSpiderChecker(ConstantChecker):
                     {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
                 ),
                 (CloseSpiderChecker, "checker_failed", {}),
+                (
+                    TrueCrawlerChecker,
+                    "finished",
+                    {
+                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+                        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+                    },
+                ),
+                (
+                    FalseCrawlerChecker,
+                    "bad_session_inits",
+                    {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
+                ),
             )
         ),
         (
@@ -328,6 +359,19 @@ class CloseSpiderChecker(ConstantChecker):
             {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
         ),
         ("tests.test_sessions.CloseSpiderChecker", "checker_failed", {}),
+        (
+            "tests.test_sessions.TrueCrawlerChecker",
+            "finished",
+            {
+                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+                "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+            },
+        ),
+        (
+            "tests.test_sessions.FalseCrawlerChecker",
+            "bad_session_inits",
+            {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
+        ),
     ),
 )
 @ensureDeferred
