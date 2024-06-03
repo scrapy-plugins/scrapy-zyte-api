@@ -210,7 +210,7 @@ async def test_param_precedence(
             "postalCode": postal_codes[location_setting]
         }
     if location_meta is None:
-        meta["zyte_api_session_location"] = None
+        meta["zyte_api_session_location"] = {}
     elif location_meta is not UNSET:
         meta["zyte_api_session_location"] = {"postalCode": postal_codes[location_meta]}
 

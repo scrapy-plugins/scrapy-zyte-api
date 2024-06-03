@@ -346,10 +346,7 @@ request for which the session is being initialized will be used instead.
 This setting, if not empty, takes precedence over the
 :setting:`ZYTE_API_SESSION_PARAMS` setting and the
 :reqmeta:`zyte_api_session_params` request metadata key, but it can be
-overridden by the :reqmeta:`zyte_api_session_location` request metadata key,
-and setting :reqmeta:`zyte_api_session_location` to ``None`` nullifies the
-setting, letting :setting:`ZYTE_API_SESSION_PARAMS` or
-:reqmeta:`zyte_api_session_params` be used instead.
+overridden by the :reqmeta:`zyte_api_session_location` request metadata key.
 
 To disable the :setting:`ZYTE_API_SESSION_LOCATION` setting on a specific
 request, e.g. to use the :setting:`ZYTE_API_SESSION_PARAMS` setting or the
