@@ -282,12 +282,13 @@ class CloseSpiderChecker(ConstantChecker):
 
 
 @pytest.mark.parametrize(
-    ("checker", "close_reason"),
+    ("checker", "close_reason", "stats"),
     (
         *(
             pytest.param(
                 checker,
                 close_reason,
+                stats,
                 marks=pytest.mark.skipif(
                     not _RAW_CLASS_SETTING_SUPPORT,
                     reason=(
@@ -296,19 +297,41 @@ class CloseSpiderChecker(ConstantChecker):
                     ),
                 ),
             )
-            for checker, close_reason in (
-                (TrueChecker, "finished"),
-                (FalseChecker, "bad_session_inits"),
-                (CloseSpiderChecker, "checker_failed"),
+            for checker, close_reason, stats in (
+                (
+                    TrueChecker,
+                    "finished",
+                    {
+                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+                        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+                    },
+                ),
+                (
+                    FalseChecker,
+                    "bad_session_inits",
+                    {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
+                ),
+                (CloseSpiderChecker, "checker_failed", {}),
             )
         ),
-        ("tests.test_sessions.TrueChecker", "finished"),
-        ("tests.test_sessions.FalseChecker", "bad_session_inits"),
-        ("tests.test_sessions.CloseSpiderChecker", "checker_failed"),
+        (
+            "tests.test_sessions.TrueChecker",
+            "finished",
+            {
+                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+                "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+            },
+        ),
+        (
+            "tests.test_sessions.FalseChecker",
+            "bad_session_inits",
+            {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
+        ),
+        ("tests.test_sessions.CloseSpiderChecker", "checker_failed", {}),
     ),
 )
 @ensureDeferred
-async def test_checker(checker, close_reason, mockserver):
+async def test_checker(checker, close_reason, stats, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_CHECKER": checker,
@@ -335,15 +358,87 @@ async def test_checker(checker, close_reason, mockserver):
         if k.startswith("scrapy-zyte-api/sessions")
     }
     assert crawler.spider.close_reason == close_reason
-    if close_reason == "finished":
-        assert session_stats == {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-            "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-        }
-    elif close_reason == "bad_session_inits":
-        assert session_stats == {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1,
-        }
-    else:
-        assert close_reason == "checker_failed"
-        assert session_stats == {}
+    assert session_stats == stats
+
+
+@pytest.mark.parametrize(
+    ("postal_code", "url", "close_reason", "stats"),
+    (
+        (
+            None,
+            "https://example.com",
+            "finished",
+            {
+                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+                "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+            },
+        ),
+        (
+            "10001",
+            "https://postal-code-10001.example",
+            "finished",
+            {
+                "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 1,
+                "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/check-passed": 1,
+            },
+        ),
+        (
+            "10002",
+            "https://postal-code-10001.example",
+            "bad_session_inits",
+            {"scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/failed": 1},
+        ),
+        (
+            "10001",
+            "https://no-location-support.example",
+            "unsupported_set_location",
+            {},
+        ),
+    ),
+)
+@ensureDeferred
+async def test_checker_location(postal_code, url, close_reason, stats, mockserver):
+    """The default checker looks into the outcome of the ``setLocation`` action
+    if a location meta/setting was used."""
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+    if postal_code is not None:
+        settings["ZYTE_API_SESSION_LOCATION"] = {"postalCode": postal_code}
+
+    class TestSpider(Spider):
+        name = "test"
+
+        def start_requests(self):
+            yield Request(
+                url,
+                meta={
+                    "zyte_api_automap": {
+                        "actions": [
+                            {
+                                "action": "setLocation",
+                                "address": {"postalCode": postal_code},
+                            }
+                        ]
+                    },
+                },
+            )
+
+        def parse(self, response):
+            pass
+
+        def closed(self, reason):
+            self.close_reason = reason
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert crawler.spider.close_reason == close_reason
+    assert session_stats == stats

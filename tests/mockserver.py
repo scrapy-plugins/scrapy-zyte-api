@@ -164,13 +164,24 @@ class DefaultResource(Resource):
         if actions:
             results: List[_ActionResult] = []
             for action in actions:
-                results.append(
-                    {
-                        "action": action["action"],
-                        "elapsedTime": 1.0,
-                        "status": "success",
-                    }
-                )
+                result = {
+                    "action": action["action"],
+                    "elapsedTime": 1.0,
+                    "status": "success",
+                }
+                if action["action"] == "setLocation":
+                    if domain.startswith("postal-code-10001"):
+                        try:
+                            postal_code = action["address"]["postalCode"]
+                        except (KeyError, IndexError, TypeError):
+                            postal_code = None
+                        if postal_code != "10001":
+                            result["status"] = "returned"
+                            result["error"] = "Action setLocation failed"
+                    elif domain.startswith("no-location-support"):
+                        result["status"] = "returned"
+                        result["error"] = "Action setLocation not supported on …"
+                results.append(result)
             response_data["actions"] = results  # type: ignore[assignment]
 
         if request_data.get("product") is True:
