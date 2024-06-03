@@ -405,7 +405,7 @@ to work even after an unsuccessful response. See :ref:`optimize-sessions`.
 ZYTE_API_SESSION_PARAMS
 =======================
 
-Default: ``{}``
+Default: ``{"browserHtml": True}``
 
 Parameters to use for session initialization.
 
@@ -415,9 +415,6 @@ arbitrary Zyte API parameters instead of a specific subset.
 
 If it does not define a ``"url"``, the URL of the request for which the session
 is being initialized will be used.
-
-It can be left undefined if no specific parameters are needed to initialize a
-session.
 
 This setting can be overridden by the :setting:`ZYTE_API_SESSION_LOCATION`
 setting, the :reqmeta:`zyte_api_session_location` request metadata key, or the
