@@ -164,7 +164,7 @@ class DefaultResource(Resource):
         if actions:
             results: List[_ActionResult] = []
             for action in actions:
-                result = {
+                result: _ActionResult = {
                     "action": action["action"],
                     "elapsedTime": 1.0,
                     "status": "success",
