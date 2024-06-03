@@ -730,3 +730,85 @@ async def test_check_overrides_error(mockserver):
         "scrapy-zyte-api/sessions/pools/session-check-fails.com/use/check-failed": retry_times
         + 1,
     }
+
+
+@pytest.mark.parametrize(
+    ("setting", "value"),
+    (
+        (1, 1),
+        (2, 2),
+        (None, 8),
+    ),
+)
+@ensureDeferred
+async def test_pool_size(setting, value, mockserver):
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+    }
+    if setting is not None:
+        settings["ZYTE_API_SESSION_POOL_SIZE"] = setting
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"] * (value + 1)
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": value,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": value + 1,
+    }
+
+
+@pytest.mark.parametrize(
+    ("global_setting", "pool_setting", "value"),
+    (
+        (None, 1, 1),
+        (None, 2, 2),
+        (3, None, 3),
+    ),
+)
+@ensureDeferred
+async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+    }
+    if global_setting is not None:
+        settings["ZYTE_API_SESSION_POOL_SIZE"] = global_setting
+    if pool_setting is not None:
+        settings["ZYTE_API_SESSION_POOL_SIZES"] = {"pool.example": pool_setting}
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com", "https://pool.example"] * (value + 1)
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": (
+            value if pool_setting is None else min(value + 1, 8)
+        ),
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": value + 1,
+        "scrapy-zyte-api/sessions/pools/pool.example/init/check-passed": value,
+        "scrapy-zyte-api/sessions/pools/pool.example/use/check-passed": value + 1,
+    }
