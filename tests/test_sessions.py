@@ -1,3 +1,4 @@
+from math import floor
 from typing import Any, Dict
 
 import pytest
@@ -625,4 +626,62 @@ async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mocks
             8 if global_setting is None else global_setting
         ),
         "scrapy-zyte-api/sessions/pools/pool.example/init/failed": value,
+    }
+
+
+@pytest.mark.parametrize(
+    ("setting", "value"),
+    (
+        (None, 1),
+        (0, 1),
+        (1, 1),
+        (2, 2),
+    ),
+)
+@ensureDeferred
+async def test_max_errors(setting, value, mockserver):
+    retry_times = 2
+    settings = {
+        "RETRY_TIMES": retry_times,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_PARAMS": {"browserHtml": True},
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+    }
+    if setting is not None:
+        settings["ZYTE_API_SESSION_MAX_ERRORS"] = setting
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com/"]
+
+        def start_requests(self):
+            for url in self.start_urls:
+                yield Request(
+                    url,
+                    meta={
+                        "zyte_api_automap": {
+                            "browserHtml": True,
+                            "httpResponseBody": True,
+                        }
+                    },
+                )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": floor(
+            (retry_times + 1) / value
+        )
+        + 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/failed": retry_times + 1,
     }

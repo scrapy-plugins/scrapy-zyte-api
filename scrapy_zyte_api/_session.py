@@ -600,7 +600,6 @@ class _SessionManager:
         )
         session_id = self._get_request_session_id(request)
         if session_id is not None:
-            return
             self._errors[session_id] += 1
             if self._errors[session_id] < self._max_errors:
                 return
@@ -699,7 +698,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         ):
             return None
 
-        if exception.status == 422:
+        if exception.parsed.type == "/problem/session-expired":
             self._sessions.handle_expiration(request)
         else:
             self._sessions.handle_error(request)
