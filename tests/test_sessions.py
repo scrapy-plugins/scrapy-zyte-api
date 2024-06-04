@@ -18,7 +18,7 @@ from scrapy_zyte_api import (
 )
 from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT, _REQUEST_ERROR_HAS_QUERY
 
-from . import get_crawler
+from . import get_crawler, serialize_settings
 
 UNSET = object()
 
@@ -907,3 +907,66 @@ async def test_retry_stop(monotonic_mock, retrying, outcomes, exhausted):
         assert outcome is last_outcome
     else:
         assert not exhausted
+
+
+try:
+    from scrapy import addons  # noqa: F401
+except ImportError:
+    ADDON_SUPPORT = False
+else:
+    ADDON_SUPPORT = True
+
+
+@pytest.mark.parametrize(
+    ("manual_settings", "addon_settings"),
+    (
+        (
+            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
+            {},
+        ),
+        (
+            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
+            {"ZYTE_API_RETRY_POLICY": "zyte_api.zyte_api_retrying"},
+        ),
+        (
+            {
+                "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
+            },
+            {"ZYTE_API_RETRY_POLICY": "zyte_api.aggressive_retrying"},
+        ),
+        (
+            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
+            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
+        ),
+        (
+            {
+                "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
+            },
+            {
+                "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
+            },
+        ),
+        (
+            {"ZYTE_API_RETRY_POLICY": "tests.test_sessions.UNSET"},
+            {"ZYTE_API_RETRY_POLICY": "tests.test_sessions.UNSET"},
+        ),
+    ),
+)
+@ensureDeferred
+@pytest.mark.skipif(
+    not ADDON_SUPPORT, reason="No add-on support in this version of Scrapy"
+)
+async def test_addon(manual_settings, addon_settings):
+    crawler = await get_crawler(
+        {
+            "ZYTE_API_TRANSPARENT_MODE": True,
+            "ZYTE_API_SESSION_ENABLED": True,
+            **manual_settings,
+        }
+    )
+    addon_crawler = await get_crawler(
+        {"ZYTE_API_SESSION_ENABLED": True, **addon_settings}, use_addon=True
+    )
+    assert serialize_settings(crawler.settings) == serialize_settings(
+        addon_crawler.settings
+    )
