@@ -1,5 +1,8 @@
+from collections import deque
+from copy import copy
 from math import floor
 from typing import Any, Dict
+from unittest.mock import patch
 
 import pytest
 from pytest_twisted import ensureDeferred
@@ -7,8 +10,13 @@ from scrapy import Request, Spider
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response
 from scrapy.utils.httpobj import urlparse_cached
+from zyte_api import RequestError
 
-from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT
+from scrapy_zyte_api import (
+    SESSION_AGGRESSIVE_RETRY_POLICY,
+    SESSION_DEFAULT_RETRY_POLICY,
+)
+from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT, _REQUEST_ERROR_HAS_QUERY
 
 from . import get_crawler
 
@@ -812,3 +820,90 @@ async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
         "scrapy-zyte-api/sessions/pools/pool.example/init/check-passed": value,
         "scrapy-zyte-api/sessions/pools/pool.example/use/check-passed": value + 1,
     }
+
+
+def mock_request_error(*, status=200):
+    kwargs = {}
+    if _REQUEST_ERROR_HAS_QUERY:
+        kwargs["query"] = {}
+    return RequestError(
+        history=None,
+        request_info=None,
+        response_content=None,
+        status=status,
+        **kwargs,
+    )
+
+
+# Number of times to test request errors that must be retried forever.
+FOREVER_TIMES = 100
+
+
+class fast_forward:
+    def __init__(self, time):
+        self.time = time
+
+
+@pytest.mark.parametrize(
+    ("retrying", "outcomes", "exhausted"),
+    (
+        *(
+            (retry_policy, outcomes, exhausted)
+            for retry_policy in (
+                SESSION_DEFAULT_RETRY_POLICY,
+                SESSION_AGGRESSIVE_RETRY_POLICY,
+            )
+            for status in (520, 521)
+            for outcomes, exhausted in (
+                (
+                    (mock_request_error(status=status),),
+                    True,
+                ),
+                (
+                    (mock_request_error(status=429),),
+                    False,
+                ),
+                (
+                    (
+                        mock_request_error(status=429),
+                        mock_request_error(status=status),
+                    ),
+                    True,
+                ),
+            )
+        ),
+    ),
+)
+@ensureDeferred
+@patch("time.monotonic")
+async def test_retry_stop(monotonic_mock, retrying, outcomes, exhausted):
+    monotonic_mock.return_value = 0
+    last_outcome = outcomes[-1]
+    outcomes = deque(outcomes)
+
+    def wait(retry_state):
+        return 0.0
+
+    retrying = copy(retrying)
+    retrying.wait = wait
+
+    async def run():
+        while True:
+            try:
+                outcome = outcomes.popleft()
+            except IndexError:
+                return
+            else:
+                if isinstance(outcome, fast_forward):
+                    monotonic_mock.return_value += outcome.time
+                    continue
+                raise outcome
+
+    run = retrying.wraps(run)
+    try:
+        await run()
+    except Exception as outcome:
+        assert exhausted
+        assert outcome is last_outcome
+    else:
+        assert not exhausted

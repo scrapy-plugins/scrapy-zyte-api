@@ -24,6 +24,16 @@ from scrapy_zyte_api.responses import _API_RESPONSE
 from . import SETTINGS, make_handler
 
 
+# https://github.com/scrapy/scrapy/blob/02b97f98e74a994ad3e4d74e7ed55207e508a576/tests/mockserver.py#L27C1-L33C19
+def getarg(request, name, default=None, type=None):
+    if name in request.args:
+        value = request.args[name][0]
+        if type is not None:
+            value = type(value)
+        return value
+    return default
+
+
 def get_ephemeral_port():
     s = socket.socket()
     s.bind(("", 0))
