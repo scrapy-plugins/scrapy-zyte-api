@@ -1,5 +1,5 @@
 from collections import deque
-from copy import copy
+from copy import copy, deepcopy
 from math import floor
 from typing import Any, Dict, Union
 from unittest.mock import patch
@@ -1372,3 +1372,103 @@ async def test_missing_session_id(mockserver, caplog):
         "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/failed": 1,
     }
     assert "had no session ID assigned, unexpectedly" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("settings", "meta", "meta_key"),
+    (
+        (
+            {},
+            {},
+            "zyte_api",
+        ),
+        (
+            {},
+            {"zyte_api": {}},
+            "zyte_api",
+        ),
+        (
+            {},
+            {"zyte_api": {"httpResponseBody": True}},
+            "zyte_api",
+        ),
+        (
+            {},
+            {"zyte_api_automap": True},
+            "zyte_api_automap",
+        ),
+        (
+            {"ZYTE_API_TRANSPARENT_MODE": True},
+            {},
+            "zyte_api_automap",
+        ),
+        (
+            {"ZYTE_API_TRANSPARENT_MODE": True},
+            {"zyte_api_automap": False},
+            "zyte_api",
+        ),
+        (
+            {"ZYTE_API_TRANSPARENT_MODE": True},
+            {"zyte_api_automap": {}},
+            "zyte_api_automap",
+        ),
+        (
+            {"ZYTE_API_TRANSPARENT_MODE": True},
+            {"zyte_api_automap": True},
+            "zyte_api_automap",
+        ),
+    ),
+)
+@ensureDeferred
+async def test_assign_meta_key(settings, meta, meta_key, mockserver):
+    """Session ID is set in the zyte_api_provider meta key always, and in
+    either zyte_api or zyte_api_automap depending on some settings and meta
+    keys."""
+
+    class Tracker:
+        def __init__(self):
+            self.meta = None
+
+        def track(self, request: Request, spider: Spider):
+            self.meta = deepcopy(request.meta)
+
+    tracker = Tracker()
+
+    settings = {
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        **settings,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+
+        def start_requests(self):
+            yield Request(
+                "https://example.com",
+                meta=meta,
+            )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+    }
+
+    assert (
+        tracker.meta["zyte_api_provider"]["session"]
+        == tracker.meta[meta_key]["session"]
+    )
+    other_meta_key = "zyte_api" if meta_key != "zyte_api" else "zyte_api_automap"
+    assert tracker.meta.get(other_meta_key, False) is False

@@ -614,7 +614,10 @@ class _SessionManager:
             meta_key = "zyte_api"
         else:
             meta_key = "zyte_api_automap"
-        request.meta.setdefault(meta_key, {})["session"] = {"id": session_id}
+        request.meta.setdefault(meta_key, {})
+        if not isinstance(request.meta[meta_key], dict):
+            request.meta[meta_key] = {}
+        request.meta[meta_key]["session"] = {"id": session_id}
         request.meta.setdefault("dont_merge_cookies", True)
 
     def handle_error(self, request: Request):
