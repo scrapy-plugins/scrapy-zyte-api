@@ -271,7 +271,7 @@ async def test_param_precedence(
             {"browserHtml": True, "url": "https://example.com"},
             "failed_forbidden_domain",
             {
-                "scrapy-zyte-api/sessions/pools/forbidden.example/init/check-passed": 1,
+                "scrapy-zyte-api/sessions/pools/forbidden.example/init/check-passed": 2,
                 "scrapy-zyte-api/sessions/pools/forbidden.example/use/failed": 1,
             },
         ),
