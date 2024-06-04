@@ -1248,3 +1248,39 @@ async def test_cookies(mockserver):
         None,
         b"a=b",
     ]
+
+
+@ensureDeferred
+async def test_empty_queue(mockserver):
+    """After a pool is full, there might be a situation when the middleware
+    tries to assign a session to a request but all sessions of the pool are
+    pending creation or a refresh. In those cases, the assign process should
+    wait until a session becomes available in the queue."""
+    settings = {
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        # We send 2 requests in parallel, so only the first one gets a session
+        # created on demand, and the other one is forced to wait until that
+        # session is initialized.
+        start_urls = ["https://example.com/1", "https://example.com/2"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 2,
+    }

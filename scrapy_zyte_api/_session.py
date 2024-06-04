@@ -489,15 +489,16 @@ class _SessionManager:
                 session_id = self._queues[pool].popleft()
             except IndexError:  # No ready-to-use session available.
                 attempts += 1
-                if attempts >= 50:
+                if attempts >= 60:  # >= 60 seconds
                     raise RuntimeError(
-                        "Could not get a session ID from the session rotation "
-                        "queue after 50 attempts. This is unexpected, please "
-                        "report the issue to the scrapy-zyte-api developers "
-                        "with a minimal, reproducible example. If building a "
-                        "minimal, reproducible example is not possible, debug "
-                        "logs and stats from a crawl affected by the issue "
-                        "might help."
+                        f"Could not get a session ID from the session "
+                        f"rotation queue after {attempts} attempts. This is "
+                        f"unexpected, please report the issue to the "
+                        f"scrapy-zyte-api developers with a minimal, "
+                        f"reproducible example. If building a minimal, "
+                        f"reproducible example is not possible, debug logs "
+                        f"and stats from a crawl affected by the issue might "
+                        f"help."
                     )
                 await sleep(1)
         assert session_id is not None
