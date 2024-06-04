@@ -483,10 +483,22 @@ class _SessionManager:
         session_id = None
         session_config = self._get_session_config(request)
         pool = session_config.pool(request)
+        attempts = 0
         while session_id not in self._pools[pool]:  # After 1st loop: invalid session.
             try:
                 session_id = self._queues[pool].popleft()
             except IndexError:  # No ready-to-use session available.
+                attempts += 1
+                if attempts >= 50:
+                    raise RuntimeError(
+                        "Could not get a session ID from the session rotation "
+                        "queue after 50 attempts. This is unexpected, please "
+                        "report the issue to the scrapy-zyte-api developers "
+                        "with a minimal, reproducible example. If building a "
+                        "minimal, reproducible example is not possible, debug "
+                        "logs and stats from a crawl affected by the issue "
+                        "might help."
+                    )
                 await sleep(1)
         assert session_id is not None
         self._queues[pool].append(session_id)
