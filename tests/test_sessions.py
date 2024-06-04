@@ -823,7 +823,7 @@ async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
 
 
 def mock_request_error(*, status=200):
-    kwargs = {}
+    kwargs: Dict[str, Any] = {}
     if _REQUEST_ERROR_HAS_QUERY:
         kwargs["query"] = {}
     return RequestError(
