@@ -1134,3 +1134,33 @@ async def test_session_refresh(mockserver):
     assert tracker.sessions[2] == tracker.sessions[3]
     assert tracker.sessions[0] != tracker.sessions[4]
     assert tracker.sessions[2] != tracker.sessions[4]
+
+
+@ensureDeferred
+async def test_expired(mockserver):
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://session-expired.example"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/session-expired.example/init/check-passed": 2,
+        "scrapy-zyte-api/sessions/pools/session-expired.example/use/expired": 1,
+    }
