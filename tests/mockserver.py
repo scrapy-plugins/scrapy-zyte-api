@@ -146,7 +146,9 @@ class DefaultResource(Resource):
                     postal_code = request_data["actions"][0]["address"]["postalCode"]
                 except (KeyError, IndexError, TypeError):
                     postal_code = None
-                if postal_code != "10001":
+                if postal_code != "10001" and not domain.startswith(
+                    "postal-code-10001-soft"
+                ):
                     request.setResponseCode(500)
                     return b""
             response_data["session"] = request_data["session"]

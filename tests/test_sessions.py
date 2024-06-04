@@ -477,27 +477,29 @@ async def test_checker(checker, close_reason, stats, mockserver):
     (
         (
             None,
-            "https://example.com",
+            "https://postal-code-10001-soft.example",
             "finished",
             {
-                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-                "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/init/check-passed": 1,
+                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/use/check-passed": 1,
             },
         ),
         (
             "10001",
-            "https://postal-code-10001.example",
+            "https://postal-code-10001-soft.example",
             "finished",
             {
-                "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 1,
-                "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/check-passed": 1,
+                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/init/check-passed": 1,
+                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/use/check-passed": 1,
             },
         ),
         (
             "10002",
-            "https://postal-code-10001.example",
+            "https://postal-code-10001-soft.example",
             "bad_session_inits",
-            {"scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/failed": 1},
+            {
+                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/init/check-failed": 1
+            },
         ),
         (
             "10001",
@@ -1061,8 +1063,8 @@ async def test_session_config(mockserver):
 
 @ensureDeferred
 async def test_session_refresh(mockserver):
-    """When a session fails to pass its validity check, the session is
-    discarded and a different session is used instead."""
+    """If a response does not pass a session validity check, the session is
+    discarded, and the request is retried with a different session."""
 
     class Tracker:
         def __init__(self):

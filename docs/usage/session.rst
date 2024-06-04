@@ -101,9 +101,9 @@ is closed with ``unsupported_set_location`` as the close reason, so that you
 can set a proper :ref:`session initialization logic <session-init>` for
 requests targeting that website.
 
-For sessions initialized with arbitrary parameters (or no parameters as all),
-no session check is performed, sessions are assumed to be fine until they
-expire or are banned.
+For sessions initialized with arbitrary or no parameters, no session check is
+performed, sessions are assumed to be fine until they expire or are banned.
+That is so even if those arbitrary parameters include a ``setLocation`` action.
 
 To implement your own code to check session responses and determine whether
 their session should be kept or discarded, use the
