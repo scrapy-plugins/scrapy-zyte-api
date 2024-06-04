@@ -166,6 +166,13 @@ Here are some things you can try:
     :setting:`ZYTE_API_SESSION_MAX_ERRORS` to require a higher number of
     unsuccessful responses before discarding a session.
 
+If you do not need :ref:`session checking <session-check>` and your
+:ref:`initialization parameters <session-init>` are only
+:http:`request:browserHtml` and :http:`request:actions`:, :ref:`server-managed
+sessions <zyte-api-session-contexts>` might be a more cost-effective choice, as
+they live much longer than :ref:`client-managed sessions
+<zyte-api-session-id>`.
+
 
 .. _session-configs:
 
