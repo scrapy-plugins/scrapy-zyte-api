@@ -90,13 +90,13 @@ class Addon:
             "https"
         ] = "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler"
         _setdefault(
-            settings, "DOWNLOADER_MIDDLEWARES", ScrapyZyteAPIDownloaderMiddleware, 1000
+            settings, "DOWNLOADER_MIDDLEWARES", ScrapyZyteAPIDownloaderMiddleware, 633
         )
         _setdefault(
             settings,
             "DOWNLOADER_MIDDLEWARES",
             ScrapyZyteAPISessionDownloaderMiddleware,
-            1100,
+            667,
         )
         _setdefault(settings, "SPIDER_MIDDLEWARES", ScrapyZyteAPISpiderMiddleware, 100)
         settings.set(

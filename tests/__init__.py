@@ -21,8 +21,8 @@ SETTINGS: SETTINGS_T = {
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
     },
     "DOWNLOADER_MIDDLEWARES": {
-        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
-        "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 1100,
+        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
+        "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
     },
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "REQUEST_FINGERPRINTER_IMPLEMENTATION": "2.7",  # Silence deprecation warning

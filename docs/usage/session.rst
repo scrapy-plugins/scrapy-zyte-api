@@ -198,6 +198,23 @@ To define a different session config for a given URL pattern, install
 
 .. autofunction:: scrapy_zyte_api.session_config
 
+.. _session-cookies:
+
+Cookie handling
+===============
+
+All requests involved in session management, both requests to initialize a
+session and requests that are assigned a session, have their
+:reqmeta:`dont_merge_cookies <scrapy:dont_merge_cookies>` request metadata key
+set to ``True`` if not already defined. Each Zyte API session handles its own
+cookies instead.
+
+If you set :reqmeta:`dont_merge_cookies <scrapy:dont_merge_cookies>` to
+``False`` in a request, that request will include cookies. However, session
+init requests will still ignore the cookiejar. To include cookies in session
+init requests, use :ref:`init params <session-init>`.
+
+
 .. _session-stats:
 
 Session stats

@@ -104,7 +104,7 @@ scrapy-zyte-api integration as follows:
         "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
     }
     DOWNLOADER_MIDDLEWARES = {
-        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
     }
     SPIDER_MIDDLEWARES = {
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
@@ -147,7 +147,7 @@ middleware to the :setting:`DOWNLOADER_MIDDLEWARES
     :caption: settings.py
 
     DOWNLOADER_MIDDLEWARES = {
-        "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 1100,
+        "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
     }
 
 

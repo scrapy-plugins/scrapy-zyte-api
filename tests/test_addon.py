@@ -138,8 +138,8 @@ def _test_setting_changes(initial_settings, expected_settings):
 
 BASE_EXPECTED = {
     "DOWNLOADER_MIDDLEWARES": {
-        ScrapyZyteAPIDownloaderMiddleware: 1000,
-        ScrapyZyteAPISessionDownloaderMiddleware: 1100,
+        ScrapyZyteAPIDownloaderMiddleware: 633,
+        ScrapyZyteAPISessionDownloaderMiddleware: 667,
     },
     "DOWNLOAD_HANDLERS": {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPDownloadHandler",
@@ -176,8 +176,8 @@ BASE_EXPECTED = {
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
                     "builtins.str": 123,
-                    ScrapyZyteAPIDownloaderMiddleware: 1000,
-                    ScrapyZyteAPISessionDownloaderMiddleware: 1100,
+                    ScrapyZyteAPIDownloaderMiddleware: 633,
+                    ScrapyZyteAPISessionDownloaderMiddleware: 667,
                 },
             },
         ),
@@ -191,7 +191,7 @@ BASE_EXPECTED = {
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
                     ScrapyZyteAPIDownloaderMiddleware: 999,
-                    ScrapyZyteAPISessionDownloaderMiddleware: 1100,
+                    ScrapyZyteAPISessionDownloaderMiddleware: 667,
                 },
             },
         ),
@@ -205,7 +205,7 @@ BASE_EXPECTED = {
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
                     "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 999,
-                    ScrapyZyteAPISessionDownloaderMiddleware: 1100,
+                    ScrapyZyteAPISessionDownloaderMiddleware: 667,
                 },
             },
         ),
@@ -226,8 +226,8 @@ def test_no_poet_setting_changes(initial_settings, expected_settings):
             {
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
-                    ScrapyZyteAPIDownloaderMiddleware: 1000,
-                    ScrapyZyteAPISessionDownloaderMiddleware: 1100,
+                    ScrapyZyteAPIDownloaderMiddleware: 633,
+                    ScrapyZyteAPISessionDownloaderMiddleware: 667,
                     InjectionMiddleware: 543,
                 },
                 "SCRAPY_POET_PROVIDERS": {

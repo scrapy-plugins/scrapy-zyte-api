@@ -173,7 +173,7 @@ They will be mapped even if defined with their default value.
 Headers will also be mapped if set to a non-default value elsewhere, e.g. in a
 custom downloader middleware, as long as it is done before the scrapy-zyte-api
 downloader middleware, which is responsible for the mapping, processes the
-request. Here “before” means a lower value than ``1000`` in the
+request. Here “before” means a lower value than ``633`` in the
 :setting:`DOWNLOADER_MIDDLEWARES <scrapy:DOWNLOADER_MIDDLEWARES>` setting.
 
 Similarly, you can add any of those headers to the

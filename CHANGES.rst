@@ -379,7 +379,7 @@ When upgrading, you should set the following in your Scrapy settings:
 .. code-block:: python
 
   DOWNLOADER_MIDDLEWARES = {
-      "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+      "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
   }
   # only applicable for Scrapy 2.7+
   REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
