@@ -1,7 +1,7 @@
 from collections import deque
 from copy import copy
 from math import floor
-from typing import Any, Dict
+from typing import Any, Dict, Union
 from unittest.mock import patch
 
 import pytest
@@ -1315,3 +1315,60 @@ async def test_empty_queue_limit(mockserver):
         "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
         "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
     }
+
+
+@ensureDeferred
+async def test_missing_session_id(mockserver, caplog):
+    """If a session ID is missing from a request that should have had it
+    assigned, a warning is logged about it."""
+
+    class SessionIDRemovingDownloaderMiddleware:
+
+        def process_exception(
+            self, request: Request, exception: Exception, spider: Spider
+        ) -> Union[Request, None]:
+            if not isinstance(exception, RequestError) or request.meta.get(
+                "_is_session_init_request", False
+            ):
+                return None
+
+            del request.meta["zyte_api_automap"]["session"]
+            del request.meta["zyte_api_provider"]["session"]
+            return None
+
+    settings = {
+        "DOWNLOADER_MIDDLEWARES": {
+            "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
+            "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
+            SessionIDRemovingDownloaderMiddleware: 675,
+        },
+        "RETRY_TIMES": 0,
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://postal-code-10001.example"]
+
+        def parse(self, response):
+            pass
+
+    caplog.clear()
+    caplog.set_level("WARNING")
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/failed": 1,
+    }
+    assert "had no session ID assigned, unexpectedly" in caplog.text

@@ -548,6 +548,13 @@ class _SessionManager:
             session_id = request.meta[meta_key].get("session", {}).get("id", None)
             if session_id:
                 return session_id
+        logger.warning(
+            f"Request {request} had no session ID assigned, unexpectedly. "
+            f"If you are sure this issue is not caused by your own code, "
+            f"please report this at "
+            f"https://github.com/scrapy-plugins/scrapy-zyte-api/issues/new "
+            f"providing a minimal, reproducible example."
+        )
         return None
 
     def _start_session_refresh(self, session_id: str, request: Request):
@@ -571,12 +578,6 @@ class _SessionManager:
     def _start_request_session_refresh(self, request: Request):
         session_id = self._get_request_session_id(request)
         if session_id is None:
-            logger.warning(
-                f"Request {request} had no session ID assigned, "
-                f"unexpectedly. Please report this issue to the "
-                f"scrapy-zyte-api maintainers, providing a minimal, "
-                f"reproducible example."
-            )
             return
         self._start_session_refresh(session_id, request)
 
