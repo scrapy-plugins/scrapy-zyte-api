@@ -980,7 +980,13 @@ async def test_addon(manual_settings, addon_settings):
 async def test_session_config(mockserver):
     pytest.importorskip("web_poet")
 
-    @session_config(["postal-code-10001-a.example", "postal-code-10001-a-fail.example"])
+    @session_config(
+        [
+            "postal-code-10001-a.example",
+            "postal-code-10001-a-fail.example",
+            "postal-code-10001-a-alternative.example",
+        ]
+    )
     class CustomSessionConfig(SessionConfig):
 
         def params(self, request: Request):
@@ -997,6 +1003,12 @@ async def test_session_config(mockserver):
             domain = urlparse_cached(request).netloc
             return "fail" not in domain
 
+        def pool(self, request: Request) -> str:
+            domain = urlparse_cached(request).netloc
+            if domain == "postal-code-10001-a-alternative.example":
+                return "postal-code-10001-a.example"
+            return domain
+
     settings = {
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
@@ -1008,6 +1020,7 @@ async def test_session_config(mockserver):
         name = "test"
         start_urls = [
             "https://postal-code-10001-a.example",
+            "https://postal-code-10001-a-alternative.example",
             "https://postal-code-10001-a-fail.example",
             "https://postal-code-10001-b.example",
         ]
@@ -1040,8 +1053,8 @@ async def test_session_config(mockserver):
         if k.startswith("scrapy-zyte-api/sessions")
     }
     assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/postal-code-10001-a.example/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/postal-code-10001-a.example/use/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/postal-code-10001-a.example/init/check-passed": 2,
+        "scrapy-zyte-api/sessions/pools/postal-code-10001-a.example/use/check-passed": 2,
         "scrapy-zyte-api/sessions/pools/postal-code-10001-a-fail.example/init/check-failed": 1,
         "scrapy-zyte-api/sessions/pools/postal-code-10001-b.example/init/failed": 1,
     }
@@ -1063,6 +1076,7 @@ async def test_session_config(mockserver):
     }
     assert session_stats == {
         "scrapy-zyte-api/sessions/pools/postal-code-10001-a.example/init/failed": 1,
+        "scrapy-zyte-api/sessions/pools/postal-code-10001-a-alternative.example/init/failed": 1,
         "scrapy-zyte-api/sessions/pools/postal-code-10001-a-fail.example/init/failed": 1,
         "scrapy-zyte-api/sessions/pools/postal-code-10001-b.example/init/failed": 1,
     }
