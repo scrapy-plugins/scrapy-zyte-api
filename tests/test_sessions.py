@@ -15,6 +15,8 @@ from zyte_api import RequestError
 from scrapy_zyte_api import (
     SESSION_AGGRESSIVE_RETRY_POLICY,
     SESSION_DEFAULT_RETRY_POLICY,
+    SessionConfig,
+    session_config,
 )
 from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT, _REQUEST_ERROR_HAS_QUERY
 
@@ -970,3 +972,88 @@ async def test_addon(manual_settings, addon_settings):
     assert serialize_settings(crawler.settings) == serialize_settings(
         addon_crawler.settings
     )
+
+
+@ensureDeferred
+async def test_session_config(mockserver):
+    pytest.importorskip("web_poet")
+
+    @session_config("postal-code-10001-a.example")
+    class CustomSessionConfig(SessionConfig):
+
+        def params(self, request: Request):
+            return {
+                "actions": [
+                    {
+                        "action": "setLocation",
+                        "address": {"postalCode": "10001"},
+                    }
+                ]
+            }
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = [
+            "https://postal-code-10001-a.example",
+            "https://postal-code-10001-b.example",
+        ]
+
+        def start_requests(self):
+            for url in self.start_urls:
+                yield Request(
+                    url,
+                    meta={
+                        "zyte_api_automap": {
+                            "actions": [
+                                {
+                                    "action": "setLocation",
+                                    "address": {"postalCode": "10001"},
+                                }
+                            ]
+                        },
+                    },
+                )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/postal-code-10001-a.example/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/postal-code-10001-a.example/use/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/postal-code-10001-b.example/init/failed": 1,
+    }
+
+    from scrapy_zyte_api._session import session_config_registry
+
+    session_config_registry.__init__()
+
+    # Ensure the registry cleanup worked, otherwise we could affect other
+    # tests.
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/postal-code-10001-a.example/init/failed": 1,
+        "scrapy-zyte-api/sessions/pools/postal-code-10001-b.example/init/failed": 1,
+    }
