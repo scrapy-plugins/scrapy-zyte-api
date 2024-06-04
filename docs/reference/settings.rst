@@ -468,6 +468,40 @@ Default: ``{}``
 overrides of :setting:`ZYTE_API_SESSION_POOL_SIZE` for those pools.
 
 
+.. setting:: ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS
+
+ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS
+===================================
+
+Default: ``60``
+
+scrapy-zyte-api maintains a rotation queue of ready-to-use sessions per
+:ref:`pool <session-pools>`. At some points, the queue might be empty for a
+given pool because all its sessions are in the process of being initialized or
+refreshed.
+
+If the queue is empty when trying to assign a session to a request,
+scrapy-zyte-api will wait some time
+(:setting:`ZYTE_API_SESSION_QUEUE_WAIT_TIME`), and then try to get a session
+from the queue again.
+
+Use this setting to configure the maximum number of attempts before giving up
+and raising a :exc:`RuntimeError` exception.
+
+
+.. setting:: ZYTE_API_SESSION_QUEUE_WAIT_TIME
+
+ZYTE_API_SESSION_QUEUE_WAIT_TIME
+===================================
+
+Default: ``1.0``
+
+Number of seconds to wait between attempts to get a session from a rotation
+queue.
+
+See :setting:`ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS` for details.
+
+
 .. setting:: ZYTE_API_SKIP_HEADERS
 
 ZYTE_API_SKIP_HEADERS

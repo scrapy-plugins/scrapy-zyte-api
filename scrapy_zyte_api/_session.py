@@ -411,6 +411,12 @@ class _SessionManager:
         # will be appended to the queue as they are initialized and ready to
         # use.
         self._queues: Dict[str, Deque[str]] = defaultdict(deque)
+        self._queue_max_attempts = settings.getint(
+            "ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS", 60
+        )
+        self._queue_wait_time = settings.getfloat(
+            "ZYTE_API_SESSION_QUEUE_WAIT_TIME", 1.0
+        )
 
         # Contains the on-going tasks to create new sessions.
         #
@@ -489,18 +495,23 @@ class _SessionManager:
                 session_id = self._queues[pool].popleft()
             except IndexError:  # No ready-to-use session available.
                 attempts += 1
-                if attempts >= 60:  # >= 60 seconds
+                if attempts >= self._queue_max_attempts:
                     raise RuntimeError(
                         f"Could not get a session ID from the session "
-                        f"rotation queue after {attempts} attempts. This is "
-                        f"unexpected, please report the issue to the "
-                        f"scrapy-zyte-api developers with a minimal, "
-                        f"reproducible example. If building a minimal, "
-                        f"reproducible example is not possible, debug logs "
-                        f"and stats from a crawl affected by the issue might "
-                        f"help."
+                        f"rotation queue after {attempts} attempts, waiting "
+                        f"at least {self._queue_wait_time} seconds between "
+                        f"attempts. Either the values of the "
+                        f"ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS and "
+                        f"ZYTE_API_SESSION_QUEUE_WAIT_TIME settings are too "
+                        f"low for your scenario, in which case you can modify "
+                        f"them accordingly, or there might be a bug with "
+                        f"scrapy-zyte-api session management. If you think it "
+                        f"could be the later, please report the issue at "
+                        f"https://github.com/scrapy-plugins/scrapy-zyte-api/issues/new "
+                        f"providing a minimal reproducible example if "
+                        f"possible, or debug logs and stats otherwise."
                     )
-                await sleep(1)
+                await sleep(self._queue_wait_time)
         assert session_id is not None
         self._queues[pool].append(session_id)
         return session_id

@@ -1284,3 +1284,34 @@ async def test_empty_queue(mockserver):
         "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
         "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 2,
     }
+
+
+@ensureDeferred
+async def test_empty_queue_limit(mockserver):
+    settings = {
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS": 1,
+        "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0,
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com/1", "https://example.com/2"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+    }
