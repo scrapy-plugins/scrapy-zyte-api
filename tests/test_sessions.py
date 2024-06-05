@@ -1472,3 +1472,48 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
     )
     other_meta_key = "zyte_api" if meta_key != "zyte_api" else "zyte_api_automap"
     assert tracker.meta.get(other_meta_key, False) is False
+
+
+@ensureDeferred
+async def test_provider(mockserver):
+    pytest.importorskip("scrapy_poet")
+
+    from scrapy_poet import DummyResponse
+    from zyte_common_items import Product
+
+    class Tracker:
+        def __init__(self):
+            self.query = None
+
+        def track(self, request: Request, spider: Spider):
+            self.query = request.meta["zyte_api"]
+
+    tracker = Tracker()
+
+    settings = {
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response: DummyResponse, product: Product):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+    }
+    assert "product" in tracker.query
