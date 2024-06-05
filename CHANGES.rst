@@ -1,6 +1,15 @@
 Changes
 =======
 
+N.N.N (YYYY-MM-DD)
+------------------
+
+* The recommended position for ``ScrapyZyteAPIDownloaderMiddleware`` changed
+  from 1000 to 633, to accommodate for the new
+  ``ScrapyZyteAPISessionDownloaderMiddleware``, which needs to be after
+  ``ScrapyZyteAPIDownloaderMiddleware`` and before the Scrapy cookie downloader
+  middleware (700).
+
 0.18.2 (2024-04-25)
 -------------------
 
