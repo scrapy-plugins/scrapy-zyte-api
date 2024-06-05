@@ -282,8 +282,7 @@ async def test_param_precedence(
             {"browserHtml": True, "url": "https://example.com"},
             "failed_forbidden_domain",
             {
-                "scrapy-zyte-api/sessions/pools/forbidden.example/init/check-passed": 2,
-                "scrapy-zyte-api/sessions/pools/forbidden.example/use/failed": 1,
+                "scrapy-zyte-api/sessions/pools/forbidden.example/init/check-passed": 1,
             },
         ),
     ),
@@ -659,7 +658,7 @@ async def test_max_errors(setting, value, mockserver):
         "RETRY_TIMES": retry_times,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
-        "ZYTE_API_SESSION_PARAMS": {"browserHtml": True},
+        "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
     }
     if setting is not None:
@@ -667,19 +666,7 @@ async def test_max_errors(setting, value, mockserver):
 
     class TestSpider(Spider):
         name = "test"
-        start_urls = ["https://example.com/"]
-
-        def start_requests(self):
-            for url in self.start_urls:
-                yield Request(
-                    url,
-                    meta={
-                        "zyte_api_automap": {
-                            "browserHtml": True,
-                            "httpResponseBody": True,
-                        }
-                    },
-                )
+        start_urls = ["https://temporary-download-error.example"]
 
         def parse(self, response):
             pass
@@ -693,11 +680,12 @@ async def test_max_errors(setting, value, mockserver):
         if k.startswith("scrapy-zyte-api/sessions")
     }
     assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": floor(
+        "scrapy-zyte-api/sessions/pools/temporary-download-error.example/init/check-passed": floor(
             (retry_times + 1) / value
         )
         + 1,
-        "scrapy-zyte-api/sessions/pools/example.com/use/failed": retry_times + 1,
+        "scrapy-zyte-api/sessions/pools/temporary-download-error.example/use/failed": retry_times
+        + 1,
     }
 
 
@@ -1324,7 +1312,7 @@ async def test_missing_session_id(mockserver, caplog):
 
     class TestSpider(Spider):
         name = "test"
-        start_urls = ["https://postal-code-10001.example"]
+        start_urls = ["https://temporary-download-error.example"]
 
         def parse(self, response):
             pass
@@ -1340,8 +1328,8 @@ async def test_missing_session_id(mockserver, caplog):
         if k.startswith("scrapy-zyte-api/sessions")
     }
     assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/failed": 1,
+        "scrapy-zyte-api/sessions/pools/temporary-download-error.example/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/temporary-download-error.example/use/failed": 1,
     }
     assert "had no session ID assigned, unexpectedly" in caplog.text
 
