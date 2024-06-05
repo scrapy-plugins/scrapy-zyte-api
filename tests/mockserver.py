@@ -152,7 +152,7 @@ class DefaultResource(Resource):
             # See test_sessions.py::test_param_precedence
             if domain.startswith("postal-code-10001"):
                 postal_code = None
-                for action in request_data["actions"]:
+                for action in request_data.get("actions", []):
                     try:
                         postal_code = action["address"]["postalCode"]
                     except (KeyError, IndexError, TypeError):
