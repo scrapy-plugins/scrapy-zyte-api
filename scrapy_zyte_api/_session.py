@@ -728,10 +728,15 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
 
         if exception.parsed.type == "/problem/session-expired":
             self._sessions.handle_expiration(request)
-        else:
+            reason = "session_expired"
+        elif exception.status in {520, 521}:
             self._sessions.handle_error(request)
+            reason = "download_error"
+        else:
+            return None
+
         return get_retry_request(
             request,
             spider=spider,
-            reason="unsuccessful_response",
+            reason=reason,
         )

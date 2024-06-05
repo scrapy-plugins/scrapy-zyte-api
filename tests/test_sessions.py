@@ -5,6 +5,7 @@ from typing import Any, Dict, Union
 from unittest.mock import patch
 
 import pytest
+from aiohttp.client_exceptions import ServerConnectionError
 from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider, signals
 from scrapy.exceptions import CloseSpider
@@ -826,14 +827,14 @@ async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
     }
 
 
-def mock_request_error(*, status=200):
+def mock_request_error(*, status=200, response_content=None):
     kwargs: Dict[str, Any] = {}
     if _REQUEST_ERROR_HAS_QUERY:
         kwargs["query"] = {}
     return RequestError(
         history=None,
         request_info=None,
-        response_content=None,
+        response_content=response_content,
         status=status,
         **kwargs,
     )
@@ -1134,36 +1135,6 @@ async def test_session_refresh(mockserver):
     assert tracker.sessions[2] == tracker.sessions[3]
     assert tracker.sessions[0] != tracker.sessions[4]
     assert tracker.sessions[2] != tracker.sessions[4]
-
-
-@ensureDeferred
-async def test_expired(mockserver):
-    settings = {
-        "RETRY_TIMES": 0,
-        "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
-        "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
-    }
-
-    class TestSpider(Spider):
-        name = "test"
-        start_urls = ["https://session-expired.example"]
-
-        def parse(self, response):
-            pass
-
-    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
-
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/session-expired.example/init/check-passed": 2,
-        "scrapy-zyte-api/sessions/pools/session-expired.example/use/expired": 1,
-    }
 
 
 @ensureDeferred
@@ -1518,3 +1489,96 @@ async def test_provider(mockserver):
         "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
     }
     assert "product" in tracker.query
+
+
+class ExceptionRaisingDownloaderMiddleware:
+
+    async def process_request(self, request: Request, spider: Spider) -> None:
+        if request.meta.get("_is_session_init_request", False):
+            return
+        raise spider.exception
+
+
+@pytest.mark.parametrize(
+    ("exception", "stat", "reason"),
+    (
+        (
+            mock_request_error(
+                status=422, response_content=b'{"type": "/problem/session-expired"}'
+            ),
+            "expired",
+            "session_expired",
+        ),
+        (
+            mock_request_error(status=520),
+            "failed",
+            "download_error",
+        ),
+        (
+            mock_request_error(status=521),
+            "failed",
+            "download_error",
+        ),
+        (
+            mock_request_error(status=500),
+            None,
+            None,
+        ),
+        (
+            ServerConnectionError(),
+            None,
+            None,
+        ),
+        (
+            RuntimeError(),
+            None,
+            None,
+        ),
+    ),
+)
+@ensureDeferred
+async def test_exceptions(exception, stat, reason, mockserver, caplog):
+    settings = {
+        "DOWNLOADER_MIDDLEWARES": {
+            "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
+            "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
+            "tests.test_sessions.ExceptionRaisingDownloaderMiddleware": 675,
+        },
+        "RETRY_TIMES": 0,
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.exception = exception
+
+        def parse(self, response):
+            pass
+
+    caplog.clear()
+    caplog.set_level("ERROR")
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    if stat is not None:
+        assert session_stats == {
+            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
+            f"scrapy-zyte-api/sessions/pools/example.com/use/{stat}": 1,
+        }
+    else:
+        assert session_stats == {
+            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        }
+    if reason is not None:
+        assert reason in caplog.text
