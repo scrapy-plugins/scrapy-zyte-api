@@ -50,7 +50,7 @@ except ImportError:
 
 try:
     from scrapy.downloadermiddlewares.retry import get_retry_request
-except ImportError:
+except ImportError:  # pragma: no cover
     # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/downloadermiddlewares/retry.py#L57-L142
     def get_retry_request(
         request,
