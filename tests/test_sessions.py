@@ -656,10 +656,11 @@ async def test_max_errors(setting, value, mockserver):
     retry_times = 2
     settings = {
         "RETRY_TIMES": retry_times,
-        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
     }
     if setting is not None:
         settings["ZYTE_API_SESSION_MAX_ERRORS"] = setting
@@ -671,9 +672,7 @@ async def test_max_errors(setting, value, mockserver):
         def parse(self, response):
             pass
 
-    crawler = await get_crawler(
-        settings, spider_cls=TestSpider, setup_engine=False, use_addon=True
-    )
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await crawler.crawl()
 
     session_stats = {
@@ -1305,6 +1304,7 @@ async def test_missing_session_id(mockserver, caplog):
             "tests.test_sessions.SessionIDRemovingDownloaderMiddleware": 675,
         },
         "RETRY_TIMES": 0,
+        "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
@@ -1321,9 +1321,7 @@ async def test_missing_session_id(mockserver, caplog):
 
     caplog.clear()
     caplog.set_level("WARNING")
-    crawler = await get_crawler(
-        settings, spider_cls=TestSpider, setup_engine=False, use_addon=True
-    )
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await crawler.crawl()
 
     session_stats = {
