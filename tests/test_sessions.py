@@ -671,7 +671,9 @@ async def test_max_errors(setting, value, mockserver):
         def parse(self, response):
             pass
 
-    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    crawler = await get_crawler(
+        settings, spider_cls=TestSpider, setup_engine=False, use_addon=True
+    )
     await crawler.crawl()
 
     session_stats = {
@@ -1319,7 +1321,9 @@ async def test_missing_session_id(mockserver, caplog):
 
     caplog.clear()
     caplog.set_level("WARNING")
-    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    crawler = await get_crawler(
+        settings, spider_cls=TestSpider, setup_engine=False, use_addon=True
+    )
     await crawler.crawl()
 
     session_stats = {
