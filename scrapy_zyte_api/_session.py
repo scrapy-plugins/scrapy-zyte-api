@@ -105,12 +105,12 @@ try:
 except ImportError:
 
     def NO_CALLBACK(response):
-        pass
+        pass  # pragma: no cover
 
 
 try:
     from scrapy.utils.defer import deferred_to_future
-except ImportError:
+except ImportError:  # pragma: no cover
     import asyncio
     from warnings import catch_warnings, filterwarnings
 
