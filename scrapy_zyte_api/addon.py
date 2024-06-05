@@ -117,11 +117,10 @@ class Addon:
             _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiProvider, 1100)
 
         if settings.getbool("ZYTE_API_SESSION_ENABLED", False):
-            loaded_retry_policy = retry_policy = settings.get(
+            retry_policy = settings.get(
                 "ZYTE_API_RETRY_POLICY", "zyte_api.zyte_api_retrying"
             )
-            if retry_policy is not None:
-                loaded_retry_policy = load_object(retry_policy)
+            loaded_retry_policy = load_object(retry_policy)
             settings.set(
                 "ZYTE_API_RETRY_POLICY",
                 _SESSION_RETRY_POLICIES.get(loaded_retry_policy, retry_policy),
