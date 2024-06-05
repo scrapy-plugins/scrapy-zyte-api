@@ -103,7 +103,10 @@ except ImportError:
 try:
     from scrapy.http.request import NO_CALLBACK
 except ImportError:
-    NO_CALLBACK = None
+
+    def NO_CALLBACK(response):
+        pass
+
 
 try:
     from scrapy.utils.defer import deferred_to_future
@@ -446,7 +449,7 @@ class _SessionManager:
                 "dont_merge_cookies": True,
                 "zyte_api": {**session_params, "session": {"id": session_id}},
             },
-            callback=NO_CALLBACK or spider.parse,
+            callback=NO_CALLBACK,
         )
         if _DOWNLOAD_NEEDS_SPIDER:
             deferred = self._crawler.engine.download(

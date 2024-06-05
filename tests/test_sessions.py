@@ -1454,13 +1454,14 @@ async def test_provider(mockserver):
 
     settings = {
         "ZYTE_API_SESSION_ENABLED": True,
-        "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
     }
 
     class TestSpider(Spider):
         name = "test"
-        start_urls = ["https://example.com"]
+
+        def start_requests(self):
+            yield Request("https://example.com", callback=self.parse)
 
         def parse(self, response: DummyResponse, product: Product):
             pass
