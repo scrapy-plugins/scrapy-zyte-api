@@ -558,6 +558,50 @@ async def test_checker_location(postal_code, url, close_reason, stats, mockserve
     assert session_stats == stats
 
 
+class CloseSpiderURLChecker:
+
+    def check(self, request: Request, response: Response) -> bool:
+        if "fail" in request.url:
+            raise CloseSpider("checker_failed")
+        return True
+
+
+@ensureDeferred
+async def test_checker_close_spider_use(mockserver):
+    """A checker can raise CloseSpider not only during session initialization,
+    but also during session use."""
+    settings = {
+        "ZYTE_API_SESSION_CHECKER": "tests.test_sessions.CloseSpiderURLChecker",
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com/fail"]
+
+        def parse(self, response):
+            pass
+
+        def closed(self, reason):
+            self.close_reason = reason
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert crawler.spider.close_reason == "checker_failed"
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+    }
+
+
 @pytest.mark.parametrize(
     ("setting", "value"),
     (
