@@ -120,15 +120,6 @@ class DefaultResource(Resource):
                 "detail": "Account is suspended, check billing details.",
             }
             return json.dumps(response_data).encode()
-        if "session-expired" in domain:
-            request.setResponseCode(422)
-            response_data = {
-                "status": 422,
-                "type": "/problem/session-expired",
-                "title": "Session has expired",
-                "detail": "Session has expired. Try creating a new session.",
-            }
-            return json.dumps(response_data).encode()
 
         html = "<html><body>Hello<h1>World!</h1></body></html>"
         if "browserHtml" in request_data:
