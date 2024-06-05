@@ -1317,30 +1317,31 @@ async def test_empty_queue_limit(mockserver):
     }
 
 
+class SessionIDRemovingDownloaderMiddleware:
+
+    def process_exception(
+        self, request: Request, exception: Exception, spider: Spider
+    ) -> Union[Request, None]:
+        if not isinstance(exception, RequestError) or request.meta.get(
+            "_is_session_init_request", False
+        ):
+            return None
+
+        del request.meta["zyte_api_automap"]["session"]
+        del request.meta["zyte_api_provider"]["session"]
+        return None
+
+
 @ensureDeferred
 async def test_missing_session_id(mockserver, caplog):
     """If a session ID is missing from a request that should have had it
     assigned, a warning is logged about it."""
 
-    class SessionIDRemovingDownloaderMiddleware:
-
-        def process_exception(
-            self, request: Request, exception: Exception, spider: Spider
-        ) -> Union[Request, None]:
-            if not isinstance(exception, RequestError) or request.meta.get(
-                "_is_session_init_request", False
-            ):
-                return None
-
-            del request.meta["zyte_api_automap"]["session"]
-            del request.meta["zyte_api_provider"]["session"]
-            return None
-
     settings = {
         "DOWNLOADER_MIDDLEWARES": {
             "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
             "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
-            SessionIDRemovingDownloaderMiddleware: 675,
+            "tests.test_sessions.SessionIDRemovingDownloaderMiddleware": 675,
         },
         "RETRY_TIMES": 0,
         "ZYTE_API_SESSION_ENABLED": True,
@@ -1427,7 +1428,7 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
 
     class Tracker:
         def __init__(self):
-            self.meta = None
+            self.meta: Dict[str, Any] = {}
 
         def track(self, request: Request, spider: Spider):
             self.meta = deepcopy(request.meta)
@@ -1483,7 +1484,7 @@ async def test_provider(mockserver):
 
     class Tracker:
         def __init__(self):
-            self.query = None
+            self.query: Dict[str, Any] = {}
 
         def track(self, request: Request, spider: Spider):
             self.query = request.meta["zyte_api"]
