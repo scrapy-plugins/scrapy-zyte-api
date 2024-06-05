@@ -1215,6 +1215,23 @@ async def test_session_config_location_no_set_location(mockserver):
 
 
 @ensureDeferred
+async def test_session_config_no_web_poet(mockserver):
+    """If web-poet is not installed, @session_config raises a RuntimeError."""
+    try:
+        import web_poet  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        pytest.skip("Test only relevant when web-poet is not installed.")
+
+    with pytest.raises(RuntimeError):
+
+        @session_config(["example.com"])
+        class CustomSessionConfig(SessionConfig):
+            pass
+
+
+@ensureDeferred
 async def test_session_refresh(mockserver):
     """If a response does not pass a session validity check, the session is
     discarded, and the request is retried with a different session."""
@@ -1416,6 +1433,44 @@ async def test_empty_queue_limit(mockserver):
     assert session_stats == {
         "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
         "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+    }
+
+
+@ensureDeferred
+async def test_concurrent_session_refreshing(mockserver):
+    """When more than 1 request is using the same session concurrently, it can
+    happen that more than 1 response triggers a session refresh. In those
+    cases, the same session should be refreshed only once, not once per
+    response triggering a refresh."""
+    settings = {
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_MAX_ERRORS": 1,
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com/"]
+
+        def parse(self, response):
+            for n in range(2):
+                yield Request(f"https://example.com/{n}?temporary-download-error")
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/init/failed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/failed": 2,
     }
 
 

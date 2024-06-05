@@ -120,7 +120,7 @@ class DefaultResource(Resource):
                 "detail": "Account is suspended, check billing details.",
             }
             return json.dumps(response_data).encode()
-        if "temporary-download-error" in domain:
+        if "temporary-download-error" in request_data["url"]:
             request.setResponseCode(520)
             response_data = {
                 "status": 520,
