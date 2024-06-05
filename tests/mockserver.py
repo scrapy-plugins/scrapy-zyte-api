@@ -151,10 +151,14 @@ class DefaultResource(Resource):
         if "session" in request_data:
             # See test_sessions.py::test_param_precedence
             if domain.startswith("postal-code-10001"):
-                try:
-                    postal_code = request_data["actions"][0]["address"]["postalCode"]
-                except (KeyError, IndexError, TypeError):
-                    postal_code = None
+                postal_code = None
+                for action in request_data["actions"]:
+                    try:
+                        postal_code = action["address"]["postalCode"]
+                    except (KeyError, IndexError, TypeError):
+                        pass
+                    else:
+                        break
                 if postal_code != "10001" and not domain.startswith(
                     "postal-code-10001-soft"
                 ):
