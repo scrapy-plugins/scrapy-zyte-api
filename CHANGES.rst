@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.18.3 (2024-06-DD)
+0.18.3 (2024-06-07)
 -------------------
 
 * The log messages from the download handler that indicate the source request
