@@ -224,7 +224,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             self._process_request_error(request, error)
             raise
         except Exception as er:
-            logger.error(
+            logger.debug(
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
             )
             raise
@@ -235,7 +235,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     def _process_request_error(self, request, error):
         detail = (error.parsed.data or {}).get("detail", error.message)
-        logger.error(
+        logger.debug(
             f"Got Zyte API error (status={error.status}, "
             f"type={error.parsed.type!r}, request_id={error.request_id!r}) "
             f"while processing URL ({request.url}): {detail}"
