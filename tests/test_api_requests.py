@@ -209,6 +209,7 @@ async def test_exceptions(
     exception_text: str,
     mockserver,
 ):
+    caplog.set_level("DEBUG")
     async with mockserver.make_handler() as handler:
         req = Request("http://example.com", method="POST", meta=meta)
         with pytest.raises(exception_type):
