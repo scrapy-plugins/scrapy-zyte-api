@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.18.4 (2024-06-DD)
+0.18.4 (2024-06-10)
 -------------------
 
 * Now the :setting:`ZYTE_API_PROVIDER_PARAMS` setting and the
