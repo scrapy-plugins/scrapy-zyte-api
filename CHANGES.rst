@@ -10,6 +10,14 @@ N.N.N (YYYY-MM-DD)
   ``ScrapyZyteAPIDownloaderMiddleware`` and before the Scrapy cookie downloader
   middleware (700).
 
+0.18.3 (2024-06-07)
+-------------------
+
+* The log messages from the download handler that indicate the source request
+  URL of an exception have switched from ``ERROR`` log level to ``DEBUG``. The
+  exceptions themselves that follow those messages will still be logged as
+  errors unless you handle them.
+
 0.18.2 (2024-04-25)
 -------------------
 
