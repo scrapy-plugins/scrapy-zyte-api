@@ -174,8 +174,10 @@ class ZyteApiProvider(PageObjectInputProvider):
 
         if AnyResponse in to_provide:
             if (
-                item_requested and extract_from != "httpResponseBody"
-            ) or extract_from == "browserHtml":
+                (item_requested and extract_from != "httpResponseBody")
+                or extract_from == "browserHtml"
+                or zyte_api_meta.get("browserHtml", False) is True
+            ):
                 html_requested = True
             elif extract_from == "httpResponseBody" or http_response_needed:
                 zyte_api_meta["httpResponseBody"] = True
