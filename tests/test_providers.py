@@ -1020,7 +1020,7 @@ async def test_provider_actions(mockserver, caplog):
 
 
 def test_auto_pages_set():
-    assert set(_ITEM_KEYWORDS) == {get_item_cls(cls) for cls in _AUTO_PAGES}
+    assert set(_ITEM_KEYWORDS) == {get_item_cls(cls) for cls in _AUTO_PAGES}  # type: ignore[call-overload]
 
 
 @ensureDeferred
@@ -1108,7 +1108,8 @@ async def test_auto_field_stat_partial_override(mockserver):
         ),
     }
 
-    default_registry.__init__()  # Reset rules
+    # Reset rules
+    default_registry.__init__()  # type: ignore[misc]
 
 
 @ensureDeferred
@@ -1253,7 +1254,8 @@ async def test_auto_field_stat_full_override(mockserver):
         "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stat_full_override.<locals>.MyProductPage": "",
     }
 
-    default_registry.__init__()  # Reset rules
+    # Reset rules
+    default_registry.__init__()  # type: ignore[misc]
 
 
 @ensureDeferred
@@ -1269,7 +1271,7 @@ async def test_auto_field_stat_callback_override(mockserver):
             yield Request(self.url, callback=self.parse)
 
         def parse(self, response: DummyResponse, product: Product):
-            product["name"] = "foo"
+            product.name = "foo"
             yield product
 
     settings = create_scrapy_settings()
@@ -1293,7 +1295,8 @@ async def test_auto_field_stat_callback_override(mockserver):
         ),
     }
 
-    default_registry.__init__()  # Reset rules
+    # Reset rules
+    default_registry.__init__()  # type: ignore[misc]
 
 
 @ensureDeferred
@@ -1345,7 +1348,8 @@ async def test_auto_field_stat_item_page_override(mockserver):
         ),
     }
 
-    default_registry.__init__()  # Reset rules
+    # Reset rules
+    default_registry.__init__()  # type: ignore[misc]
 
 
 @ensureDeferred
@@ -1409,7 +1413,8 @@ async def test_auto_field_stat_alt_page_override(mockserver):
         ),
     }
 
-    default_registry.__init__()  # Reset rules
+    # Reset rules
+    default_registry.__init__()  # type: ignore[misc]
 
 
 @ensureDeferred
@@ -1453,4 +1458,5 @@ async def test_auto_field_stat_non_auto_override(mockserver):
         "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stat_non_auto_override.<locals>.MyProductPage": "",
     }
 
-    default_registry.__init__()  # Reset rules
+    # Reset rules
+    default_registry.__init__()  # type: ignore[misc]

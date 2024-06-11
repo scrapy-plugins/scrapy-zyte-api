@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type, cast
 
 import attrs
 from andi.typeutils import is_typing_annotated, strip_annotated
@@ -54,7 +54,7 @@ _ITEM_KEYWORDS: Dict[type, str] = {
     ArticleNavigation: "articleNavigation",
     JobPosting: "jobPosting",
 }
-_AUTO_PAGES: Set[Type] = {
+_AUTO_PAGES: Set[type] = {
     AutoArticlePage,
     AutoArticleListPage,
     AutoArticleNavigationPage,
@@ -151,7 +151,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         http_response = None
         screenshot_requested = Screenshot in to_provide
         for cls in list(to_provide):
-            self._track_auto_fields(crawler, request, cls)
+            self._track_auto_fields(crawler, request, cast(type, cls))
             item = self.injector.weak_cache.get(request, {}).get(cls)
             if item:
                 results.append(item)
