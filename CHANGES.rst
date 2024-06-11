@@ -10,6 +10,14 @@ N.N.N (YYYY-MM-DD)
   ``ScrapyZyteAPIDownloaderMiddleware`` and before the Scrapy cookie downloader
   middleware (700).
 
+0.18.4 (2024-06-10)
+-------------------
+
+* Now the :setting:`ZYTE_API_PROVIDER_PARAMS` setting and the
+  :reqmeta:`zyte_api_provider` request metadata key can influence the
+  resolution of an :class:`~web_poet.page_inputs.response.AnyResponse`
+  dependency.
+
 0.18.3 (2024-06-07)
 -------------------
 
@@ -96,7 +104,8 @@ N.N.N (YYYY-MM-DD)
   * :doc:`scrapy-poet <scrapy-poet:index>` >= 0.21.0
   * :doc:`web-poet <web-poet:index>` >= 0.16.0
 
-* Added support for :class:`web_poet.AnyResponse` dependency.
+* Added support for :class:`web_poet.AnyResponse
+  <web_poet.page_inputs.response.AnyResponse>` dependency.
 * Added support to specify the country code via :class:`typing.Annotated` and
   :class:`scrapy_zyte_api.Geolocation` dependency *(supported only on Python
   3.9+)*.

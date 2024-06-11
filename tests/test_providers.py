@@ -440,6 +440,61 @@ async def test_provider_any_response_only(mockserver):
 
 
 @ensureDeferred
+async def test_provider_any_response_http_response_param(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {"httpResponseBody": True}
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0] == {
+        "url": url,
+        "httpResponseBody": True,
+        "httpResponseHeaders": True,
+    }
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is HttpResponse
+
+
+@ensureDeferred
+async def test_provider_any_response_browser_html_param(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+
+    class ZyteAPISpider(Spider):
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse_)
+
+        def parse_(self, response: DummyResponse, page: SomePage):
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {"browserHtml": True}
+    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0] == {
+        "url": url,
+        "browserHtml": True,
+    }
+    assert type(item["page"].response) is AnyResponse
+    assert type(item["page"].response.response) is BrowserResponse
+
+
+@ensureDeferred
 async def test_provider_any_response_product(mockserver):
     @attrs.define
     class SomePage(BasePage):
