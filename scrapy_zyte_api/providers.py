@@ -1,10 +1,11 @@
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type
 
+import attrs
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
 from scrapy.utils.defer import maybe_deferred_to_future
-from scrapy_poet import PageObjectInputProvider
+from scrapy_poet import InjectionMiddleware, PageObjectInputProvider
 from web_poet import (
     AnyResponse,
     BrowserHtml,
@@ -13,10 +14,19 @@ from web_poet import (
     HttpResponseHeaders,
 )
 from web_poet.annotated import AnnotatedInstance
+from web_poet.fields import get_fields_dict
+from web_poet.utils import get_fq_class_name
 from zyte_common_items import (
     Article,
     ArticleList,
     ArticleNavigation,
+    AutoArticleListPage,
+    AutoArticleNavigationPage,
+    AutoArticlePage,
+    AutoJobPostingPage,
+    AutoProductListPage,
+    AutoProductNavigationPage,
+    AutoProductPage,
     Item,
     JobPosting,
     Product,
@@ -33,6 +43,35 @@ try:
     from scrapy.http.request import NO_CALLBACK
 except ImportError:
     NO_CALLBACK = None
+
+
+_ITEM_KEYWORDS: Dict[type, str] = {
+    Product: "product",
+    ProductList: "productList",
+    ProductNavigation: "productNavigation",
+    Article: "article",
+    ArticleList: "articleList",
+    ArticleNavigation: "articleNavigation",
+    JobPosting: "jobPosting",
+}
+_AUTO_PAGES: Set[Type] = {
+    AutoArticlePage,
+    AutoArticleListPage,
+    AutoArticleNavigationPage,
+    AutoJobPostingPage,
+    AutoProductPage,
+    AutoProductListPage,
+    AutoProductNavigationPage,
+}
+
+
+# https://stackoverflow.com/a/25959545
+def _field_cls(page_cls, field_name):
+    for cls in page_cls.__mro__:
+        if field_name in cls.__dict__:
+            return cls
+    # Only used with fields known to exist
+    assert False  # noqa: B011
 
 
 class ZyteApiProvider(PageObjectInputProvider):
@@ -54,8 +93,54 @@ class ZyteApiProvider(PageObjectInputProvider):
         Screenshot,
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._injection_mw = None
+        self._tracked_auto_fields = set()
+
     def is_provided(self, type_: Callable) -> bool:
         return super().is_provided(strip_annotated(type_))
+
+    def _track_auto_fields(self, crawler: Crawler, request: Request, cls: Type):
+        if cls not in _ITEM_KEYWORDS:
+            return
+        if self._injection_mw is None:
+            try:
+                self._injection_mw = crawler.get_downloader_middleware(
+                    InjectionMiddleware
+                )
+            except AttributeError:
+                for component in crawler.engine.downloader.middleware.middlewares:
+                    if isinstance(component, InjectionMiddleware):
+                        self._injection_mw = component
+                        break
+            if self._injection_mw is None:
+                raise RuntimeError(
+                    "Could not find the InjectionMiddleware among enabled "
+                    "downloader middlewares. Please, ensure you have properly "
+                    "configured scrapy-poet."
+                )
+        cls = self._injection_mw.registry.page_cls_for_item(request.url, cls) or cls
+        if cls in self._tracked_auto_fields:
+            return
+        self._tracked_auto_fields.add(cls)
+        if cls in _ITEM_KEYWORDS:
+            auto_fields = set(attrs.fields_dict(cls))
+        else:
+            auto_cls = None
+            for ancestor in cls.__mro__:
+                if ancestor in _AUTO_PAGES:
+                    auto_cls = ancestor
+                    break
+            auto_fields = set()
+            if auto_cls:
+                for field_name in get_fields_dict(cls):
+                    field_cls = _field_cls(cls, field_name)
+                    if field_cls is auto_cls:
+                        auto_fields.add(field_name)
+        cls_fqn = get_fq_class_name(cls)
+        field_list = " ".join(sorted(auto_fields))
+        crawler.stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)
 
     async def __call__(  # noqa: C901
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
@@ -66,6 +151,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         http_response = None
         screenshot_requested = Screenshot in to_provide
         for cls in list(to_provide):
+            self._track_auto_fields(crawler, request, cls)
             item = self.injector.weak_cache.get(request, {}).get(cls)
             if item:
                 results.append(item)
@@ -89,15 +175,6 @@ class ZyteApiProvider(PageObjectInputProvider):
             return results
 
         html_requested = BrowserResponse in to_provide or BrowserHtml in to_provide
-        item_keywords: Dict[type, str] = {
-            Product: "product",
-            ProductList: "productList",
-            ProductNavigation: "productNavigation",
-            Article: "article",
-            ArticleList: "articleList",
-            ArticleNavigation: "articleNavigation",
-            JobPosting: "jobPosting",
-        }
 
         zyte_api_meta = {
             **crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS"),
@@ -135,7 +212,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                         }
                     )
                 continue
-            kw = item_keywords.get(cls_stripped)
+            kw = _ITEM_KEYWORDS.get(cls_stripped)
             if not kw:
                 continue
             item_requested = True
@@ -165,7 +242,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         )
 
         extract_from = None  # type: ignore[assignment]
-        for item_type, kw in item_keywords.items():
+        for item_type, kw in _ITEM_KEYWORDS.items():
             options_name = f"{kw}Options"
             if item_type not in to_provide_stripped and options_name in zyte_api_meta:
                 del zyte_api_meta[options_name]
@@ -271,7 +348,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                 result = AnnotatedInstance(Actions(actions_result), cls.__metadata__)  # type: ignore[attr-defined]
                 results.append(result)
                 continue
-            kw = item_keywords.get(cls_stripped)
+            kw = _ITEM_KEYWORDS.get(cls_stripped)
             if not kw:
                 continue
             assert issubclass(cls_stripped, Item)
