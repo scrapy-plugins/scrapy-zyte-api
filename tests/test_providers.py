@@ -1024,7 +1024,32 @@ def test_auto_pages_set():
 
 
 @ensureDeferred
-async def test_auto_field_stat_no_override(mockserver):
+async def test_auto_field_stats_not_enabled(mockserver):
+    class TestSpider(Spider):
+        name = "test_spider"
+        url: str
+
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse)
+
+        def parse(self, response: DummyResponse, product: Product):
+            pass
+
+    settings = create_scrapy_settings()
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    _, _, crawler = await crawl_single_item(TestSpider, HtmlResource, settings)
+
+    auto_field_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/auto_fields")
+    }
+    assert auto_field_stats == {}
+
+
+@ensureDeferred
+async def test_auto_field_stats_no_override(mockserver):
     """When requesting an item directly from Zyte API, without an override to
     change fields, stats reflect the entire list of item fields."""
 
@@ -1039,8 +1064,9 @@ async def test_auto_field_stat_no_override(mockserver):
             pass
 
     settings = create_scrapy_settings()
-    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(TestSpider, HtmlResource, settings)
 
     auto_field_stats = {
@@ -1059,7 +1085,7 @@ async def test_auto_field_stat_no_override(mockserver):
 
 
 @ensureDeferred
-async def test_auto_field_stat_partial_override(mockserver):
+async def test_auto_field_stats_partial_override(mockserver):
     """When requesting an item and having an Auto…Page subclass to change
     fields, stats reflect the list of item fields not defined in the
     subclass. Defined field method are not listed, even if they return the
@@ -1088,8 +1114,9 @@ async def test_auto_field_stat_partial_override(mockserver):
             pass
 
     settings = create_scrapy_settings()
-    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
@@ -1100,7 +1127,7 @@ async def test_auto_field_stat_partial_override(mockserver):
         if k.startswith("scrapy-zyte-api/auto_fields")
     }
     assert auto_field_stats == {
-        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stat_partial_override.<locals>.MyProductPage": (
+        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_partial_override.<locals>.MyProductPage": (
             "additionalProperties aggregateRating availability breadcrumbs "
             "canonicalUrl color currency currencyRaw description descriptionHtml "
             "features gtin images mainImage metadata mpn price productId "
@@ -1113,7 +1140,7 @@ async def test_auto_field_stat_partial_override(mockserver):
 
 
 @ensureDeferred
-async def test_auto_field_stat_full_override(mockserver):
+async def test_auto_field_stats_full_override(mockserver):
     """When requesting an item and having an Auto…Page subclass to change
     all fields, stats reflect the list of non-overriden item fields as an empty
     string."""
@@ -1239,8 +1266,9 @@ async def test_auto_field_stat_full_override(mockserver):
             pass
 
     settings = create_scrapy_settings()
-    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
@@ -1251,7 +1279,7 @@ async def test_auto_field_stat_full_override(mockserver):
         if k.startswith("scrapy-zyte-api/auto_fields")
     }
     assert auto_field_stats == {
-        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stat_full_override.<locals>.MyProductPage": "",
+        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_full_override.<locals>.MyProductPage": "",
     }
 
     # Reset rules
@@ -1259,7 +1287,7 @@ async def test_auto_field_stat_full_override(mockserver):
 
 
 @ensureDeferred
-async def test_auto_field_stat_callback_override(mockserver):
+async def test_auto_field_stats_callback_override(mockserver):
     """Fields overridden in callbacks, instead of using a page object, are not
     taken into account."""
 
@@ -1275,8 +1303,9 @@ async def test_auto_field_stat_callback_override(mockserver):
             yield product
 
     settings = create_scrapy_settings()
-    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
@@ -1300,7 +1329,7 @@ async def test_auto_field_stat_callback_override(mockserver):
 
 
 @ensureDeferred
-async def test_auto_field_stat_item_page_override(mockserver):
+async def test_auto_field_stats_item_page_override(mockserver):
     """The stat accounts for the configured page for a given item, so if you
     request that page directly, things work the same as if you request the item
     itself."""
@@ -1328,8 +1357,9 @@ async def test_auto_field_stat_item_page_override(mockserver):
             pass
 
     settings = create_scrapy_settings()
-    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
@@ -1340,7 +1370,7 @@ async def test_auto_field_stat_item_page_override(mockserver):
         if k.startswith("scrapy-zyte-api/auto_fields")
     }
     assert auto_field_stats == {
-        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stat_item_page_override.<locals>.MyProductPage": (
+        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_item_page_override.<locals>.MyProductPage": (
             "additionalProperties aggregateRating availability breadcrumbs "
             "canonicalUrl color currency currencyRaw description descriptionHtml "
             "features gtin images mainImage metadata mpn price productId "
@@ -1353,7 +1383,7 @@ async def test_auto_field_stat_item_page_override(mockserver):
 
 
 @ensureDeferred
-async def test_auto_field_stat_alt_page_override(mockserver):
+async def test_auto_field_stats_alt_page_override(mockserver):
     """The stat does not account for alternatives pages, so if you request a
     page that provides an item, the page that counts for stats is the
     configured page for that item, not the actual page requested."""
@@ -1393,8 +1423,9 @@ async def test_auto_field_stat_alt_page_override(mockserver):
             pass
 
     settings = create_scrapy_settings()
-    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
@@ -1405,7 +1436,7 @@ async def test_auto_field_stat_alt_page_override(mockserver):
         if k.startswith("scrapy-zyte-api/auto_fields")
     }
     assert auto_field_stats == {
-        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stat_alt_page_override.<locals>.MyProductPage": (
+        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_alt_page_override.<locals>.MyProductPage": (
             "additionalProperties aggregateRating availability breadcrumbs "
             "canonicalUrl color currency currencyRaw description descriptionHtml "
             "features gtin images mainImage metadata mpn price productId "
@@ -1418,7 +1449,7 @@ async def test_auto_field_stat_alt_page_override(mockserver):
 
 
 @ensureDeferred
-async def test_auto_field_stat_non_auto_override(mockserver):
+async def test_auto_field_stats_non_auto_override(mockserver):
     """If instead of using an Auto…Page class you use a custom class, all
     fields are assumed to be overridden."""
 
@@ -1443,8 +1474,9 @@ async def test_auto_field_stat_non_auto_override(mockserver):
             pass
 
     settings = create_scrapy_settings()
-    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
@@ -1455,7 +1487,7 @@ async def test_auto_field_stat_non_auto_override(mockserver):
         if k.startswith("scrapy-zyte-api/auto_fields")
     }
     assert auto_field_stats == {
-        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stat_non_auto_override.<locals>.MyProductPage": "",
+        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_non_auto_override.<locals>.MyProductPage": "",
     }
 
     # Reset rules

@@ -96,6 +96,7 @@ class ZyteApiProvider(PageObjectInputProvider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._injection_mw = None
+        self._should_track_auto_fields = None
         self._tracked_auto_fields = set()
 
     def is_provided(self, type_: Callable) -> bool:
@@ -103,6 +104,12 @@ class ZyteApiProvider(PageObjectInputProvider):
 
     def _track_auto_fields(self, crawler: Crawler, request: Request, cls: Type):
         if cls not in _ITEM_KEYWORDS:
+            return
+        if self._should_track_auto_fields is None:
+            self._should_track_auto_fields = crawler.settings.getbool(
+                "ZYTE_API_AUTO_FIELD_STATS", False
+            )
+        if self._should_track_auto_fields is False:
             return
         if self._injection_mw is None:
             try:
