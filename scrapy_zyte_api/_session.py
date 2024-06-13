@@ -284,19 +284,40 @@ except ImportError:
 
             .. code-block:: python
 
+                from typing import Any, Dict
+
                 from scrapy import Request
                 from scrapy.http.response import Response
                 from scrapy_zyte_api import SessionConfig, session_config
 
 
-                @session_config("ecommerce.example")
+                @session_config(["ecommerce.de.example, ecommerce.us.example"])
                 class EcommerceExampleSessionConfig(SessionConfig):
-
-                    def check(self, response: Response, request: Request) -> bool:
-                        return bool(response.css(".is_valid").get())
 
                     def pool(self, request: Request) -> str:
                         return "ecommerce.example"
+
+                    def params(self, request: Request) -> Dict[str, Any]:
+                        return {
+                            "url": request.url,
+                            "browserHtml": True,
+                            "actions": [
+                                {
+                                    "action": "type",
+                                    "selector": {"type": "css", "value": ".zipcode"},
+                                    "text": self.location(request)["postalCode"],
+                                },
+                                {
+                                    "action": "click",
+                                    "selector": {"type": "css", "value": "[type='submit']"},
+                                },
+                            ],
+                        }
+
+                    def check(self, response: Response, request: Request) -> bool:
+                        return (
+                            response.css(".zipcode::text").get() == self.location(request)["postalCode"]
+                        )
 
             Your :class:`~scrapy_zyte_api.SessionConfig` subclass must be
             defined in a module that gets imported at run time. See
