@@ -19,7 +19,7 @@ from scrapy_zyte_api import (
     SessionConfig,
     session_config,
 )
-from scrapy_zyte_api._session import session_config_registry
+from scrapy_zyte_api._session import SESSION_INIT_META_KEY, session_config_registry
 from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT, _REQUEST_ERROR_HAS_QUERY
 
 from . import get_crawler, serialize_settings
@@ -328,7 +328,7 @@ class ConstantChecker:
     def __init__(self, result):
         self._result = result
 
-    def check(self, request: Request, response: Response) -> bool:
+    def check(self, response: Response, request: Request) -> bool:
         if self._result in (True, False):
             return self._result
         raise self._result
@@ -346,7 +346,12 @@ class FalseChecker(ConstantChecker):
 
 class CloseSpiderChecker(ConstantChecker):
     def __init__(self):
-        super().__init__(CloseSpider("checker_failed"))
+        super().__init__(CloseSpider("closed_by_checker"))
+
+
+class UnexpectedExceptionChecker(ConstantChecker):
+    def __init__(self):
+        super().__init__(Exception)
 
 
 class TrueCrawlerChecker(ConstantChecker):
@@ -365,6 +370,34 @@ class FalseCrawlerChecker(ConstantChecker):
 
     def __init__(self, crawler):
         super().__init__(not crawler.settings["ZYTE_API_SESSION_ENABLED"])
+
+
+class UseChecker(ConstantChecker):
+    """Always pass for session initialization requests, apply the check logic
+    only on session use requests."""
+
+    def check(self, response: Response, request: Request) -> bool:
+        if response.meta.get(SESSION_INIT_META_KEY, False) is True:
+            return True
+        return super().check(request, response)
+
+
+class FalseUseChecker(FalseChecker, UseChecker):
+    pass
+
+
+class CloseSpiderUseChecker(CloseSpiderChecker, UseChecker):
+    pass
+
+
+class UnexpectedExceptionUseChecker(UnexpectedExceptionChecker, UseChecker):
+    pass
+
+
+# NOTE: There is no use checker subclass for TrueChecker because the outcome
+# would be the same (always return True), and there are no use checker
+# subclasses for the crawler classes because the init use is enough to verify
+# that using the crawler works.
 
 
 @pytest.mark.parametrize(
@@ -397,7 +430,35 @@ class FalseCrawlerChecker(ConstantChecker):
                     "bad_session_inits",
                     {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
                 ),
-                (CloseSpiderChecker, "checker_failed", {}),
+                (
+                    FalseUseChecker,
+                    "finished",
+                    {
+                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
+                        "scrapy-zyte-api/sessions/pools/example.com/use/check-failed": 1,
+                    },
+                ),
+                (CloseSpiderChecker, "closed_by_checker", {}),
+                (
+                    CloseSpiderUseChecker,
+                    "closed_by_checker",
+                    {
+                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+                    },
+                ),
+                (
+                    UnexpectedExceptionChecker,
+                    "bad_session_inits",
+                    {"scrapy-zyte-api/sessions/pools/example.com/init/check-error": 1},
+                ),
+                (
+                    UnexpectedExceptionUseChecker,
+                    "finished",
+                    {
+                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
+                        "scrapy-zyte-api/sessions/pools/example.com/use/check-error": 1,
+                    },
+                ),
                 (
                     TrueCrawlerChecker,
                     "finished",
@@ -426,7 +487,35 @@ class FalseCrawlerChecker(ConstantChecker):
             "bad_session_inits",
             {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
         ),
-        ("tests.test_sessions.CloseSpiderChecker", "checker_failed", {}),
+        (
+            "tests.test_sessions.FalseUseChecker",
+            "finished",
+            {
+                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
+                "scrapy-zyte-api/sessions/pools/example.com/use/check-failed": 1,
+            },
+        ),
+        ("tests.test_sessions.CloseSpiderChecker", "closed_by_checker", {}),
+        (
+            "tests.test_sessions.CloseSpiderUseChecker",
+            "closed_by_checker",
+            {
+                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+            },
+        ),
+        (
+            "tests.test_sessions.UnexpectedExceptionChecker",
+            "bad_session_inits",
+            {"scrapy-zyte-api/sessions/pools/example.com/init/check-error": 1},
+        ),
+        (
+            "tests.test_sessions.UnexpectedExceptionUseChecker",
+            "finished",
+            {
+                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
+                "scrapy-zyte-api/sessions/pools/example.com/use/check-error": 1,
+            },
+        ),
         (
             "tests.test_sessions.TrueCrawlerChecker",
             "finished",
@@ -445,6 +534,7 @@ class FalseCrawlerChecker(ConstantChecker):
 @ensureDeferred
 async def test_checker(checker, close_reason, stats, mockserver):
     settings = {
+        "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_CHECKER": checker,
         "ZYTE_API_SESSION_ENABLED": True,
@@ -562,7 +652,7 @@ class CloseSpiderURLChecker:
 
     def check(self, request: Request, response: Response) -> bool:
         if "fail" in request.url:
-            raise CloseSpider("checker_failed")
+            raise CloseSpider("closed_by_checker")
         return True
 
 
@@ -596,7 +686,7 @@ async def test_checker_close_spider_use(mockserver):
         for k, v in crawler.stats.get_stats().items()
         if k.startswith("scrapy-zyte-api/sessions")
     }
-    assert crawler.spider.close_reason == "checker_failed"
+    assert crawler.spider.close_reason == "closed_by_checker"
     assert session_stats == {
         "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
     }
@@ -1253,6 +1343,146 @@ async def test_session_config_location_no_set_location(mockserver):
         "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
         "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
     }
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
+async def test_session_config_param_error(mockserver):
+    pytest.importorskip("web_poet")
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+
+        def params(self, request: Request):
+            raise Exception
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/param-error": 1,
+    }
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
+async def test_session_config_pool_caching(mockserver):
+    pytest.importorskip("web_poet")
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        def __init__(self, crawler):
+            super().__init__(crawler)
+            self.pools = deque(("example.com",))
+
+        def pool(self, request: Request):
+            # The following code would fail on the second call, which never
+            # happens due to pool caching.
+            return self.pools.popleft()
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+        def closed(self, reason):
+            self.close_reason = reason
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+    }
+    assert crawler.spider.close_reason == "finished"
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
+async def test_session_config_pool_error(mockserver):
+    # NOTE: This error should only happen during the initial process_request
+    # call. By the time the code reaches process_response, the cached pool
+    # value for that request is reused, so there is no new call to
+    # SessionConfig.pool that could fail during process_response only.
+
+    pytest.importorskip("web_poet")
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+
+        def pool(self, request: Request):
+            raise Exception
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+        def closed(self, reason):
+            self.close_reason = reason
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {}
+    assert crawler.spider.close_reason == "pool_error"
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]

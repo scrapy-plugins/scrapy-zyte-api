@@ -215,12 +215,57 @@ init requests will still ignore the cookiejar. To include cookies in session
 init requests, use :ref:`init params <session-init>`.
 
 
+Session retry policies
+======================
+
+The following retry policies are designed to work well with session management
+(see :ref:`enable-sessions`):
+
+.. autodata:: scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY
+    :annotation:
+
+.. autodata:: scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY
+    :annotation:
+
+
+Spider closers
+==============
+
+Session management can close your spider early in the following scenarios:
+
+-   ``bad_session_inits``: Too many session initializations failed in a row for
+    a given session pool.
+
+    You can use the :setting:`ZYTE_API_SESSION_MAX_BAD_INITS` and
+    :setting:`ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL` settings to adjust that
+    maximum.
+
+-   ``pool_error``: There was an error determining the session pool ID for some
+    request.
+
+    It is most likely the result of a bad implementation of
+    :meth:`SessionConfig.pool <scrapy_zyte_api.SessionConfig.pool>`; the
+    logs should contain an error message with a traceback for such errors.
+
+A custom :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`
+implementation may also close your spider with a custom reason by raising a
+:exc:`~scrapy.exceptions.CloseSpider` exception.
+
+
 .. _session-stats:
 
 Session stats
 =============
 
 The following stats exist for scrapy-zyte-api session management:
+
+``scrapy-zyte-api/sessions/pools/{pool}/init/check-error``
+    Number of times that a session for pool ``{pool}`` triggered an unexpected
+    exception during its session validation check right after initialization.
+
+    It is most likely the result of a bad implementation of
+    :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`; the
+    logs should contain an error message with a traceback for such errors.
 
 ``scrapy-zyte-api/sessions/pools/{pool}/init/check-failed``
     Number of times that a session from pool ``{pool}`` failed its session
@@ -233,6 +278,23 @@ The following stats exist for scrapy-zyte-api session management:
 ``scrapy-zyte-api/sessions/pools/{pool}/init/failed``
     Number of times that initializing a session for pool ``{pool}`` resulted in
     an :ref:`unsuccessful response <zyte-api-unsuccessful-responses>`.
+
+``scrapy-zyte-api/sessions/pools/{pool}/init/param-error``
+    Number of times that initializing a session for pool ``{pool}`` triggered
+    an unexpected exception when obtaining the Zyte API parameters for session
+    initialization.
+
+    It is most likely the result of a bad implementation of
+    :meth:`SessionConfig.params <scrapy_zyte_api.SessionConfig.params>`; the
+    logs should contain an error message with a traceback for such errors.
+
+``scrapy-zyte-api/sessions/pools/{pool}/use/check-error``
+    Number of times that a response that used a session from pool ``{pool}``
+    triggered an unexpected exception during its session validation check.
+
+    It is most likely the result of a bad implementation of
+    :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`; the
+    logs should contain an error message with a traceback for such errors.
 
 ``scrapy-zyte-api/sessions/pools/{pool}/use/check-failed``
     Number of times that a response that used a session from pool ``{pool}``
@@ -248,15 +310,3 @@ The following stats exist for scrapy-zyte-api session management:
 ``scrapy-zyte-api/sessions/pools/{pool}/use/failed``
     Number of times that a request that used a session from pool ``{pool}``
     got an :ref:`unsuccessful response <zyte-api-unsuccessful-responses>`.
-
-Session retry policies
-======================
-
-The following retry policies are designed to work well with session management
-(see :ref:`enable-sessions`):
-
-.. autodata:: scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY
-    :annotation:
-
-.. autodata:: scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY
-    :annotation:
