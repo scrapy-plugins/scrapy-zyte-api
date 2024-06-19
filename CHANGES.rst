@@ -1,6 +1,15 @@
 Changes
 =======
 
+N.N.N (YYYY-MM-DD)
+------------------
+
+* The recommended position for ``ScrapyZyteAPIDownloaderMiddleware`` changed
+  from 1000 to 633, to accommodate for the new
+  ``ScrapyZyteAPISessionDownloaderMiddleware``, which needs to be after
+  ``ScrapyZyteAPIDownloaderMiddleware`` and before the Scrapy cookie downloader
+  middleware (700).
+
 0.18.4 (2024-06-10)
 -------------------
 
@@ -396,7 +405,7 @@ When upgrading, you should set the following in your Scrapy settings:
 .. code-block:: python
 
   DOWNLOADER_MIDDLEWARES = {
-      "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+      "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
   }
   # only applicable for Scrapy 2.7+
   REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"

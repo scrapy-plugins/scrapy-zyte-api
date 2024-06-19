@@ -56,4 +56,8 @@ intersphinx_mapping = {
         "https://zyte-common-items.readthedocs.io/en/latest",
         None,
     ),
+    "zyte-spider-templates": (
+        "https://zyte-spider-templates.readthedocs.io/en/latest",
+        None,
+    ),
 }

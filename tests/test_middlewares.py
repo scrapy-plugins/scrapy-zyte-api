@@ -140,7 +140,7 @@ async def test_max_requests(caplog):
 
         settings = {
             "DOWNLOADER_MIDDLEWARES": {
-                "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000
+                "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633
             },
             "ZYTE_API_MAX_REQUESTS": zapi_max_requests,
             "ZYTE_API_URL": server.urljoin("/"),

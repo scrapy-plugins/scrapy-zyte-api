@@ -1,15 +1,13 @@
-import logging
+from logging import getLogger
 from typing import cast
 
 from scrapy import Request
 from scrapy.exceptions import IgnoreRequest
-from zyte_api.aio.errors import RequestError
+from zyte_api import RequestError
 
 from ._params import _ParamParser
 
-logger = logging.getLogger(__name__)
-
-
+logger = getLogger(__name__)
 _start_requests_processed = object()
 
 

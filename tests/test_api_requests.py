@@ -588,6 +588,7 @@ async def test_default_params_merging(
     crawler = await get_crawler({setting_key: setting})
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
+    caplog.clear()
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     for key in ignore_keys:
@@ -2896,6 +2897,7 @@ async def test_automap_cookie_limit(meta, caplog):
     )
     cookiejar += 1
     cookie_middleware.process_request(request, spider=None)
+    caplog.clear()
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     assert api_params["experimental"]["requestCookies"] == [
@@ -3215,6 +3217,7 @@ async def test_default_params_automap(default_params, meta, expected, warnings, 
     crawler = await get_crawler(settings)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
+    caplog.clear()
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     api_params.pop("url")

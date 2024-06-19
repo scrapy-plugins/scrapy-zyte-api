@@ -86,3 +86,46 @@ string.
     <https://github.com/jd/tenacity/issues/147>`_.
 
 See :ref:`retry`.
+
+
+.. reqmeta:: zyte_api_session_enabled
+
+zyte_api_session_enabled
+=========================
+
+Default: :setting:`ZYTE_API_SESSION_ENABLED`
+
+Whether to use :ref:`scrapy-zyte-api session management <session>` for the
+request (``True``) or not (``False``).
+
+
+.. reqmeta:: zyte_api_session_location
+
+zyte_api_session_location
+=========================
+
+Default: ``{}``
+
+Address for ``setLocation``-based session initialization. See
+:setting:`ZYTE_API_SESSION_LOCATION` for details.
+
+This request metadata key, if not empty, takes precedence over the
+:setting:`ZYTE_API_SESSION_LOCATION` setting, the
+:setting:`ZYTE_API_SESSION_PARAMS` setting, and the
+:reqmeta:`zyte_api_session_location` request metadata key.
+
+
+.. reqmeta:: zyte_api_session_params
+
+zyte_api_session_params
+=======================
+
+Default: ``{}``
+
+Parameters to use for session initialization. See
+:setting:`ZYTE_API_SESSION_PARAMS` for details.
+
+This request metadata key, if not empty, takes precedence over the
+:setting:`ZYTE_API_SESSION_PARAMS` setting, but it can be overridden
+by the :setting:`ZYTE_API_SESSION_LOCATION` setting or the
+:reqmeta:`zyte_api_session_location` request metadata key.
