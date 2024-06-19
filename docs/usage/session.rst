@@ -285,6 +285,15 @@ Session management can close your spider early in the following scenarios:
     :meth:`SessionConfig.pool <scrapy_zyte_api.SessionConfig.pool>`; the
     logs should contain an error message with a traceback for such errors.
 
+-   ``unsupported_set_location``: You used :setting:`ZYTE_API_SESSION_LOCATION`
+    or :reqmeta:`zyte_api_session_location` to configure :ref:`session
+    initialization <session-init>` with the ``setLocation`` action, but Zyte
+    API does not yet support ``setLocation`` for the target website.
+
+    It is most likely the result of a bad implementation of
+    :meth:`SessionConfig.pool <scrapy_zyte_api.SessionConfig.pool>`; the
+    logs should contain an error message with a traceback for such errors.
+
 A custom :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`
 implementation may also close your spider with a custom reason by raising a
 :exc:`~scrapy.exceptions.CloseSpider` exception.
