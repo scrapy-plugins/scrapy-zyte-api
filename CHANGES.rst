@@ -1,8 +1,10 @@
 Changes
 =======
 
-N.N.N (YYYY-MM-DD)
-------------------
+0.19.0 (2024-06-DD)
+-------------------
+
+* Implemented a :ref:`session management API <session>`.
 
 * The recommended position for ``ScrapyZyteAPIDownloaderMiddleware`` changed
   from 1000 to 633, to accommodate for the new
