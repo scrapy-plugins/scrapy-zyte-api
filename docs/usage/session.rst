@@ -16,10 +16,41 @@ When using scrapy-zyte-api, you can use these session APIs through the
 corresponding Zyte API fields (:http:`request:session`,
 :http:`request:sessionContext`).
 
-However, scrapy-zyte-api also provides its own session API, which offers an API
-similar to that of :ref:`server-managed sessions <zyte-api-session-contexts>`,
-but built on top of :ref:`client-managed sessions <zyte-api-session-id>`, to
-provide the best of both.
+However, scrapy-zyte-api also provides its own session management API, similar
+to that of :ref:`server-managed sessions <zyte-api-session-contexts>`, but
+built on top of :ref:`client-managed sessions <zyte-api-session-id>`.
+
+scrapy-zyte-api session management offers some advantages over
+:ref:`server-managed sessions <zyte-api-session-contexts>`:
+
+-   You can perform :ref:`session validity checks <session-check>`, so that the
+    sessions of responses that do not pass those checks are refreshed, and the
+    responses retried with a different session.
+
+-   You can use arbitrary Zyte API parameters for :ref:`session initialization
+    <session-init>`, beyond those that :http:`request:sessionContextParameters`
+    supports.
+
+-   You have granular control over the session pool size, max errors, etc. See
+    :ref:`optimize-sessions` and :ref:`session-configs`.
+
+However, scrapy-zyte-api session manager is not a replacement for
+:ref:`server-managed sessions <zyte-api-session-contexts>` or
+:ref:`client-managed sessions <zyte-api-session-id>`:
+
+-   :ref:`Server-managed sessions <zyte-api-session-contexts>` offer a longer
+    life time than the :ref:`client-managed sessions <zyte-api-session-id>`
+    that scrapy-zyte-api session management uses, so as long as you do not need
+    one of the scrapy-zyte-api session management features, they can be
+    significantly more efficient (fewer total sessions needed per crawl).
+
+    Zyte API can also optimize server-managed sessions based on the target
+    website. With scrapy-zyte-api session management, you need to :ref:`handle
+    optimization yourself <optimize-sessions>`.
+
+-   :ref:`Client-managed sessions <zyte-api-session-id>` offer full control
+    over session management, while scrapy-zyte-api session management removes
+    some of that control to provide an easier API for supported use cases.
 
 .. _enable-sessions:
 
@@ -168,7 +199,7 @@ Here are some things you can try:
 
 If you do not need :ref:`session checking <session-check>` and your
 :ref:`initialization parameters <session-init>` are only
-:http:`request:browserHtml` and :http:`request:actions`:, :ref:`server-managed
+:http:`request:browserHtml` and :http:`request:actions`, :ref:`server-managed
 sessions <zyte-api-session-contexts>` might be a more cost-effective choice, as
 they live much longer than :ref:`client-managed sessions
 <zyte-api-session-id>`.
@@ -210,9 +241,16 @@ set to ``True`` if not already defined. Each Zyte API session handles its own
 cookies instead.
 
 If you set :reqmeta:`dont_merge_cookies <scrapy:dont_merge_cookies>` to
-``False`` in a request, that request will include cookies. However, session
-init requests will still ignore the cookiejar. To include cookies in session
-init requests, use :ref:`init params <session-init>`.
+``False`` in a request that uses a session, that request will include cookies
+managed by Scrapy. However, session initialization requests will still have
+:reqmeta:`dont_merge_cookies <scrapy:dont_merge_cookies>` set to ``True``, you
+cannot override that.
+
+To include cookies in session initialization requests, use
+:http:`request:requestCookies` in :ref:`session initialization parameters
+<session-init>`. But mind that those cookies are only set during that request,
+:ref:`they are not added to the session cookie jar
+<zyte-api-session-cookie-jar>`.
 
 
 Session retry policies
