@@ -1,6 +1,13 @@
 Changes
 =======
 
+N.N.N (YYYY-MM-DD)
+------------------
+
+* ``scrapy-zyte-api[provider]`` now requires zyte-common-items >= 0.20.0.
+
+* Added the :setting:`ZYTE_API_AUTO_FIELD_STATS` setting.
+
 0.18.4 (2024-06-10)
 -------------------
 

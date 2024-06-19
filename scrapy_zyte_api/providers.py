@@ -33,6 +33,7 @@ from zyte_common_items import (
     ProductList,
     ProductNavigation,
 )
+from zyte_common_items.fields import is_auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult
@@ -63,15 +64,6 @@ _AUTO_PAGES: Set[type] = {
     AutoProductListPage,
     AutoProductNavigationPage,
 }
-
-
-# https://stackoverflow.com/a/25959545
-def _field_cls(page_cls, field_name):
-    for cls in page_cls.__mro__:
-        if field_name in cls.__dict__:
-            return cls
-    # Only used with fields known to exist
-    assert False  # noqa: B011
 
 
 class ZyteApiProvider(PageObjectInputProvider):
@@ -134,17 +126,10 @@ class ZyteApiProvider(PageObjectInputProvider):
         if cls in _ITEM_KEYWORDS:
             auto_fields = set(attrs.fields_dict(cls))
         else:
-            auto_cls = None
-            for ancestor in cls.__mro__:
-                if ancestor in _AUTO_PAGES:
-                    auto_cls = ancestor
-                    break
             auto_fields = set()
-            if auto_cls:
-                for field_name in get_fields_dict(cls):
-                    field_cls = _field_cls(cls, field_name)
-                    if field_cls is auto_cls:
-                        auto_fields.add(field_name)
+            for field_name in get_fields_dict(cls):
+                if is_auto_field(cls, field_name):
+                    auto_fields.add(field_name)
         cls_fqn = get_fq_class_name(cls)
         field_list = " ".join(sorted(auto_fields))
         crawler.stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)

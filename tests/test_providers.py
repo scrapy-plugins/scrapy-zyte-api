@@ -24,6 +24,7 @@ from web_poet import (
 )
 from web_poet.pages import get_item_cls
 from zyte_common_items import AutoProductPage, BasePage, BaseProductPage, Product
+from zyte_common_items.fields import auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot, actions
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
@@ -1488,6 +1489,97 @@ async def test_auto_field_stats_non_auto_override(mockserver):
     }
     assert auto_field_stats == {
         "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_non_auto_override.<locals>.MyProductPage": "",
+    }
+
+    # Reset rules
+    default_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
+async def test_auto_field_stats_auto_field_decorator(mockserver):
+    """Using @auto_field forces a field to not be considered overridden."""
+
+    @attrs.define
+    class MyProductPage(BaseProductPage):
+        product: Product
+
+        @auto_field
+        def additionalProperties(self):
+            return self.product.additionalProperties
+
+    handle_urls(f"{mockserver.host}:{mockserver.port}")(MyProductPage)
+
+    class TestSpider(Spider):
+        name = "test_spider"
+        url: str
+
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse)
+
+        def parse(self, response: DummyResponse, product: Product):
+            pass
+
+    settings = create_scrapy_settings()
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    _, _, crawler = await crawl_single_item(
+        TestSpider, HtmlResource, settings, port=mockserver.port
+    )
+
+    auto_field_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/auto_fields")
+    }
+    assert auto_field_stats == {
+        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_auto_field_decorator.<locals>.MyProductPage": "additionalProperties",
+    }
+
+    # Reset rules
+    default_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
+async def test_auto_field_stats_auto_field_meta(mockserver):
+    """Using @field(meta={"auto_field": True}) has the same effect as using
+    @auto_field."""
+
+    @attrs.define
+    class MyProductPage(BaseProductPage):
+        product: Product
+
+        @field(meta={"auto_field": True})
+        def additionalProperties(self):
+            return self.product.additionalProperties
+
+    handle_urls(f"{mockserver.host}:{mockserver.port}")(MyProductPage)
+
+    class TestSpider(Spider):
+        name = "test_spider"
+        url: str
+
+        def start_requests(self):
+            yield Request(self.url, callback=self.parse)
+
+        def parse(self, response: DummyResponse, product: Product):
+            pass
+
+    settings = create_scrapy_settings()
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    _, _, crawler = await crawl_single_item(
+        TestSpider, HtmlResource, settings, port=mockserver.port
+    )
+
+    auto_field_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/auto_fields")
+    }
+    assert auto_field_stats == {
+        "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_auto_field_meta.<locals>.MyProductPage": "additionalProperties",
     }
 
     # Reset rules

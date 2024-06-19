@@ -13,7 +13,8 @@ ZYTE_API_AUTO_FIELD_STATS
 
 Default: ``False``
 
-Enables stats that indicate which requested fields come directly from
+Enables stats that indicate which requested fields :ref:`obtained through
+scrapy-poet integration <scrapy-poet>` come directly from
 :ref:`zyte-api-extract`.
 
 If for any request no page object class is used to override
@@ -33,10 +34,8 @@ If for any request a custom page object class is used to override some
         "<space-separated list of fields not overridden>"
     )
 
-.. note:: If that page object class is not a subclass of an ``Auto``-prefixed
-    class from :doc:`zyte-common-items <zyte-common-items:index>`, all fields
-    are assumed to have been overridden, i.e. the stat value is always an empty
-    string.
+.. note:: :func:`zyte_common_items.fields.is_auto_field` is used to determine
+    whether a field has been overridden or not.
 
 .. setting:: ZYTE_API_AUTOMAP_PARAMS
 
