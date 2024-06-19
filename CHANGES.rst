@@ -2,7 +2,7 @@ Changes
 =======
 
 0.19.0 (2024-06-DD)
-------------------
+-------------------
 
 * Implemented a :ref:`session management API <session>`.
 
