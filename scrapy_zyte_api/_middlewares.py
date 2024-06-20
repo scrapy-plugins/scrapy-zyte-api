@@ -32,7 +32,8 @@ class _BaseMiddleware:
             slot_id = f"{self._slot_prefix}{slot_id}"
             request.meta["download_slot"] = slot_id
         _, slot = downloader._get_slot(request, spider)
-        slot.delay = 0
+        if not spider.crawler.settings.getbool('ZYTE_API_PRESERVE_DELAY'):
+            slot.delay = 0
 
 
 class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
