@@ -1349,6 +1349,79 @@ async def test_session_config_location_no_set_location(mockserver):
 
 
 @ensureDeferred
+async def test_session_config_check_meta(mockserver):
+    """When initializing a session, zyte_api_session-prefixed params should be
+    included in the session initialization request, so that they can be used
+    from check methods validating those requests.
+
+    For example, when validating a location, access to
+    zyte_api_session_location may be necessary.
+    """
+    pytest.importorskip("web_poet")
+
+    params = {
+        "actions": [
+            {
+                "action": "setLocation",
+                "address": {"postalCode": "10001"},
+            }
+        ]
+    }
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+
+        def check(self, response, request):
+            return (
+                bool(self.location(request))
+                and response.meta["zyte_api_session_params"] == params
+                and response.meta["zyte_api_session_foo"] == "bar"
+            )
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def start_requests(self):
+            for url in self.start_urls:
+                yield Request(
+                    url,
+                    meta={
+                        "zyte_api_automap": params,
+                        "zyte_api_session_params": params,
+                        "zyte_api_session_location": {"postalCode": "10001"},
+                        "zyte_api_session_foo": "bar",
+                    },
+                )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+    }
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
 async def test_session_config_param_error(mockserver):
     pytest.importorskip("web_poet")
 
