@@ -60,7 +60,9 @@ Enabling session management
 To enable session management for all requests, set
 :setting:`ZYTE_API_SESSION_ENABLED` to ``True``. You can also toggle session
 management on or off for specific requests using the
-:reqmeta:`zyte_api_session_enabled` request metadata key.
+:reqmeta:`zyte_api_session_enabled` request metadata key, or override the
+:meth:`~scrapy_zyte_api.SessionConfig.enabled` method of a :ref:`session config
+override <session-configs>`.
 
 By default, scrapy-zyte-api will maintain up to 8 sessions per domain, each
 initialized with a :ref:`browser request <zyte-api-browser>` targeting the URL
@@ -154,6 +156,13 @@ define a separate :ref:`session config override <session-configs>` for each
 website, each with its own implementation of
 :meth:`~scrapy_zyte_api.SessionConfig.check`.
 
+The :reqmeta:`zyte_api_session_location` and :reqmeta:`zyte_api_session_params`
+request metadata keys, if present in a request that triggers a session
+initialization request, will be copied into the session initialization request,
+so that they are available when :setting:`ZYTE_API_SESSION_CHECKER` or
+:meth:`~scrapy_zyte_api.SessionConfig.check` are called for a session
+initialization request.
+
 If your session checking implementation relies on the response body (e.g. it
 uses CSS or XPath expressions), you should make sure that you are getting one,
 which might not be the case if you are mostly using :ref:`Zyte API automatic
@@ -175,12 +184,14 @@ on every Zyte API request:
 Managing pools
 ==============
 
+scrapy-zyte-api can maintain multiple session pools.
+
 By default, scrapy-zyte-api maintains a separate pool of sessions per domain.
 
 If you use the :reqmeta:`zyte_api_session_params` or
 :reqmeta:`zyte_api_session_location` request metadata keys, scrapy-zyte-api
 will automatically use separate session pools within the target domain for
-those requests.
+those parameters or locations.
 
 If you want to customize further which pool is assigned to a given request,
 e.g. to have the same pool for multiple domains or use different pools within
@@ -188,6 +199,11 @@ the same domain (e.g. for different URL patterns), you can either use the
 :reqmeta:`zyte_api_session_pool` request metadata key or use the
 :meth:`~scrapy_zyte_api.SessionConfig.pool` method of :ref:`session config
 overrides <session-configs>`.
+
+The :setting:`ZYTE_API_SESSION_POOL_SIZE` setting determines the desired number
+of concurrent, active, working sessions per pool. The
+:setting:`ZYTE_API_SESSION_POOL_SIZES` setting allows defining different values
+for specific pools.
 
 
 .. _optimize-sessions:
@@ -383,3 +399,6 @@ The following stats exist for scrapy-zyte-api session management:
 ``scrapy-zyte-api/sessions/pools/{pool}/use/failed``
     Number of times that a request that used a session from pool ``{pool}``
     got an :ref:`unsuccessful response <zyte-api-unsuccessful-responses>`.
+
+``scrapy-zyte-api/sessions/use/disabled``
+    Number of processed requests for which session management was disabled.

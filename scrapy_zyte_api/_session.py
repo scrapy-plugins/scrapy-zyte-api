@@ -213,9 +213,18 @@ class SessionConfig:
             self._checker = build_from_crawler(load_object(checker_cls), crawler)
         else:
             self._checker = None
-
+        self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
         self._pool_counters = defaultdict(int)
         self._param_pools: DefaultDict[str, Dict[str, int]] = defaultdict(dict)
+
+    def enabled(self, request: Request) -> bool:
+        """Return ``True`` if the request should use sessions from
+        :ref:`session management <session>` or ``False`` otherwise.
+
+        The default implementation is based on settings and request metadata
+        keys as described in :ref:`enable-sessions`.
+        """
+        return request.meta.get("zyte_api_session_enabled", self._enabled)
 
     def pool(self, request: Request) -> str:
         """Return the ID of the session pool to use for *request*.
@@ -572,6 +581,11 @@ class _SessionManager:
                 SESSION_INIT_META_KEY: True,
                 "dont_merge_cookies": True,
                 "zyte_api": {**session_params, "session": {"id": session_id}},
+                **{
+                    k: v
+                    for k, v in request.meta.items()
+                    if k in {"zyte_api_session_location", "zyte_api_session_params"}
+                },
             },
             callback=NO_CALLBACK,
         )
@@ -717,7 +731,11 @@ class _SessionManager:
         """Check the response for signs of session expiration, update the
         internal session pool accordingly, and return ``False`` if the session
         has expired or ``True`` if the session passed validation."""
+        if self.is_init_request(request):
+            return True
         session_config = self._get_session_config(request)
+        if not session_config.enabled(request):
+            return True
         pool = self._get_pool(request)
         try:
             passed = session_config.check(response, request)
@@ -743,6 +761,12 @@ class _SessionManager:
 
     async def assign(self, request: Request):
         """Assign a working session to *request*."""
+        if self.is_init_request(request):
+            return
+        session_config = self._get_session_config(request)
+        if not session_config.enabled(request):
+            self._crawler.stats.inc_value("scrapy-zyte-api/sessions/use/disabled")
+            return
         session_id = await self._next(request)
         # Note: If there is a session set already (e.g. a request being
         # retried), it is overridden.
@@ -763,6 +787,10 @@ class _SessionManager:
             request.meta[meta_key] = {}
         request.meta[meta_key]["session"] = {"id": session_id}
         request.meta.setdefault("dont_merge_cookies", True)
+
+    def is_enabled(self, request: Request) -> bool:
+        session_config = self._get_session_config(request)
+        return session_config.enabled(request)
 
     def handle_error(self, request: Request):
         pool = self._get_pool(request)
@@ -817,27 +845,18 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         return cls(crawler)
 
     def __init__(self, crawler: Crawler):
-        self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
         self._crawler = crawler
         self._sessions = _SessionManager(crawler)
         self._fatal_error_handler = FatalErrorHandler(crawler)
 
     async def process_request(self, request: Request, spider: Spider) -> None:
-        if not request.meta.get(
-            "zyte_api_session_enabled", self._enabled
-        ) or self._sessions.is_init_request(request):
-            return
         async with self._fatal_error_handler:
             await self._sessions.assign(request)
 
     async def process_response(
         self, request: Request, response: Response, spider: Spider
     ) -> Union[Request, Response, None]:
-        if (
-            isinstance(response, DummyResponse)
-            or not request.meta.get("zyte_api_session_enabled", self._enabled)
-            or self._sessions.is_init_request(request)
-        ):
+        if isinstance(response, DummyResponse):
             return response
         async with self._fatal_error_handler:
             passed = await self._sessions.check(response, request)
@@ -857,8 +876,8 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
     ) -> Union[Request, None]:
         if (
             not isinstance(exception, RequestError)
-            or not request.meta.get("zyte_api_session_enabled", self._enabled)
             or self._sessions.is_init_request(request)
+            or not self._sessions.is_enabled(request)
         ):
             return None
 

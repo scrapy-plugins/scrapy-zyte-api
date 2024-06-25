@@ -98,6 +98,8 @@ Default: :setting:`ZYTE_API_SESSION_ENABLED`
 Whether to use :ref:`scrapy-zyte-api session management <session>` for the
 request (``True``) or not (``False``).
 
+.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.enabled`
+
 
 .. reqmeta:: zyte_api_session_location
 
