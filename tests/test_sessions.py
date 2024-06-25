@@ -1350,9 +1350,9 @@ async def test_session_config_location_no_set_location(mockserver):
 
 @ensureDeferred
 async def test_session_config_check_meta(mockserver):
-    """When initializing a session, zyte_api_session-prefixed params should be
-    included in the session initialization request, so that they can be used
-    from check methods validating those requests.
+    """When initializing a session, known zyte_api_session-prefixed params
+    should be included in the session initialization request, so that they can
+    be used from check methods validating those requests.
 
     For example, when validating a location, access to
     zyte_api_session_location may be necessary.
@@ -1375,7 +1375,13 @@ async def test_session_config_check_meta(mockserver):
             return (
                 bool(self.location(request))
                 and response.meta["zyte_api_session_params"] == params
-                and response.meta["zyte_api_session_foo"] == "bar"
+                and (
+                    (
+                        response.meta.get("_is_session_init_request", False)
+                        and "zyte_api_session_foo" not in response.meta
+                    )
+                    or response.meta["zyte_api_session_foo"] == "bar"
+                )
             )
 
     settings = {

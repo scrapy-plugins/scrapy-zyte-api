@@ -508,7 +508,7 @@ class _SessionManager:
                 **{
                     k: v
                     for k, v in request.meta.items()
-                    if k.startswith("zyte_api_session_")
+                    if k in {"zyte_api_session_location", "zyte_api_session_params"}
                 },
             },
             callback=NO_CALLBACK,
