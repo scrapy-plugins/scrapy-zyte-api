@@ -505,6 +505,11 @@ class _SessionManager:
                 SESSION_INIT_META_KEY: True,
                 "dont_merge_cookies": True,
                 "zyte_api": {**session_params, "session": {"id": session_id}},
+                **{
+                    k: v
+                    for k, v in request.meta.items()
+                    if k in {"zyte_api_session_location", "zyte_api_session_params"}
+                },
             },
             callback=NO_CALLBACK,
         )
