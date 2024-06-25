@@ -145,6 +145,13 @@ define a separate :ref:`session config override <session-configs>` for each
 website, each with its own implementation of
 :meth:`~scrapy_zyte_api.SessionConfig.check`.
 
+The :reqmeta:`zyte_api_session_location` and :reqmeta:`zyte_api_session_params`
+request metadata keys, if present in a request that triggers a session
+initialization request, will be copied into the session initialization request,
+so that they are available when :setting:`ZYTE_API_SESSION_CHECKER` or
+:meth:`~scrapy_zyte_api.SessionConfig.check` are called for a session
+initialization request.
+
 If your session checking implementation relies on the response body (e.g. it
 uses CSS or XPath expressions), you should make sure that you are getting one,
 which might not be the case if you are mostly using :ref:`Zyte API automatic
