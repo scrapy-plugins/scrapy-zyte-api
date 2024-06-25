@@ -73,7 +73,9 @@ async def test_enabled(setting, meta, outcome, mockserver):
             "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
         }
     else:
-        assert session_stats == {}
+        assert session_stats == {
+            "scrapy-zyte-api/sessions/use/disabled": 1,
+        }
 
 
 @pytest.mark.parametrize(
@@ -1701,6 +1703,7 @@ async def test_cookies(mockserver):
     assert session_stats == {
         "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
         "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 2,
+        "scrapy-zyte-api/sessions/use/disabled": 2,
     }
 
     assert tracker.cookies == [
