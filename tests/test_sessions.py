@@ -1206,6 +1206,47 @@ async def test_session_config(mockserver):
 
 
 @ensureDeferred
+async def test_session_config_enabled(mockserver):
+    pytest.importorskip("web_poet")
+
+    @session_config(["enabled.example", "disabled.example"])
+    class CustomSessionConfig(SessionConfig):
+
+        def enabled(self, request: Request):
+            return "enabled" in urlparse_cached(request).netloc
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://enabled.example", "https://disabled.example"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/use/disabled": 1,
+        "scrapy-zyte-api/sessions/pools/enabled.example/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/enabled.example/use/check-passed": 1,
+    }
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
 async def test_session_config_location(mockserver):
     """A custom session config can be used to customize the params for
     location, e.g. to include extra actions, while still relying on the default
