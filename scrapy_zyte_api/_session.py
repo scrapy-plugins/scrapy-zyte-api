@@ -194,7 +194,7 @@ class SessionConfig:
 
         self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
 
-    def enabled(self, request: Request) -> str:
+    def enabled(self, request: Request) -> bool:
         """Return ``True`` if the request should use sessions from
         :ref:`session management <session>` or ``False`` otherwise.
 
@@ -809,7 +809,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         if (
             not isinstance(exception, RequestError)
             or self._sessions.is_init_request(request)
-            or not self._sessions._is_enabled(request)
+            or not self._sessions.is_enabled(request)
         ):
             return None
 
