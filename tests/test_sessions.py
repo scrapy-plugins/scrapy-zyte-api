@@ -94,26 +94,26 @@ async def test_enabled(setting, meta, outcome, mockserver):
         (UNSET, False, UNSET, UNSET, False),
         (UNSET, False, UNSET, None, False),
         (UNSET, False, UNSET, False, False),
-        (UNSET, False, UNSET, True, True),
+        (UNSET, False, UNSET, True, False),
         (UNSET, False, False, UNSET, False),
         (UNSET, False, False, None, False),
         (UNSET, False, False, False, False),
-        (UNSET, False, False, True, True),
-        (UNSET, False, True, UNSET, True),
+        (UNSET, False, False, True, False),
+        (UNSET, False, True, UNSET, False),
         (UNSET, False, True, None, False),
         (UNSET, False, True, False, False),
-        (UNSET, False, True, True, True),
+        (UNSET, False, True, True, False),
         (UNSET, True, UNSET, UNSET, True),
         (UNSET, True, UNSET, None, True),
-        (UNSET, True, UNSET, False, False),
+        (UNSET, True, UNSET, False, True),
         (UNSET, True, UNSET, True, True),
-        (UNSET, True, False, UNSET, False),
+        (UNSET, True, False, UNSET, True),
         (UNSET, True, False, None, True),
-        (UNSET, True, False, False, False),
+        (UNSET, True, False, False, True),
         (UNSET, True, False, True, True),
         (UNSET, True, True, UNSET, True),
         (UNSET, True, True, None, True),
-        (UNSET, True, True, False, False),
+        (UNSET, True, True, False, True),
         (UNSET, True, True, True, True),
         (False, UNSET, UNSET, UNSET, False),
         (False, UNSET, UNSET, None, False),
@@ -123,69 +123,69 @@ async def test_enabled(setting, meta, outcome, mockserver):
         (False, UNSET, False, None, False),
         (False, UNSET, False, False, False),
         (False, UNSET, False, True, True),
-        (False, UNSET, True, UNSET, True),
+        (False, UNSET, True, UNSET, False),
         (False, UNSET, True, None, False),
         (False, UNSET, True, False, False),
         (False, UNSET, True, True, True),
         (False, False, UNSET, UNSET, False),
         (False, False, UNSET, None, False),
         (False, False, UNSET, False, False),
-        (False, False, UNSET, True, True),
+        (False, False, UNSET, True, False),
         (False, False, False, UNSET, False),
         (False, False, False, None, False),
         (False, False, False, False, False),
-        (False, False, False, True, True),
-        (False, False, True, UNSET, True),
+        (False, False, False, True, False),
+        (False, False, True, UNSET, False),
         (False, False, True, None, False),
         (False, False, True, False, False),
-        (False, False, True, True, True),
+        (False, False, True, True, False),
         (False, True, UNSET, UNSET, True),
         (False, True, UNSET, None, True),
-        (False, True, UNSET, False, False),
+        (False, True, UNSET, False, True),
         (False, True, UNSET, True, True),
-        (False, True, False, UNSET, False),
+        (False, True, False, UNSET, True),
         (False, True, False, None, True),
-        (False, True, False, False, False),
+        (False, True, False, False, True),
         (False, True, False, True, True),
         (False, True, True, UNSET, True),
         (False, True, True, None, True),
-        (False, True, True, False, False),
+        (False, True, True, False, True),
         (False, True, True, True, True),
         (True, UNSET, UNSET, UNSET, True),
-        (True, UNSET, UNSET, None, True),
+        (True, UNSET, UNSET, None, False),
         (True, UNSET, UNSET, False, False),
         (True, UNSET, UNSET, True, True),
-        (True, UNSET, False, UNSET, False),
-        (True, UNSET, False, None, True),
+        (True, UNSET, False, UNSET, True),
+        (True, UNSET, False, None, False),
         (True, UNSET, False, False, False),
         (True, UNSET, False, True, True),
         (True, UNSET, True, UNSET, True),
-        (True, UNSET, True, None, True),
+        (True, UNSET, True, None, False),
         (True, UNSET, True, False, False),
         (True, UNSET, True, True, True),
         (True, False, UNSET, UNSET, False),
         (True, False, UNSET, None, False),
         (True, False, UNSET, False, False),
-        (True, False, UNSET, True, True),
+        (True, False, UNSET, True, False),
         (True, False, False, UNSET, False),
         (True, False, False, None, False),
         (True, False, False, False, False),
-        (True, False, False, True, True),
-        (True, False, True, UNSET, True),
+        (True, False, False, True, False),
+        (True, False, True, UNSET, False),
         (True, False, True, None, False),
         (True, False, True, False, False),
-        (True, False, True, True, True),
+        (True, False, True, True, False),
         (True, True, UNSET, UNSET, True),
         (True, True, UNSET, None, True),
-        (True, True, UNSET, False, False),
+        (True, True, UNSET, False, True),
         (True, True, UNSET, True, True),
-        (True, True, False, UNSET, False),
+        (True, True, False, UNSET, True),
         (True, True, False, None, True),
-        (True, True, False, False, False),
+        (True, True, False, False, True),
         (True, True, False, True, True),
         (True, True, True, UNSET, True),
         (True, True, True, None, True),
-        (True, True, True, False, False),
+        (True, True, True, False, True),
         (True, True, True, True, True),
     ),
 )
@@ -194,6 +194,15 @@ async def test_param_precedence(
     params_setting, params_meta, location_setting, location_meta, outcome, mockserver
 ):
     postal_codes = {True: "10001", False: "10002"}
+    pool = (
+        "postal-code-10001.example[0]"
+        if params_meta in postal_codes
+        else (
+            f"postal-code-10001.example@{postal_codes[location_meta]}"
+            if location_meta in postal_codes
+            else "postal-code-10001.example"
+        )
+    )
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
@@ -260,12 +269,12 @@ async def test_param_precedence(
     }
     if outcome:
         assert session_stats == {
-            "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 1,
-            "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/check-passed": 1,
+            f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed": 1,
+            f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed": 1,
         }
     else:
         assert session_stats == {
-            "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/failed": 1,
+            f"scrapy-zyte-api/sessions/pools/{pool}/init/failed": 1,
         }
 
 
@@ -870,6 +879,143 @@ async def test_check_overrides_error(mockserver):
 
 
 @pytest.mark.parametrize(
+    ("meta", "pool"),
+    (
+        ({}, "example.com"),
+        ({"zyte_api_session_location": {"postalCode": "10001"}}, "example.com@10001"),
+        (
+            {"zyte_api_session_location": {"postalCode": "10001", "foo": "bar"}},
+            "example.com@10001",
+        ),
+        (
+            {
+                "zyte_api_session_location": {
+                    "addressCountry": "US",
+                    "addressRegion": "TX",
+                }
+            },
+            "example.com@US,TX",
+        ),
+        (
+            {
+                "zyte_api_session_location": {
+                    "addressCountry": "ES",
+                    "addressRegion": "Pontevedra",
+                    "streetAddress": "Rúa do Príncipe, 123",
+                    "postalCode": "12345",
+                }
+            },
+            "example.com@ES,Pontevedra,12345,Rúa do Príncipe, 123",
+        ),
+        (
+            {
+                "zyte_api_session_params": {"foo": "bar"},
+                "zyte_api_session_location": {"postalCode": "10001"},
+            },
+            "example.com[0]",
+        ),
+        (
+            {
+                "zyte_api_session_pool": "foo",
+                "zyte_api_session_params": {"foo": "bar"},
+                "zyte_api_session_location": {"postalCode": "10001"},
+            },
+            "foo",
+        ),
+    ),
+)
+@ensureDeferred
+async def test_pool(meta, pool, mockserver):
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+
+        def start_requests(self):
+            yield Request("https://example.com", meta=meta)
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed": 1,
+        f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed": 1,
+    }
+
+
+@ensureDeferred
+async def test_pool_params(mockserver, caplog):
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+
+        def start_requests(self):
+            yield Request(
+                "https://example.com/a",
+                meta={"zyte_api_session_params": {"foo": "bar"}},
+            )
+            yield Request(
+                "https://example.com/b",
+                meta={"zyte_api_session_params": {"foo": "bar"}},
+            )
+            yield Request(
+                "https://example.com/c",
+                meta={"zyte_api_session_params": {"foo": "baz"}},
+            )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    caplog.clear()
+    caplog.set_level("INFO")
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com[0]/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com[0]/use/check-passed": 2,
+        "scrapy-zyte-api/sessions/pools/example.com[1]/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com[1]/use/check-passed": 1,
+    }
+    expected_logs = {
+        (
+            "INFO",
+            "Session pool example.com[0] uses these session initialization parameters: {'foo': 'bar'}",
+        ): 0,
+        (
+            "INFO",
+            "Session pool example.com[1] uses these session initialization parameters: {'foo': 'baz'}",
+        ): 0,
+    }
+    for record in caplog.records:
+        entry = (record.levelname, record.msg)
+        if entry in expected_logs:
+            expected_logs[entry] += 1
+    assert all(v == 1 for v in expected_logs.values())
+
+
+@pytest.mark.parametrize(
     ("setting", "value"),
     (
         (1, 1),
@@ -1205,8 +1351,113 @@ async def test_session_config(mockserver):
     }
 
 
+@pytest.mark.parametrize(
+    ("settings", "meta", "used"),
+    (
+        ({}, {}, True),
+        (
+            {
+                "ZYTE_API_SESSION_PARAMS": {
+                    "actions": [
+                        {"action": "setLocation", "address": {"postalCode": "10002"}}
+                    ]
+                }
+            },
+            {},
+            False,
+        ),
+        ({"ZYTE_API_SESSION_LOCATION": {"postalCode": "10002"}}, {}, False),
+        (
+            {},
+            {
+                "zyte_api_session_params": {
+                    "actions": [
+                        {"action": "setLocation", "address": {"postalCode": "10002"}}
+                    ]
+                }
+            },
+            False,
+        ),
+        ({}, {"zyte_api_session_location": {"postalCode": "10002"}}, False),
+    ),
+)
 @ensureDeferred
-async def test_session_config_location(mockserver):
+async def test_session_config_location(settings, meta, used, mockserver):
+    """Overriding location in SessionConfig only has an effect when neither
+    spider-level nor request-level variables are used to modify params."""
+    pytest.importorskip("web_poet")
+
+    @session_config(["postal-code-10001.example"])
+    class CustomSessionConfig(SessionConfig):
+
+        def location(self, request: Request):
+            return {"postalCode": "10001"}
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        **settings,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://postal-code-10001.example"]
+
+        def start_requests(self):
+            for url in self.start_urls:
+                yield Request(
+                    url,
+                    meta={
+                        "zyte_api_automap": {
+                            "actions": [
+                                {
+                                    "action": "setLocation",
+                                    "address": {"postalCode": "10001"},
+                                }
+                            ]
+                        },
+                        **meta,
+                    },
+                )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    if used:
+        assert session_stats == {
+            "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 1,
+            "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/check-passed": 1,
+        }
+    else:
+        pool = (
+            "postal-code-10001.example[0]"
+            if "zyte_api_session_params" in meta
+            else (
+                "postal-code-10001.example@10002"
+                if "zyte_api_session_location" in meta
+                else "postal-code-10001.example"
+            )
+        )
+        assert session_stats == {
+            f"scrapy-zyte-api/sessions/pools/{pool}/init/failed": 1,
+        }
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
+async def test_session_config_params_location(mockserver):
     """A custom session config can be used to customize the params for
     location, e.g. to include extra actions, while still relying on the default
     check to determine whether or not the session remains valid based on the
@@ -1278,7 +1529,7 @@ async def test_session_config_location(mockserver):
 
 
 @ensureDeferred
-async def test_session_config_location_no_set_location(mockserver):
+async def test_session_config_params_location_no_set_location(mockserver):
     """A custom session config can be used to customize the params for
     location to the point where they do not use a ``setLocation`` action. In
     that case, the default session check will return ``True`` by default, i.e.
@@ -1349,7 +1600,7 @@ async def test_session_config_location_no_set_location(mockserver):
 
 
 @ensureDeferred
-async def test_session_config_param_error(mockserver):
+async def test_session_config_params_error(mockserver):
     pytest.importorskip("web_poet")
 
     @session_config(["example.com"])

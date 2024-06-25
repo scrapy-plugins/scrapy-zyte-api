@@ -110,6 +110,15 @@ To change how sessions are initialized, you have the following options:
 -   To customize session initialization per request, define
     :meth:`~scrapy_zyte_api.SessionConfig.params` in a :ref:`session config
     override <session-configs>`.
+    :meth:`~scrapy_zyte_api.SessionConfig.location` can define a default
+    location for a given domain.
+
+Precedence, from higher to lower, is:
+:meth:`~scrapy_zyte_api.SessionConfig.params`,
+:reqmeta:`zyte_api_session_params`,
+:reqmeta:`zyte_api_session_location`,
+:setting:`ZYTE_API_SESSION_PARAMS`, :setting:`ZYTE_API_SESSION_LOCATION`,
+:meth:`~scrapy_zyte_api.SessionConfig.location`.
 
 .. _session-check:
 
@@ -159,6 +168,27 @@ on every Zyte API request:
 
     ZYTE_API_AUTOMAP_PARAMS = {"browserHtml": True}
     ZYTE_API_PROVIDER_PARAMS = {"browserHtml": True}
+
+
+.. _session-pools:
+
+Managing pools
+==============
+
+By default, scrapy-zyte-api maintains a separate pool of sessions per domain.
+
+If you use the :reqmeta:`zyte_api_session_params` or
+:reqmeta:`zyte_api_session_location` request metadata keys, scrapy-zyte-api
+will automatically use separate session pools within the target domain for
+those requests.
+
+If you want to customize further which pool is assigned to a given request,
+e.g. to have the same pool for multiple domains or use different pools within
+the same domain (e.g. for different URL patterns), you can either use the
+:reqmeta:`zyte_api_session_pool` request metadata key or use the
+:meth:`~scrapy_zyte_api.SessionConfig.pool` method of :ref:`session config
+overrides <session-configs>`.
+
 
 .. _optimize-sessions:
 

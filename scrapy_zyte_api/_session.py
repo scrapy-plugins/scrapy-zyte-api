@@ -1,9 +1,22 @@
+import json
 from asyncio import Task, create_task, sleep
 from collections import defaultdict, deque
 from copy import deepcopy
 from functools import partial
 from logging import getLogger
-from typing import Any, Deque, Dict, Optional, Set, Type, TypeVar, Union, cast
+from typing import (
+    Any,
+    DefaultDict,
+    Deque,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 from uuid import uuid4
 from weakref import WeakKeyDictionary
 
@@ -173,6 +186,17 @@ class SessionConfig:
     """Default session configuration for :ref:`scrapy-zyte-api sessions
     <session>`."""
 
+    #: List of address fields to use when available, and their order, when
+    #: :ref:`creating a pool ID for a request <session-pools>` based on the
+    #: content of the :reqmeta:`zyte_api_session_location` metadata key. See
+    #: :meth:`pool`.
+    ADDRESS_FIELDS: List[str] = [
+        "addressCountry",
+        "addressRegion",
+        "postalCode",
+        "streetAddress",
+    ]
+
     @classmethod
     def from_crawler(cls, crawler):
         return cls(crawler)
@@ -181,10 +205,8 @@ class SessionConfig:
         self.crawler = crawler
 
         settings = crawler.settings
-        self._fallback_location = settings.getdict("ZYTE_API_SESSION_LOCATION")
-        self._fallback_params = settings.getdict(
-            "ZYTE_API_SESSION_PARAMS", {"browserHtml": True}
-        )
+        self._setting_location = settings.getdict("ZYTE_API_SESSION_LOCATION")
+        self._setting_params = settings.getdict("ZYTE_API_SESSION_PARAMS")
 
         checker_cls = settings.get("ZYTE_API_SESSION_CHECKER", None)
         if checker_cls:
@@ -192,19 +214,50 @@ class SessionConfig:
         else:
             self._checker = None
 
+        self._pool_counters = defaultdict(int)
+        self._param_pools: DefaultDict[str, Dict[str, int]] = defaultdict(dict)
+
     def pool(self, request: Request) -> str:
         """Return the ID of the session pool to use for *request*.
 
-        .. _session-pools:
+        The main aspects of the default implementation are described in
+        :ref:`session-pools`.
 
-        The default implementation returns the request URL netloc, e.g.
-        ``"books.toscrape.com"`` for a request targeting
-        https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html.
+        When the :reqmeta:`zyte_api_session_params` request metadata key is
+        used, the pool ID is the target domain followed by an integer between
+        brackets (e.g. ``example.com[0]``), and a log message indicates which
+        session initialization parameters are associated with that pool ID.
 
-        scrapy-zyte-api can maintain multiple session pools, each pool with up
-        to :setting:`ZYTE_API_SESSION_POOL_SIZE` sessions.
+        When the :reqmeta:`zyte_api_session_location` request metadata key is
+        used, the pool ID is the target domain followed by an at sign and the
+        comma-separated values of the non-empty fields from
+        :data:`ADDRESS_FIELDS` (e.g. ``example.com@US,NY,10001``).
         """
-        return urlparse_cached(request).netloc
+        meta_pool = request.meta.get("zyte_api_session_pool", "")
+        if meta_pool:
+            return meta_pool
+        netloc = urlparse_cached(request).netloc
+        meta_params = request.meta.get("zyte_api_session_params", None)
+        if meta_params:
+            param_key = json.dumps(meta_params, sort_keys=True)
+            try:
+                index = self._param_pools[netloc][param_key]
+            except KeyError:
+                index = self._pool_counters[netloc]
+                logger.info(
+                    f"Session pool {netloc}[{index}] uses these session "
+                    f"initialization parameters: {meta_params}"
+                )
+                self._pool_counters[netloc] += 1
+                self._param_pools[netloc][param_key] = index
+            return f"{netloc}[{index}]"
+        meta_location = request.meta.get("zyte_api_session_location", None)
+        if meta_location:
+            location_id = ",".join(
+                [meta_location[k] for k in self.ADDRESS_FIELDS if k in meta_location]
+            )
+            return f"{netloc}@{location_id}"
+        return netloc
 
     def location(self, request: Request) -> Dict[str, str]:
         """Return the address :class:`dict` to use for ``setLocation``-based
@@ -213,21 +266,13 @@ class SessionConfig:
         The default implementation is based on settings and request metadata
         keys as described in :ref:`session-init`.
         """
-        return request.meta.get("zyte_api_session_location", self._fallback_location)
+        return request.meta.get("zyte_api_session_location", self._setting_location)
 
-    def params(self, request: Request) -> Dict[str, Any]:
-        """Return the Zyte API request parameters to use to initialize a
-        session for *request*.
-
-        The default implementation is based on settings and request metadata
-        keys as described in :ref:`session-init`.
-        """
-        location = self.location(request)
-        params = request.meta.get("zyte_api_session_params", self._fallback_params)
-        if not location:
-            return params
+    def _location_params(
+        self, request: Request, location: Dict[str, str]
+    ) -> Dict[str, Any]:
         return {
-            "url": params.get("url", request.url),
+            "url": self._setting_params.get("url", request.url),
             "browserHtml": True,
             "actions": [
                 {
@@ -236,6 +281,28 @@ class SessionConfig:
                 }
             ],
         }
+
+    def params(self, request: Request) -> Dict[str, Any]:
+        """Return the Zyte API request parameters to use to initialize a
+        session for *request*.
+
+        The default implementation is based on settings and request metadata
+        keys as described in :ref:`session-init`.
+        """
+        meta_params = request.meta.get("zyte_api_session_params", None)
+        if meta_params:
+            return meta_params
+        meta_location = request.meta.get("zyte_api_session_location", None)
+        if meta_location is not None:
+            return self._location_params(request, meta_location)
+        if self._setting_params:
+            return self._setting_params
+        if self._setting_location:
+            return self._location_params(request, self._setting_location)
+        location = self.location(request)
+        if location:
+            return self._location_params(request, location)
+        return {"browserHtml": True}
 
     def check(self, response: Response, request: Request) -> bool:
         """Return ``True`` if the session used to fetch *response* should be

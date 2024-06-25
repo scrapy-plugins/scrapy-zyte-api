@@ -114,6 +114,8 @@ This request metadata key, if not empty, takes precedence over the
 :setting:`ZYTE_API_SESSION_PARAMS` setting, and the
 :reqmeta:`zyte_api_session_location` request metadata key.
 
+.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.location`
+
 
 .. reqmeta:: zyte_api_session_params
 
@@ -129,3 +131,18 @@ This request metadata key, if not empty, takes precedence over the
 :setting:`ZYTE_API_SESSION_PARAMS` setting, but it can be overridden
 by the :setting:`ZYTE_API_SESSION_LOCATION` setting or the
 :reqmeta:`zyte_api_session_location` request metadata key.
+
+.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.params`
+
+
+.. reqmeta:: zyte_api_session_pool
+
+zyte_api_session_pool
+=====================
+
+Default: ``""``
+
+Determines the ID of the session pool to assign to the request, overriding the
+:ref:`default pool assignment logic <session-pools>`.
+
+.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.pool`
