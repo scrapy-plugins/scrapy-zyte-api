@@ -354,29 +354,15 @@ ZYTE_API_SESSION_LOCATION
 
 Default: ``{}``
 
-If defined, sessions are initialized using the ``setLocation``
-:http:`action <request:actions>`, and the value of this setting must be the
-target address :class:`dict`. For example:
+See :ref:`session-init` for general information about location configuration
+and parameter precedence.
+
+Example:
 
 .. code-block:: python
     :caption: settings.py
 
     ZYTE_API_SESSION_LOCATION = {"postalCode": "10001"}
-
-If the :setting:`ZYTE_API_SESSION_PARAMS` setting or the
-:reqmeta:`zyte_api_session_params` request metadata key set a ``"url"``, it
-will be used for session initialization as well. Otherwise, the URL of the
-request for which the session is being initialized will be used instead.
-
-This setting, if not empty, takes precedence over the
-:setting:`ZYTE_API_SESSION_PARAMS` setting and the
-:reqmeta:`zyte_api_session_params` request metadata key, but it can be
-overridden by the :reqmeta:`zyte_api_session_location` request metadata key.
-
-To disable the :setting:`ZYTE_API_SESSION_LOCATION` setting on a specific
-request, e.g. to use the :setting:`ZYTE_API_SESSION_PARAMS` setting or the
-:reqmeta:`zyte_api_session_params` request metadata key instead, set
-the :reqmeta:`zyte_api_session_location` request metadata key to ``{}``.
 
 
 .. setting:: ZYTE_API_SESSION_MAX_BAD_INITS
@@ -430,20 +416,10 @@ to work even after an unsuccessful response. See :ref:`optimize-sessions`.
 ZYTE_API_SESSION_PARAMS
 =======================
 
-Default: ``{"browserHtml": True}``
+Default: ``{}``
 
-Parameters to use for session initialization.
-
-It works similarly to :http:`request:sessionContextParams` from
-:ref:`server-managed sessions <zyte-api-session-contexts>`, but it supports
-arbitrary Zyte API parameters instead of a specific subset.
-
-If it does not define a ``"url"``, the URL of the request for which the session
-is being initialized will be used.
-
-This setting can be overridden by the :setting:`ZYTE_API_SESSION_LOCATION`
-setting, the :reqmeta:`zyte_api_session_location` request metadata key, or the
-:reqmeta:`zyte_api_session_params` request metadata key.
+See :ref:`session-init` for general information about defining session
+initialization parameters and parameter precedence.
 
 Example:
 

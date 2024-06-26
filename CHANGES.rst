@@ -25,16 +25,13 @@ Unreleased
 
   #.  :reqmeta:`zyte_api_session_params`
 
-  #.  :reqmeta:`zyte_api_session_location` (using any
-      :meth:`~scrapy_zyte_api.SessionConfig.params` override)
+  #.  :reqmeta:`zyte_api_session_location`
 
   #.  :setting:`ZYTE_API_SESSION_PARAMS`
 
-  #.  :setting:`ZYTE_API_SESSION_LOCATION` (using any
-      :meth:`~scrapy_zyte_api.SessionConfig.params` override)
+  #.  :setting:`ZYTE_API_SESSION_LOCATION`
 
-  #.  :meth:`~scrapy_zyte_api.SessionConfig.location` (using any
-      :meth:`~scrapy_zyte_api.SessionConfig.params` override)
+  #.  :meth:`~scrapy_zyte_api.SessionConfig.location`
 
   #.  :meth:`~scrapy_zyte_api.SessionConfig.params`
 
