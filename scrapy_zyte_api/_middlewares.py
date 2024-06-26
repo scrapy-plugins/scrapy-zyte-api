@@ -21,6 +21,10 @@ class _BaseMiddleware:
     def __init__(self, crawler):
         self._param_parser = _ParamParser(crawler, cookies_enabled=False)
         self._crawler = crawler
+        self._preserve_delay = crawler.settings.getbool(
+            "ZYTE_API_PRESERVE_DELAY",
+            not crawler.settings.getbool("AUTOTHROTTLE_ENABLED"),
+        )
 
     def slot_request(self, request, spider, force=False):
         if not force and self._param_parser.parse(request) is None:
@@ -31,8 +35,8 @@ class _BaseMiddleware:
         if not isinstance(slot_id, str) or not slot_id.startswith(self._slot_prefix):
             slot_id = f"{self._slot_prefix}{slot_id}"
             request.meta["download_slot"] = slot_id
-        _, slot = downloader._get_slot(request, spider)
-        if not spider.crawler.settings.getbool('ZYTE_API_PRESERVE_DELAY'):
+        if not self._preserve_delay:
+            _, slot = downloader._get_slot(request, spider)
             slot.delay = 0
 
 

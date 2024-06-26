@@ -205,6 +205,33 @@ Note that requests with error responses that cannot be retried or exceed their
 retry limit also count here.
 
 
+.. setting:: ZYTE_API_PRESERVE_DELAY
+
+ZYTE_API_PRESERVE_DELAY
+=======================
+
+Default: ``not`` :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>`
+
+By default, requests for which use of scrapy-zyte-api is enabled get
+``zyte-api@`` prepended to their download slot ID, and if
+:setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>` is enabled, the
+corresponding download slot (see :setting:`DOWNLOAD_SLOTS
+<scrapy:DOWNLOAD_SLOTS>`) gets its download delay (see :setting:`DOWNLOAD_DELAY
+<scrapy:DOWNLOAD_DELAY>`) reset to 0. This nullifies the
+effects of the :ref:`AutoThrottle extension <topics-autothrottle>` for Zyte API
+requests, delegating throttling management to Zyte API.
+
+If you have :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>`
+disabled, but you have some download delay set (e.g. through
+:setting:`DOWNLOAD_DELAY <scrapy:DOWNLOAD_DELAY>` or :setting:`DOWNLOAD_SLOTS
+<scrapy:DOWNLOAD_SLOTS>`) and you do not want that delay to affect Zyte API
+requests, set this setting to ``False``.
+
+If you have :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>`
+enabled, and you want it to also work on Zyte API requests, set this setting to
+``True``.
+
+
 .. setting:: ZYTE_API_PROVIDER_PARAMS
 
 ZYTE_API_PROVIDER_PARAMS
