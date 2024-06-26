@@ -274,22 +274,21 @@ class SessionConfig:
 
         The default implementation is based on settings and request metadata
         keys as described in :ref:`session-init`.
+
+        You should only override this method if you need a location to be
+        always used, even when no location is specified through request
+        metadata or settings.
+
+        When overriding this method, you should only return a custom value if
+        the default implementation returns an empty :class:`dict`, e.g.
+
+        .. code-block:: python
+
+            def location(self, request: Request) -> Dict[str, str]:
+                fallback = {"addressCountry": "US", "addressRegion": "NY", "postalCode": "10001"}
+                return super().location(request) or fallback
         """
         return request.meta.get("zyte_api_session_location", self._setting_location)
-
-    def _location_params(
-        self, request: Request, location: Dict[str, str]
-    ) -> Dict[str, Any]:
-        return {
-            "url": self._setting_params.get("url", request.url),
-            "browserHtml": True,
-            "actions": [
-                {
-                    "action": "setLocation",
-                    "address": location,
-                }
-            ],
-        }
 
     def params(self, request: Request) -> Dict[str, Any]:
         """Return the Zyte API request parameters to use to initialize a
@@ -297,20 +296,37 @@ class SessionConfig:
 
         The default implementation is based on settings and request metadata
         keys as described in :ref:`session-init`.
+
+        When overriding this method, you should return parameters for the
+        target location, i.e. the output of :meth:`location`, unless that
+        output is an empty :class:`dict`, e.g.
+
+        .. code-block:: python
+
+            def params(self, request: Request) -> Dict[str, Any]:
+                if location := self.location(request):
+                    return {
+                        "url": "https://example.com/new-session/for-country",
+                        "httpResponseBody": True,
+                        "httpRequestMethod": "POST",
+                        "httpRequestText": location["addressCountry"],
+                    }
+                return {
+                    "url": "https://example.com/new-session",
+                    "httpResponseBody": True,
+                }
         """
-        meta_params = request.meta.get("zyte_api_session_params", None)
-        if meta_params:
-            return meta_params
-        meta_location = request.meta.get("zyte_api_session_location", None)
-        if meta_location is not None:
-            return self._location_params(request, meta_location)
-        if self._setting_params:
-            return self._setting_params
-        if self._setting_location:
-            return self._location_params(request, self._setting_location)
-        location = self.location(request)
-        if location:
-            return self._location_params(request, location)
+        if location := self.location(request):
+            return {
+                "url": self._setting_params.get("url", request.url),
+                "browserHtml": True,
+                "actions": [
+                    {
+                        "action": "setLocation",
+                        "address": location,
+                    }
+                ],
+            }
         return {"browserHtml": True}
 
     def check(self, response: Response, request: Request) -> bool:
@@ -537,6 +553,8 @@ class _SessionManager:
         )
         self._session_config_map: Dict[Type[SessionConfig], SessionConfig] = {}
 
+        self._setting_params = settings.getdict("ZYTE_API_SESSION_PARAMS")
+
     def _get_session_config(self, request: Request) -> SessionConfig:
         try:
             return self._session_config_cache[request]
@@ -561,17 +579,25 @@ class _SessionManager:
 
     async def _init_session(self, session_id: str, request: Request, pool: str) -> bool:
         session_config = self._get_session_config(request)
-        try:
-            session_params = session_config.params(request)
-        except Exception:
-            self._crawler.stats.inc_value(
-                f"scrapy-zyte-api/sessions/pools/{pool}/init/param-error"
-            )
-            logger.exception(
-                f"Unexpected exception raised while obtaining session "
-                f"initialization parameters for request {request}."
-            )
-            return False
+        if meta_params := request.meta.get("zyte_api_session_params", None):
+            session_params = meta_params
+        elif (
+            not request.meta.get("zyte_api_session_location", None)
+            and self._setting_params
+        ):
+            session_params = self._setting_params
+        else:
+            try:
+                session_params = session_config.params(request)
+            except Exception:
+                self._crawler.stats.inc_value(
+                    f"scrapy-zyte-api/sessions/pools/{pool}/init/param-error"
+                )
+                logger.exception(
+                    f"Unexpected exception raised while obtaining session "
+                    f"initialization parameters for request {request}."
+                )
+                return False
         session_params = deepcopy(session_params)
         session_init_url = session_params.pop("url", request.url)
         spider = self._crawler.spider

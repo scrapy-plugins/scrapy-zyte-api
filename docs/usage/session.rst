@@ -117,17 +117,25 @@ To change how sessions are initialized, you have the following options:
 
 Precedence, from higher to lower, is:
 
-#.  :meth:`~scrapy_zyte_api.SessionConfig.params`
-
 #.  :reqmeta:`zyte_api_session_params`
 
-#.  :reqmeta:`zyte_api_session_location`
+#.  :reqmeta:`zyte_api_session_location` (using any
+    :meth:`~scrapy_zyte_api.SessionConfig.params` override)
 
 #.  :setting:`ZYTE_API_SESSION_PARAMS`
 
-#.  :setting:`ZYTE_API_SESSION_LOCATION`
+#.  :setting:`ZYTE_API_SESSION_LOCATION` (using any
+    :meth:`~scrapy_zyte_api.SessionConfig.params` override)
 
-#.  :meth:`~scrapy_zyte_api.SessionConfig.location`
+#.  :meth:`~scrapy_zyte_api.SessionConfig.location` (using any
+    :meth:`~scrapy_zyte_api.SessionConfig.params` override)
+
+#.  :meth:`~scrapy_zyte_api.SessionConfig.params`
+
+.. note:: An implementation of :meth:`~scrapy_zyte_api.SessionConfig.location`
+    can technically override :reqmeta:`zyte_api_session_location` or
+    :setting:`ZYTE_API_SESSION_LOCATION`, but it is not recommended as it
+    breaks the precedence chain above that users may expect.
 
 .. _session-check:
 

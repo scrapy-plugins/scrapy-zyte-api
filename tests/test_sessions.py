@@ -154,15 +154,15 @@ async def test_enabled(setting, meta, outcome, mockserver):
         (False, True, True, False, True),
         (False, True, True, True, True),
         (True, UNSET, UNSET, UNSET, True),
-        (True, UNSET, UNSET, None, False),
+        (True, UNSET, UNSET, None, True),
         (True, UNSET, UNSET, False, False),
         (True, UNSET, UNSET, True, True),
         (True, UNSET, False, UNSET, True),
-        (True, UNSET, False, None, False),
+        (True, UNSET, False, None, True),
         (True, UNSET, False, False, False),
         (True, UNSET, False, True, True),
         (True, UNSET, True, UNSET, True),
-        (True, UNSET, True, None, False),
+        (True, UNSET, True, None, True),
         (True, UNSET, True, False, False),
         (True, UNSET, True, True, True),
         (True, False, UNSET, UNSET, False),
@@ -192,7 +192,7 @@ async def test_enabled(setting, meta, outcome, mockserver):
     ),
 )
 @ensureDeferred
-async def test_param_precedence(
+async def test_params_precedence(
     params_setting, params_meta, location_setting, location_meta, outcome, mockserver
 ):
     postal_codes = {True: "10001", False: "10002"}
@@ -1353,6 +1353,85 @@ async def test_session_config(mockserver):
     }
 
 
+@ensureDeferred
+async def test_session_config_check_meta(mockserver):
+    """When initializing a session, known zyte_api_session-prefixed params
+    should be included in the session initialization request, so that they can
+    be used from check methods validating those requests.
+
+    For example, when validating a location, access to
+    zyte_api_session_location may be necessary.
+    """
+    pytest.importorskip("web_poet")
+
+    params = {
+        "actions": [
+            {
+                "action": "setLocation",
+                "address": {"postalCode": "10001"},
+            }
+        ]
+    }
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+
+        def check(self, response, request):
+            return (
+                bool(self.location(request))
+                and response.meta["zyte_api_session_params"] == params
+                and (
+                    (
+                        response.meta.get("_is_session_init_request", False)
+                        and "zyte_api_session_foo" not in response.meta
+                    )
+                    or response.meta["zyte_api_session_foo"] == "bar"
+                )
+            )
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def start_requests(self):
+            for url in self.start_urls:
+                yield Request(
+                    url,
+                    meta={
+                        "zyte_api_automap": params,
+                        "zyte_api_session_params": params,
+                        "zyte_api_session_location": {"postalCode": "10001"},
+                        "zyte_api_session_foo": "bar",
+                    },
+                )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com[0]/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com[0]/use/check-passed": 1,
+    }
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
 async def test_session_config_enabled(mockserver):
     pytest.importorskip("web_poet")
 
@@ -1425,15 +1504,16 @@ async def test_session_config_enabled(mockserver):
 )
 @ensureDeferred
 async def test_session_config_location(settings, meta, used, mockserver):
-    """Overriding location in SessionConfig only has an effect when neither
-    spider-level nor request-level variables are used to modify params."""
+    """Overriding location in SessionConfig, if done according to the docs,
+    only has an effect when neither spider-level nor request-level variables
+    are used to modify params."""
     pytest.importorskip("web_poet")
 
     @session_config(["postal-code-10001.example"])
     class CustomSessionConfig(SessionConfig):
 
         def location(self, request: Request):
-            return {"postalCode": "10001"}
+            return super().location(request) or {"postalCode": "10001"}
 
     settings = {
         "RETRY_TIMES": 0,
@@ -1490,6 +1570,112 @@ async def test_session_config_location(settings, meta, used, mockserver):
                 else "postal-code-10001.example"
             )
         )
+        assert session_stats == {
+            f"scrapy-zyte-api/sessions/pools/{pool}/init/failed": 1,
+        }
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    ("settings", "meta", "used"),
+    (
+        ({}, {}, True),
+        (
+            {
+                "ZYTE_API_SESSION_PARAMS": {
+                    "actions": [
+                        {"action": "setLocation", "address": {"postalCode": "10002"}}
+                    ]
+                }
+            },
+            {},
+            False,
+        ),
+        ({"ZYTE_API_SESSION_LOCATION": {"postalCode": "10002"}}, {}, True),
+        (
+            {},
+            {
+                "zyte_api_session_params": {
+                    "actions": [
+                        {"action": "setLocation", "address": {"postalCode": "10002"}}
+                    ]
+                }
+            },
+            False,
+        ),
+        ({}, {"zyte_api_session_location": {"postalCode": "10002"}}, True),
+    ),
+)
+@ensureDeferred
+async def test_session_config_location_bad(settings, meta, used, mockserver):
+    """Overriding location in SessionConfig, if it does not return
+    super().location() when truthy, breaks params precedence for location meta
+    key and setting, but does not break raw params meta key and setting."""
+    pytest.importorskip("web_poet")
+
+    @session_config(["postal-code-10001.example"])
+    class CustomSessionConfig(SessionConfig):
+
+        def location(self, request: Request):
+            return {"postalCode": "10001"}
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        **settings,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://postal-code-10001.example"]
+
+        def start_requests(self):
+            for url in self.start_urls:
+                yield Request(
+                    url,
+                    meta={
+                        "zyte_api_automap": {
+                            "actions": [
+                                {
+                                    "action": "setLocation",
+                                    "address": {"postalCode": "10001"},
+                                }
+                            ]
+                        },
+                        **meta,
+                    },
+                )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    pool = (
+        "postal-code-10001.example[0]"
+        if "zyte_api_session_params" in meta
+        else (
+            "postal-code-10001.example@10002"
+            if "zyte_api_session_location" in meta
+            else "postal-code-10001.example"
+        )
+    )
+    if used:
+        assert session_stats == {
+            f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed": 1,
+            f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed": 1,
+        }
+    else:
         assert session_stats == {
             f"scrapy-zyte-api/sessions/pools/{pool}/init/failed": 1,
         }
@@ -1641,62 +1827,103 @@ async def test_session_config_params_location_no_set_location(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
+@pytest.mark.parametrize(
+    ("meta", "settings", "pool", "outcome"),
+    (
+        ({}, {}, "postal-code-10001.example", False),
+        (
+            {
+                "zyte_api_session_params": {
+                    "actions": [
+                        {
+                            "action": "setLocation",
+                            "address": {"postalCode": "10001"},
+                        },
+                    ]
+                }
+            },
+            {},
+            "postal-code-10001.example[0]",
+            True,
+        ),
+        (
+            {"zyte_api_session_location": {"postalCode": "10001"}},
+            {},
+            "postal-code-10001.example@10001",
+            False,
+        ),
+        (
+            {},
+            {
+                "ZYTE_API_SESSION_PARAMS": {
+                    "actions": [
+                        {
+                            "action": "setLocation",
+                            "address": {"postalCode": "10001"},
+                        },
+                    ]
+                }
+            },
+            "postal-code-10001.example",
+            True,
+        ),
+        (
+            {},
+            {"ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"}},
+            "postal-code-10001.example",
+            False,
+        ),
+    ),
+)
 @ensureDeferred
-async def test_session_config_check_meta(mockserver):
-    """When initializing a session, known zyte_api_session-prefixed params
-    should be included in the session initialization request, so that they can
-    be used from check methods validating those requests.
-
-    For example, when validating a location, access to
-    zyte_api_session_location may be necessary.
-    """
+async def test_session_config_params_precedence(
+    meta, settings, pool, outcome, mockserver
+):
+    """A params override should have no impact on the use of the
+    zyte_api_session_params request metadata key or the use of the
+    ZYTE_API_SESSION_PARAMS setting. However, it can nullify locations if not
+    implemented with support for them as the default implementation has."""
     pytest.importorskip("web_poet")
 
-    params = {
-        "actions": [
-            {
-                "action": "setLocation",
-                "address": {"postalCode": "10001"},
-            }
-        ]
-    }
-
-    @session_config(["example.com"])
+    @session_config(["postal-code-10001.example"])
     class CustomSessionConfig(SessionConfig):
 
-        def check(self, response, request):
-            return (
-                bool(self.location(request))
-                and response.meta["zyte_api_session_params"] == params
-                and (
-                    (
-                        response.meta.get("_is_session_init_request", False)
-                        and "zyte_api_session_foo" not in response.meta
-                    )
-                    or response.meta["zyte_api_session_foo"] == "bar"
-                )
-            )
+        def params(self, request: Request):
+            return {
+                "actions": [
+                    {
+                        "action": "setLocation",
+                        "address": {"postalCode": "10002"},
+                    },
+                ]
+            }
 
     settings = {
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        **settings,
     }
 
     class TestSpider(Spider):
         name = "test"
-        start_urls = ["https://example.com"]
+        start_urls = ["https://postal-code-10001.example"]
 
         def start_requests(self):
             for url in self.start_urls:
                 yield Request(
                     url,
                     meta={
-                        "zyte_api_automap": params,
-                        "zyte_api_session_params": params,
-                        "zyte_api_session_location": {"postalCode": "10001"},
-                        "zyte_api_session_foo": "bar",
+                        "zyte_api_automap": {
+                            "actions": [
+                                {
+                                    "action": "setLocation",
+                                    "address": {"postalCode": "10001"},
+                                },
+                            ],
+                        },
+                        **meta,
                     },
                 )
 
@@ -1711,10 +1938,15 @@ async def test_session_config_check_meta(mockserver):
         for k, v in crawler.stats.get_stats().items()
         if k.startswith("scrapy-zyte-api/sessions")
     }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com[0]/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com[0]/use/check-passed": 1,
-    }
+    if outcome:
+        assert session_stats == {
+            f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed": 1,
+            f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed": 1,
+        }
+    else:
+        assert session_stats == {
+            f"scrapy-zyte-api/sessions/pools/{pool}/init/failed": 1,
+        }
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]
