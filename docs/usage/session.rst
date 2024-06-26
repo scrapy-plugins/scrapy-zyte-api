@@ -60,7 +60,9 @@ Enabling session management
 To enable session management for all requests, set
 :setting:`ZYTE_API_SESSION_ENABLED` to ``True``. You can also toggle session
 management on or off for specific requests using the
-:reqmeta:`zyte_api_session_enabled` request metadata key.
+:reqmeta:`zyte_api_session_enabled` request metadata key, or override the
+:meth:`~scrapy_zyte_api.SessionConfig.enabled` method of a :ref:`session config
+override <session-configs>`.
 
 By default, scrapy-zyte-api will maintain up to 8 sessions per domain, each
 initialized with a :ref:`browser request <zyte-api-browser>` targeting the URL
@@ -144,6 +146,13 @@ If you need to check session validity for multiple websites, it is better to
 define a separate :ref:`session config override <session-configs>` for each
 website, each with its own implementation of
 :meth:`~scrapy_zyte_api.SessionConfig.check`.
+
+The :reqmeta:`zyte_api_session_location` and :reqmeta:`zyte_api_session_params`
+request metadata keys, if present in a request that triggers a session
+initialization request, will be copied into the session initialization request,
+so that they are available when :setting:`ZYTE_API_SESSION_CHECKER` or
+:meth:`~scrapy_zyte_api.SessionConfig.check` are called for a session
+initialization request.
 
 If your session checking implementation relies on the response body (e.g. it
 uses CSS or XPath expressions), you should make sure that you are getting one,
@@ -353,3 +362,6 @@ The following stats exist for scrapy-zyte-api session management:
 ``scrapy-zyte-api/sessions/pools/{pool}/use/failed``
     Number of times that a request that used a session from pool ``{pool}``
     got an :ref:`unsuccessful response <zyte-api-unsuccessful-responses>`.
+
+``scrapy-zyte-api/sessions/use/disabled``
+    Number of processed requests for which session management was disabled.
