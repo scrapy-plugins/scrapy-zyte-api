@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.20.0 (2024-06-DD)
+0.20.0 (2024-06-26)
 -------------------
 
 * If the :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>` setting
