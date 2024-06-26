@@ -210,7 +210,8 @@ retry limit also count here.
 ZYTE_API_PRESERVE_DELAY
 =======================
 
-Default: ``False if`` :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>` ``else True``
+Default: ``False if`` :setting:`AUTOTHROTTLE_ENABLED
+<scrapy:AUTOTHROTTLE_ENABLED>` ``else True``
 
 By default, requests for which use of scrapy-zyte-api is enabled get
 ``zyte-api@`` prepended to their download slot ID, and if
