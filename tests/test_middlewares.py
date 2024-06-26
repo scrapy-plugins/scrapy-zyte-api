@@ -50,9 +50,10 @@ def spider_output_processor(middleware, request, spider):
     ["settings", "preserve"],
     [
         ({}, True),
-        ({"AUTOTHROTTLE_ENABLED": True}, False),
         ({"ZYTE_API_PRESERVE_DELAY": False}, False),
         ({"ZYTE_API_PRESERVE_DELAY": True}, True),
+        ({"AUTOTHROTTLE_ENABLED": True}, False),
+        ({"AUTOTHROTTLE_ENABLED": True, "ZYTE_API_PRESERVE_DELAY": True}, True),
     ],
 )
 @ensureDeferred
