@@ -1,6 +1,37 @@
 Changes
 =======
 
+0.20.0 (2024-06-26)
+-------------------
+
+* If the :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>` setting
+  is ``False``, the delay of download slots for Zyte API requests no longer
+  resets to zero, and instead scrapy-zyte-api respects the
+  :setting:`DOWNLOAD_DELAY <scrapy:DOWNLOAD_DELAY>` setting and
+  ``zyte-api@``-prefixed entries in the :setting:`DOWNLOAD_SLOTS
+  <scrapy:DOWNLOAD_SLOTS>` setting.
+
+  A new :setting:`ZYTE_API_PRESERVE_DELAY` setting allows overriding this
+  behavior, i.e. enabling delay resetting even if
+  :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>` is ``False`` or
+  disabling delay resetting even if :setting:`AUTOTHROTTLE_ENABLED
+  <scrapy:AUTOTHROTTLE_ENABLED>` is ``True``.
+
+* The :reqmeta:`zyte_api_session_location` and
+  :reqmeta:`zyte_api_session_params` request metadata keys, if present in a
+  request that triggers a session initialization request, will be copied into
+  the session initialization request, so that they are available when
+  :setting:`ZYTE_API_SESSION_CHECKER` or :meth:`SessionConfig.check
+  <scrapy_zyte_api.SessionConfig.check>` are called for a session
+  initialization request.
+
+* The new :meth:`SessionConfig.enabled <scrapy_zyte_api.SessionConfig.enabled>`
+  method allows configuring whether session management should be enabled or
+  disabled for any given request.
+
+* A new stat, ``scrapy-zyte-api/sessions/use/disabled``, indicates the number
+  of requests for which session management was disabled.
+
 0.19.0 (2024-06-19)
 -------------------
 
