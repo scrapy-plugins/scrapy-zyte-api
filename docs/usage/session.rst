@@ -116,11 +116,18 @@ To change how sessions are initialized, you have the following options:
     location for a given domain.
 
 Precedence, from higher to lower, is:
-:meth:`~scrapy_zyte_api.SessionConfig.params`,
-:reqmeta:`zyte_api_session_params`,
-:reqmeta:`zyte_api_session_location`,
-:setting:`ZYTE_API_SESSION_PARAMS`, :setting:`ZYTE_API_SESSION_LOCATION`,
-:meth:`~scrapy_zyte_api.SessionConfig.location`.
+
+#.  :meth:`~scrapy_zyte_api.SessionConfig.params`
+
+#.  :reqmeta:`zyte_api_session_params`
+
+#.  :reqmeta:`zyte_api_session_location`
+
+#.  :setting:`ZYTE_API_SESSION_PARAMS`
+
+#.  :setting:`ZYTE_API_SESSION_LOCATION`
+
+#.  :meth:`~scrapy_zyte_api.SessionConfig.location`
 
 .. _session-check:
 
