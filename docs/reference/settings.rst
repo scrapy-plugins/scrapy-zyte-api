@@ -304,7 +304,7 @@ Example:
 
     class MySessionChecker:
 
-        def check(self, request: Request, response: Response) -> bool:
+        def check(self, response: Response, request: Request) -> bool:
             return bool(response.css(".is_valid"))
 
 
@@ -330,7 +330,7 @@ object, for example to read settings:
             location = crawler.settings["ZYTE_API_SESSION_LOCATION"]
             self.postal_code = location["postalCode"]
 
-        def check(self, request: Request, response: Response) -> bool:
+        def check(self, response: Response, request: Request) -> bool:
             return response.css(".postal_code::text").get() == self.postal_code
 
 

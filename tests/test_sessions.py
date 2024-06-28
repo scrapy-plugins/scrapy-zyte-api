@@ -652,7 +652,7 @@ async def test_checker_location(postal_code, url, close_reason, stats, mockserve
 
 class CloseSpiderURLChecker:
 
-    def check(self, request: Request, response: Response) -> bool:
+    def check(self, response: Response, request: Request) -> bool:
         if "fail" in request.url:
             raise CloseSpider("closed_by_checker")
         return True
@@ -829,7 +829,7 @@ async def test_max_errors(setting, value, mockserver):
 
 class DomainChecker:
 
-    def check(self, request: Request, response: Response) -> bool:
+    def check(self, response: Response, request: Request) -> bool:
         domain = urlparse_cached(request).netloc
         return "fail" not in domain
 
