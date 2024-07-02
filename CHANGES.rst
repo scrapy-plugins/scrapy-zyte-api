@@ -1,6 +1,41 @@
 Changes
 =======
 
+Unreleased
+----------
+
+* The precedence of session param settings, request metadata keys and session
+  config override methods has changed.
+
+  Before, priority from higher to lower was:
+
+  #.  :meth:`~scrapy_zyte_api.SessionConfig.params`
+
+  #.  :meth:`~scrapy_zyte_api.SessionConfig.location`
+
+  #.  :reqmeta:`zyte_api_session_location`
+
+  #.  :setting:`ZYTE_API_SESSION_LOCATION`
+
+  #.  :reqmeta:`zyte_api_session_params`
+
+  #.  :setting:`ZYTE_API_SESSION_PARAMS`
+
+  Now, it is:
+
+  #.  :reqmeta:`zyte_api_session_params`
+
+  #.  :reqmeta:`zyte_api_session_location`
+
+  #.  :setting:`ZYTE_API_SESSION_PARAMS`
+
+  #.  :setting:`ZYTE_API_SESSION_LOCATION`
+
+  #.  :meth:`~scrapy_zyte_api.SessionConfig.location`
+
+  #.  :meth:`~scrapy_zyte_api.SessionConfig.params`
+
+
 0.20.0 (2024-06-26)
 -------------------
 

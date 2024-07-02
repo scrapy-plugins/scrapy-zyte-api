@@ -34,15 +34,16 @@ scrapy-zyte-api session management offers some advantages over
 -   You have granular control over the session pool size, max errors, etc. See
     :ref:`optimize-sessions` and :ref:`session-configs`.
 
-However, scrapy-zyte-api session manager is not a replacement for
+However, scrapy-zyte-api session management is not a replacement for
 :ref:`server-managed sessions <zyte-api-session-contexts>` or
 :ref:`client-managed sessions <zyte-api-session-id>`:
 
 -   :ref:`Server-managed sessions <zyte-api-session-contexts>` offer a longer
     life time than the :ref:`client-managed sessions <zyte-api-session-id>`
     that scrapy-zyte-api session management uses, so as long as you do not need
-    one of the scrapy-zyte-api session management features, they can be
-    significantly more efficient (fewer total sessions needed per crawl).
+    one of the scrapy-zyte-api session management features, server-managed
+    sessions can be significantly more efficient (fewer total sessions needed
+    per crawl).
 
     Zyte API can also optimize server-managed sessions based on the target
     website. With scrapy-zyte-api session management, you need to :ref:`handle
@@ -64,10 +65,14 @@ management on or off for specific requests using the
 :meth:`~scrapy_zyte_api.SessionConfig.enabled` method of a :ref:`session config
 override <session-configs>`.
 
+.. _session-init-default:
+
 By default, scrapy-zyte-api will maintain up to 8 sessions per domain, each
 initialized with a :ref:`browser request <zyte-api-browser>` targeting the URL
-of the first request that will use the session. Sessions will be automatically
-rotated among requests, and refreshed as they expire or get banned.
+of the first request that will use the session. Sessions are automatically
+rotated among requests, and refreshed as they expire or get banned. You can
+customize most of this logic though request metadata, settings and
+:ref:`session config overrides <session-configs>`.
 
 For session management to work as expected, your
 :setting:`ZYTE_API_RETRY_POLICY` should not retry 520 and 521 responses:
@@ -76,13 +81,14 @@ For session management to work as expected, your
     (:data:`~zyte_api.zyte_api_retrying`) or
     :data:`~zyte_api.aggressive_retrying`:
 
-    -   If you are :ref:`using the add-on <config-addon>`, they are
-        automatically replaced with a matching session-specific retry policy,
-        either :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` or
+    -   If you are :ref:`using the scrapy-zyte-api add-on <config-addon>`,
+        these built-in retry policies are automatically replaced with a
+        matching session-specific retry policy, either
+        :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` or
         :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY`.
 
-    -   If you are not using the add-on, set :setting:`ZYTE_API_RETRY_POLICY`
-        manually to either
+    -   If you are not using the scrapy-zyte-api add-on, set
+        :setting:`ZYTE_API_RETRY_POLICY` manually to either
         :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` or
         :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY`. For example:
 
@@ -99,19 +105,62 @@ For session management to work as expected, your
 Initializing sessions
 =====================
 
-To change how sessions are initialized, you have the following options:
+To change the :ref:`default session initialization parameters
+<session-init-default>`, you have the following options:
 
--   To run the ``setLocation`` :http:`action <request:actions>` for session
-    initialization, use the :setting:`ZYTE_API_SESSION_LOCATION` setting or the
+-   To initialize sessions with a given **location**, use the
+    :setting:`ZYTE_API_SESSION_LOCATION` setting or the
     :reqmeta:`zyte_api_session_location` request metadata key.
 
--   For session initialization with arbitrary Zyte API request fields, use the
-    :setting:`ZYTE_API_SESSION_PARAMS` setting or the
+    The value should be a dictionary with keys supported by the ``address``
+    field of the ``setLocation`` :http:`action <request:actions>`, e.g.
+
+    .. code-block:: python
+
+        {
+            "addressCountry": "US",
+            "addressRegion": "NY",
+            "postalCode": "10001",
+            "streetAddress": "3 Penn Plz",
+        }
+
+    By default, the location is set using the ``setLocation``
+    :http:`action <request:actions>`. A :ref:`session config override
+    <session-configs>` can change that through
+    :meth:`~scrapy_zyte_api.SessionConfig.params`.
+
+-   For session initialization with **arbitrary Zyte API request fields**, use
+    the :setting:`ZYTE_API_SESSION_PARAMS` setting or the
     :reqmeta:`zyte_api_session_params` request metadata key.
 
--   To customize session initialization per request, define
-    :meth:`~scrapy_zyte_api.SessionConfig.params` in a :ref:`session config
-    override <session-configs>`.
+    It works similarly to :http:`request:sessionContextParams` from
+    :ref:`server-managed sessions <zyte-api-session-contexts>`, but it supports
+    arbitrary Zyte API parameters instead of a specific subset.
+
+    If it does not define a ``"url"``, the URL of the request :ref:`triggering
+    a session initialization request <pool-size>` will be used.
+
+-   When defining a :ref:`session config override <session-configs>`, you can
+    customize the default and location-setting session initialization
+    parameters through :meth:`~scrapy_zyte_api.SessionConfig.params`.
+
+    :meth:`~scrapy_zyte_api.SessionConfig.location` can define a default
+    location for its :ref:`session config override <session-configs>` to use
+    when no location is specified otherwise.
+
+Precedence, from higher to lower, is:
+
+#.  :reqmeta:`zyte_api_session_params`
+
+#.  :reqmeta:`zyte_api_session_location`
+
+#.  :setting:`ZYTE_API_SESSION_PARAMS`
+
+#.  :setting:`ZYTE_API_SESSION_LOCATION`
+
+#.  :meth:`~scrapy_zyte_api.SessionConfig.location`
+
+#.  :meth:`~scrapy_zyte_api.SessionConfig.params`
 
 .. _session-check:
 
@@ -127,30 +176,34 @@ initialization fails, e.g. due to rendering issues, IP-geolocation mismatches,
 A-B tests, etc. It can also help in cases where website sessions expire before
 Zyte API sessions.
 
-By default, for sessions that are initialized with a location, the outcome of
-the ``setLocation`` action is checked. If the action fails, the session is
-discarded. If the action is not even available for a given website, the spider
-is closed with ``unsupported_set_location`` as the close reason, so that you
-can set a proper :ref:`session initialization logic <session-init>` for
-requests targeting that website.
+By default, if a location is defined through
+:reqmeta:`zyte_api_session_location`, :setting:`ZYTE_API_SESSION_LOCATION` or
+:meth:`~scrapy_zyte_api.SessionConfig.location`, even if the parameters used
+for session initialization actually come from
+:reqmeta:`zyte_api_session_params` or :setting:`ZYTE_API_SESSION_LOCATION`, the
+outcome of the first ``setLocation`` action used, if any, is checked. If the
+action fails, the session is discarded. If the action is not even available for
+a given website, the spider is closed with ``unsupported_set_location`` as the
+close reason; in that case, you should define a proper :ref:`session
+initialization logic <session-init>` for requests targeting that website.
 
-For sessions initialized with arbitrary or no parameters, no session check is
+For sessions initialized without a configured location, no session check is
 performed, sessions are assumed to be fine until they expire or are banned.
-That is so even if those arbitrary parameters include a ``setLocation`` action.
+That is so even if session initialization parameters include a ``setLocation``
+action.
 
 To implement your own code to check session responses and determine whether
 their session should be kept or discarded, use the
-:setting:`ZYTE_API_SESSION_CHECKER` setting.
-
-If you need to check session validity for multiple websites, it is better to
-define a separate :ref:`session config override <session-configs>` for each
-website, each with its own implementation of
-:meth:`~scrapy_zyte_api.SessionConfig.check`.
+:setting:`ZYTE_API_SESSION_CHECKER` setting. If you need to check session
+validity for multiple websites, it is better to define a separate :ref:`session
+config override <session-configs>` for each website, each with its own
+implementation of :meth:`~scrapy_zyte_api.SessionConfig.check`.
 
 The :reqmeta:`zyte_api_session_location` and :reqmeta:`zyte_api_session_params`
-request metadata keys, if present in a request that triggers a session
-initialization request, will be copied into the session initialization request,
-so that they are available when :setting:`ZYTE_API_SESSION_CHECKER` or
+request metadata keys, if present in a request that :ref:`triggers a session
+initialization request <pool-size>`, will be copied into the session
+initialization request, so that they are available when
+:setting:`ZYTE_API_SESSION_CHECKER` or
 :meth:`~scrapy_zyte_api.SessionConfig.check` are called for a session
 initialization request.
 
@@ -169,14 +222,60 @@ on every Zyte API request:
     ZYTE_API_AUTOMAP_PARAMS = {"browserHtml": True}
     ZYTE_API_PROVIDER_PARAMS = {"browserHtml": True}
 
+
+.. _session-pools:
+
+Managing pools
+==============
+
+scrapy-zyte-api can maintain multiple session pools.
+
+By default, scrapy-zyte-api maintains a separate pool of sessions per domain.
+
+If you use the :reqmeta:`zyte_api_session_params` or
+:reqmeta:`zyte_api_session_location` request metadata keys, scrapy-zyte-api
+will automatically use separate session pools within the target domain for
+those parameters or locations. See :meth:`~scrapy_zyte_api.SessionConfig.pool`
+for details.
+
+If you want to customize further which pool is assigned to a given request,
+e.g. to have the same pool for multiple domains or use different pools within
+the same domain (e.g. for different URL patterns), you can either use the
+:reqmeta:`zyte_api_session_pool` request metadata key or use the
+:meth:`~scrapy_zyte_api.SessionConfig.pool` method of :ref:`session config
+overrides <session-configs>`.
+
+The :setting:`ZYTE_API_SESSION_POOL_SIZE` setting determines the desired number
+of concurrent, active, working sessions per pool. The
+:setting:`ZYTE_API_SESSION_POOL_SIZES` setting allows defining different values
+for specific pools.
+
+.. _pool-size:
+
+The actual number of sessions created for a session pool depends on the number
+of requests that ask for a session from that pool, and the life time of those
+sessions:
+
+-   When a request asks for a session from a given pool, if the session pool
+    has not yet reached its desired pool size, a :ref:`session initialization
+    request <session-init>` is triggered. If the session pool has been filled,
+    an existing session is used instead.
+
+-   When a response associated with a session pool indicates that the session
+    expired, an error over the limit (see
+    :setting:`ZYTE_API_SESSION_MAX_ERRORS`), or a failed :ref:`validity check
+    <session-check>`, a :ref:`session initialization request <session-init>` is
+    triggered to replace that session in the session pool.
+
+
 .. _optimize-sessions:
 
 Optimizing sessions
 ===================
 
 For faster crawls and lower costs, specially where session initialization
-requests are more expensive than session usage requests (e.g. because
-initialization relies on ``browserHtml`` and usage relies on
+requests are more expensive than session usage requests (e.g. scenarios where
+initialization relies on ``browserHtml`` while usage relies on
 ``httpResponseBody``), you should try to make your sessions live as long as
 possible before they are discarded.
 
@@ -221,9 +320,10 @@ Overriding session configs
 
 For spiders that target a single website, using settings and request metadata
 keys for :ref:`session initialization <session-init>` and :ref:`session
-checking <session-check>` should do the job. However, for broad crawls or
-:doc:`multi-website spiders <zyte-spider-templates:index>`, you might want to
-define different session configs for different websites.
+checking <session-check>` should do the job. However, for broad-crawl spiders,
+:doc:`multi-website spiders <zyte-spider-templates:index>`, or for code
+reusability purposes, you might want to define different session configs for
+different websites.
 
 The default session config is implemented by the
 :class:`~scrapy_zyte_api.SessionConfig` class:
