@@ -1,3 +1,5 @@
+from typing import cast
+
 from scrapy.settings import BaseSettings
 from scrapy.utils.misc import load_object
 from zyte_api import zyte_api_retrying
@@ -74,7 +76,7 @@ class Addon:
             settings.set(
                 "REQUEST_FINGERPRINTER_CLASS",
                 "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
-                settings.getpriority("REQUEST_FINGERPRINTER_CLASS"),
+                cast(int, settings.getpriority("REQUEST_FINGERPRINTER_CLASS")),
             )
         else:
             settings.set(

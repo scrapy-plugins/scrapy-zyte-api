@@ -419,6 +419,8 @@ async def test_provider_any_response_only(mockserver):
         response: AnyResponse
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -502,6 +504,8 @@ async def test_provider_any_response_product(mockserver):
         product: Product
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -531,6 +535,8 @@ async def test_provider_any_response_product_extract_from_browser_html(mockserve
         product: Product
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -563,6 +569,8 @@ async def test_provider_any_response_product_item_extract_from_browser_html(mock
         response: AnyResponse
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -597,6 +605,8 @@ async def test_provider_any_response_product_extract_from_browser_html_2(mockser
         product: Product
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -633,6 +643,8 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
         product: Product
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -667,6 +679,8 @@ async def test_provider_any_response_product_options_empty(mockserver):
         product: Product
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -703,6 +717,8 @@ async def test_provider_any_response_product_extract_from_http_response_2(mockse
         product: Product
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -738,6 +754,8 @@ async def test_provider_any_response_browser_html(mockserver):
         html: BrowserHtml
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -764,6 +782,8 @@ async def test_provider_any_response_browser_response(mockserver):
         browser_response: BrowserResponse
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -791,6 +811,8 @@ async def test_provider_any_response_browser_html_response(mockserver):
         html: BrowserHtml
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -818,6 +840,8 @@ async def test_provider_any_response_http_response(mockserver):
         http_response: HttpResponse
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -849,6 +873,8 @@ async def test_provider_any_response_browser_http_response(mockserver):
         http_response: HttpResponse
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -887,6 +913,8 @@ async def test_provider_any_response_http_response_multiple_pages(mockserver):
         response: AnyResponse
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -921,6 +949,8 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
         response: AnyResponse
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -948,6 +978,8 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
 @ensureDeferred
 async def test_screenshot(mockserver):
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
