@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.21.0 (2024-07-DD)
+0.21.0 (2024-07-02)
 -------------------
 
 * **Backward-incompatible change:** The precedence of session param settings,
