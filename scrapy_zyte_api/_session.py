@@ -276,9 +276,7 @@ class SessionConfig:
         keys as described in :ref:`session-init`.
 
         When overriding this method, you should only return a custom value if
-        the default implementation returns an empty :class:`dict`, to avoid
-        breaking the :ref:`precedence chain that users expect <session-init>`,
-        e.g.
+        the default implementation returns an empty :class:`dict`, e.g.
 
         .. code-block:: python
 
@@ -286,10 +284,12 @@ class SessionConfig:
                 fallback = {"addressCountry": "US", "addressRegion": "NY", "postalCode": "10001"}
                 return super().location(request) or fallback
 
-        .. note:: An implementation of :meth:`~scrapy_zyte_api.SessionConfig.location`
-            can technically override :reqmeta:`zyte_api_session_location` or
-            :setting:`ZYTE_API_SESSION_LOCATION`, but it is not recommended as it
-            breaks the precedence chain above that users may expect.
+        .. note:: An implementation of
+            :meth:`~scrapy_zyte_api.SessionConfig.location` can technically
+            override :reqmeta:`zyte_api_session_location` or
+            :setting:`ZYTE_API_SESSION_LOCATION`, but it is not recommended as
+            it breaks the :ref:`precedence chain that users expect
+            <session-init>`.
 
         You should only override this method if you need a location to be
         used even when no location is specified through request metadata or
