@@ -1,15 +1,13 @@
-import logging
+from logging import getLogger
 from typing import cast
 
 from scrapy import Request
 from scrapy.exceptions import IgnoreRequest
-from zyte_api.aio.errors import RequestError
+from zyte_api import RequestError
 
 from ._params import _ParamParser
 
-logger = logging.getLogger(__name__)
-
-
+logger = getLogger(__name__)
 _start_requests_processed = object()
 
 
@@ -23,6 +21,10 @@ class _BaseMiddleware:
     def __init__(self, crawler):
         self._param_parser = _ParamParser(crawler, cookies_enabled=False)
         self._crawler = crawler
+        self._preserve_delay = crawler.settings.getbool(
+            "ZYTE_API_PRESERVE_DELAY",
+            not crawler.settings.getbool("AUTOTHROTTLE_ENABLED"),
+        )
 
     def slot_request(self, request, spider, force=False):
         if not force and self._param_parser.parse(request) is None:
@@ -33,8 +35,9 @@ class _BaseMiddleware:
         if not isinstance(slot_id, str) or not slot_id.startswith(self._slot_prefix):
             slot_id = f"{self._slot_prefix}{slot_id}"
             request.meta["download_slot"] = slot_id
-        _, slot = downloader._get_slot(request, spider)
-        slot.delay = 0
+        if not self._preserve_delay:
+            _, slot = downloader._get_slot(request, spider)
+            slot.delay = 0
 
 
 class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):

@@ -4,7 +4,7 @@ from pathlib import Path
 project = "scrapy-zyte-api"
 copyright = "2023, Zyte Group Ltd"
 author = "Zyte Group Ltd"
-release = "0.18.4"
+release = "0.21.0"
 
 sys.path.insert(0, str(Path(__file__).parent.absolute()))  # _ext
 extensions = [
@@ -54,6 +54,10 @@ intersphinx_mapping = {
     ),
     "zyte-common-items": (
         "https://zyte-common-items.readthedocs.io/en/latest",
+        None,
+    ),
+    "zyte-spider-templates": (
+        "https://zyte-spider-templates.readthedocs.io/en/latest",
         None,
     ),
 }

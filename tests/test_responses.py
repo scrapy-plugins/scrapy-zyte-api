@@ -441,8 +441,7 @@ def test__process_response_body_and_headers(encoding, content_type):
             "utf-16-le",
         ),
         (
-            """<html><head><meta http-equiv="Content-Type" content="text/html; charset="gb2312">
-            </head><body>✨</body></html>""",
+            """<html><head><meta http-equiv="Content-Type" content="text/html; charset="gb2312"></head><body>✨</body></html>""",
             "✨",
             "gb18030",
             None,

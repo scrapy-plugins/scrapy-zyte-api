@@ -232,10 +232,36 @@ ZYTE_API_MAX_REQUESTS
 Default: ``None``
 
 When set to an integer value > 0, the spider will close when the number of Zyte
-API requests reaches it.
+API requests reaches it, with ``closespider_max_zapi_requests`` as the close
+reason.
 
 Note that requests with error responses that cannot be retried or exceed their
 retry limit also count here.
+
+
+.. setting:: ZYTE_API_PRESERVE_DELAY
+
+ZYTE_API_PRESERVE_DELAY
+=======================
+
+Default: ``False if`` :setting:`AUTOTHROTTLE_ENABLED
+<scrapy:AUTOTHROTTLE_ENABLED>` ``else True``
+
+By default, requests for which use of scrapy-zyte-api is enabled get
+``zyte-api@`` prepended to their download slot ID, and if
+:setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>` is ``True``, the
+corresponding download slot gets its download delay reset to 0. This nullifies
+the effects of the :ref:`AutoThrottle extension <topics-autothrottle>` for Zyte
+API requests, delegating throttling management to Zyte API.
+
+If :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>` is ``False``,
+but you have a download delay set through :setting:`DOWNLOAD_DELAY
+<scrapy:DOWNLOAD_DELAY>` and you do not want that delay to affect Zyte API
+requests, set this setting to ``False``.
+
+If you have :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>`
+enabled, and you want it to also work on Zyte API requests, set this setting to
+``True``.
 
 
 .. setting:: ZYTE_API_PROVIDER_PARAMS
@@ -278,6 +304,237 @@ subclass.
     must use their import path as a string instead.
 
 See :ref:`retry`.
+
+
+.. setting:: ZYTE_API_SESSION_CHECKER
+
+ZYTE_API_SESSION_CHECKER
+========================
+
+Default: ``None``
+
+A :ref:`Scrapy component <topics-components>` (or its import path as a string)
+that defines a ``check`` method.
+
+If ``check`` returns ``True``, the response session is considered valid; if
+``check`` returns ``False``, the response session is considered invalid, and
+will be discarded. ``check`` can also raise a
+:exc:`~scrapy.exceptions.CloseSpider` exception to close the spider.
+
+If defined, the ``check`` method is called on every response that is using a
+:ref:`session managed by scrapy-zyte-api <session>`. If not defined, the
+default implementation checks the outcome of the ``setLocation`` action if
+session initialization was location-based, as described in
+:ref:`session-check`.
+
+Example:
+
+.. code-block:: python
+    :caption: settings.py
+
+    from scrapy import Request
+    from scrapy.http.response import Response
+
+
+    class MySessionChecker:
+
+        def check(self, response: Response, request: Request) -> bool:
+            return bool(response.css(".is_valid"))
+
+
+    ZYTE_API_SESSION_CHECKER = MySessionChecker
+
+Because the session checker is a Scrapy component, you can access the crawler
+object, for example to read settings:
+
+.. code-block:: python
+    :caption: settings.py
+
+    from scrapy import Request
+    from scrapy.http.response import Response
+
+
+    class MySessionChecker:
+
+        @classmethod
+        def from_crawler(cls, crawler):
+            return cls(crawler)
+
+        def __init__(self, crawler):
+            location = crawler.settings["ZYTE_API_SESSION_LOCATION"]
+            self.postal_code = location["postalCode"]
+
+        def check(self, response: Response, request: Request) -> bool:
+            return response.css(".postal_code::text").get() == self.postal_code
+
+
+    ZYTE_API_SESSION_CHECKER = MySessionChecker
+
+
+.. setting:: ZYTE_API_SESSION_ENABLED
+
+ZYTE_API_SESSION_ENABLED
+========================
+
+Default: ``False``
+
+Enables :ref:`scrapy-zyte-api session management <session>`.
+
+
+.. setting:: ZYTE_API_SESSION_LOCATION
+
+ZYTE_API_SESSION_LOCATION
+=========================
+
+Default: ``{}``
+
+See :ref:`session-init` for general information about location configuration
+and parameter precedence.
+
+Example:
+
+.. code-block:: python
+    :caption: settings.py
+
+    ZYTE_API_SESSION_LOCATION = {"postalCode": "10001"}
+
+
+.. setting:: ZYTE_API_SESSION_MAX_BAD_INITS
+
+ZYTE_API_SESSION_MAX_BAD_INITS
+==============================
+
+Default: ``8``
+
+The maximum number of :ref:`scrapy-zyte-api sessions <session>` per pool that
+are allowed to fail their session check right after creation in a row. If the
+maximum is reached, the spider closes with ``bad_session_inits`` as the close
+reason.
+
+To override this value for specific pools, use
+:setting:`ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL`.
+
+
+.. setting:: ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL
+
+ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL
+=======================================
+
+Default: ``{}``
+
+:class:`dict` where keys are :ref:`pool <session-pools>` IDs and values are
+overrides of :setting:`ZYTE_API_SESSION_POOL_SIZE` for those pools.
+
+
+.. setting:: ZYTE_API_SESSION_MAX_ERRORS
+
+ZYTE_API_SESSION_MAX_ERRORS
+===========================
+
+Default: ``1``
+
+Maximum number of :ref:`unsuccessful responses
+<zyte-api-unsuccessful-responses>` allowed for any given session before
+discarding the session.
+
+You might want to increase this number if you find that a session may continue
+to work even after an unsuccessful response. See :ref:`optimize-sessions`.
+
+.. note:: This setting does not affect session checks
+    (:setting:`ZYTE_API_SESSION_CHECKER`). A session is always discarded the
+    first time it fails its session check.
+
+
+.. setting:: ZYTE_API_SESSION_PARAMS
+
+ZYTE_API_SESSION_PARAMS
+=======================
+
+Default: ``{}``
+
+See :ref:`session-init` for general information about defining session
+initialization parameters and parameter precedence.
+
+Example:
+
+.. code-block:: python
+    :caption: settings.py
+
+    ZYTE_API_SESSION_PARAMS = {
+        "browserHtml": True,
+        "actions": [
+            {
+                "action": "setLocation",
+                "address": {"postalCode": "10001"},
+            }
+        ],
+    }
+
+.. tip:: The example above is equivalent to setting
+    :setting:`ZYTE_API_SESSION_LOCATION` to ``{"postalCode": "10001"}``.
+
+
+.. setting:: ZYTE_API_SESSION_POOL_SIZE
+
+ZYTE_API_SESSION_POOL_SIZE
+==========================
+
+Default: ``8``
+
+The maximum number of active :ref:`scrapy-zyte-api sessions <session>` to keep
+per :ref:`pool <session-pools>`.
+
+To override this value for specific pools, use
+:setting:`ZYTE_API_SESSION_POOL_SIZES`.
+
+Increase this number to lower the frequency with which requests are sent
+through each session, which on some websites may increase the lifetime of each
+session. See :ref:`optimize-sessions`.
+
+
+.. setting:: ZYTE_API_SESSION_POOL_SIZES
+
+ZYTE_API_SESSION_POOL_SIZES
+===========================
+
+Default: ``{}``
+
+:class:`dict` where keys are :ref:`pool <session-pools>` IDs and values are
+overrides of :setting:`ZYTE_API_SESSION_POOL_SIZE` for those pools.
+
+
+.. setting:: ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS
+
+ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS
+===================================
+
+Default: ``60``
+
+scrapy-zyte-api maintains a rotation queue of ready-to-use sessions per
+:ref:`pool <session-pools>`. At some points, the queue might be empty for a
+given pool because all its sessions are in the process of being initialized or
+refreshed.
+
+If the queue is empty when trying to assign a session to a request,
+scrapy-zyte-api will wait some time
+(:setting:`ZYTE_API_SESSION_QUEUE_WAIT_TIME`), and then try to get a session
+from the queue again.
+
+Use this setting to configure the maximum number of attempts before giving up
+and raising a :exc:`RuntimeError` exception.
+
+
+.. setting:: ZYTE_API_SESSION_QUEUE_WAIT_TIME
+
+ZYTE_API_SESSION_QUEUE_WAIT_TIME
+===================================
+
+Default: ``1.0``
+
+Number of seconds to wait between attempts to get a session from a rotation
+queue.
+
+See :setting:`ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS` for details.
 
 
 .. setting:: ZYTE_API_SKIP_HEADERS

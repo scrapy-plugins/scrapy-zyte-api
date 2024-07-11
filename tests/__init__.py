@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, Type, Union
 
 from scrapy import Spider
 from scrapy.crawler import Crawler
+from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler as _get_crawler
 from zyte_api.aio.client import AsyncClient
 
@@ -20,7 +21,8 @@ SETTINGS: SETTINGS_T = {
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
     },
     "DOWNLOADER_MIDDLEWARES": {
-        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
+        "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
     },
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "REQUEST_FINGERPRINTER_IMPLEMENTATION": "2.7",  # Silence deprecation warning
@@ -93,6 +95,30 @@ async def make_handler(
     finally:
         if handler is not None:
             await handler._close()  # NOQA
+
+
+def serialize_settings(settings):
+    result = dict(settings)
+    for setting in (
+        "ADDONS",
+        "ZYTE_API_FALLBACK_HTTP_HANDLER",
+        "ZYTE_API_FALLBACK_HTTPS_HANDLER",
+    ):
+        if setting in settings:
+            del result[setting]
+    for setting in (
+        "DOWNLOADER_MIDDLEWARES",
+        "SCRAPY_POET_PROVIDERS",
+        "SPIDER_MIDDLEWARES",
+    ):
+        if setting in result:
+            for key in list(result[setting]):
+                if isinstance(key, str):
+                    obj = load_object(key)
+                    result[setting][obj] = result[setting].pop(key)
+    for key in result["DOWNLOAD_HANDLERS"]:
+        result["DOWNLOAD_HANDLERS"][key] = result["DOWNLOAD_HANDLERS"][key].__class__
+    return result
 
 
 @contextmanager

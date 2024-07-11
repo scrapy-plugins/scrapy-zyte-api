@@ -86,3 +86,62 @@ string.
     <https://github.com/jd/tenacity/issues/147>`_.
 
 See :ref:`retry`.
+
+
+.. reqmeta:: zyte_api_session_enabled
+
+zyte_api_session_enabled
+=========================
+
+Default: :setting:`ZYTE_API_SESSION_ENABLED`
+
+Whether to use :ref:`scrapy-zyte-api session management <session>` for the
+request (``True``) or not (``False``).
+
+.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.enabled`
+
+
+.. reqmeta:: zyte_api_session_location
+
+zyte_api_session_location
+=========================
+
+Default: ``{}``
+
+See :ref:`session-init` for general information about location configuration
+and parameter precedence.
+
+Example:
+
+.. code-block:: python
+
+    Request(
+        "https://example.com",
+        meta={
+            "zyte_api_session_location": {"postalCode": "10001"},
+        },
+    )
+
+
+.. reqmeta:: zyte_api_session_params
+
+zyte_api_session_params
+=======================
+
+Default: ``{}``
+
+See :ref:`session-init` for general information about defining session
+initialization parameters and parameter precedence.
+
+
+.. reqmeta:: zyte_api_session_pool
+
+zyte_api_session_pool
+=====================
+
+Default: ``""``
+
+Determines the ID of the session pool to assign to the request, overriding the
+:ref:`default pool assignment logic <session-pools>`.
+
+.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.pool`
