@@ -23,7 +23,10 @@ set:
 
 .. code-block:: python
 
-    "scrapy-zyte-api/auto_fields/<item class import path>": "<space-separated field list>"
+    "scrapy-zyte-api/auto_fields/<item class import path>": "(all fields)"
+
+.. note:: A literal ``(all fields)`` string is used as value, not a list with
+    all fields.
 
 If for any request a custom page object class is used to override some
 :ref:`zyte-api-extract` fields, the following stat is set:

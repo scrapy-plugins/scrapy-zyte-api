@@ -1,6 +1,5 @@
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type, cast
 
-import attrs
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
@@ -124,14 +123,14 @@ class ZyteApiProvider(PageObjectInputProvider):
             return
         self._tracked_auto_fields.add(cls)
         if cls in _ITEM_KEYWORDS:
-            auto_fields = set(attrs.fields_dict(cls))
+            field_list = "(all fields)"
         else:
             auto_fields = set()
             for field_name in get_fields_dict(cls):
                 if is_auto_field(cls, field_name):
                     auto_fields.add(field_name)
+            field_list = " ".join(sorted(auto_fields))
         cls_fqn = get_fq_class_name(cls)
-        field_list = " ".join(sorted(auto_fields))
         crawler.stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)
 
     async def __call__(  # noqa: C901

@@ -1077,10 +1077,7 @@ async def test_auto_field_stats_no_override(mockserver):
     }
     assert auto_field_stats == {
         "scrapy-zyte-api/auto_fields/zyte_common_items.items.product.Product": (
-            "additionalProperties aggregateRating availability brand breadcrumbs "
-            "canonicalUrl color currency currencyRaw description descriptionHtml "
-            "features gtin images mainImage metadata mpn name price productId "
-            "regularPrice size sku style url variants"
+            "(all fields)"
         ),
     }
 
@@ -1089,7 +1086,7 @@ async def test_auto_field_stats_no_override(mockserver):
 async def test_auto_field_stats_partial_override(mockserver):
     """When requesting an item and having an Auto…Page subclass to change
     fields, stats reflect the list of item fields not defined in the
-    subclass. Defined field method are not listed, even if they return the
+    subclass. Defined field methods are not listed, even if they return the
     original item field, directly or as a fallback."""
 
     class MyProductPage(AutoProductPage):
