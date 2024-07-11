@@ -127,7 +127,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         else:
             auto_fields = set()
             for field_name in get_fields_dict(cls):
-                if is_auto_field(cls, field_name):
+                if is_auto_field(cls, field_name):  # type: ignore[arg-type]
                     auto_fields.add(field_name)
             field_list = " ".join(sorted(auto_fields))
         cls_fqn = get_fq_class_name(cls)
