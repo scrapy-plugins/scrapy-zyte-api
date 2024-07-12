@@ -1057,7 +1057,7 @@ async def test_auto_field_stats_no_override(mockserver):
 
     from scrapy.statscollectors import MemoryStatsCollector
 
-    duplicate_stat_calls = defaultdict(int)
+    duplicate_stat_calls: defaultdict[str, int] = defaultdict(int)
 
     class OnlyOnceStatsCollector(MemoryStatsCollector):
 
