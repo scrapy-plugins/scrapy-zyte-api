@@ -4,7 +4,7 @@ from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
 from scrapy.utils.defer import maybe_deferred_to_future
-from scrapy_poet import InjectionMiddleware, PageObjectInputProvider
+from scrapy_poet import PageObjectInputProvider
 from web_poet import (
     AnyResponse,
     BrowserHtml,
@@ -86,7 +86,6 @@ class ZyteApiProvider(PageObjectInputProvider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._injection_mw = None
         self._should_track_auto_fields = None
         self._tracked_auto_fields = set()
 
@@ -102,23 +101,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             )
         if self._should_track_auto_fields is False:
             return
-        if self._injection_mw is None:
-            try:
-                self._injection_mw = crawler.get_downloader_middleware(
-                    InjectionMiddleware
-                )
-            except AttributeError:
-                for component in crawler.engine.downloader.middleware.middlewares:
-                    if isinstance(component, InjectionMiddleware):
-                        self._injection_mw = component
-                        break
-            if self._injection_mw is None:
-                raise RuntimeError(
-                    "Could not find the InjectionMiddleware among enabled "
-                    "downloader middlewares. Please, ensure you have properly "
-                    "configured scrapy-poet."
-                )
-        cls = self._injection_mw.registry.page_cls_for_item(request.url, cls) or cls
+        cls = self.injector.registry.page_cls_for_item(request.url, cls) or cls
         if cls in self._tracked_auto_fields:
             return
         self._tracked_auto_fields.add(cls)

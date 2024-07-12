@@ -1,4 +1,5 @@
 import sys
+from collections import defaultdict
 
 import pytest
 
@@ -1054,17 +1055,45 @@ async def test_auto_field_stats_no_override(mockserver):
     """When requesting an item directly from Zyte API, without an override to
     change fields, stats reflect the entire list of item fields."""
 
+    from scrapy.statscollectors import MemoryStatsCollector
+
+    duplicate_stat_calls = defaultdict(int)
+
+    class OnlyOnceStatsCollector(MemoryStatsCollector):
+
+        def track_duplicate_stat_calls(self, key):
+            if key.startswith("scrapy-zyte-api/auto_fields/") and key in self._stats:
+                duplicate_stat_calls[key] += 1
+
+        def set_value(self, key, value, spider=None):
+            self.track_duplicate_stat_calls(key)
+            super().set_value(key, value, spider)
+
+        def inc_value(self, key, count=1, start=1, spider=None):
+            self.track_duplicate_stat_calls(key)
+            super().inc_value(key, count, start, spider)
+
+        def max_value(self, key, value, spider=None):
+            self.track_duplicate_stat_calls(key)
+            super().max_value(key, value, spider)
+
+        def min_value(self, key, value, spider=None):
+            self.track_duplicate_stat_calls(key)
+            super().min_value(key, value, spider)
+
     class TestSpider(Spider):
         name = "test_spider"
         url: str
 
         def start_requests(self):
-            yield Request(self.url, callback=self.parse)
+            for url in ("data:,a", "data:,b"):
+                yield Request(url, callback=self.parse)
 
         def parse(self, response: DummyResponse, product: Product):
             pass
 
     settings = create_scrapy_settings()
+    settings["STATS_CLASS"] = OnlyOnceStatsCollector
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -1080,6 +1109,7 @@ async def test_auto_field_stats_no_override(mockserver):
             "(all fields)"
         ),
     }
+    assert all(value == 0 for value in duplicate_stat_calls.values())
 
 
 @ensureDeferred
