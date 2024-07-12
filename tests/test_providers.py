@@ -1315,10 +1315,7 @@ async def test_auto_field_stats_callback_override(mockserver):
     }
     assert auto_field_stats == {
         "scrapy-zyte-api/auto_fields/zyte_common_items.items.product.Product": (
-            "additionalProperties aggregateRating availability brand breadcrumbs "
-            "canonicalUrl color currency currencyRaw description descriptionHtml "
-            "features gtin images mainImage metadata mpn name price productId "
-            "regularPrice size sku style url variants"
+            "(all fields)"
         ),
     }
 
