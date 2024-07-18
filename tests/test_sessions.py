@@ -17,6 +17,7 @@ from scrapy_zyte_api import (
     SESSION_AGGRESSIVE_RETRY_POLICY,
     SESSION_DEFAULT_RETRY_POLICY,
     SessionConfig,
+    is_session_init_request,
     session_config,
 )
 from scrapy_zyte_api._session import SESSION_INIT_META_KEY, session_config_registry
@@ -2649,3 +2650,16 @@ async def test_exceptions(exception, stat, reason, mockserver, caplog):
         }
     if reason is not None:
         assert reason in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("meta", "expected"),
+    (
+        ({}, False),
+        ({SESSION_INIT_META_KEY: False}, False),
+        ({SESSION_INIT_META_KEY: True}, True),
+    ),
+)
+def test_is_session_init_request(meta, expected):
+    actual = is_session_init_request(Request("https://example.com", meta=meta))
+    assert expected == actual
