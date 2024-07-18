@@ -37,6 +37,12 @@ SESSION_INIT_META_KEY = "_is_session_init_request"
 ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
 
 
+def is_session_init_request(request):
+    """Return ``True`` if the request is a :ref:`session initialization request
+    <session-init>` or ``False`` otherwise."""
+    return request.meta.get(SESSION_INIT_META_KEY, False) is True
+
+
 class SessionRetryFactory(RetryFactory):
     temporary_download_error_stop = stop_after_attempt(1)
 
@@ -338,6 +344,10 @@ class SessionConfig:
                     "url": "https://example.com/new-session",
                     "httpResponseBody": True,
                 }
+
+        The returned parameters do not need to include :http:`request:url`. If
+        missing, it is picked from the request :ref:`triggering a session
+        initialization request <pool-size>`.
         """
         if location := self.location(request):
             return {
@@ -358,6 +368,10 @@ class SessionConfig:
 
         The default implementation checks the outcome of the ``setLocation``
         action if a location was defined, as described in :ref:`session-check`.
+
+        If you need to tell whether *request* is a :ref:`session initialization
+        request <session-init>` or not, use
+        :func:`~scrapy_zyte_api.is_session_init_request`.
         """
         if self._checker:
             return self._checker.check(response, request)
