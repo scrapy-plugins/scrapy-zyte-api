@@ -338,6 +338,12 @@ To define a different session config for a given URL pattern, install
 
 .. autofunction:: scrapy_zyte_api.session_config
 
+Classes decorated with :func:`~scrapy_zyte_api.session_config` are registered
+into :data:`~scrapy_zyte_api.session_config_registry`:
+
+.. autodata:: scrapy_zyte_api.session_config_registry
+    :annotation:
+
 .. _session-cookies:
 
 Cookie handling

@@ -21,6 +21,7 @@ from ._session import (
     SessionConfig,
     session_config,
 )
+from ._session import session_config_registry as _session_config_registry
 from .addon import Addon
 from .handler import ScrapyZyteAPIDownloadHandler
 
@@ -37,3 +38,7 @@ SESSION_DEFAULT_RETRY_POLICY = _SESSION_DEFAULT_RETRY_POLICY
 #: .. note:: When using python-zyte-api 0.5.2 or lower, this is the same as
 #:           :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY`.
 SESSION_AGGRESSIVE_RETRY_POLICY = _SESSION_AGGRESSIVE_RETRY_POLICY
+
+#: Instance of :class:`web_poet.rules.RulesRegistry` that holds :ref:`session
+#: configs <session-configs>`.
+session_config_registry = _session_config_registry
