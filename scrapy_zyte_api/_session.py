@@ -338,6 +338,10 @@ class SessionConfig:
                     "url": "https://example.com/new-session",
                     "httpResponseBody": True,
                 }
+
+        The returned parameters do not need to include :http:`request:url`. If
+        missing, it is picked from the request :ref:`triggering a session
+        initialization request <pool-size>`.
         """
         if location := self.location(request):
             return {
