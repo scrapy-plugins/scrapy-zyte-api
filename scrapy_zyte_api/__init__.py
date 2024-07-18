@@ -19,6 +19,7 @@ from ._session import SESSION_DEFAULT_RETRY_POLICY as _SESSION_DEFAULT_RETRY_POL
 from ._session import (
     ScrapyZyteAPISessionDownloaderMiddleware,
     SessionConfig,
+    is_session_init_request,
     session_config,
 )
 from ._session import session_config_registry as _session_config_registry

@@ -338,6 +338,12 @@ To define a different session config for a given URL pattern, install
 
 .. autofunction:: scrapy_zyte_api.session_config
 
+If in a session config implementation or in any other Scrapy component you need
+to tell whether a request is a :ref:`session initialization request
+<session-init>` or not, use :func:`~scrapy_zyte_api.is_session_init_request`:
+
+.. autofunction:: scrapy_zyte_api.is_session_init_request
+
 Classes decorated with :func:`~scrapy_zyte_api.session_config` are registered
 into :data:`~scrapy_zyte_api.session_config_registry`:
 
