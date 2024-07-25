@@ -6,6 +6,40 @@ Settings
 
 :ref:`Settings <topics-settings>` for scrapy-zyte-api.
 
+.. setting:: ZYTE_API_AUTO_FIELD_STATS
+
+ZYTE_API_AUTO_FIELD_STATS
+=========================
+
+Default: ``False``
+
+Enables stats that indicate which requested fields :ref:`obtained through
+scrapy-poet integration <scrapy-poet>` come directly from
+:ref:`zyte-api-extract`.
+
+If for any request no page object class is used to override
+:ref:`zyte-api-extract` fields for a given item type, the following stat is
+set:
+
+.. code-block:: python
+
+    "scrapy-zyte-api/auto_fields/<item class import path>": "(all fields)"
+
+.. note:: A literal ``(all fields)`` string is used as value, not a list with
+    all fields.
+
+If for any request a custom page object class is used to override some
+:ref:`zyte-api-extract` fields, the following stat is set:
+
+.. code-block:: python
+
+    "scrapy-zyte-api/auto_fields/<override class import path>": (
+        "<space-separated list of fields not overridden>"
+    )
+
+.. note:: :func:`zyte_common_items.fields.is_auto_field` is used to determine
+    whether a field has been overridden or not.
+
 .. setting:: ZYTE_API_AUTOMAP_PARAMS
 
 ZYTE_API_AUTOMAP_PARAMS
