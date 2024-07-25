@@ -4,7 +4,7 @@
 Retries
 =======
 
-To make :ref:`error handling <zyte-api-errors>` easier, scrapy-zyte-api lets
+To make :ref:`error handling <zapi-errors>` easier, scrapy-zyte-api lets
 you :ref:`handle successful Zyte API responses as usual <retry-successful>`,
 but :ref:`implements a more advanced retry mechanism for rate-limiting and
 unsuccessful responses <retry-non-successful>`.
@@ -14,7 +14,7 @@ unsuccessful responses <retry-non-successful>`.
 Retrying successful Zyte API responses
 ======================================
 
-When a :ref:`successful Zyte API response <zyte-api-successful-responses>` is
+When a :ref:`successful Zyte API response <zapi-successful-responses>` is
 received, a Scrapy response object is built based on the upstream website
 response (see :ref:`response`), and passed to your :ref:`downloader middlewares
 <topics-downloader-middleware>` and :ref:`spider callback <topics-spiders>`.
@@ -30,8 +30,8 @@ them using Scrapy’s built-in retry middleware
 Retrying non-successful Zyte API responses
 ==========================================
 
-When a :ref:`rate-limiting <zyte-api-rate-limit>` or an :ref:`unsuccessful
-<zyte-api-unsuccessful-responses>` Zyte API response is received, no Scrapy
+When a :ref:`rate-limiting <zapi-rate-limit>` or an :ref:`unsuccessful
+<zapi-unsuccessful-responses>` Zyte API response is received, no Scrapy
 response object is built. Instead, a :ref:`retry policy <retry-policy>` is
 followed, and if the policy retries are exhausted, a
 :class:`zyte_api.RequestError` exception is raised.

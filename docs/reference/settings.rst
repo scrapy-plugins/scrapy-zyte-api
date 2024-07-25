@@ -15,10 +15,10 @@ Default: ``False``
 
 Enables stats that indicate which requested fields :ref:`obtained through
 scrapy-poet integration <scrapy-poet>` come directly from
-:ref:`zyte-api-extract`.
+:ref:`zapi-extract`.
 
 If for any request no page object class is used to override
-:ref:`zyte-api-extract` fields for a given item type, the following stat is
+:ref:`zapi-extract` fields for a given item type, the following stat is
 set:
 
 .. code-block:: python
@@ -29,7 +29,7 @@ set:
     all fields.
 
 If for any request a custom page object class is used to override some
-:ref:`zyte-api-extract` fields, the following stat is set:
+:ref:`zapi-extract` fields, the following stat is set:
 
 .. code-block:: python
 
@@ -434,7 +434,7 @@ ZYTE_API_SESSION_MAX_ERRORS
 Default: ``1``
 
 Maximum number of :ref:`unsuccessful responses
-<zyte-api-unsuccessful-responses>` allowed for any given session before
+<zapi-unsuccessful-responses>` allowed for any given session before
 discarding the session.
 
 You might want to increase this number if you find that a session may continue
