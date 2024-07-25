@@ -1,12 +1,17 @@
 Changes
 =======
 
-N.N.N (YYYY-MM-DD)
-------------------
+0.22.0 (2024-07-DD)
+-------------------
 
-* ``scrapy-zyte-api[provider]`` now requires zyte-common-items >= 0.20.0.
+* ``scrapy-zyte-api[provider]`` now requires :doc:`zyte-common-items
+  <zyte-common-items:index>` 0.20.0+.
 
 * Added the :setting:`ZYTE_API_AUTO_FIELD_STATS` setting.
+
+* Added the :func:`~scrapy_zyte_api.is_session_init_request` function.
+
+* Added the :data:`~scrapy_zyte_api.session_config_registry` variable.
 
 0.21.0 (2024-07-02)
 -------------------
@@ -120,8 +125,7 @@ N.N.N (YYYY-MM-DD)
 * The ``Accept``, ``Accept-Encoding``, ``Accept-Language``, and ``User-Agent``
   headers are now dropped automatically during :ref:`header mapping
   <header-mapping>` unless they have user-defined values. This fix can improve
-  success rates on some websites when using :ref:`HTTP requests
-  <zyte-api-http>`.
+  success rates on some websites when using :ref:`HTTP requests <zapi-http>`.
 
 0.18.1 (2024-04-19)
 -------------------
