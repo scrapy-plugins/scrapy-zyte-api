@@ -16,7 +16,7 @@ Requirements
 You need at least:
 
 -   A :ref:`Zyte API <zyte-api>` subscription (there’s a :ref:`free trial
-    <zyte-api-trial>`).
+    <zapi-trial>`).
 
 -   Python 3.8+
 

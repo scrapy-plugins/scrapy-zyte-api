@@ -6,10 +6,10 @@ Session management
 
 Zyte API provides powerful session APIs:
 
--   :ref:`Client-managed sessions <zyte-api-session-id>` give you full control
+-   :ref:`Client-managed sessions <zapi-session-id>` give you full control
     over session management.
 
--   :ref:`Server-managed sessions <zyte-api-session-contexts>` let Zyte API
+-   :ref:`Server-managed sessions <zapi-session-contexts>` let Zyte API
     handle session management for you.
 
 When using scrapy-zyte-api, you can use these session APIs through the
@@ -17,11 +17,11 @@ corresponding Zyte API fields (:http:`request:session`,
 :http:`request:sessionContext`).
 
 However, scrapy-zyte-api also provides its own session management API, similar
-to that of :ref:`server-managed sessions <zyte-api-session-contexts>`, but
-built on top of :ref:`client-managed sessions <zyte-api-session-id>`.
+to that of :ref:`server-managed sessions <zapi-session-contexts>`, but
+built on top of :ref:`client-managed sessions <zapi-session-id>`.
 
 scrapy-zyte-api session management offers some advantages over
-:ref:`server-managed sessions <zyte-api-session-contexts>`:
+:ref:`server-managed sessions <zapi-session-contexts>`:
 
 -   You can perform :ref:`session validity checks <session-check>`, so that the
     sessions of responses that do not pass those checks are refreshed, and the
@@ -35,11 +35,11 @@ scrapy-zyte-api session management offers some advantages over
     :ref:`optimize-sessions` and :ref:`session-configs`.
 
 However, scrapy-zyte-api session management is not a replacement for
-:ref:`server-managed sessions <zyte-api-session-contexts>` or
-:ref:`client-managed sessions <zyte-api-session-id>`:
+:ref:`server-managed sessions <zapi-session-contexts>` or
+:ref:`client-managed sessions <zapi-session-id>`:
 
--   :ref:`Server-managed sessions <zyte-api-session-contexts>` offer a longer
-    life time than the :ref:`client-managed sessions <zyte-api-session-id>`
+-   :ref:`Server-managed sessions <zapi-session-contexts>` offer a longer
+    life time than the :ref:`client-managed sessions <zapi-session-id>`
     that scrapy-zyte-api session management uses, so as long as you do not need
     one of the scrapy-zyte-api session management features, server-managed
     sessions can be significantly more efficient (fewer total sessions needed
@@ -49,7 +49,7 @@ However, scrapy-zyte-api session management is not a replacement for
     website. With scrapy-zyte-api session management, you need to :ref:`handle
     optimization yourself <optimize-sessions>`.
 
--   :ref:`Client-managed sessions <zyte-api-session-id>` offer full control
+-   :ref:`Client-managed sessions <zapi-session-id>` offer full control
     over session management, while scrapy-zyte-api session management removes
     some of that control to provide an easier API for supported use cases.
 
@@ -68,7 +68,7 @@ override <session-configs>`.
 .. _session-init-default:
 
 By default, scrapy-zyte-api will maintain up to 8 sessions per domain, each
-initialized with a :ref:`browser request <zyte-api-browser>` targeting the URL
+initialized with a :ref:`browser request <zapi-browser>` targeting the URL
 of the first request that will use the session. Sessions are automatically
 rotated among requests, and refreshed as they expire or get banned. You can
 customize most of this logic though request metadata, settings and
@@ -134,7 +134,7 @@ To change the :ref:`default session initialization parameters
     :reqmeta:`zyte_api_session_params` request metadata key.
 
     It works similarly to :http:`request:sessionContextParams` from
-    :ref:`server-managed sessions <zyte-api-session-contexts>`, but it supports
+    :ref:`server-managed sessions <zapi-session-contexts>`, but it supports
     arbitrary Zyte API parameters instead of a specific subset.
 
     If it does not define a ``"url"``, the URL of the request :ref:`triggering
@@ -210,7 +210,7 @@ initialization request.
 If your session checking implementation relies on the response body (e.g. it
 uses CSS or XPath expressions), you should make sure that you are getting one,
 which might not be the case if you are mostly using :ref:`Zyte API automatic
-extraction <zyte-api-extract>`, e.g. when using :doc:`Zyte spider templates
+extraction <zapi-extract>`, e.g. when using :doc:`Zyte spider templates
 <zyte-spider-templates:index>`. For example, you can use
 :setting:`ZYTE_API_AUTOMAP_PARAMS` and :setting:`ZYTE_API_PROVIDER_PARAMS` to
 force :http:`request:browserHtml` or :http:`request:httpResponseBody` to be set
@@ -288,7 +288,7 @@ Here are some things you can try:
     (:setting:`ZYTE_API_SESSION_POOL_SIZE`). The more different sessions you
     use, the more slowly you send requests through each session.
 
-    Mind, however, that :ref:`client-managed sessions <zyte-api-session-id>`
+    Mind, however, that :ref:`client-managed sessions <zapi-session-id>`
     expire after `15 minutes since creation or 2 minutes since the last request
     <https://docs.zyte.com/zyte-api/usage/reference.html#operation/extract/request/session>`_.
     At a certain point, increasing :setting:`ZYTE_API_SESSION_POOL_SIZE`
@@ -298,7 +298,7 @@ Here are some things you can try:
     counterproductive.
 
 -   By default, sessions are discarded as soon as an :ref:`unsuccessful
-    response <zyte-api-unsuccessful-responses>` is received.
+    response <zapi-unsuccessful-responses>` is received.
 
     However, on some websites sessions may remain valid even after a few
     unsuccessful responses. If that is the case, you might want to increase
@@ -308,9 +308,9 @@ Here are some things you can try:
 If you do not need :ref:`session checking <session-check>` and your
 :ref:`initialization parameters <session-init>` are only
 :http:`request:browserHtml` and :http:`request:actions`, :ref:`server-managed
-sessions <zyte-api-session-contexts>` might be a more cost-effective choice, as
+sessions <zapi-session-contexts>` might be a more cost-effective choice, as
 they live much longer than :ref:`client-managed sessions
-<zyte-api-session-id>`.
+<zapi-session-id>`.
 
 
 .. _session-configs:
@@ -371,7 +371,7 @@ To include cookies in session initialization requests, use
 :http:`request:requestCookies` in :ref:`session initialization parameters
 <session-init>`. But mind that those cookies are only set during that request,
 :ref:`they are not added to the session cookie jar
-<zyte-api-session-cookie-jar>`.
+<zapi-session-cookie-jar>`.
 
 
 Session retry policies
@@ -441,7 +441,7 @@ The following stats exist for scrapy-zyte-api session management:
 
 ``scrapy-zyte-api/sessions/pools/{pool}/init/failed``
     Number of times that initializing a session for pool ``{pool}`` resulted in
-    an :ref:`unsuccessful response <zyte-api-unsuccessful-responses>`.
+    an :ref:`unsuccessful response <zapi-unsuccessful-responses>`.
 
 ``scrapy-zyte-api/sessions/pools/{pool}/init/param-error``
     Number of times that initializing a session for pool ``{pool}`` triggered
@@ -473,7 +473,7 @@ The following stats exist for scrapy-zyte-api session management:
 
 ``scrapy-zyte-api/sessions/pools/{pool}/use/failed``
     Number of times that a request that used a session from pool ``{pool}``
-    got an :ref:`unsuccessful response <zyte-api-unsuccessful-responses>`.
+    got an :ref:`unsuccessful response <zapi-unsuccessful-responses>`.
 
 ``scrapy-zyte-api/sessions/use/disabled``
     Number of processed requests for which session management was disabled.
