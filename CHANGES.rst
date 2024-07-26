@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.22.0 (2024-07-DD)
+0.22.0 (2024-07-26)
 -------------------
 
 * ``scrapy-zyte-api[provider]`` now requires :doc:`zyte-common-items
