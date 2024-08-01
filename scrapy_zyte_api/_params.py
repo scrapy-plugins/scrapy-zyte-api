@@ -35,6 +35,12 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
         "requires_browser_rendering": False,
         "changes_fingerprint": False,
     },
+    "ipType": {
+        "default": None,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like headers.
+    },
     "httpRequestMethod": {
         "default": "GET",
         "is_extract_type": False,
@@ -209,6 +215,12 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
         "requires_browser_rendering": False,
         "changes_fingerprint": True,
     },
+    "followRedirect": {
+        "default": True,
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
     "sessionContext": {
         "default": [],
         "is_extract_type": False,
@@ -219,7 +231,23 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
         "default": {},
         "is_extract_type": False,
         "requires_browser_rendering": False,
-        "changes_fingerprint": False,  # Treated like sessionContext.
+        # Unlike session or sessionContext, where you can have a different
+        # value for the same request, when 2 requests use different
+        # sessionContextParameters they are most likely trying to get a
+        # different response from each other.
+        "changes_fingerprint": True,
+    },
+    "session": {
+        "default": {},
+        "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": False,  # Treated like headers.
+    },
+    "networkCapture": {
+        "default": [],
+        "is_extract_type": False,
+        "requires_browser_rendering": False,  # Not on its own.
+        "changes_fingerprint": True,
     },
     "device": {
         "default": "auto",
@@ -242,6 +270,18 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
     "responseCookies": {
         "default": False,
         "is_extract_type": False,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "serp": {
+        "default": False,
+        "is_extract_type": True,
+        "requires_browser_rendering": False,
+        "changes_fingerprint": True,
+    },
+    "serpOptions": {
+        "default": {},
+        "is_extract_type": False,  # Not on its own.
         "requires_browser_rendering": False,
         "changes_fingerprint": True,
     },

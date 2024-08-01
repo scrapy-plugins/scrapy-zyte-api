@@ -31,6 +31,7 @@ from zyte_common_items import (
     Product,
     ProductList,
     ProductNavigation,
+    Serp,
 )
 from zyte_common_items.fields import is_auto_field
 
@@ -53,6 +54,7 @@ _ITEM_KEYWORDS: Dict[type, str] = {
     ArticleList: "articleList",
     ArticleNavigation: "articleNavigation",
     JobPosting: "jobPosting",
+    Serp: "serp",
 }
 _AUTO_PAGES: Set[type] = {
     AutoArticlePage,
