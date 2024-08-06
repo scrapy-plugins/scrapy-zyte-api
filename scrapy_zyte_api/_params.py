@@ -2,7 +2,7 @@ from base64 import b64decode, b64encode
 from copy import copy
 from logging import getLogger
 from os import environ
-from typing import Any, Dict, List, Literal, Mapping, Optional, Set, Union
+from typing import Any, Dict, List, Mapping, Optional, Set, Union
 from warnings import warn
 
 from scrapy import Request
@@ -486,9 +486,7 @@ def _warn_about_request_headers(
         )
 
 
-def _get_extract_from(
-    api_params: Dict[str, Any], extract_type: str
-) -> Union[str, Literal[_NoDefault]]:
+def _get_extract_from(api_params: Dict[str, Any], extract_type: str) -> Union[str, Any]:
     options = api_params.get(f"{extract_type}Options", {})
     default_extract_from = _REQUEST_PARAMS[extract_type].get(
         "default_extract_from", _NoDefault
