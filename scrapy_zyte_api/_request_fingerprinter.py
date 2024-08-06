@@ -21,7 +21,7 @@ else:
     from scrapy.utils.misc import create_instance, load_object
     from w3lib.url import canonicalize_url
 
-    from ._params import _REQUEST_PARAMS, _ParamParser, _uses_browser
+    from ._params import _REQUEST_PARAMS, _may_use_browser, _ParamParser
 
     class ScrapyZyteAPIRequestFingerprinter:
         @classmethod
@@ -73,7 +73,7 @@ else:
         def _normalize_params(self, api_params):
             api_params["url"] = canonicalize_url(
                 api_params["url"],
-                keep_fragments=_uses_browser(api_params),
+                keep_fragments=_may_use_browser(api_params),
             )
 
             if "httpRequestText" in api_params:
@@ -82,7 +82,7 @@ else:
                 ).decode()
 
             for key, value in _REQUEST_PARAMS.items():
-                if value["changes_fingerprint"] is False:
+                if not value.get("changes_fingerprint", True):
                     api_params.pop(key, None)
 
         def fingerprint(self, request):

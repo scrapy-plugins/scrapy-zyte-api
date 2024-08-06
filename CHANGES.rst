@@ -1,6 +1,27 @@
 Changes
 =======
 
+Unreleased
+----------
+
+* Added automatic mapping support for new Zyte API request fields:
+  :http:`request:ipType`, :http:`request:followRedirect`,
+  :http:`request:session`, :http:`request:networkCapture`,
+  :http:`request:serp`, :http:`request:serpOptions`.
+
+  * You will be warned when using their default values unnecessarily.
+
+  * When enabling :http:`request:serp`, :http:`request:httpResponseBody` and
+    :http:`request:httpResponseHeaders` will no longer be enabled by default,
+    and header mapping is disabled.
+
+* When it is not clear whether a request will use browser rendering or not,
+  e.g. an :ref:`automatic extraction request <zapi-extract>` without an
+  :http:`extractFrom <productOptions.extractFrom>` value, the URL fragment is
+  now taken into account for request fingerprinting, i.e.
+  ``https://example.com#a`` and ``https://example.com#b`` are *not* considered
+  duplicate requests anymore in that scenario.
+
 0.22.0 (2024-07-26)
 -------------------
 
