@@ -7,7 +7,7 @@ Request fingerprinting parameters
 The request fingerprinter class of scrapy-zyte-api generates request
 fingerprints for Zyte API requests based on the following Zyte API parameters:
 
--   :http:`request:url` (:func:`canonicalized <w3lib.url.canonicalize_url>`)
+-   :http:`request:url` (:func:`canonicalized <w3lib.url.canonicalize_url>`).
 
     For URLs that include a URL fragment, like ``https://example.com#foo``, URL
     canonicalization keeps the URL fragment if :http:`request:browserHtml` or
@@ -18,7 +18,7 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
 
 -   Request attribute parameters (:http:`request:httpRequestBody`,
     :http:`request:httpRequestText`, :http:`request:httpRequestMethod`), except
-    headers
+    headers.
 
     Equivalent :http:`request:httpRequestBody` and
     :http:`request:httpRequestText` values generate the same signature.
@@ -27,29 +27,39 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
     :http:`request:httpResponseBody`, :http:`request:httpResponseHeaders`,
     :http:`request:responseCookies`, :http:`request:screenshot`, and
     :ref:`automatic extraction outputs <zapi-extract-fields>` like
-    :http:`request:product`)
+    :http:`request:product`).
+
+    Same for :http:`request:networkCapture`, although it is not a proper output
+    parameters (it needs to be combined with another browser rendering
+    parameter to work).
 
 -   Rendering option parameters (:http:`request:actions`,
     :http:`request:device`, :http:`request:javascript`,
     :http:`request:screenshotOptions`, :http:`request:viewport`, and automatic
-    extraction options like :http:`request:productOptions`)
+    extraction options like :http:`request:productOptions`).
 
--   :http:`request:geolocation`
+-   :http:`request:geolocation`.
 
--   :http:`request:echoData`
+-   :http:`request:sessionContextParameters`.
+
+-   :http:`request:followRedirect`.
+
+-   :http:`request:echoData`.
 
 The following Zyte API parameters are *not* taken into account for request
 fingerprinting:
 
 -   Request header parameters (:http:`request:customHttpRequestHeaders`,
-    :http:`request:requestHeaders`)
+    :http:`request:requestHeaders`).
 
 -   Request cookie parameters (:http:`request:cookieManagement`,
-    :http:`request:requestCookies`)
+    :http:`request:requestCookies`).
 
--   Session handling parameters (:http:`request:sessionContext`,
-    :http:`request:sessionContextParameters`)
+-   Session ID parameters (:http:`request:sessionContext`,
+    :http:`request:session.id`).
 
--   :http:`request:jobId`
+-   :http:`request:ipType`.
 
--   Experimental parameters (:http:`experimental.* <request:experimental>`)
+-   :http:`request:jobId`.
+
+-   Experimental parameters (:http:`experimental.* <request:experimental>`).

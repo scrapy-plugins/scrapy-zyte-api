@@ -39,10 +39,10 @@ from . import (
 )
 from .mockserver import DelayedResource, MockServer, produce_request_response
 
-# Pick one of the automatic extraction keys for testing purposes.
-EXTRACT_KEYS_ITER = iter(_EXTRACT_KEYS)
-EXTRACT_KEY = next(EXTRACT_KEYS_ITER)
-EXTRACT_KEY_2 = next(EXTRACT_KEYS_ITER)
+# Pick regular automatic extraction keys for testing purposes. Do not use serp,
+# as it has an irregular behavior.
+EXTRACT_KEY = "article"
+EXTRACT_KEY_2 = "productNavigation"
 
 DEFAULT_ACCEPT_ENCODING = ", ".join(
     encoding.decode() for encoding in ACCEPTED_ENCODINGS
@@ -1094,10 +1094,9 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
-        # If both httpResponseBody and browserHtml (or screenshot, or both, or
-        # automatic extraction properties) are True, implicitly or explicitly,
-        # Request.headers are mapped both as customHttpRequestHeaders and as
-        # requestHeaders.
+        # If both httpResponseBody and browserHtml (or screenshot) are True,
+        # implicitly or explicitly, Request.headers are mapped both as
+        # customHttpRequestHeaders and as requestHeaders.
         (
             {"Referer": "a"},
             {"browserHtml": True, "httpResponseBody": True},
@@ -1128,20 +1127,6 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
         ),
         (
             {"Referer": "a"},
-            {EXTRACT_KEY: True, "httpResponseBody": True},
-            {
-                "customHttpRequestHeaders": [
-                    {"name": "Referer", "value": "a"},
-                ],
-                "httpResponseBody": True,
-                "httpResponseHeaders": True,
-                "requestHeaders": {"referer": "a"},
-                EXTRACT_KEY: True,
-            },
-            [],
-        ),
-        (
-            {"Referer": "a"},
             {"browserHtml": True, "screenshot": True, "httpResponseBody": True},
             {
                 "browserHtml": True,
@@ -1152,6 +1137,74 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
                 "httpResponseHeaders": True,
                 "requestHeaders": {"referer": "a"},
                 "screenshot": True,
+            },
+            [],
+        ),
+        # When combined with httpResponseBody, automatic extraction properties
+        # only force requestHeaders mapping if extractFrom is set to
+        # browserHtml.
+        (
+            {"Referer": "a"},
+            {EXTRACT_KEY: True, "httpResponseBody": True},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                EXTRACT_KEY: True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                "httpResponseBody": True,
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+                "httpResponseBody": True,
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+                "requestHeaders": {"referer": "a"},
+                EXTRACT_KEY: True,
             },
             [],
         ),
@@ -2111,7 +2164,6 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
-                "requestHeaders": {"referer": "a"},
             },
             [],
         ),
