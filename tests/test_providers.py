@@ -1184,9 +1184,9 @@ async def test_auto_field_stats_partial_override(mockserver):
     assert auto_field_stats == {
         "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_partial_override.<locals>.MyProductPage": (
             "additionalProperties aggregateRating availability breadcrumbs "
-            "canonicalUrl color currency currencyRaw description descriptionHtml "
-            "features gtin images mainImage metadata mpn price productId "
-            "regularPrice size sku style url variants"
+            "canonicalUrl color currency currencyRaw customAttributes description "
+            "descriptionHtml features gtin images mainImage metadata mpn price "
+            "productId regularPrice size sku style url variants"
         ),
     }
 
@@ -1424,9 +1424,9 @@ async def test_auto_field_stats_item_page_override(mockserver):
     assert auto_field_stats == {
         "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_item_page_override.<locals>.MyProductPage": (
             "additionalProperties aggregateRating availability breadcrumbs "
-            "canonicalUrl color currency currencyRaw description descriptionHtml "
-            "features gtin images mainImage metadata mpn price productId "
-            "regularPrice size sku style url variants"
+            "canonicalUrl color currency currencyRaw customAttributes description "
+            "descriptionHtml features gtin images mainImage metadata mpn price "
+            "productId regularPrice size sku style url variants"
         ),
     }
 
@@ -1490,9 +1490,9 @@ async def test_auto_field_stats_alt_page_override(mockserver):
     assert auto_field_stats == {
         "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_alt_page_override.<locals>.MyProductPage": (
             "additionalProperties aggregateRating availability breadcrumbs "
-            "canonicalUrl color currency currencyRaw description descriptionHtml "
-            "features gtin images mainImage metadata mpn price productId "
-            "regularPrice size sku style url variants"
+            "canonicalUrl color currency currencyRaw customAttributes description "
+            "descriptionHtml features gtin images mainImage metadata mpn price "
+            "productId regularPrice size sku style url variants"
         ),
     }
 
