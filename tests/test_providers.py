@@ -394,6 +394,33 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
     assert "Geolocation dependencies must be annotated" in caplog.text
 
 
+@ensureDeferred
+async def test_provider_custom_attrs(mockserver):
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "customAttributes": {
+            "attr1": {"type": "string", "description": "descr1"},
+            "attr2": {"type": "number", "description": "descr2"},
+        }
+    }
+
+    item, url, _ = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
+            customAttributes={
+                "attr1": "foo",
+                "attr2": 42,
+            },
+        )
+    )
+
+
 class RecordingHandler(ScrapyZyteAPIDownloadHandler):
     """Subclasses the original handler in order to record the Zyte API parameters
     used for each downloading request.

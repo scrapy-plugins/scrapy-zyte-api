@@ -230,6 +230,12 @@ class DefaultResource(Resource):
                     "name"
                 ] += f" (country {request_data['geolocation']})"
 
+            if "customAttributes" in request_data:
+                response_data["customAttributes"] = {
+                    "attr1": "foo",
+                    "attr2": 42,
+                }
+
         return json.dumps(response_data).encode()
 
 
