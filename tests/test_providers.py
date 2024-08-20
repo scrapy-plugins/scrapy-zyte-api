@@ -1241,6 +1241,10 @@ async def test_auto_field_stats_full_override(mockserver):
             return self.product.currencyRaw
 
         @field
+        def customAttributes(self):
+            return self.product.customAttributes
+
+        @field
         def description(self):
             return self.product.description
 

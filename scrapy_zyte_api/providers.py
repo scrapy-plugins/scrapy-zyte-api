@@ -329,7 +329,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             result = cls_stripped.from_dict(api_response.raw_api_response[kw])  # type: ignore[attr-defined]
             custom_attrs = api_response.raw_api_response.get("customAttributes")
             if custom_attrs:
-                result.customAttributes = custom_attrs
+                result.customAttributes = custom_attrs  # type: ignore[attr-defined]
             if is_typing_annotated(cls):
                 result = AnnotatedInstance(result, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(result)
