@@ -1,7 +1,7 @@
 from collections import deque
 from copy import copy, deepcopy
 from math import floor
-from typing import Any, Dict, Union
+from typing import Any, Dict, Tuple, Union
 from unittest.mock import patch
 
 import pytest
@@ -424,7 +424,7 @@ class OnlyPassFirstInitChecker:
 # subclasses for the crawler classes because the init use is enough to verify
 # that using the crawler works.
 
-CHECKER_TESTS = (
+CHECKER_TESTS: Tuple[Tuple[str, str, Dict[str, int]], ...] = (
     (
         "tests.test_sessions.TrueChecker",
         "finished",
