@@ -232,8 +232,13 @@ class DefaultResource(Resource):
 
             if "customAttributes" in request_data:
                 response_data["customAttributes"] = {
-                    "attr1": "foo",
-                    "attr2": 42,
+                    "metadata": {
+                        "totalInputTokens": "1000",
+                    },
+                    "values": {
+                        "attr1": "foo",
+                        "attr2": 42,
+                    },
                 }
 
         return json.dumps(response_data).encode()
