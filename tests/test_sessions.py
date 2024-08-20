@@ -11,6 +11,7 @@ from scrapy import Request, Spider, signals
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response
 from scrapy.utils.httpobj import urlparse_cached
+from scrapy.utils.misc import load_object
 from zyte_api import RequestError
 
 from scrapy_zyte_api import (
@@ -406,140 +407,109 @@ class UnexpectedExceptionUseChecker(UnexpectedExceptionChecker, UseChecker):
     pass
 
 
+class OnlyPassFirstInitChecker:
+
+    def __init__(self):
+        self.on_first_init = True
+
+    def check(self, response: Response, request: Request) -> bool:
+        if self.on_first_init:
+            self.on_first_init = False
+            return True
+        return False
+
+
 # NOTE: There is no use checker subclass for TrueChecker because the outcome
 # would be the same (always return True), and there are no use checker
 # subclasses for the crawler classes because the init use is enough to verify
 # that using the crawler works.
 
+CHECKER_TESTS = (
+    (
+        "tests.test_sessions.TrueChecker",
+        "finished",
+        {
+            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+            "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+        },
+    ),
+    (
+        "tests.test_sessions.FalseChecker",
+        "bad_session_inits",
+        {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
+    ),
+    (
+        "tests.test_sessions.FalseUseChecker",
+        "finished",
+        {
+            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
+            "scrapy-zyte-api/sessions/pools/example.com/use/check-failed": 1,
+        },
+    ),
+    ("tests.test_sessions.CloseSpiderChecker", "closed_by_checker", {}),
+    (
+        "tests.test_sessions.CloseSpiderUseChecker",
+        "closed_by_checker",
+        {
+            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        },
+    ),
+    (
+        "tests.test_sessions.UnexpectedExceptionChecker",
+        "bad_session_inits",
+        {"scrapy-zyte-api/sessions/pools/example.com/init/check-error": 1},
+    ),
+    (
+        "tests.test_sessions.UnexpectedExceptionUseChecker",
+        "finished",
+        {
+            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
+            "scrapy-zyte-api/sessions/pools/example.com/use/check-error": 1,
+        },
+    ),
+    (
+        "tests.test_sessions.TrueCrawlerChecker",
+        "finished",
+        {
+            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+            "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+        },
+    ),
+    (
+        "tests.test_sessions.FalseCrawlerChecker",
+        "bad_session_inits",
+        {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
+    ),
+    (
+        "tests.test_sessions.OnlyPassFirstInitChecker",
+        "bad_session_inits",
+        {
+            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+            "scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1,
+            "scrapy-zyte-api/sessions/pools/example.com/use/check-failed": 1,
+        },
+    ),
+)
+
 
 @pytest.mark.parametrize(
     ("checker", "close_reason", "stats"),
     (
+        *CHECKER_TESTS,
         *(
             pytest.param(
-                checker,
+                load_object(checker),
                 close_reason,
                 stats,
                 marks=pytest.mark.skipif(
                     not _RAW_CLASS_SETTING_SUPPORT,
                     reason=(
-                        "Configuring component classes instead of their import "
-                        "paths requires Scrapy 2.4+."
+                        "Configuring component classes instead of their "
+                        "import paths requires Scrapy 2.4+."
                     ),
                 ),
             )
-            for checker, close_reason, stats in (
-                (
-                    TrueChecker,
-                    "finished",
-                    {
-                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-                        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-                    },
-                ),
-                (
-                    FalseChecker,
-                    "bad_session_inits",
-                    {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
-                ),
-                (
-                    FalseUseChecker,
-                    "finished",
-                    {
-                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
-                        "scrapy-zyte-api/sessions/pools/example.com/use/check-failed": 1,
-                    },
-                ),
-                (CloseSpiderChecker, "closed_by_checker", {}),
-                (
-                    CloseSpiderUseChecker,
-                    "closed_by_checker",
-                    {
-                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-                    },
-                ),
-                (
-                    UnexpectedExceptionChecker,
-                    "bad_session_inits",
-                    {"scrapy-zyte-api/sessions/pools/example.com/init/check-error": 1},
-                ),
-                (
-                    UnexpectedExceptionUseChecker,
-                    "finished",
-                    {
-                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
-                        "scrapy-zyte-api/sessions/pools/example.com/use/check-error": 1,
-                    },
-                ),
-                (
-                    TrueCrawlerChecker,
-                    "finished",
-                    {
-                        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-                        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-                    },
-                ),
-                (
-                    FalseCrawlerChecker,
-                    "bad_session_inits",
-                    {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
-                ),
-            )
-        ),
-        (
-            "tests.test_sessions.TrueChecker",
-            "finished",
-            {
-                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-                "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-            },
-        ),
-        (
-            "tests.test_sessions.FalseChecker",
-            "bad_session_inits",
-            {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
-        ),
-        (
-            "tests.test_sessions.FalseUseChecker",
-            "finished",
-            {
-                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
-                "scrapy-zyte-api/sessions/pools/example.com/use/check-failed": 1,
-            },
-        ),
-        ("tests.test_sessions.CloseSpiderChecker", "closed_by_checker", {}),
-        (
-            "tests.test_sessions.CloseSpiderUseChecker",
-            "closed_by_checker",
-            {
-                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-            },
-        ),
-        (
-            "tests.test_sessions.UnexpectedExceptionChecker",
-            "bad_session_inits",
-            {"scrapy-zyte-api/sessions/pools/example.com/init/check-error": 1},
-        ),
-        (
-            "tests.test_sessions.UnexpectedExceptionUseChecker",
-            "finished",
-            {
-                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
-                "scrapy-zyte-api/sessions/pools/example.com/use/check-error": 1,
-            },
-        ),
-        (
-            "tests.test_sessions.TrueCrawlerChecker",
-            "finished",
-            {
-                "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-                "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-            },
-        ),
-        (
-            "tests.test_sessions.FalseCrawlerChecker",
-            "bad_session_inits",
-            {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
+            for checker, close_reason, stats in CHECKER_TESTS
         ),
     ),
 )
