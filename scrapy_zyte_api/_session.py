@@ -729,7 +729,6 @@ class _SessionManager:
                     raise TooManyBadSessionInits
             self._queues[pool].append(session_id)
             return session_id
-        raise RuntimeError("The spider is closing due to a fatal error")
 
     async def _next_from_queue(self, request: Request, pool: str) -> str:
         session_id = None
