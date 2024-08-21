@@ -966,3 +966,31 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             spider=spider,
             reason=reason,
         )
+
+
+class LocationSessionConfig(SessionConfig):
+    """Location-based session configuration for :ref:`scrapy-zyte-api sessions
+    <session>`. The aim of this class is to reduce boilerplate code.
+    If not location is provided, it defaults to :func:~scrapy_zyte_api._session.SessionConfig.params`
+    and :func:~scrapy_zyte_api._session.SessionConfig.check` methods. Otherwise, it uses the location
+    related logic define by :func:~scrapy_zyte_api._session.LocationSessionConfig.location_params`
+    and :func:~scrapy_zyte_api._session.LocationSessionConfig.location_checks`.
+    """
+
+    def params(self, request):
+        if not (location := self.location(request)):
+            return super().params(request)
+        return self.location_params(request, location)
+
+    def check(self, response, request):
+        if not (location := self.location(request)):
+            return super().check(response, request)
+        return self.location_check(response, request, location)
+
+    def location_params(self, request, location):
+        """Method to add params location-specific. Similar to :func:`~scrapy_zyte_api._session.SessionConfig.check`"""
+        return super().params(request)
+
+    def location_check(self, response, request, location):
+        """Method to check location-specific conditions. Similar to :func:`~scrapy_zyte_api._session.SessionConfig.check`"""
+        return super().check(response, request)
