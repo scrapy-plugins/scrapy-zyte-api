@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
@@ -13,8 +13,6 @@ from web_poet import (
     HttpResponseHeaders,
 )
 from web_poet.annotated import AnnotatedInstance
-from web_poet.fields import get_fields_dict
-from web_poet.utils import get_fq_class_name
 from zyte_common_items import (
     Article,
     ArticleList,
@@ -32,7 +30,6 @@ from zyte_common_items import (
     ProductList,
     ProductNavigation,
 )
-from zyte_common_items.fields import is_auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult
@@ -84,37 +81,8 @@ class ZyteApiProvider(PageObjectInputProvider):
         Screenshot,
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._should_track_auto_fields = None
-        self._tracked_auto_fields = set()
-
     def is_provided(self, type_: Callable) -> bool:
         return super().is_provided(strip_annotated(type_))
-
-    def _track_auto_fields(self, crawler: Crawler, request: Request, cls: Type):
-        if cls not in _ITEM_KEYWORDS:
-            return
-        if self._should_track_auto_fields is None:
-            self._should_track_auto_fields = crawler.settings.getbool(
-                "ZYTE_API_AUTO_FIELD_STATS", False
-            )
-        if self._should_track_auto_fields is False:
-            return
-        cls = self.injector.registry.page_cls_for_item(request.url, cls) or cls
-        if cls in self._tracked_auto_fields:
-            return
-        self._tracked_auto_fields.add(cls)
-        if cls in _ITEM_KEYWORDS:
-            field_list = "(all fields)"
-        else:
-            auto_fields = set()
-            for field_name in get_fields_dict(cls):
-                if is_auto_field(cls, field_name):  # type: ignore[arg-type]
-                    auto_fields.add(field_name)
-            field_list = " ".join(sorted(auto_fields))
-        cls_fqn = get_fq_class_name(cls)
-        crawler.stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)
 
     async def __call__(  # noqa: C901
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
@@ -125,7 +93,6 @@ class ZyteApiProvider(PageObjectInputProvider):
         http_response = None
         screenshot_requested = Screenshot in to_provide
         for cls in list(to_provide):
-            self._track_auto_fields(crawler, request, cast(type, cls))
             item = self.injector.weak_cache.get(request, {}).get(cls)
             if item:
                 results.append(item)

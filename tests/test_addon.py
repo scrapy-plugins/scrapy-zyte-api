@@ -24,8 +24,10 @@ except ImportError:
     POET = False
     InjectionMiddleware = None
     ZyteApiProvider: Optional[Type] = None
+    ScrapyZyteAPIPoetItemPipeline: Optional[Type] = None
 else:
     POET = True
+    from scrapy_zyte_api.poet import ScrapyZyteAPIPoetItemPipeline
     from scrapy_zyte_api.providers import ZyteApiProvider
 
 _crawler = get_crawler()
@@ -120,6 +122,7 @@ def _test_setting_changes(initial_settings, expected_settings):
     # Test separately settings that copy_to_dict messes up.
     for setting in (
         "DOWNLOADER_MIDDLEWARES",
+        "ITEM_PIPELINES",
         "SCRAPY_POET_PROVIDERS",
         "SPIDER_MIDDLEWARES",
     ):
@@ -145,6 +148,7 @@ BASE_EXPECTED = {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPDownloadHandler",
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler",
     },
+    "ITEM_PIPELINES": {},
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "SPIDER_MIDDLEWARES": {
         ScrapyZyteAPISpiderMiddleware: 100,
@@ -229,6 +233,9 @@ def test_no_poet_setting_changes(initial_settings, expected_settings):
                     ScrapyZyteAPIDownloaderMiddleware: 633,
                     ScrapyZyteAPISessionDownloaderMiddleware: 667,
                     InjectionMiddleware: 543,
+                },
+                "ITEM_PIPELINES": {
+                    ScrapyZyteAPIPoetItemPipeline: 0,
                 },
                 "SCRAPY_POET_PROVIDERS": {
                     ZyteApiProvider: 1100,

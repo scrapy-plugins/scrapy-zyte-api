@@ -42,6 +42,9 @@ else:
     SETTINGS["SCRAPY_POET_PROVIDERS"] = {
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100
     }
+    SETTINGS["ITEM_PIPELINES"] = {
+        "scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline": 0
+    }
 SETTINGS_ADDON: SETTINGS_T = {
     "ADDONS": {
         Addon: 500,
@@ -108,6 +111,7 @@ def serialize_settings(settings):
             del result[setting]
     for setting in (
         "DOWNLOADER_MIDDLEWARES",
+        "ITEM_PIPELINES",
         "SCRAPY_POET_PROVIDERS",
         "SPIDER_MIDDLEWARES",
     ):

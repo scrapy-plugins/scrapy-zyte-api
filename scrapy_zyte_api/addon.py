@@ -111,9 +111,11 @@ class Addon:
         except ImportError:
             pass
         else:
+            from scrapy_zyte_api.poet import ScrapyZyteAPIPoetItemPipeline
             from scrapy_zyte_api.providers import ZyteApiProvider
 
             _setdefault(settings, "DOWNLOADER_MIDDLEWARES", InjectionMiddleware, 543)
+            _setdefault(settings, "ITEM_PIPELINES", ScrapyZyteAPIPoetItemPipeline, 0)
             _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiProvider, 1100)
 
         if settings.getbool("ZYTE_API_SESSION_ENABLED", False):

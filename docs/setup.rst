@@ -120,6 +120,8 @@ spider to use Zyte API for all requests, set the following setting as well:
 
     ZYTE_API_TRANSPARENT_MODE = True
 
+.. _scrapy-poet-manual-setup:
+
 For :ref:`scrapy-poet integration <scrapy-poet>`, add the following provider to
 the ``SCRAPY_POET_PROVIDERS`` setting:
 
@@ -148,6 +150,17 @@ middleware to the :setting:`DOWNLOADER_MIDDLEWARES
 
     DOWNLOADER_MIDDLEWARES = {
         "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
+    }
+
+For :setting:`ZYTE_API_AUTO_FIELD_STATS` support, first :ref:`enable
+scrapy-poet integration <scrapy-poet-manual-setup>`, and then add the following
+item pipeline to the :setting:`ITEM_PIPELINES <scrapy:ITEM_PIPELINES>` setting:
+
+.. code-block:: python
+    :caption: settings.py
+
+    ITEM_PIPELINES = {
+        "scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline": 0,
     }
 
 
