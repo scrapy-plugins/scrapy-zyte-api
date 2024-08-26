@@ -348,6 +348,8 @@ class SessionConfig:
         The returned parameters do not need to include :http:`request:url`. If
         missing, it is picked from the request :ref:`triggering a session
         initialization request <pool-size>`.
+
+        .. seealso:: :class:`~scrapy_zyte_api.LocationSessionConfig`
         """
         if location := self.location(request):
             return {
@@ -372,6 +374,8 @@ class SessionConfig:
         If you need to tell whether *request* is a :ref:`session initialization
         request <session-init>` or not, use
         :func:`~scrapy_zyte_api.is_session_init_request`.
+
+        .. seealso:: :class:`~scrapy_zyte_api.LocationSessionConfig`
         """
         if self._checker:
             return self._checker.check(response, request)
@@ -969,12 +973,13 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
 
 
 class LocationSessionConfig(SessionConfig):
-    """Location-based session configuration for :ref:`scrapy-zyte-api sessions
-    <session>`. The aim of this class is to reduce boilerplate code.
-    If not location is provided, it defaults to :func:~scrapy_zyte_api._session.SessionConfig.params`
-    and :func:~scrapy_zyte_api._session.SessionConfig.check` methods. Otherwise, it uses the location
-    related logic define by :func:~scrapy_zyte_api._session.LocationSessionConfig.location_params`
-    and :func:~scrapy_zyte_api._session.LocationSessionConfig.location_checks`.
+    """:class:`~scrapy_zyte_api.SessionConfig` subclass to minimize boilerplate
+    when implementing location-specific session configs, i.e. session configs
+    where the default values should be used unless a location is set.
+
+    Provides counterparts to some :class:`~scrapy_zyte_api.SessionConfig`
+    methods that are only called when a location is set, and get that location
+    as a parameter.
     """
 
     def params(self, request):
@@ -988,9 +993,13 @@ class LocationSessionConfig(SessionConfig):
         return self.location_check(response, request, location)
 
     def location_params(self, request, location):
-        """Method to add params location-specific. Similar to :func:`~scrapy_zyte_api._session.SessionConfig.check`"""
+        """Like :class:`SessionConfig.params
+        <scrapy_zyte_api.SessionConfig.params>`, but it is only called when a
+        location it set, and gets that *location* as a parameter."""
         return super().params(request)
 
     def location_check(self, response, request, location):
-        """Method to check location-specific conditions. Similar to :func:`~scrapy_zyte_api._session.SessionConfig.check`"""
+        """Like :class:`SessionConfig.check
+        <scrapy_zyte_api.SessionConfig.check>`, but it is only called when a
+        location it set, and gets that *location* as a parameter."""
         return super().check(response, request)
