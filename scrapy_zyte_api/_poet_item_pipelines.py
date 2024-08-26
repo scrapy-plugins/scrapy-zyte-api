@@ -73,7 +73,6 @@ class ScrapyZyteAPIPoetItemPipeline:
         if not page_cls:
             field_list = "(all fields)"
         else:
-            cls = page_cls
             auto_fields = set()
             missing_fields = False
             for field_name in get_fields_dict(cls):
