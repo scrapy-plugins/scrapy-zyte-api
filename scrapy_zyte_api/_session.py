@@ -982,23 +982,27 @@ class LocationSessionConfig(SessionConfig):
     as a parameter.
     """
 
-    def params(self, request):
+    def params(self, request: Request) -> Dict[str, Any]:
         if not (location := self.location(request)):
             return super().params(request)
         return self.location_params(request, location)
 
-    def check(self, response, request):
+    def check(self, response: Response, request: Request) -> bool:
         if not (location := self.location(request)):
             return super().check(response, request)
         return self.location_check(response, request, location)
 
-    def location_params(self, request, location):
+    def location_params(
+        self, request: Request, location: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Like :class:`SessionConfig.params
         <scrapy_zyte_api.SessionConfig.params>`, but it is only called when a
         location it set, and gets that *location* as a parameter."""
         return super().params(request)
 
-    def location_check(self, response, request, location):
+    def location_check(
+        self, response: Response, request: Request, location: Dict[str, Any]
+    ) -> bool:
         """Like :class:`SessionConfig.check
         <scrapy_zyte_api.SessionConfig.check>`, but it is only called when a
         location it set, and gets that *location* as a parameter."""
