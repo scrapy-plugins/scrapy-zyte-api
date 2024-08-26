@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import Any
+from typing import Any, Set, Type
 
 from itemadapter import ItemAdapter
 from scrapy import Spider
@@ -26,10 +26,10 @@ class ScrapyZyteAPIPoetItemPipeline:
 
         raw_url_fields = crawler.settings.getdict("ZYTE_API_AUTO_FIELD_URL_FIELDS", {})
         self._url_fields = {load_object(k): v for k, v in raw_url_fields.items()}
-        self._seen = set()
+        self._seen: Set[Type] = set()
         self._crawler = crawler
         self._stats = crawler.stats
-        self._cls_without_url = set()
+        self._cls_without_url: Set[Type] = set()
 
     def open_spider(self, spider):
         for component in self._crawler.engine.downloader.middleware.middlewares:
