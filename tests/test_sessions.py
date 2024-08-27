@@ -2195,6 +2195,147 @@ async def test_location_session_config(mockserver):
 
 
 @ensureDeferred
+async def test_location_session_config_no_methods(mockserver):
+    """If no location_* methods are defined, LocationSessionConfig works the
+    same as SessionConfig."""
+    pytest.importorskip("web_poet")
+
+    @session_config(
+        [
+            "postal-code-10001.example",
+            "postal-code-10001-alternative.example",
+        ]
+    )
+    class CustomSessionConfig(LocationSessionConfig):
+
+        def pool(self, request: Request) -> str:
+            domain = urlparse_cached(request).netloc
+            if domain == "postal-code-10001-alternative.example":
+                return "postal-code-10001.example"
+            return domain
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = [
+            "https://postal-code-10001.example",
+            "https://postal-code-10001-alternative.example",
+        ]
+
+        def start_requests(self):
+            for url in self.start_urls:
+                yield Request(
+                    url,
+                    meta={
+                        "zyte_api_automap": {
+                            "actions": [
+                                {
+                                    "action": "setLocation",
+                                    "address": {"postalCode": "10001"},
+                                }
+                            ]
+                        },
+                    },
+                )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 2,
+        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/check-passed": 2,
+    }
+
+    # Clean up the session config registry, and check it, otherwise we could
+    # affect other tests.
+
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
+async def test_location_session_config_no_location(mockserver):
+    """If no location is configured, the methods are never called."""
+    pytest.importorskip("web_poet")
+
+    @session_config(["postal-code-10001.example", "a.example"])
+    class CustomSessionConfig(LocationSessionConfig):
+
+        def location_params(
+            self, request: Request, location: Dict[str, Any]
+        ) -> Dict[str, Any]:
+            assert False
+
+        def location_check(
+            self, response: Response, request: Request, location: Dict[str, Any]
+        ) -> bool:
+            assert False
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://postal-code-10001.example", "https://a.example"]
+
+        def start_requests(self):
+            for url in self.start_urls:
+                yield Request(
+                    url,
+                    meta={
+                        "zyte_api_automap": {
+                            "actions": [
+                                {
+                                    "action": "setLocation",
+                                    "address": {"postalCode": "10001"},
+                                }
+                            ]
+                        },
+                    },
+                )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/failed": 1,
+        "scrapy-zyte-api/sessions/pools/a.example/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/a.example/use/check-passed": 1,
+    }
+
+    # Clean up the session config registry, and check it, otherwise we could
+    # affect other tests.
+
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
 async def test_session_refresh(mockserver):
     """If a response does not pass a session validity check, the session is
     discarded, and the request is retried with a different session."""
