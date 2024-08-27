@@ -780,3 +780,30 @@ async def test_custom_item_custom_url_field(mockserver):
 
     # Reset rules
     default_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
+async def test_missing_injection_middleware(mockserver):
+
+    class TestSpider(Spider):
+        name = "test_spider"
+        url: str
+
+        def start_requests(self):
+            for url in (
+                mockserver.urljoin("/"),
+                mockserver.urljoin("/products/b"),
+            ):
+                yield Request(url, callback=self.parse)
+
+        def parse(self, response: DummyResponse, product: Product):
+            yield product
+
+    settings = create_scrapy_settings()
+    del settings["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"]
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ZYTE_API_AUTO_FIELD_STATS"] = True
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    with pytest.raises(RuntimeError):
+        _, _, crawler = await crawl_single_item(TestSpider, HtmlResource, settings)

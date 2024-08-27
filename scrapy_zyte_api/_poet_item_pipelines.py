@@ -6,7 +6,7 @@ from scrapy import Spider
 from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
 from scrapy.utils.misc import load_object
-from scrapy_poet.downloadermiddlewares import InjectionMiddleware
+from scrapy_poet import InjectionMiddleware
 from web_poet.fields import get_fields_dict
 from web_poet.utils import get_fq_class_name
 from zyte_common_items.fields import is_auto_field
@@ -37,9 +37,8 @@ class ScrapyZyteAPIPoetItemPipeline:
                 self._registry = component.injector.registry
                 return
         raise RuntimeError(
-            "Could not find "
-            "scrapy_poet.downloadermiddlewares.InjectionMiddleware among "
-            "downloader middlewares. scrapy-poet may be misconfigured."
+            "Could not find scrapy_poet.InjectionMiddleware among downloader "
+            "middlewares. scrapy-poet may be misconfigured."
         )
 
     def process_item(self, item: Any, spider: Spider):
