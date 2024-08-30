@@ -1,6 +1,14 @@
 Changes
 =======
 
+0.22.1 (2024-08-30)
+-------------------
+
+* Fixed an issue in the handling of excessive session initialization failures
+  during session refreshing, which would manifest as an asyncio messages about
+  unretrieved ``TooManyBadSessionInits`` task exceptions instead of stopping
+  the spider as intended.
+
 0.22.0 (2024-07-26)
 -------------------
 
