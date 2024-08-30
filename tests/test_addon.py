@@ -24,10 +24,10 @@ except ImportError:
     POET = False
     InjectionMiddleware = None
     ZyteApiProvider: Optional[Type] = None
-    ScrapyZyteAPIPoetItemPipeline: Optional[Type] = None
+    ScrapyZyteAPIAutoFieldStatsItemPipeline: Optional[Type] = None
 else:
     POET = True
-    from scrapy_zyte_api.poet import ScrapyZyteAPIPoetItemPipeline
+    from scrapy_zyte_api.poet import ScrapyZyteAPIAutoFieldStatsItemPipeline
     from scrapy_zyte_api.providers import ZyteApiProvider
 
 _crawler = get_crawler()
@@ -235,7 +235,7 @@ def test_no_poet_setting_changes(initial_settings, expected_settings):
                     InjectionMiddleware: 543,
                 },
                 "ITEM_PIPELINES": {
-                    ScrapyZyteAPIPoetItemPipeline: 0,
+                    ScrapyZyteAPIAutoFieldStatsItemPipeline: 0,
                 },
                 "SCRAPY_POET_PROVIDERS": {
                     ZyteApiProvider: 1100,

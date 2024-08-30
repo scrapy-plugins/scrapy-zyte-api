@@ -33,7 +33,9 @@ async def test_not_enabled(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(TestSpider, HtmlResource, settings)
 
@@ -93,7 +95,9 @@ async def test_no_override(mockserver):
     settings = create_scrapy_settings()
     settings["STATS_CLASS"] = OnlyOnceStatsCollector
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(TestSpider, HtmlResource, settings)
@@ -142,7 +146,9 @@ async def test_partial_override(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
@@ -295,7 +301,9 @@ async def test_full_override(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
@@ -333,7 +341,9 @@ async def test_callback_override(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
@@ -385,7 +395,9 @@ async def test_item_page_override(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
@@ -452,7 +464,9 @@ async def test_alt_page_override(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
@@ -504,7 +518,9 @@ async def test_non_auto_override(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
@@ -550,7 +566,9 @@ async def test_auto_field_decorator(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
@@ -597,7 +615,9 @@ async def test_auto_field_meta(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
@@ -653,7 +673,9 @@ async def test_custom_item(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(
@@ -706,7 +728,9 @@ async def test_custom_item_missing_url(mockserver, caplog):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     caplog.clear()
@@ -761,7 +785,9 @@ async def test_custom_item_custom_url_field(mockserver):
 
     settings = create_scrapy_settings()
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_AUTO_FIELD_URL_FIELDS"] = {CustomProduct: "product_url"}
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -802,7 +828,9 @@ async def test_missing_injection_middleware(mockserver):
     settings = create_scrapy_settings()
     del settings["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"]
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ITEM_PIPELINES"]["scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline"] = 0
+    settings["ITEM_PIPELINES"][
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline"
+    ] = 0
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     with pytest.raises(RuntimeError):

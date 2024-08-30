@@ -14,7 +14,7 @@ from zyte_common_items.fields import is_auto_field
 logger = getLogger(__name__)
 
 
-class ScrapyZyteAPIPoetItemPipeline:
+class ScrapyZyteAPIAutoFieldStatsItemPipeline:
 
     @classmethod
     def from_crawler(cls, crawler):

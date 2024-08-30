@@ -160,7 +160,7 @@ item pipeline to the :setting:`ITEM_PIPELINES <scrapy:ITEM_PIPELINES>` setting:
     :caption: settings.py
 
     ITEM_PIPELINES = {
-        "scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline": 0,
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline": 0,
     }
 
 

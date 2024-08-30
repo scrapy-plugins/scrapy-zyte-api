@@ -43,7 +43,7 @@ else:
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100
     }
     SETTINGS["ITEM_PIPELINES"] = {
-        "scrapy_zyte_api.poet.ScrapyZyteAPIPoetItemPipeline": 0
+        "scrapy_zyte_api.poet.ScrapyZyteAPIAutoFieldStatsItemPipeline": 0
     }
 SETTINGS_ADDON: SETTINGS_T = {
     "ADDONS": {

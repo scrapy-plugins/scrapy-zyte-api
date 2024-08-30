@@ -1,1 +1,1 @@
-from ._poet_item_pipelines import ScrapyZyteAPIPoetItemPipeline
+from ._poet_item_pipelines import ScrapyZyteAPIAutoFieldStatsItemPipeline
