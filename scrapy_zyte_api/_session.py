@@ -348,6 +348,8 @@ class SessionConfig:
         The returned parameters do not need to include :http:`request:url`. If
         missing, it is picked from the request :ref:`triggering a session
         initialization request <pool-size>`.
+
+        .. seealso:: :class:`~scrapy_zyte_api.LocationSessionConfig`
         """
         if location := self.location(request):
             return {
@@ -372,6 +374,8 @@ class SessionConfig:
         If you need to tell whether *request* is a :ref:`session initialization
         request <session-init>` or not, use
         :func:`~scrapy_zyte_api.is_session_init_request`.
+
+        .. seealso:: :class:`~scrapy_zyte_api.LocationSessionConfig`
         """
         if self._checker:
             return self._checker.check(response, request)
@@ -966,3 +970,40 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             spider=spider,
             reason=reason,
         )
+
+
+class LocationSessionConfig(SessionConfig):
+    """:class:`~scrapy_zyte_api.SessionConfig` subclass to minimize boilerplate
+    when implementing location-specific session configs, i.e. session configs
+    where the default values should be used unless a location is set.
+
+    Provides counterparts to some :class:`~scrapy_zyte_api.SessionConfig`
+    methods that are only called when a location is set, and get that location
+    as a parameter.
+    """
+
+    def params(self, request: Request) -> Dict[str, Any]:
+        if not (location := self.location(request)):
+            return super().params(request)
+        return self.location_params(request, location)
+
+    def check(self, response: Response, request: Request) -> bool:
+        if not (location := self.location(request)):
+            return super().check(response, request)
+        return self.location_check(response, request, location)
+
+    def location_params(
+        self, request: Request, location: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Like :class:`SessionConfig.params
+        <scrapy_zyte_api.SessionConfig.params>`, but it is only called when a
+        location is set, and gets that *location* as a parameter."""
+        return super().params(request)
+
+    def location_check(
+        self, response: Response, request: Request, location: Dict[str, Any]
+    ) -> bool:
+        """Like :class:`SessionConfig.check
+        <scrapy_zyte_api.SessionConfig.check>`, but it is only called when a
+        location is set, and gets that *location* as a parameter."""
+        return super().check(response, request)
