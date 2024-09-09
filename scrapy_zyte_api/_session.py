@@ -1005,5 +1005,5 @@ class LocationSessionConfig(SessionConfig):
     ) -> bool:
         """Like :class:`SessionConfig.check
         <scrapy_zyte_api.SessionConfig.check>`, but it is only called when a
-        location it set, and gets that *location* as a parameter."""
+        location is set, and gets that *location* as a parameter."""
         return super().check(response, request)
