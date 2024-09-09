@@ -997,7 +997,7 @@ class LocationSessionConfig(SessionConfig):
     ) -> Dict[str, Any]:
         """Like :class:`SessionConfig.params
         <scrapy_zyte_api.SessionConfig.params>`, but it is only called when a
-        location it set, and gets that *location* as a parameter."""
+        location is set, and gets that *location* as a parameter."""
         return super().params(request)
 
     def location_check(
