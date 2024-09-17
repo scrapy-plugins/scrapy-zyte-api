@@ -233,7 +233,7 @@ class DefaultResource(Resource):
             if "customAttributes" in request_data:
                 response_data["customAttributes"] = {
                     "metadata": {
-                        "totalInputTokens": "1000",
+                        "textInputTokens": 1000,
                     },
                     "values": {
                         "attr1": "foo",

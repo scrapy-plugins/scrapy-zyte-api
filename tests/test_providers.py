@@ -3,6 +3,8 @@ from collections import defaultdict
 
 import pytest
 
+from scrapy_zyte_api._annotations import make_hashable
+
 pytest.importorskip("scrapy_poet")
 
 import attrs
@@ -24,7 +26,14 @@ from web_poet import (
     handle_urls,
 )
 from web_poet.pages import get_item_cls
-from zyte_common_items import AutoProductPage, BasePage, BaseProductPage, Product
+from zyte_common_items import (
+    AutoProductPage,
+    BasePage,
+    BaseProductPage,
+    CustomAttributes,
+    CustomAttributesValues,
+    Product,
+)
 from zyte_common_items.fields import auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot, actions
@@ -394,31 +403,105 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
     assert "Geolocation dependencies must be annotated" in caplog.text
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
 @ensureDeferred
 async def test_provider_custom_attrs(mockserver):
+    from typing import Annotated
+
+    @attrs.define
+    class CustomAttrsPage(BasePage):
+        product: Product
+        custom_attrs: Annotated[
+            CustomAttributes,
+            make_hashable(
+                {
+                    "attr1": {"type": "string", "description": "descr1"},
+                    "attr2": {"type": "number", "description": "descr2"},
+                }
+            ),
+        ]
+
+    class CustomAttrsZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: CustomAttrsPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+                "custom_attrs": page.custom_attrs,
+            }
+
     settings = create_scrapy_settings()
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    settings["ZYTE_API_PROVIDER_PARAMS"] = {
-        "customAttributes": {
-            "attr1": {"type": "string", "description": "descr1"},
-            "attr2": {"type": "number", "description": "descr2"},
-        }
-    }
 
-    item, url, _ = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, _ = await crawl_single_item(
+        CustomAttrsZyteAPISpider, HtmlResource, settings
+    )
     assert item["product"] == Product.from_dict(
         dict(
             url=url,
             name="Product name",
             price="10",
             currency="USD",
-            customAttributes={
+        )
+    )
+    assert item["custom_attrs"] == CustomAttributes.from_dict(
+        {
+            "values": {
                 "attr1": "foo",
                 "attr2": 42,
             },
+            "metadata": {"textInputTokens": 1000},
+        }
+    )
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@ensureDeferred
+async def test_provider_custom_attrs_values(mockserver):
+    from typing import Annotated
+
+    @attrs.define
+    class CustomAttrsPage(BasePage):
+        product: Product
+        custom_attrs: Annotated[
+            CustomAttributesValues,
+            make_hashable(
+                {
+                    "attr1": {"type": "string", "description": "descr1"},
+                    "attr2": {"type": "number", "description": "descr2"},
+                }
+            ),
+        ]
+
+    class CustomAttrsZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: CustomAttrsPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+                "custom_attrs": page.custom_attrs,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(
+        CustomAttrsZyteAPISpider, HtmlResource, settings
+    )
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
         )
     )
+    assert item["custom_attrs"] == {
+        "attr1": "foo",
+        "attr2": 42,
+    }
 
 
 class RecordingHandler(ScrapyZyteAPIDownloadHandler):
@@ -1184,9 +1267,9 @@ async def test_auto_field_stats_partial_override(mockserver):
     assert auto_field_stats == {
         "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_partial_override.<locals>.MyProductPage": (
             "additionalProperties aggregateRating availability breadcrumbs "
-            "canonicalUrl color currency currencyRaw customAttributes description "
-            "descriptionHtml features gtin images mainImage metadata mpn price "
-            "productId regularPrice size sku style url variants"
+            "canonicalUrl color currency currencyRaw description descriptionHtml "
+            "features gtin images mainImage metadata mpn price productId "
+            "regularPrice size sku style url variants"
         ),
     }
 
@@ -1239,10 +1322,6 @@ async def test_auto_field_stats_full_override(mockserver):
         @field
         def currencyRaw(self):
             return self.product.currencyRaw
-
-        @field
-        def customAttributes(self):
-            return self.product.customAttributes
 
         @field
         def description(self):
@@ -1428,9 +1507,9 @@ async def test_auto_field_stats_item_page_override(mockserver):
     assert auto_field_stats == {
         "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_item_page_override.<locals>.MyProductPage": (
             "additionalProperties aggregateRating availability breadcrumbs "
-            "canonicalUrl color currency currencyRaw customAttributes description "
-            "descriptionHtml features gtin images mainImage metadata mpn price "
-            "productId regularPrice size sku style url variants"
+            "canonicalUrl color currency currencyRaw description descriptionHtml "
+            "features gtin images mainImage metadata mpn price productId "
+            "regularPrice size sku style url variants"
         ),
     }
 
@@ -1494,9 +1573,9 @@ async def test_auto_field_stats_alt_page_override(mockserver):
     assert auto_field_stats == {
         "scrapy-zyte-api/auto_fields/tests.test_providers.test_auto_field_stats_alt_page_override.<locals>.MyProductPage": (
             "additionalProperties aggregateRating availability breadcrumbs "
-            "canonicalUrl color currency currencyRaw customAttributes description "
-            "descriptionHtml features gtin images mainImage metadata mpn price "
-            "productId regularPrice size sku style url variants"
+            "canonicalUrl color currency currencyRaw description descriptionHtml "
+            "features gtin images mainImage metadata mpn price productId "
+            "regularPrice size sku style url variants"
         ),
     }
 

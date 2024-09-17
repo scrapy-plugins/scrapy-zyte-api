@@ -26,6 +26,9 @@ from zyte_common_items import (
     AutoProductListPage,
     AutoProductNavigationPage,
     AutoProductPage,
+    CustomAttributes,
+    CustomAttributesMetadata,
+    CustomAttributesValues,
     Item,
     JobPosting,
     Product,
@@ -76,6 +79,8 @@ class ZyteApiProvider(PageObjectInputProvider):
         ArticleNavigation,
         BrowserHtml,
         BrowserResponse,
+        CustomAttributes,
+        CustomAttributesValues,
         Geolocation,
         JobPosting,
         Product,
@@ -185,6 +190,17 @@ class ZyteApiProvider(PageObjectInputProvider):
                             for k, v in action
                         }
                     )
+                continue
+            if cls_stripped in {CustomAttributes, CustomAttributesValues}:
+                zyte_api_meta["customAttributes"] = {
+                    k: (
+                        dict(v)
+                        if isinstance(v, frozenset)
+                        else list(v) if isinstance(v, tuple) else v
+                    )
+                    for k, v in cls.__metadata__[0]  # type: ignore[attr-defined]
+                }
+
                 continue
             kw = _ITEM_KEYWORDS.get(cls_stripped)
             if not kw:
@@ -322,14 +338,32 @@ class ZyteApiProvider(PageObjectInputProvider):
                 result = AnnotatedInstance(Actions(actions_result), cls.__metadata__)  # type: ignore[attr-defined]
                 results.append(result)
                 continue
+            if cls_stripped is CustomAttributes and is_typing_annotated(cls):
+                custom_attrs_result = api_response.raw_api_response["customAttributes"]
+                result = AnnotatedInstance(
+                    CustomAttributes(
+                        CustomAttributesValues(custom_attrs_result["values"]),
+                        CustomAttributesMetadata.from_dict(
+                            custom_attrs_result["metadata"]
+                        ),
+                    ),
+                    cls.__metadata__,  # type: ignore[attr-defined]
+                )
+                results.append(result)
+                continue
+            if cls_stripped is CustomAttributesValues and is_typing_annotated(cls):
+                custom_attrs_result = api_response.raw_api_response["customAttributes"]
+                result = AnnotatedInstance(
+                    CustomAttributesValues(custom_attrs_result["values"]),
+                    cls.__metadata__,  # type: ignore[attr-defined]
+                )
+                results.append(result)
+                continue
             kw = _ITEM_KEYWORDS.get(cls_stripped)
             if not kw:
                 continue
             assert issubclass(cls_stripped, Item)
             result = cls_stripped.from_dict(api_response.raw_api_response[kw])  # type: ignore[attr-defined]
-            custom_attrs = api_response.raw_api_response.get("customAttributes")
-            if custom_attrs:
-                result.customAttributes = custom_attrs.get("values", {})  # type: ignore[attr-defined]
             if is_typing_annotated(cls):
                 result = AnnotatedInstance(result, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(result)
