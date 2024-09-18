@@ -38,7 +38,7 @@ from zyte_common_items import (
 from zyte_common_items.fields import is_auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
-from scrapy_zyte_api._annotations import _ActionResult
+from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -180,27 +180,15 @@ class ZyteApiProvider(PageObjectInputProvider):
                     )
                 zyte_api_meta["actions"] = []
                 for action in cls.__metadata__[0]:  # type: ignore[attr-defined]
-                    zyte_api_meta["actions"].append(
-                        {
-                            k: (
-                                dict(v)
-                                if isinstance(v, frozenset)
-                                else list(v) if isinstance(v, tuple) else v
-                            )
-                            for k, v in action
-                        }
-                    )
+                    zyte_api_meta["actions"].append(_from_hashable(action))
                 continue
             if cls_stripped in {CustomAttributes, CustomAttributesValues}:
-                zyte_api_meta["customAttributes"] = {
-                    k: (
-                        dict(v)
-                        if isinstance(v, frozenset)
-                        else list(v) if isinstance(v, tuple) else v
+                custom_attrs_input, custom_attrs_options = cls.__metadata__[0]  # type: ignore[attr-defined]
+                zyte_api_meta["customAttributes"] = _from_hashable(custom_attrs_input)
+                if custom_attrs_options:
+                    zyte_api_meta["customAttributesOptions"] = _from_hashable(
+                        custom_attrs_options
                     )
-                    for k, v in cls.__metadata__[0]  # type: ignore[attr-defined]
-                }
-
                 continue
             kw = _ITEM_KEYWORDS.get(cls_stripped)
             if not kw:

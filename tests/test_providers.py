@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import pytest
 
-from scrapy_zyte_api._annotations import make_hashable
+from scrapy_zyte_api._annotations import custom_attrs
 
 pytest.importorskip("scrapy_poet")
 
@@ -403,25 +403,32 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
     assert "Geolocation dependencies must be annotated" in caplog.text
 
 
+custom_attrs_input = {
+    "attr1": {"type": "string", "description": "descr1"},
+    "attr2": {"type": "number", "description": "descr2"},
+}
+
+
 @pytest.mark.skipif(
     sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
 )
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        custom_attrs(custom_attrs_input),
+        custom_attrs(custom_attrs_input, None),
+        custom_attrs(custom_attrs_input, {}),
+        custom_attrs(custom_attrs_input, {"foo": "bar"}),
+    ],
+)
 @ensureDeferred
-async def test_provider_custom_attrs(mockserver):
+async def test_provider_custom_attrs(mockserver, annotation):
     from typing import Annotated
 
     @attrs.define
     class CustomAttrsPage(BasePage):
         product: Product
-        custom_attrs: Annotated[
-            CustomAttributes,
-            make_hashable(
-                {
-                    "attr1": {"type": "string", "description": "descr1"},
-                    "attr2": {"type": "number", "description": "descr2"},
-                }
-            ),
-        ]
+        custom_attrs: Annotated[CustomAttributes, annotation]
 
     class CustomAttrsZyteAPISpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: CustomAttrsPage):  # type: ignore[override]
@@ -468,12 +475,7 @@ async def test_provider_custom_attrs_values(mockserver):
         product: Product
         custom_attrs: Annotated[
             CustomAttributesValues,
-            make_hashable(
-                {
-                    "attr1": {"type": "string", "description": "descr1"},
-                    "attr2": {"type": "number", "description": "descr2"},
-                }
-            ),
+            custom_attrs(custom_attrs_input),
         ]
 
     class CustomAttrsZyteAPISpider(ZyteAPISpider):
