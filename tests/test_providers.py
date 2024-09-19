@@ -3,8 +3,6 @@ from collections import defaultdict
 
 import pytest
 
-from scrapy_zyte_api._annotations import custom_attrs
-
 pytest.importorskip("scrapy_poet")
 
 import attrs
@@ -36,7 +34,14 @@ from zyte_common_items import (
 )
 from zyte_common_items.fields import auto_field
 
-from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot, actions
+from scrapy_zyte_api import (
+    Actions,
+    ExtractFrom,
+    Geolocation,
+    Screenshot,
+    actions,
+    custom_attrs,
+)
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import _AUTO_PAGES, _ITEM_KEYWORDS, ZyteApiProvider
 
