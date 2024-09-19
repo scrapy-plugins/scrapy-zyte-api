@@ -33,8 +33,7 @@ setuptools.setup(
             "andi>=0.6.0",
             "scrapy-poet>=0.22.3",
             "web-poet>=0.17.0",
-            # https://github.com/zytedata/zyte-common-items/pull/106
-            "zyte-common-items @ git+https://github.com/zytedata/zyte-common-items.git@9b8cf84",
+            "zyte-common-items>=0.23.0",
         ]
     },
     classifiers=[
