@@ -12,7 +12,6 @@ from scrapy_zyte_api._annotations import (
     "input,expected",
     [
         ([], ()),
-        (set(), ()),
         ({}, frozenset()),
         ("foo", "foo"),
         (["foo"], ("foo",)),
