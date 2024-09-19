@@ -57,6 +57,7 @@ class _ActionResult(TypedDict, total=False):
 
 
 def make_hashable(obj: Any) -> Any:
+    """Converts input into hashable form, to use in ``Annotated``."""
     if isinstance(obj, (tuple, list)):
         return tuple((make_hashable(e) for e in obj))
 
@@ -67,6 +68,7 @@ def make_hashable(obj: Any) -> Any:
 
 
 def _from_hashable(obj: Any) -> Any:
+    """Converts a result of ``make_hashable`` back to original form."""
     if isinstance(obj, tuple):
         return [_from_hashable(o) for o in obj]
 
