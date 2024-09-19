@@ -24,10 +24,24 @@ from web_poet import (
     handle_urls,
 )
 from web_poet.pages import get_item_cls
-from zyte_common_items import AutoProductPage, BasePage, BaseProductPage, Product
+from zyte_common_items import (
+    AutoProductPage,
+    BasePage,
+    BaseProductPage,
+    CustomAttributes,
+    CustomAttributesValues,
+    Product,
+)
 from zyte_common_items.fields import auto_field
 
-from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot, actions
+from scrapy_zyte_api import (
+    Actions,
+    ExtractFrom,
+    Geolocation,
+    Screenshot,
+    actions,
+    custom_attrs,
+)
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import _AUTO_PAGES, _ITEM_KEYWORDS, ZyteApiProvider
 
@@ -392,6 +406,109 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
     item, url, _ = await crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
     assert item is None
     assert "Geolocation dependencies must be annotated" in caplog.text
+
+
+custom_attrs_input = {
+    "attr1": {"type": "string", "description": "descr1"},
+    "attr2": {"type": "number", "description": "descr2"},
+}
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        custom_attrs(custom_attrs_input),
+        custom_attrs(custom_attrs_input, None),
+        custom_attrs(custom_attrs_input, {}),
+        custom_attrs(custom_attrs_input, {"foo": "bar"}),
+    ],
+)
+@ensureDeferred
+async def test_provider_custom_attrs(mockserver, annotation):
+    from typing import Annotated
+
+    @attrs.define
+    class CustomAttrsPage(BasePage):
+        product: Product
+        custom_attrs: Annotated[CustomAttributes, annotation]
+
+    class CustomAttrsZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: CustomAttrsPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+                "custom_attrs": page.custom_attrs,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(
+        CustomAttrsZyteAPISpider, HtmlResource, settings
+    )
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
+        )
+    )
+    assert item["custom_attrs"] == CustomAttributes.from_dict(
+        {
+            "values": {
+                "attr1": "foo",
+                "attr2": 42,
+            },
+            "metadata": {"textInputTokens": 1000},
+        }
+    )
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
+)
+@ensureDeferred
+async def test_provider_custom_attrs_values(mockserver):
+    from typing import Annotated
+
+    @attrs.define
+    class CustomAttrsPage(BasePage):
+        product: Product
+        custom_attrs: Annotated[
+            CustomAttributesValues,
+            custom_attrs(custom_attrs_input),
+        ]
+
+    class CustomAttrsZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: CustomAttrsPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+                "custom_attrs": page.custom_attrs,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(
+        CustomAttrsZyteAPISpider, HtmlResource, settings
+    )
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
+        )
+    )
+    assert item["custom_attrs"] == {
+        "attr1": "foo",
+        "attr2": 42,
+    }
 
 
 class RecordingHandler(ScrapyZyteAPIDownloadHandler):
