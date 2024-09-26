@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.23.0 (YYYY-MM-DD)
+0.23.0 (2024-09-26)
 -------------------
 
 * Added support for :ref:`custom attribute extraction <custom-attrs>`.
