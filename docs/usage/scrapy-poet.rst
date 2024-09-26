@@ -137,9 +137,9 @@ Custom attribute extraction
 ---------------------------
 
 You can request custom attribute extraction by using either a
-:class:`scrapy_zyte_api.CustomAttributes` dependency (if you need both the
+:class:`zyte_common_items.CustomAttributes` dependency (if you need both the
 attribute values and the attribute extraction metadata) or a
-:class:`scrapy_zyte_api.CustomAttributesValues` dependency (if you only need
+:class:`zyte_common_items.CustomAttributesValues` dependency (if you only need
 the values). You need to annotate it with input data as a dictionary and, if
 needed, a dictionary with extraction options. You should use the
 :func:`scrapy_zyte_api.custom_attrs` function to create the annotation:
@@ -148,7 +148,8 @@ needed, a dictionary with extraction options. You should use the
 
     from typing import Annotated
 
-    from scrapy_zyte_api import CustomAttributes, custom_attrs
+    from scrapy_zyte_api import custom_attrs
+    from zyte_common_items import CustomAttributes
 
 
     @attrs.define
@@ -168,7 +169,7 @@ You can then access the results as the dependency value:
 
         def parse_page(self, response: DummyResponse, page: MyPageObject):
             ...
-            for k, v in page.custom_attributes.items():
+            for k, v in page.custom_attributes.values.items():
                 ...
 
 
