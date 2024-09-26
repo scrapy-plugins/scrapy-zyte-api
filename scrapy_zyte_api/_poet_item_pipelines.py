@@ -60,13 +60,13 @@ class ScrapyZyteAPIAutoFieldStatsItemPipeline:
                     f"that item type, use the ZYTE_API_AUTO_FIELD_URL_FIELDS "
                     f"setting to set a different field."
                 )
-            return
+            return item
 
         page_cls = self._registry.page_cls_for_item(url, item_cls)
 
         cls = page_cls or item_cls
         if cls in self._seen:
-            return
+            return item
         self._seen.add(cls)
 
         if not page_cls:
@@ -86,3 +86,4 @@ class ScrapyZyteAPIAutoFieldStatsItemPipeline:
 
         cls_fqn = get_fq_class_name(cls)
         self._stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)
+        return item
