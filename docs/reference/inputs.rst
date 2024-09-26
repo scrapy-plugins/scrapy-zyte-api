@@ -60,3 +60,5 @@ Built-in input annotations
     :members:
 
 .. autofunction:: scrapy_zyte_api.actions
+
+.. autofunction:: scrapy_zyte_api.custom_attrs

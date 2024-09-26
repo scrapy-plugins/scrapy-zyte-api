@@ -1,6 +1,12 @@
 Changes
 =======
 
+0.23.0 (YYYY-MM-DD)
+-------------------
+
+* Added support for :ref:`custom attribute extraction <custom-attrs>`.
+* Added the :class:`~scrapy_zyte_api.LocationSessionConfig` class.
+
 0.22.1 (2024-08-30)
 -------------------
 
