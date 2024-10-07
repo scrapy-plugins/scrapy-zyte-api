@@ -1,10 +1,17 @@
 Changes
 =======
 
+0.24.0 (YYYY-MM-DD)
+-------------------
+
+* Added support for ``zyte_common_items.JobPostingNavigation`` to the
+  scrapy-poet provider.
+
 0.23.0 (2024-09-26)
 -------------------
 
 * Added support for :ref:`custom attribute extraction <custom-attrs>`.
+
 * Added the :class:`~scrapy_zyte_api.LocationSessionConfig` class.
 
 0.22.1 (2024-08-30)
