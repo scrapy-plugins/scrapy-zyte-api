@@ -650,6 +650,7 @@ async def test_default_params_immutability(setting_key, meta_key, setting, meta)
 async def _test_automap(
     settings, request_kwargs, meta, expected, warnings, caplog, cookie_jar=None
 ):
+    caplog.clear()
     request = Request(url="https://example.com", **request_kwargs)
     request.meta["zyte_api_automap"] = meta
     settings = {**settings, "ZYTE_API_TRANSPARENT_MODE": True}
@@ -694,7 +695,7 @@ async def _test_automap(
         for warning in warnings:
             assert warning in caplog.text
     else:
-        assert not caplog.records
+        assert not caplog.records, caplog.records[0].args
 
 
 @pytest.mark.parametrize(

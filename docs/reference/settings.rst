@@ -13,13 +13,11 @@ ZYTE_API_AUTO_FIELD_STATS
 
 Default: ``False``
 
-Enables stats that indicate which requested fields :ref:`obtained through
-scrapy-poet integration <scrapy-poet>` come directly from
-:ref:`zapi-extract`.
+Enables stats that indicate which fields from yielded items come from
+:ref:`zapi-extract` when using :ref:`scrapy-poet integration <scrapy-poet>`.
 
-If for any request no page object class is used to override
-:ref:`zapi-extract` fields for a given item type, the following stat is
-set:
+If for any combination of item type and URL there is no registered page object
+class, the following stat is set:
 
 .. code-block:: python
 
@@ -28,8 +26,9 @@ set:
 .. note:: A literal ``(all fields)`` string is used as value, not a list with
     all fields.
 
-If for any request a custom page object class is used to override some
-:ref:`zapi-extract` fields, the following stat is set:
+When a page object class is registered for a given combination of item type and
+URL, and that page object class overrides some fields, the following stat is
+set:
 
 .. code-block:: python
 
@@ -39,6 +38,32 @@ If for any request a custom page object class is used to override some
 
 .. note:: :func:`zyte_common_items.fields.is_auto_field` is used to determine
     whether a field has been overridden or not.
+
+Item URLs are read from the ``url`` field by default. Use
+:setting:`ZYTE_API_AUTO_FIELD_URL_FIELDS` to configure a different field for
+any given item type.
+
+.. setting:: ZYTE_API_AUTO_FIELD_URL_FIELDS
+
+ZYTE_API_AUTO_FIELD_URL_FIELDS
+==============================
+
+Default: ``{}``
+
+Dictionary where keys are item types or their import paths, and values are
+strings with the names of the fields in those item types that indicate the
+source URL of the item.
+
+For example:
+
+.. code-block:: python
+    :caption: settings.py
+
+    ZYTE_API_AUTO_FIELD_URL_FIELDS = {
+        "my_project.items.CustomItem": "custom_url_field",
+    }
+
+If a URL field is not specified for an item, ``url`` is used by default.
 
 .. setting:: ZYTE_API_AUTOMAP_PARAMS
 
