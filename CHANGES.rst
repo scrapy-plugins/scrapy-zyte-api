@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.24.0 (YYYY-MM-DD)
+0.24.0 (2024-10-07)
 -------------------
 
 * Added support for ``zyte_common_items.JobPostingNavigation`` to the
