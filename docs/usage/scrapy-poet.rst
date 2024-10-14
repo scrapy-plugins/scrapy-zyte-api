@@ -39,8 +39,6 @@ Dependency annotations
 
 ``ZyteApiProvider`` understands and makes use of some dependency annotations.
 
-.. note:: Dependency annotations require Python 3.9+.
-
 Item annotations
 ----------------
 
