@@ -18,7 +18,7 @@ You need at least:
 -   A :ref:`Zyte API <zyte-api>` subscription (there’s a :ref:`free trial
     <zapi-trial>`).
 
--   Python 3.8+
+-   Python 3.9+
 
 -   Scrapy 2.0.1+
 
