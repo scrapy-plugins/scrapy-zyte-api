@@ -229,7 +229,7 @@ key.
 .. setting:: DOWNLOAD_WARNSIZE
 
 DOWNLOAD_WARNSIZE
------------------
+=================
 
 Default: ``33554432`` (32 MiB)
 
