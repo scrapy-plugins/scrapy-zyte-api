@@ -470,9 +470,10 @@ async def test_trust_env(enabled):
     ),
 )
 def test_user_agent_for_build_client(user_agent, expected):
-    settings: SETTINGS_T = Settings(
+    settings: Settings = Settings(
         {
-            **SETTINGS,
+            # see https://github.com/python/mypy/issues/16557#issuecomment-1831213673
+            **SETTINGS,  # type: ignore[dict-item]
             "_ZYTE_API_USER_AGENT": user_agent,
         }
     )
@@ -499,6 +500,7 @@ async def test_bad_key():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "zyte_api_bad_key"
 
 
@@ -526,6 +528,7 @@ async def test_suspended_account_start_urls():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
 
 
@@ -548,6 +551,7 @@ async def test_suspended_account_callback():
         crawler = get_crawler(TestSpider, settings_dict=settings)
         await crawler.crawl()
 
+    assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
 
 

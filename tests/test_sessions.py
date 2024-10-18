@@ -393,7 +393,7 @@ class UseChecker(ConstantChecker):
     def check(self, response: Response, request: Request) -> bool:
         if response.meta.get(SESSION_INIT_META_KEY, False) is True:
             return True
-        return super().check(request, response)
+        return super().check(response, request)
 
 
 class FalseUseChecker(FalseChecker, UseChecker):
@@ -2789,7 +2789,7 @@ class ExceptionRaisingDownloaderMiddleware:
     async def process_request(self, request: Request, spider: Spider) -> None:
         if request.meta.get("_is_session_init_request", False):
             return
-        raise spider.exception
+        raise spider.exception  # type: ignore[attr-defined]
 
 
 @pytest.mark.parametrize(

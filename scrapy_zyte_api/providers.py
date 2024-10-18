@@ -5,6 +5,7 @@ from scrapy import Request
 from scrapy.crawler import Crawler
 from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import PageObjectInputProvider
+from twisted.internet.defer import Deferred
 from web_poet import (
     AnyResponse,
     BrowserHtml,
@@ -47,7 +48,7 @@ try:
     # requires Scrapy >= 2.8
     from scrapy.http.request import NO_CALLBACK
 except ImportError:
-    NO_CALLBACK = None
+    NO_CALLBACK = None  # type: ignore[assignment]
 
 
 _ITEM_KEYWORDS: Dict[type, str] = {
@@ -103,6 +104,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         return super().is_provided(strip_annotated(type_))
 
     def _track_auto_fields(self, crawler: Crawler, request: Request, cls: Type):
+        assert crawler.stats
         if cls not in _ITEM_KEYWORDS:
             return
         if self._should_track_auto_fields is None:
@@ -256,8 +258,9 @@ class ZyteApiProvider(PageObjectInputProvider):
             },
             callback=NO_CALLBACK,
         )
+        assert crawler.engine
         api_response: ZyteAPITextResponse = await maybe_deferred_to_future(
-            crawler.engine.download(api_request)
+            cast("Deferred[ZyteAPITextResponse]", crawler.engine.download(api_request))
         )
 
         assert api_response.raw_api_response

@@ -343,7 +343,7 @@ def test__process_response_no_body():
         "product": {"name": "shoes"},
     }
 
-    resp = _process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
 
     assert isinstance(resp, Response)
     assert resp.body == b""
@@ -512,7 +512,7 @@ def test__process_response_non_text():
             }
         ],
     }
-    resp = _process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
 
     assert isinstance(resp, Response)
     with pytest.raises(NotSupported):
