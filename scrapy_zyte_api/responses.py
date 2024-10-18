@@ -199,8 +199,8 @@ def _body_max_size_exceeded(
             f"Cancelling download of {request_url}: expected response size "
             f"{expected_size} larger than download max size {maxsize}."
         )
-        return False
-    return True
+        return True
+    return False
 
 
 def _process_response(
