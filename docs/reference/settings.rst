@@ -208,6 +208,9 @@ To disable truncation, set this to ``0``.
 
 .. setting:: DOWNLOAD_MAXSIZE
 
+DOWNLOAD_MAXSIZE
+================
+
 Default: ``1073741824`` (1 GiB)
 
 The maximum response body size (in bytes) allowed. Bigger responses are
