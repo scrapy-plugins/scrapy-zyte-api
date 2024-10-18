@@ -1,3 +1,5 @@
+import logging
+
 from base64 import b64decode
 from copy import copy
 from datetime import datetime
@@ -14,6 +16,9 @@ from scrapy_zyte_api.utils import (
     _RESPONSE_HAS_IP_ADDRESS,
     _RESPONSE_HAS_PROTOCOL,
 )
+
+logger = logging.getLogger(__name__)
+
 
 _DEFAULT_ENCODING = "utf-8"
 
@@ -166,10 +171,67 @@ _JSON = Union[
 _API_RESPONSE = Dict[str, _JSON]
 
 
+def _check_response_size_limits(
+    expected_size: int,
+    warnsize: Optional[int],
+    maxsize: Optional[int],
+    request_url: str,
+) -> bool:
+    if warnsize and expected_size > warnsize:
+        logger.warning(
+            f"Expected response size {expected_size} larger than "
+            f"download warn size {warnsize} in request {request_url}."
+        )
+
+    if maxsize and expected_size > maxsize:
+        logger.warning(
+            f"Cancelling download of {request_url}: expected response size "
+            f"{expected_size} larger than download max size {maxsize}."
+        )
+        return False
+    return True
+
+
+def _response_max_size_exceeded(
+    api_response: _API_RESPONSE,
+    request: Request,
+    default_maxsize: Optional[int],
+    default_warnsize: Optional[int],
+) -> bool:
+    maxsize = request.meta.get("download_maxsize", default_maxsize)
+    warnsize = request.meta.get("download_warnsize", default_warnsize)
+
+    if "browserHtml" in api_response:
+        expected_size = len(api_response["browserHtml"].encode(_DEFAULT_ENCODING))
+    elif api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
+        expected_size = None
+        for header in api_response.get("httpResponseHeaders"):
+            if header["name"].lower() == "content-length":
+                expected_size = int(header["value"])
+                break
+
+        if expected_size is None or (
+            (maxsize and expected_size < maxsize)
+            and (warnsize and expected_size < warnsize)
+        ):
+            expected_size = len(b64decode(api_response.get("httpResponseBody", b"")))
+    else:
+        return False
+
+    if expected_size is not None and not _check_response_size_limits(
+        expected_size, warnsize, maxsize, request.url
+    ):
+        return True
+
+    return False
+
+
 def _process_response(
     api_response: _API_RESPONSE,
     request: Request,
     cookie_jars: Optional[Dict[Any, CookieJar]],
+    default_maxsize: Optional[int],
+    default_warnsize: Optional[int],
 ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
     """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
     this returns either a ``ZyteAPITextResponse`` or ``ZyteAPIResponse`` depending
@@ -183,6 +245,9 @@ def _process_response(
     # For now, at least one of them should be present.
 
     _process_cookies(api_response, request, cookie_jars)
+
+    if _response_max_size_exceeded(api_response, request, default_maxsize, default_warnsize):
+        return None
 
     if api_response.get("browserHtml"):
         # Using TextResponse because browserHtml always returns a browser-rendered page

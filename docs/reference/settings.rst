@@ -206,6 +206,39 @@ when :setting:`ZYTE_API_LOG_REQUESTS` is enabled, excluding object keys.
 To disable truncation, set this to ``0``.
 
 
+.. setting:: ZYTE_API_LOG_REQUESTS_TRUNCATE
+
+Default: ``1073741824`` (1 GiB)
+
+The maximum response body size (in bytes) allowed. Bigger responses are
+aborted and ignored.
+
+This applies both before and after compression. If decompressing a response
+body would exceed this limit, decompression is aborted and the response is
+ignored.
+
+Use ``0`` to disable this limit.
+
+This limit can be set per spider using the :attr:`download_maxsize` spider
+attribute and per request using the :reqmeta:`download_maxsize` Request.meta
+key.
+
+.. setting:: DOWNLOAD_WARNSIZE
+
+DOWNLOAD_WARNSIZE
+-----------------
+
+Default: ``33554432`` (32 MiB)
+
+If the size of a response exceeds this value, before or after compression, a
+warning will be logged about it.
+
+Use ``0`` to disable this limit.
+
+This limit can be set per spider using the :attr:`download_warnsize` spider
+attribute and per request using the :reqmeta:`download_warnsize` Request.meta
+key.
+
 .. setting:: ZYTE_API_MAX_COOKIES
 
 ZYTE_API_MAX_COOKIES
