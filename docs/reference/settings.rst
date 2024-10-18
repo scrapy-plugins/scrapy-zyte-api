@@ -206,8 +206,7 @@ when :setting:`ZYTE_API_LOG_REQUESTS` is enabled, excluding object keys.
 To disable truncation, set this to ``0``.
 
 
-.. setting:: DOWNLOAD_MAXSIZE
-
+.. setting:: ZYTE_API_MAX_COOKIES
 
 ZYTE_API_MAX_COOKIES
 ====================
