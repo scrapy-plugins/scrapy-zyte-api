@@ -16,9 +16,9 @@ Requirements
 You need at least:
 
 -   A :ref:`Zyte API <zyte-api>` subscription (there’s a :ref:`free trial
-    <zyte-api-trial>`).
+    <zapi-trial>`).
 
--   Python 3.8+
+-   Python 3.9+
 
 -   Scrapy 2.0.1+
 
@@ -104,7 +104,7 @@ scrapy-zyte-api integration as follows:
         "https": "scrapy_zyte_api.ScrapyZyteAPIDownloadHandler",
     }
     DOWNLOADER_MIDDLEWARES = {
-        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 1000,
+        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
     }
     SPIDER_MIDDLEWARES = {
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
@@ -138,6 +138,17 @@ If you already had a custom value for :setting:`REQUEST_FINGERPRINTER_CLASS
     :caption: settings.py
 
     ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS = "myproject.CustomRequestFingerprinter"
+
+For :ref:`session management support <session>`, add the following downloader
+middleware to the :setting:`DOWNLOADER_MIDDLEWARES
+<scrapy:DOWNLOADER_MIDDLEWARES>` setting:
+
+.. code-block:: python
+    :caption: settings.py
+
+    DOWNLOADER_MIDDLEWARES = {
+        "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
+    }
 
 
 .. _reactor-change:

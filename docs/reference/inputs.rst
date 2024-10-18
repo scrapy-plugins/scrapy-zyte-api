@@ -32,6 +32,8 @@ Inputs
 
 -   :class:`zyte_common_items.JobPosting`
 
+-   :class:`zyte_common_items.JobPostingNavigation`
+
 -   :class:`zyte_common_items.Product`
 
 -   :class:`zyte_common_items.ProductList`
@@ -60,3 +62,5 @@ Built-in input annotations
     :members:
 
 .. autofunction:: scrapy_zyte_api.actions
+
+.. autofunction:: scrapy_zyte_api.custom_attrs

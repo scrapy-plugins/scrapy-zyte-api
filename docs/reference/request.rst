@@ -173,7 +173,7 @@ They will be mapped even if defined with their default value.
 Headers will also be mapped if set to a non-default value elsewhere, e.g. in a
 custom downloader middleware, as long as it is done before the scrapy-zyte-api
 downloader middleware, which is responsible for the mapping, processes the
-request. Here “before” means a lower value than ``1000`` in the
+request. Here “before” means a lower value than ``633`` in the
 :setting:`DOWNLOADER_MIDDLEWARES <scrapy:DOWNLOADER_MIDDLEWARES>` setting.
 
 Similarly, you can add any of those headers to the
@@ -222,10 +222,10 @@ combinations that Zyte API does not currently support, and may never support:
     :http:`request:requestHeaders`.
 
 -   You can set :http:`request:httpResponseBody` to ``True`` or use
-    :ref:`automatic extraction from httpResponseBody <zyte-api-extract-from>`,
+    :ref:`automatic extraction from httpResponseBody <zapi-extract-from>`,
     and also set :http:`request:browserHtml` or :http:`request:screenshot` to
     ``True`` or use :ref:`automatic extraction from browserHtml
-    <zyte-api-extract-from>`. In this case, :attr:`Request.headers
+    <zapi-extract-from>`. In this case, :attr:`Request.headers
     <scrapy.http.Request.headers>` is mapped both as
     :http:`request:customHttpRequestHeaders` and as
     :http:`request:requestHeaders`, and :http:`request:browserHtml` is used as

@@ -5,7 +5,7 @@ sphinx:
 build:
   os: ubuntu-22.04
   tools:
-    python: "3.11"  # Keep in sync with .github/workflows/test.yml
+    python: "3.12"  # Keep in sync with .github/workflows/test.yml
 python:
   install:
     - requirements: docs/requirements.txt

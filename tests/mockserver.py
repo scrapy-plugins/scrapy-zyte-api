@@ -24,6 +24,16 @@ from scrapy_zyte_api.responses import _API_RESPONSE
 from . import SETTINGS, make_handler
 
 
+# https://github.com/scrapy/scrapy/blob/02b97f98e74a994ad3e4d74e7ed55207e508a576/tests/mockserver.py#L27C1-L33C19
+def getarg(request, name, default=None, type=None):
+    if name in request.args:
+        value = request.args[name][0]
+        if type is not None:
+            value = type(value)
+        return value
+    return default
+
+
 def get_ephemeral_port():
     s = socket.socket()
     s.bind(("", 0))
@@ -110,6 +120,15 @@ class DefaultResource(Resource):
                 "detail": "Account is suspended, check billing details.",
             }
             return json.dumps(response_data).encode()
+        if "temporary-download-error" in request_data["url"]:
+            request.setResponseCode(520)
+            response_data = {
+                "status": 520,
+                "type": "/download/temporary-error",
+                "title": "...",
+                "detail": "...",
+            }
+            return json.dumps(response_data).encode()
 
         html = "<html><body>Hello<h1>World!</h1></body></html>"
         if "browserHtml" in request_data:
@@ -128,6 +147,25 @@ class DefaultResource(Resource):
             response_data["screenshot"] = b64encode(
                 b"screenshot-body-contents"
             ).decode()
+
+        if "session" in request_data:
+            # See test_sessions.py::test_param_precedence
+            if domain.startswith("postal-code-10001"):
+                postal_code = None
+                for action in request_data.get("actions", []):
+                    try:
+                        postal_code = action["address"]["postalCode"]
+                    except (KeyError, IndexError, TypeError):
+                        pass
+                    else:
+                        break
+                if postal_code != "10001" and not domain.startswith(
+                    "postal-code-10001-soft"
+                ):
+                    request.setResponseCode(500)
+                    return b""
+            response_data["session"] = request_data["session"]
+
         if "httpResponseBody" in request_data:
             headers = request_data.get("customHttpRequestHeaders", [])
             for header in headers:
@@ -151,13 +189,24 @@ class DefaultResource(Resource):
         if actions:
             results: List[_ActionResult] = []
             for action in actions:
-                results.append(
-                    {
-                        "action": action["action"],
-                        "elapsedTime": 1.0,
-                        "status": "success",
-                    }
-                )
+                result: _ActionResult = {
+                    "action": action["action"],
+                    "elapsedTime": 1.0,
+                    "status": "success",
+                }
+                if action["action"] == "setLocation":
+                    if domain.startswith("postal-code-10001"):
+                        try:
+                            postal_code = action["address"]["postalCode"]
+                        except (KeyError, IndexError, TypeError):
+                            postal_code = None
+                        if postal_code != "10001":
+                            result["status"] = "returned"
+                            result["error"] = "Action setLocation failed"
+                    elif domain.startswith("no-location-support"):
+                        result["status"] = "returned"
+                        result["error"] = "Action setLocation not supported on …"
+                results.append(result)
             response_data["actions"] = results  # type: ignore[assignment]
 
         if request_data.get("product") is True:
@@ -180,6 +229,17 @@ class DefaultResource(Resource):
                 response_data["product"][
                     "name"
                 ] += f" (country {request_data['geolocation']})"
+
+            if "customAttributes" in request_data:
+                response_data["customAttributes"] = {
+                    "metadata": {
+                        "textInputTokens": 1000,
+                    },
+                    "values": {
+                        "attr1": "foo",
+                        "attr2": 42,
+                    },
+                }
 
         return json.dumps(response_data).encode()
 

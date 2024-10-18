@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type, cast
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
@@ -13,19 +13,34 @@ from web_poet import (
     HttpResponseHeaders,
 )
 from web_poet.annotated import AnnotatedInstance
+from web_poet.fields import get_fields_dict
+from web_poet.utils import get_fq_class_name
 from zyte_common_items import (
     Article,
     ArticleList,
     ArticleNavigation,
+    AutoArticleListPage,
+    AutoArticleNavigationPage,
+    AutoArticlePage,
+    AutoJobPostingNavigationPage,
+    AutoJobPostingPage,
+    AutoProductListPage,
+    AutoProductNavigationPage,
+    AutoProductPage,
+    CustomAttributes,
+    CustomAttributesMetadata,
+    CustomAttributesValues,
     Item,
     JobPosting,
+    JobPostingNavigation,
     Product,
     ProductList,
     ProductNavigation,
 )
+from zyte_common_items.fields import is_auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
-from scrapy_zyte_api._annotations import _ActionResult
+from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
@@ -33,6 +48,28 @@ try:
     from scrapy.http.request import NO_CALLBACK
 except ImportError:
     NO_CALLBACK = None  # type: ignore[assignment]
+
+
+_ITEM_KEYWORDS: Dict[type, str] = {
+    Product: "product",
+    ProductList: "productList",
+    ProductNavigation: "productNavigation",
+    Article: "article",
+    ArticleList: "articleList",
+    ArticleNavigation: "articleNavigation",
+    JobPosting: "jobPosting",
+    JobPostingNavigation: "jobPostingNavigation",
+}
+_AUTO_PAGES: Set[type] = {
+    AutoArticlePage,
+    AutoArticleListPage,
+    AutoArticleNavigationPage,
+    AutoJobPostingPage,
+    AutoJobPostingNavigationPage,
+    AutoProductPage,
+    AutoProductListPage,
+    AutoProductNavigationPage,
+}
 
 
 class ZyteApiProvider(PageObjectInputProvider):
@@ -46,16 +83,48 @@ class ZyteApiProvider(PageObjectInputProvider):
         ArticleNavigation,
         BrowserHtml,
         BrowserResponse,
+        CustomAttributes,
+        CustomAttributesValues,
         Geolocation,
         JobPosting,
+        JobPostingNavigation,
         Product,
         ProductList,
         ProductNavigation,
         Screenshot,
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._should_track_auto_fields = None
+        self._tracked_auto_fields = set()
+
     def is_provided(self, type_: Callable) -> bool:
         return super().is_provided(strip_annotated(type_))
+
+    def _track_auto_fields(self, crawler: Crawler, request: Request, cls: Type):
+        if cls not in _ITEM_KEYWORDS:
+            return
+        if self._should_track_auto_fields is None:
+            self._should_track_auto_fields = crawler.settings.getbool(
+                "ZYTE_API_AUTO_FIELD_STATS", False
+            )
+        if self._should_track_auto_fields is False:
+            return
+        cls = self.injector.registry.page_cls_for_item(request.url, cls) or cls
+        if cls in self._tracked_auto_fields:
+            return
+        self._tracked_auto_fields.add(cls)
+        if cls in _ITEM_KEYWORDS:
+            field_list = "(all fields)"
+        else:
+            auto_fields = set()
+            for field_name in get_fields_dict(cls):
+                if is_auto_field(cls, field_name):  # type: ignore[arg-type]
+                    auto_fields.add(field_name)
+            field_list = " ".join(sorted(auto_fields))
+        cls_fqn = get_fq_class_name(cls)
+        crawler.stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)
 
     async def __call__(  # noqa: C901
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
@@ -66,6 +135,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         http_response = None
         screenshot_requested = Screenshot in to_provide
         for cls in list(to_provide):
+            self._track_auto_fields(crawler, request, cast(type, cls))
             item = self.injector.weak_cache.get(request, {}).get(cls)
             if item:
                 results.append(item)
@@ -89,15 +159,6 @@ class ZyteApiProvider(PageObjectInputProvider):
             return results
 
         html_requested = BrowserResponse in to_provide or BrowserHtml in to_provide
-        item_keywords: Dict[type, str] = {
-            Product: "product",
-            ProductList: "productList",
-            ProductNavigation: "productNavigation",
-            Article: "article",
-            ArticleList: "articleList",
-            ArticleNavigation: "articleNavigation",
-            JobPosting: "jobPosting",
-        }
 
         zyte_api_meta = {
             **crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS"),
@@ -124,18 +185,17 @@ class ZyteApiProvider(PageObjectInputProvider):
                     )
                 zyte_api_meta["actions"] = []
                 for action in cls.__metadata__[0]:  # type: ignore[attr-defined]
-                    zyte_api_meta["actions"].append(
-                        {
-                            k: (
-                                dict(v)
-                                if isinstance(v, frozenset)
-                                else list(v) if isinstance(v, tuple) else v
-                            )
-                            for k, v in action
-                        }
+                    zyte_api_meta["actions"].append(_from_hashable(action))
+                continue
+            if cls_stripped in {CustomAttributes, CustomAttributesValues}:
+                custom_attrs_input, custom_attrs_options = cls.__metadata__[0]  # type: ignore[attr-defined]
+                zyte_api_meta["customAttributes"] = _from_hashable(custom_attrs_input)
+                if custom_attrs_options:
+                    zyte_api_meta["customAttributesOptions"] = _from_hashable(
+                        custom_attrs_options
                     )
                 continue
-            kw = item_keywords.get(cls_stripped)
+            kw = _ITEM_KEYWORDS.get(cls_stripped)
             if not kw:
                 continue
             item_requested = True
@@ -165,7 +225,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         )
 
         extract_from = None  # type: ignore[assignment]
-        for item_type, kw in item_keywords.items():
+        for item_type, kw in _ITEM_KEYWORDS.items():
             options_name = f"{kw}Options"
             if item_type not in to_provide_stripped and options_name in zyte_api_meta:
                 del zyte_api_meta[options_name]
@@ -174,8 +234,10 @@ class ZyteApiProvider(PageObjectInputProvider):
 
         if AnyResponse in to_provide:
             if (
-                item_requested and extract_from != "httpResponseBody"
-            ) or extract_from == "browserHtml":
+                (item_requested and extract_from != "httpResponseBody")
+                or extract_from == "browserHtml"
+                or zyte_api_meta.get("browserHtml", False) is True
+            ):
                 html_requested = True
             elif extract_from == "httpResponseBody" or http_response_needed:
                 zyte_api_meta["httpResponseBody"] = True
@@ -270,7 +332,28 @@ class ZyteApiProvider(PageObjectInputProvider):
                 result = AnnotatedInstance(Actions(actions_result), cls.__metadata__)  # type: ignore[attr-defined]
                 results.append(result)
                 continue
-            kw = item_keywords.get(cls_stripped)
+            if cls_stripped is CustomAttributes and is_typing_annotated(cls):
+                custom_attrs_result = api_response.raw_api_response["customAttributes"]
+                result = AnnotatedInstance(
+                    CustomAttributes(
+                        CustomAttributesValues(custom_attrs_result["values"]),
+                        CustomAttributesMetadata.from_dict(
+                            custom_attrs_result["metadata"]
+                        ),
+                    ),
+                    cls.__metadata__,  # type: ignore[attr-defined]
+                )
+                results.append(result)
+                continue
+            if cls_stripped is CustomAttributesValues and is_typing_annotated(cls):
+                custom_attrs_result = api_response.raw_api_response["customAttributes"]
+                result = AnnotatedInstance(
+                    CustomAttributesValues(custom_attrs_result["values"]),
+                    cls.__metadata__,  # type: ignore[attr-defined]
+                )
+                results.append(result)
+                continue
+            kw = _ITEM_KEYWORDS.get(cls_stripped)
             if not kw:
                 continue
             assert issubclass(cls_stripped, Item)
