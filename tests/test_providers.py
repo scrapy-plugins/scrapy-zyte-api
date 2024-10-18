@@ -536,6 +536,8 @@ async def test_provider_any_response_http_response_param(mockserver):
         response: AnyResponse
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 
@@ -564,6 +566,8 @@ async def test_provider_any_response_browser_html_param(mockserver):
         response: AnyResponse
 
     class ZyteAPISpider(Spider):
+        url: str
+
         def start_requests(self):
             yield Request(self.url, callback=self.parse_)
 

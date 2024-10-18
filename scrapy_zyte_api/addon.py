@@ -126,5 +126,5 @@ class Addon:
             settings.set(
                 "ZYTE_API_RETRY_POLICY",
                 _SESSION_RETRY_POLICIES.get(loaded_retry_policy, retry_policy),
-                settings.getpriority("ZYTE_API_RETRY_POLICY"),
+                cast(int, settings.getpriority("ZYTE_API_RETRY_POLICY")),
             )

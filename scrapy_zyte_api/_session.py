@@ -73,7 +73,7 @@ try:
     from scrapy.downloadermiddlewares.retry import get_retry_request
 except ImportError:  # pragma: no cover
     # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/downloadermiddlewares/retry.py#L57-L142
-    def get_retry_request(
+    def get_retry_request(  # type: ignore[misc]
         request,
         *,
         spider,
@@ -125,7 +125,7 @@ try:
     from scrapy.http.request import NO_CALLBACK
 except ImportError:
 
-    def NO_CALLBACK(response):
+    def NO_CALLBACK(response):  # type: ignore[misc]
         pass  # pragma: no cover
 
 
@@ -165,7 +165,7 @@ except ImportError:  # pragma: no cover
         return set_asyncio_event_loop()
 
     # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/defer.py#L360-L379
-    def deferred_to_future(d):
+    def deferred_to_future(d):  # type: ignore[misc]
         return d.asFuture(_get_asyncio_event_loop())
 
 
@@ -177,7 +177,7 @@ except ImportError:
     def build_from_crawler(
         objcls: Type[T], crawler: Crawler, /, *args: Any, **kwargs: Any
     ) -> T:
-        return create_instance(objcls, settings=None, crawler=crawler, *args, **kwargs)
+        return create_instance(objcls, settings=None, crawler=crawler, *args, **kwargs)  # type: ignore[misc]
 
 
 class PoolError(ValueError):
@@ -382,7 +382,7 @@ class SessionConfig:
         location = self.location(request)
         if not location:
             return True
-        for action in response.raw_api_response.get("actions", []):
+        for action in response.raw_api_response.get("actions", []):  # type: ignore[attr-defined]
             if action.get("action", None) != "setLocation":
                 continue
             if action.get("error", "").startswith("Action setLocation not supported "):
@@ -647,6 +647,8 @@ class _SessionManager:
             return pool
 
     async def _init_session(self, session_id: str, request: Request, pool: str) -> bool:
+        assert self._crawler.engine
+        assert self._crawler.stats
         session_config = self._get_session_config(request)
         if meta_params := request.meta.get("zyte_api_session_params", None):
             session_params = meta_params
@@ -685,7 +687,7 @@ class _SessionManager:
             callback=NO_CALLBACK,
         )
         if _DOWNLOAD_NEEDS_SPIDER:
-            deferred = self._crawler.engine.download(
+            deferred = self._crawler.engine.download(  # type: ignore[call-arg]
                 session_init_request, spider=spider
             )
         else:
@@ -829,6 +831,7 @@ class _SessionManager:
         """Check the response for signs of session expiration, update the
         internal session pool accordingly, and return ``False`` if the session
         has expired or ``True`` if the session passed validation."""
+        assert self._crawler.stats
         with self._fatal_error_handler:
             if self.is_init_request(request):
                 return True
@@ -860,6 +863,7 @@ class _SessionManager:
 
     async def assign(self, request: Request):
         """Assign a working session to *request*."""
+        assert self._crawler.stats
         with self._fatal_error_handler:
             if self.is_init_request(request):
                 return
@@ -895,6 +899,7 @@ class _SessionManager:
         return session_config.enabled(request)
 
     def handle_error(self, request: Request):
+        assert self._crawler.stats
         with self._fatal_error_handler:
             pool = self._get_pool(request)
             self._crawler.stats.inc_value(
@@ -908,6 +913,7 @@ class _SessionManager:
             self._start_request_session_refresh(request, pool)
 
     def handle_expiration(self, request: Request):
+        assert self._crawler.stats
         with self._fatal_error_handler:
             pool = self._get_pool(request)
             self._crawler.stats.inc_value(
