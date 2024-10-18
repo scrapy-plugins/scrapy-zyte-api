@@ -183,21 +183,21 @@ _API_RESPONSE = Dict[str, _JSON]
 
 
 def _body_max_size_exceeded(
-    expected_size: int,
+    body_size: int,
     warnsize: Optional[int],
     maxsize: Optional[int],
     request_url: str,
 ) -> bool:
-    if warnsize and expected_size > warnsize:
+    if warnsize and body_size > warnsize:
         logger.warning(
-            f"Expected response size {expected_size} larger than "
+            f"Actual response size {body_size} larger than "
             f"download warn size {warnsize} in request {request_url}."
         )
 
-    if maxsize and expected_size > maxsize:
+    if maxsize and body_size > maxsize:
         logger.warning(
-            f"Cancelling download of {request_url}: expected response size "
-            f"{expected_size} larger than download max size {maxsize}."
+            f"Cancelling download of {request_url}: actual response size "
+            f"{body_size} larger than download max size {maxsize}."
         )
         return True
     return False
