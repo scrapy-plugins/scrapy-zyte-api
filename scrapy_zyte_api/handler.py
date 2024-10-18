@@ -92,6 +92,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 f"({self._truncate_limit}) is invalid. It must be 0 or a "
                 f"positive integer."
             )
+        self._default_maxsize = settings.getint("DOWNLOAD_MAXSIZE")
+        self._default_warnsize = settings.getint("DOWNLOAD_WARNSIZE")
+
         crawler.signals.connect(self.engine_started, signal=signals.engine_started)
         self._crawler = crawler
         self._fallback_handler = None
@@ -231,7 +234,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         finally:
             self._update_stats(api_params)
 
-        return _process_response(api_response, request, self._cookie_jars)
+        return _process_response(
+            api_response, request, self._cookie_jars, self._default_maxsize, self._default_warnsize
+        )
 
     def _process_request_error(self, request, error):
         detail = (error.parsed.data or {}).get("detail", error.message)
