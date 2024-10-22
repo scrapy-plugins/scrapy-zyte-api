@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.25.0 (2024-10-DD)
+0.25.0 (2024-10-22)
 -------------------
 
 * Added official Python 3.13 support, removed official Python 3.8 support.
