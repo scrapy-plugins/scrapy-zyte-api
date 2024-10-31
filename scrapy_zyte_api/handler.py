@@ -235,7 +235,11 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             self._update_stats(api_params)
 
         return _process_response(
-            api_response, request, self._cookie_jars, self._default_maxsize, self._default_warnsize
+            api_response=api_response,
+            request=request,
+            cookie_jars=self._cookie_jars,
+            default_maxsize=self._default_maxsize,
+            default_warnsize=self._default_warnsize
         )
 
     def _process_request_error(self, request, error):
