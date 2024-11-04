@@ -26,6 +26,7 @@ from zyte_common_items import (
     AutoProductListPage,
     AutoProductNavigationPage,
     AutoProductPage,
+    AutoSerpPage,
     Item,
     JobPosting,
     Product,
@@ -64,6 +65,7 @@ _AUTO_PAGES: Set[type] = {
     AutoProductPage,
     AutoProductListPage,
     AutoProductNavigationPage,
+    AutoSerpPage,
 }
 
 
