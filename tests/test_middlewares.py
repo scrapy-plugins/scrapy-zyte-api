@@ -216,6 +216,7 @@ async def test_max_requests_race_condition(caplog):
         f"Maximum Zyte API requests for this crawl is set at {zapi_max_requests}"
         in caplog.text
     )
+    assert crawler.stats
     assert crawler.stats.get_value("scrapy-zyte-api/success") == zapi_max_requests
     assert crawler.stats.get_value("scrapy-zyte-api/processed") == zapi_max_requests
     assert crawler.stats.get_value("item_scraped_count") == zapi_max_requests
