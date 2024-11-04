@@ -24,7 +24,7 @@ from twisted.internet.defer import Deferred
 from zyte_api.aio.errors import RequestError
 
 from scrapy_zyte_api._cookies import _get_cookie_jar
-from scrapy_zyte_api._params import _EXTRACT_KEYS, ANY_VALUE
+from scrapy_zyte_api._params import ANY_VALUE
 from scrapy_zyte_api.handler import _ParamParser
 from scrapy_zyte_api.responses import _process_response
 
