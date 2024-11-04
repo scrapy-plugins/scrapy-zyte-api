@@ -194,8 +194,11 @@ def _process_response(
         return ZyteAPITextResponse.from_api_response(api_response, request=request)
 
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
+        scrapy_headers: Dict[bytes, bytes] = {}
+        for header in cast(List[Dict[str, str]], api_response["httpResponseHeaders"]):
+            scrapy_headers[header["name"].encode()] = header["value"].encode()
         response_cls = responsetypes.from_args(
-            headers=cast(List[Dict[str, str]], api_response["httpResponseHeaders"]),
+            headers=scrapy_headers,
             url=cast(str, api_response["url"]),
             # FIXME: update this when python-zyte-api supports base64 decoding
             body=b64decode(api_response["httpResponseBody"]),  # type: ignore
