@@ -27,8 +27,8 @@ Unreleased
 
 * When it is not clear whether a request will use browser rendering or not,
   e.g. an :ref:`automatic extraction request <zapi-extract>` without an
-  :http:`extractFrom <productOptions.extractFrom>` value, the URL fragment is
-  now taken into account for request fingerprinting, i.e.
+  :http:`extractFrom <request:productOptions.extractFrom>` value, the URL
+  fragment is now taken into account for request fingerprinting, i.e.
   ``https://example.com#a`` and ``https://example.com#b`` are *not* considered
   duplicate requests anymore in that scenario.
 
