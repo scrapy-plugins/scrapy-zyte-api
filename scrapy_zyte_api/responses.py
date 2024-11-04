@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 from scrapy import Request
-from scrapy.http import HtmlResponse, Response, TextResponse
+from scrapy.http import Headers, HtmlResponse, Response, TextResponse
 from scrapy.http.cookies import CookieJar
 from scrapy.responsetypes import responsetypes
 
@@ -194,7 +194,8 @@ def _process_response(
         return ZyteAPITextResponse.from_api_response(api_response, request=request)
 
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
-        scrapy_headers: Dict[bytes, bytes] = {}
+        # a plain dict here doesn't work correctly on Scrapy < 2.1
+        scrapy_headers = Headers()
         for header in cast(List[Dict[str, str]], api_response["httpResponseHeaders"]):
             scrapy_headers[header["name"].encode()] = header["value"].encode()
         response_cls = responsetypes.from_args(
