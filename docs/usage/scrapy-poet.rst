@@ -39,8 +39,6 @@ Dependency annotations
 
 ``ZyteApiProvider`` understands and makes use of some dependency annotations.
 
-.. note:: Dependency annotations require Python 3.9+.
-
 Item annotations
 ----------------
 
@@ -130,6 +128,47 @@ resulting page object:
             if action_result["status"] != "success":
                 return Product(is_valid=False)
         return None
+
+.. _custom-attrs:
+
+Custom attribute extraction
+---------------------------
+
+You can request custom attribute extraction by using either a
+:class:`zyte_common_items.CustomAttributes` dependency (if you need both the
+attribute values and the attribute extraction metadata) or a
+:class:`zyte_common_items.CustomAttributesValues` dependency (if you only need
+the values). You need to annotate it with input data as a dictionary and, if
+needed, a dictionary with extraction options. You should use the
+:func:`scrapy_zyte_api.custom_attrs` function to create the annotation:
+
+.. code-block:: python
+
+    from typing import Annotated
+
+    from scrapy_zyte_api import custom_attrs
+    from zyte_common_items import CustomAttributes
+
+
+    @attrs.define
+    class MyPageObject(BasePage):
+        product: Product
+        custom_attributes: Annotated[
+            CustomAttributes,
+            custom_attrs(
+                {"name": {"type": "string", "description": "name of the product"}},
+                {"method": "generate"},
+            ),
+        ]
+
+You can then access the results as the dependency value:
+
+.. code-block:: python
+
+        def parse_page(self, response: DummyResponse, page: MyPageObject):
+            ...
+            for k, v in page.custom_attributes.values.items():
+                ...
 
 
 Custom parameters

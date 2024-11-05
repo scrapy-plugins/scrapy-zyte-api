@@ -32,6 +32,35 @@ Unreleased
   ``https://example.com#a`` and ``https://example.com#b`` are *not* considered
   duplicate requests anymore in that scenario.
 
+0.25.0 (2024-10-22)
+-------------------
+
+* Added official Python 3.13 support, removed official Python 3.8 support.
+
+* Fixed a race condition that could allow more Zyte API requests than those
+  configured in the :setting:`ZYTE_API_MAX_REQUESTS` setting.
+
+0.24.0 (2024-10-07)
+-------------------
+
+* Added support for ``zyte_common_items.JobPostingNavigation`` to the
+  scrapy-poet provider.
+
+0.23.0 (2024-09-26)
+-------------------
+
+* Added support for :ref:`custom attribute extraction <custom-attrs>`.
+
+* Added the :class:`~scrapy_zyte_api.LocationSessionConfig` class.
+
+0.22.1 (2024-08-30)
+-------------------
+
+* Fixed an issue in the handling of excessive session initialization failures
+  during session refreshing, which would manifest as an asyncio messages about
+  unretrieved ``TooManyBadSessionInits`` task exceptions instead of stopping
+  the spider as intended.
+
 0.22.0 (2024-07-26)
 -------------------
 

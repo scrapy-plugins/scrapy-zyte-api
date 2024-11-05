@@ -33,8 +33,7 @@ setuptools.setup(
             "andi>=0.6.0",
             "scrapy-poet>=0.22.3",
             "web-poet>=0.17.0",
-            # "zyte-common-items>=0.20.0",
-            "zyte-common-items @ git+https://github.com/Gallaecio/zyte-common-items.git@serp",
+            "zyte-common-items>=0.24.0",
         ]
     },
     classifiers=[
@@ -44,10 +43,10 @@ setuptools.setup(
         "Natural Language :: English",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
     ],
 )

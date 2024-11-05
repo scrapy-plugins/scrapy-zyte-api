@@ -5,7 +5,7 @@ if _NEEDS_EARLY_REACTOR:
 
     install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
-from ._annotations import ExtractFrom, actions
+from ._annotations import ExtractFrom, actions, custom_attrs
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
@@ -17,6 +17,7 @@ from ._session import (
 )
 from ._session import SESSION_DEFAULT_RETRY_POLICY as _SESSION_DEFAULT_RETRY_POLICY
 from ._session import (
+    LocationSessionConfig,
     ScrapyZyteAPISessionDownloaderMiddleware,
     SessionConfig,
     is_session_init_request,

@@ -1,5 +1,5 @@
-import sys
 from collections import defaultdict
+from typing import Annotated
 
 import pytest
 
@@ -24,10 +24,24 @@ from web_poet import (
     handle_urls,
 )
 from web_poet.pages import get_item_cls
-from zyte_common_items import AutoProductPage, BasePage, BaseProductPage, Product
+from zyte_common_items import (
+    AutoProductPage,
+    BasePage,
+    BaseProductPage,
+    CustomAttributes,
+    CustomAttributesValues,
+    Product,
+)
 from zyte_common_items.fields import auto_field
 
-from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot, actions
+from scrapy_zyte_api import (
+    Actions,
+    ExtractFrom,
+    Geolocation,
+    Screenshot,
+    actions,
+    custom_attrs,
+)
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import _AUTO_PAGES, _ITEM_KEYWORDS, ZyteApiProvider
 
@@ -245,13 +259,8 @@ async def test_provider_params_remove_unused_options(mockserver):
     )
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
-)
 @ensureDeferred
 async def test_provider_extractfrom(mockserver):
-    from typing import Annotated
-
     @attrs.define
     class AnnotatedProductPage(BasePage):
         product: Annotated[Product, ExtractFrom.httpResponseBody]
@@ -281,13 +290,8 @@ async def test_provider_extractfrom(mockserver):
     )
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
-)
 @ensureDeferred
 async def test_provider_extractfrom_double(mockserver, caplog):
-    from typing import Annotated
-
     @attrs.define
     class AnnotatedProductPage(BasePage):
         product: Annotated[Product, ExtractFrom.httpResponseBody]
@@ -308,13 +312,8 @@ async def test_provider_extractfrom_double(mockserver, caplog):
     assert "Multiple different extractFrom specified for product" in caplog.text
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
-)
 @ensureDeferred
 async def test_provider_extractfrom_override(mockserver):
-    from typing import Annotated
-
     @attrs.define
     class AnnotatedProductPage(BasePage):
         product: Annotated[Product, ExtractFrom.httpResponseBody]
@@ -345,13 +344,8 @@ async def test_provider_extractfrom_override(mockserver):
     )
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
-)
 @ensureDeferred
 async def test_provider_geolocation(mockserver):
-    from typing import Annotated
-
     @attrs.define
     class GeoProductPage(BasePage):
         product: Product
@@ -371,9 +365,6 @@ async def test_provider_geolocation(mockserver):
     assert item["product"].name == "Product name (country DE)"
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
-)
 @ensureDeferred
 async def test_provider_geolocation_unannotated(mockserver, caplog):
     @attrs.define
@@ -392,6 +383,99 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
     item, url, _ = await crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
     assert item is None
     assert "Geolocation dependencies must be annotated" in caplog.text
+
+
+custom_attrs_input = {
+    "attr1": {"type": "string", "description": "descr1"},
+    "attr2": {"type": "number", "description": "descr2"},
+}
+
+
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        custom_attrs(custom_attrs_input),
+        custom_attrs(custom_attrs_input, None),
+        custom_attrs(custom_attrs_input, {}),
+        custom_attrs(custom_attrs_input, {"foo": "bar"}),
+    ],
+)
+@ensureDeferred
+async def test_provider_custom_attrs(mockserver, annotation):
+    @attrs.define
+    class CustomAttrsPage(BasePage):
+        product: Product
+        custom_attrs: Annotated[CustomAttributes, annotation]
+
+    class CustomAttrsZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: CustomAttrsPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+                "custom_attrs": page.custom_attrs,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(
+        CustomAttrsZyteAPISpider, HtmlResource, settings
+    )
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
+        )
+    )
+    assert item["custom_attrs"] == CustomAttributes.from_dict(
+        {
+            "values": {
+                "attr1": "foo",
+                "attr2": 42,
+            },
+            "metadata": {"textInputTokens": 1000},
+        }
+    )
+
+
+@ensureDeferred
+async def test_provider_custom_attrs_values(mockserver):
+    @attrs.define
+    class CustomAttrsPage(BasePage):
+        product: Product
+        custom_attrs: Annotated[
+            CustomAttributesValues,
+            custom_attrs(custom_attrs_input),
+        ]
+
+    class CustomAttrsZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: CustomAttrsPage):  # type: ignore[override]
+            yield {
+                "product": page.product,
+                "custom_attrs": page.custom_attrs,
+            }
+
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await crawl_single_item(
+        CustomAttrsZyteAPISpider, HtmlResource, settings
+    )
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
+        )
+    )
+    assert item["custom_attrs"] == {
+        "attr1": "foo",
+        "attr2": 42,
+    }
 
 
 class RecordingHandler(ScrapyZyteAPIDownloadHandler):
@@ -969,13 +1053,8 @@ async def test_screenshot(mockserver):
     assert item["screenshot"].body == b"screenshot-body-contents"
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="No Annotated support in Python < 3.9"
-)
 @ensureDeferred
 async def test_provider_actions(mockserver, caplog):
-    from typing import Annotated
-
     @attrs.define
     class ActionProductPage(BasePage):
         product: Product

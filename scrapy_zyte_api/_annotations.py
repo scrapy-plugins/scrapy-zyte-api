@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Iterable, List, Optional, TypedDict
+from typing import Any, Dict, FrozenSet, Iterable, List, Optional, Tuple, TypedDict
 
 
 class ExtractFrom(str, Enum):
@@ -56,7 +56,8 @@ class _ActionResult(TypedDict, total=False):
     error: Optional[str]
 
 
-def make_hashable(obj):
+def make_hashable(obj: Any) -> Any:
+    """Converts input into hashable form, to use in ``Annotated``."""
     if isinstance(obj, (tuple, list)):
         return tuple((make_hashable(e) for e in obj))
 
@@ -66,7 +67,26 @@ def make_hashable(obj):
     return obj
 
 
-def actions(value: Iterable[Action]):
+def _from_hashable(obj: Any) -> Any:
+    """Converts a result of ``make_hashable`` back to original form."""
+    if isinstance(obj, tuple):
+        return [_from_hashable(o) for o in obj]
+
+    if isinstance(obj, frozenset):
+        return {_from_hashable(k): _from_hashable(v) for k, v in obj}
+
+    return obj
+
+
+def actions(value: Iterable[Action]) -> Tuple[Any, ...]:
     """Convert an iterable of :class:`~scrapy_zyte_api.Action` dicts into a hashable value."""
     # both lists and dicts are not hashable and we need dep types to be hashable
     return tuple(make_hashable(action) for action in value)
+
+
+def custom_attrs(
+    input: Dict[str, Any], options: Optional[Dict[str, Any]] = None
+) -> Tuple[FrozenSet[Any], Optional[FrozenSet[Any]]]:
+    input_wrapped = make_hashable(input)
+    options_wrapped = make_hashable(options) if options else None
+    return input_wrapped, options_wrapped
