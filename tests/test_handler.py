@@ -637,7 +637,7 @@ def test_body_max_size_exceeded(
 async def test_download_request_limits(
     body_size, warnsize, maxsize, expect_null, mockserver
 ):
-    settings = {"DOWNLOAD_WARNSIZE": warnsize, "DOWNLOAD_MAXSIZE": maxsize}
+    settings: SETTINGS_T = {"DOWNLOAD_WARNSIZE": warnsize, "DOWNLOAD_MAXSIZE": maxsize}
     async with make_handler(settings, mockserver.urljoin("/")) as handler:
         handler._session = mock.AsyncMock()
         handler._session.get.return_value = mock.Mock(body=b"x" * body_size)
