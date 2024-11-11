@@ -16,8 +16,11 @@ from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
 from zyte_api.aio.retry import RetryFactory
 from zyte_api.constants import API_URL
-
-from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
+from scrapy_zyte_api.responses import ZyteAPITextResponse
+from scrapy_zyte_api.handler import (
+    ScrapyZyteAPIDownloadHandler,
+    _body_max_size_exceeded,
+)
 from scrapy_zyte_api.utils import USER_AGENT
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_T, UNSET
@@ -557,3 +560,75 @@ async def test_fallback_setting():
     handler = get_download_handler(crawler, "https")
     assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
     assert isinstance(handler._fallback_handler, HTTPDownloadHandler)
+
+
+@pytest.mark.parametrize(
+    "body_size, warnsize, maxsize, expected_result, expected_warnings",
+    [
+        # Warning only (exceeds warnsize but not maxsize)
+        (1200, 1000, 1500, False, [
+            "Actual response size 1200 larger than download warn size 1000 in request http://example.com."
+        ]),
+        # Cancel download (exceeds both warnsize and maxsize)
+        (1600, 1000, 1500, True, [
+            "Actual response size 1600 larger than download warn size 1000 in request http://example.com.",
+            "Cancelling download of http://example.com: actual response size 1600 larger than download max size 1500."
+        ]),
+        # No limits - no warnings expected
+        (500, None, None, False, []),
+    ],
+)
+def test_body_max_size_exceeded(body_size, warnsize, maxsize, expected_result, expected_warnings):
+    with mock.patch("scrapy_zyte_api.handler.logger") as logger:
+        result = _body_max_size_exceeded(
+            body_size=body_size,
+            warnsize=warnsize,
+            maxsize=maxsize,
+            request_url="http://example.com",
+        )
+
+    assert result == expected_result
+
+    if expected_warnings:
+        for call, expected_warning in zip(logger.warning.call_args_list, expected_warnings):
+            assert call[0][0] == expected_warning
+    else:
+        logger.warning.assert_not_called()
+
+
+@ensureDeferred
+@pytest.mark.parametrize(
+    "body_size, warnsize, maxsize, expect_null",
+    [
+        (500, None, None, False),  # No limits, should return response
+        (1500, 1000, None, False),  # Exceeds warnsize, should log warning but return response
+        (2500, 1000, 2000, True),  # Exceeds maxsize, should return None
+        (500, 1000, 2000, False),  # Within limits, should return response
+        (1500, None, 1000, True),  # Exceeds maxsize with no warnsize, should return None
+    ],
+)
+async def test_download_request_limits(
+    body_size, warnsize, maxsize, expect_null, mockserver
+):
+    settings = {"DOWNLOAD_WARNSIZE": warnsize, "DOWNLOAD_MAXSIZE": maxsize}
+    async with make_handler(settings, mockserver.urljoin("/")) as handler:
+        handler._session = mock.AsyncMock()
+        handler._session.get.return_value = mock.Mock(body=b"x" * body_size)
+
+        mock_api_response = mock.Mock(body=b"x" * body_size)
+
+        # Patch the `from_api_response` method of ZyteAPITextResponse only for the test
+        with mock.patch.object(
+            ZyteAPITextResponse, "from_api_response", return_value=mock_api_response
+        ):
+            with mock.patch(
+                "scrapy_zyte_api.responses._process_response",
+                return_value=mock_api_response,
+            ):
+                request = Request("https://example.com")
+                result = await handler._download_request({}, request, None)
+
+                if expect_null:
+                    assert result is None
+                else:
+                    assert result is not None
