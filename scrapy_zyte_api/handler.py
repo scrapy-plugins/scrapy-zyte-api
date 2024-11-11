@@ -23,6 +23,27 @@ from .utils import USER_AGENT
 logger = logging.getLogger(__name__)
 
 
+def _body_max_size_exceeded(
+    body_size: int,
+    warnsize: Optional[int],
+    maxsize: Optional[int],
+    request_url: str,
+) -> bool:
+    if warnsize and body_size > warnsize:
+        logger.warning(
+            f"Actual response size {body_size} larger than "
+            f"download warn size {warnsize} in request {request_url}."
+        )
+
+    if maxsize and body_size > maxsize:
+        logger.warning(
+            f"Cancelling download of {request_url}: actual response size "
+            f"{body_size} larger than download max size {maxsize}."
+        )
+        return True
+    return False
+
+
 def _truncate_str(obj, index, text, limit):
     if len(text) <= limit:
         return
@@ -234,13 +255,18 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         finally:
             self._update_stats(api_params)
 
-        return _process_response(
+        process_response = _process_response(
             api_response=api_response,
             request=request,
-            cookie_jars=self._cookie_jars,
-            default_maxsize=self._default_maxsize,
-            default_warnsize=self._default_warnsize
+            cookie_jars=self._cookie_jars
         )
+
+        if _body_max_size_exceeded(
+                len(process_response.body), self._default_maxsize, self._default_warnsize, request.url
+        ):
+            return None
+
+        return process_response
 
     def _process_request_error(self, request, error):
         detail = (error.parsed.data or {}).get("detail", error.message)
