@@ -16,11 +16,12 @@ from scrapy.utils.test import get_crawler
 from zyte_api.aio.client import AsyncClient
 from zyte_api.aio.retry import RetryFactory
 from zyte_api.constants import API_URL
-from scrapy_zyte_api.responses import ZyteAPITextResponse
+
 from scrapy_zyte_api.handler import (
     ScrapyZyteAPIDownloadHandler,
     _body_max_size_exceeded,
 )
+from scrapy_zyte_api.responses import ZyteAPITextResponse
 from scrapy_zyte_api.utils import USER_AGENT
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_T, UNSET
@@ -566,19 +567,33 @@ async def test_fallback_setting():
     "body_size, warnsize, maxsize, expected_result, expected_warnings",
     [
         # Warning only (exceeds warnsize but not maxsize)
-        (1200, 1000, 1500, False, [
-            "Actual response size 1200 larger than download warn size 1000 in request http://example.com."
-        ]),
+        (
+            1200,
+            1000,
+            1500,
+            False,
+            [
+                "Actual response size 1200 larger than download warn size 1000 in request http://example.com."
+            ],
+        ),
         # Cancel download (exceeds both warnsize and maxsize)
-        (1600, 1000, 1500, True, [
-            "Actual response size 1600 larger than download warn size 1000 in request http://example.com.",
-            "Cancelling download of http://example.com: actual response size 1600 larger than download max size 1500."
-        ]),
+        (
+            1600,
+            1000,
+            1500,
+            True,
+            [
+                "Actual response size 1600 larger than download warn size 1000 in request http://example.com.",
+                "Cancelling download of http://example.com: actual response size 1600 larger than download max size 1500.",
+            ],
+        ),
         # No limits - no warnings expected
         (500, None, None, False, []),
     ],
 )
-def test_body_max_size_exceeded(body_size, warnsize, maxsize, expected_result, expected_warnings):
+def test_body_max_size_exceeded(
+    body_size, warnsize, maxsize, expected_result, expected_warnings
+):
     with mock.patch("scrapy_zyte_api.handler.logger") as logger:
         result = _body_max_size_exceeded(
             body_size=body_size,
@@ -590,7 +605,9 @@ def test_body_max_size_exceeded(body_size, warnsize, maxsize, expected_result, e
     assert result == expected_result
 
     if expected_warnings:
-        for call, expected_warning in zip(logger.warning.call_args_list, expected_warnings):
+        for call, expected_warning in zip(
+            logger.warning.call_args_list, expected_warnings
+        ):
             assert call[0][0] == expected_warning
     else:
         logger.warning.assert_not_called()
@@ -601,10 +618,20 @@ def test_body_max_size_exceeded(body_size, warnsize, maxsize, expected_result, e
     "body_size, warnsize, maxsize, expect_null",
     [
         (500, None, None, False),  # No limits, should return response
-        (1500, 1000, None, False),  # Exceeds warnsize, should log warning but return response
+        (
+            1500,
+            1000,
+            None,
+            False,
+        ),  # Exceeds warnsize, should log warning but return response
         (2500, 1000, 2000, True),  # Exceeds maxsize, should return None
         (500, 1000, 2000, False),  # Within limits, should return response
-        (1500, None, 1000, True),  # Exceeds maxsize with no warnsize, should return None
+        (
+            1500,
+            None,
+            1000,
+            True,
+        ),  # Exceeds maxsize with no warnsize, should return None
     ],
 )
 async def test_download_request_limits(

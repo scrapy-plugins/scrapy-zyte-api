@@ -256,13 +256,14 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             self._update_stats(api_params)
 
         process_response = _process_response(
-            api_response=api_response,
-            request=request,
-            cookie_jars=self._cookie_jars
+            api_response=api_response, request=request, cookie_jars=self._cookie_jars
         )
 
         if _body_max_size_exceeded(
-                len(process_response.body), self._default_warnsize, self._default_maxsize, request.url
+            len(process_response.body),
+            self._default_warnsize,
+            self._default_maxsize,
+            request.url,
         ):
             return None
 
