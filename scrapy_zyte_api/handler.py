@@ -37,7 +37,7 @@ def _body_max_size_exceeded(
 
     if maxsize and body_size > maxsize:
         logger.warning(
-            f"Cancelling download of {request_url}: actual response size "
+            f"Dropping the response for {request_url}: actual response size "
             f"{body_size} larger than download max size {maxsize}."
         )
         return True

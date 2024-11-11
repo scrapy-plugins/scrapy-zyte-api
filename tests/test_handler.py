@@ -584,7 +584,7 @@ async def test_fallback_setting():
             True,
             [
                 "Actual response size 1600 larger than download warn size 1000 in request http://example.com.",
-                "Cancelling download of http://example.com: actual response size 1600 larger than download max size 1500.",
+                "Dropping the response for http://example.com: actual response size 1600 larger than download max size 1500.",
             ],
         ),
         # No limits - no warnings expected
