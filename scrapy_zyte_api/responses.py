@@ -1,5 +1,3 @@
-import logging
-
 from base64 import b64decode
 from copy import copy
 from datetime import datetime
@@ -16,9 +14,6 @@ from scrapy_zyte_api.utils import (
     _RESPONSE_HAS_IP_ADDRESS,
     _RESPONSE_HAS_PROTOCOL,
 )
-
-logger = logging.getLogger(__name__)
-
 
 _DEFAULT_ENCODING = "utf-8"
 
@@ -118,9 +113,7 @@ class ZyteAPIMixin:
 
 class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
     @classmethod
-    def from_api_response(
-            cls, api_response: Dict, maxsize: Optional[int], warnsize: Optional[int], *, request: Request = None
-    ):
+    def from_api_response(cls, api_response: Dict, *, request: Request = None):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
@@ -132,9 +125,6 @@ class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
             body = api_response["browserHtml"].encode(encoding)
         elif api_response.get("httpResponseBody"):
             body = b64decode(api_response["httpResponseBody"])
-
-        if _body_max_size_exceeded(len(body), maxsize, warnsize, request.url):
-            return None
 
         return cls(
             url=api_response["url"],
@@ -154,20 +144,14 @@ class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
 
 class ZyteAPIResponse(ZyteAPIMixin, Response):
     @classmethod
-    def from_api_response(
-            cls, api_response: Dict, maxsize: Optional[int], warnsize: Optional[int], *, request: Request = None
-    ):
+    def from_api_response(cls, api_response: Dict, *, request: Request = None):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
-        body = b64decode(api_response.get("httpResponseBody") or "")
-        if _body_max_size_exceeded(len(body), maxsize, warnsize, request.url):
-            return None
-
         return cls(
             url=api_response["url"],
             status=api_response.get("statusCode") or 200,
-            body=body,
+            body=b64decode(api_response.get("httpResponseBody") or ""),
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response),
@@ -182,34 +166,10 @@ _JSON = Union[
 _API_RESPONSE = Dict[str, _JSON]
 
 
-def _body_max_size_exceeded(
-    body_size: int,
-    warnsize: Optional[int],
-    maxsize: Optional[int],
-    request_url: str,
-) -> bool:
-    if warnsize and body_size > warnsize:
-        logger.warning(
-            f"Actual response size {body_size} larger than "
-            f"download warn size {warnsize} in request {request_url}."
-        )
-
-    if maxsize and body_size > maxsize:
-        logger.warning(
-            f"Cancelling download of {request_url}: actual response size "
-            f"{body_size} larger than download max size {maxsize}."
-        )
-        return True
-    return False
-
-
 def _process_response(
-    *,
     api_response: _API_RESPONSE,
     request: Request,
     cookie_jars: Optional[Dict[Any, CookieJar]],
-    default_maxsize: Optional[int],
-    default_warnsize: Optional[int],
 ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
     """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
     this returns either a ``ZyteAPITextResponse`` or ``ZyteAPIResponse`` depending
@@ -224,13 +184,10 @@ def _process_response(
 
     _process_cookies(api_response, request, cookie_jars)
 
-    maxsize = request.meta.get("download_maxsize", default_maxsize)
-    warnsize = request.meta.get("download_warnsize", default_warnsize)
-
     if api_response.get("browserHtml"):
         # Using TextResponse because browserHtml always returns a browser-rendered page
         # even when requesting files (like images)
-        return ZyteAPITextResponse.from_api_response(api_response, maxsize, warnsize, request=request)
+        return ZyteAPITextResponse.from_api_response(api_response, request=request)
 
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
         response_cls = responsetypes.from_args(
@@ -240,6 +197,6 @@ def _process_response(
             body=b64decode(api_response["httpResponseBody"]),  # type: ignore
         )
         if issubclass(response_cls, TextResponse):
-            return ZyteAPITextResponse.from_api_response(api_response, maxsize, warnsize, request=request)
+            return ZyteAPITextResponse.from_api_response(api_response, request=request)
 
-    return ZyteAPIResponse.from_api_response(api_response, maxsize, warnsize, request=request)
+    return ZyteAPIResponse.from_api_response(api_response, request=request)
