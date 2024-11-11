@@ -136,8 +136,8 @@ async def test_max_requests(caplog):
                 for i in range(spider_requests):
                     meta = {"zyte_api": {"browserHtml": True}}
 
-                    # Alternating requests between ZAPI and non-ZAPI tests if
-                    # ZYTE_API_MAX_REQUESTS solely limits ZAPI Requests.
+                    # Alternating requests between ZAPI and non-ZAPI verifies
+                    # that ZYTE_API_MAX_REQUESTS solely limits ZAPI requests.
 
                     if i % 2:
                         yield Request(
@@ -166,9 +166,56 @@ async def test_max_requests(caplog):
         f"Maximum Zyte API requests for this crawl is set at {zapi_max_requests}"
         in caplog.text
     )
-    assert crawler.stats.get_value("scrapy-zyte-api/success") <= zapi_max_requests
-    assert crawler.stats.get_value("scrapy-zyte-api/processed") <= zapi_max_requests
+    assert crawler.stats.get_value("scrapy-zyte-api/success") == zapi_max_requests
+    assert crawler.stats.get_value("scrapy-zyte-api/processed") == zapi_max_requests
     assert crawler.stats.get_value("item_scraped_count") <= zapi_max_requests + 6
+    assert crawler.stats.get_value("finish_reason") == "closespider_max_zapi_requests"
+    assert (
+        crawler.stats.get_value(
+            "downloader/exception_type_count/scrapy.exceptions.IgnoreRequest"
+        )
+        > 0
+    )
+
+
+@ensureDeferred
+async def test_max_requests_race_condition(caplog):
+    spider_requests = 8
+    zapi_max_requests = 1
+
+    with MockServer(DelayedResource) as server:
+
+        class TestSpider(Spider):
+            name = "test_spider"
+
+            def start_requests(self):
+                for i in range(spider_requests):
+                    meta = {"zyte_api": {"browserHtml": True}}
+                    yield Request("https://example.com", meta=meta, dont_filter=True)
+
+            def parse(self, response):
+                yield Item()
+
+        settings = {
+            "DOWNLOADER_MIDDLEWARES": {
+                "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633
+            },
+            "ZYTE_API_MAX_REQUESTS": zapi_max_requests,
+            "ZYTE_API_URL": server.urljoin("/"),
+            **SETTINGS,
+        }
+
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        with caplog.at_level("INFO"):
+            await crawler.crawl()
+
+    assert (
+        f"Maximum Zyte API requests for this crawl is set at {zapi_max_requests}"
+        in caplog.text
+    )
+    assert crawler.stats.get_value("scrapy-zyte-api/success") == zapi_max_requests
+    assert crawler.stats.get_value("scrapy-zyte-api/processed") == zapi_max_requests
+    assert crawler.stats.get_value("item_scraped_count") == zapi_max_requests
     assert crawler.stats.get_value("finish_reason") == "closespider_max_zapi_requests"
     assert (
         crawler.stats.get_value(

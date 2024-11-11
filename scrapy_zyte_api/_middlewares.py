@@ -53,6 +53,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
                 f"{self._max_requests}. The spider will close when it's "
                 f"reached."
             )
+        self._request_count = 0
 
         crawler.signals.connect(
             self._start_requests_processed, signal=_start_requests_processed
@@ -124,29 +125,15 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         if self._param_parser.parse(request) is None:
             return
 
-        self.slot_request(request, spider, force=True)
-
-        if self._max_requests_reached(self._crawler.engine.downloader):
+        self._request_count += 1
+        if self._max_requests and self._request_count > self._max_requests:
             self._crawler.engine.close_spider(spider, "closespider_max_zapi_requests")
             raise IgnoreRequest(
                 f"The request {request} is skipped as {self._max_requests} max "
                 f"Zyte API requests have been reached."
             )
 
-    def _max_requests_reached(self, downloader) -> bool:
-        if not self._max_requests:
-            return False
-
-        zapi_req_count = self._crawler.stats.get_value("scrapy-zyte-api/processed", 0)
-        download_req_count = sum(
-            [
-                len(slot.transferring)
-                for slot_id, slot in downloader.slots.items()
-                if slot_id.startswith(self._slot_prefix)
-            ]
-        )
-        total_requests = zapi_req_count + download_req_count
-        return total_requests >= self._max_requests
+        self.slot_request(request, spider, force=True)
 
     def process_exception(self, request, exception, spider):
         if (
