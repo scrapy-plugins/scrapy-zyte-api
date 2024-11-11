@@ -262,7 +262,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         )
 
         if _body_max_size_exceeded(
-                len(process_response.body), self._default_maxsize, self._default_warnsize, request.url
+                len(process_response.body), self._default_warnsize, self._default_maxsize, request.url
         ):
             return None
 
