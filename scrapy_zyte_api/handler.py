@@ -255,10 +255,10 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         finally:
             self._update_stats(api_params)
 
-        process_response = _process_response(
+        response = _process_response(
             api_response=api_response, request=request, cookie_jars=self._cookie_jars
         )
-        if process_response and _body_max_size_exceeded(
+        if response and _body_max_size_exceeded(
             len(process_response.body),
             self._default_warnsize,
             self._default_maxsize,
@@ -266,7 +266,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         ):
             return None
 
-        return process_response
+        return response
 
     def _process_request_error(self, request, error):
         detail = (error.parsed.data or {}).get("detail", error.message)
