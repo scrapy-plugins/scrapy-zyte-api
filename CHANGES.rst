@@ -1,6 +1,12 @@
 Changes
 =======
 
+0.25.1 (2024-11-12)
+-------------------
+
+* :setting:`DOWNLOAD_MAXSIZE` and :setting:`DOWNLOAD_WARNSIZE` are now also
+  enforced on requests sent through Zyte API.
+
 0.25.0 (2024-10-22)
 -------------------
 
