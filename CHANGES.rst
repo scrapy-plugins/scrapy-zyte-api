@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.25.1 (2024-11-DD)
+0.25.1 (2024-11-12)
 -------------------
 
 * :setting:`DOWNLOAD_MAXSIZE` and :setting:`DOWNLOAD_WARNSIZE` are now also
