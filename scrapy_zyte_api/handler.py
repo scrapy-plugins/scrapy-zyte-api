@@ -259,7 +259,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             api_response=api_response, request=request, cookie_jars=self._cookie_jars
         )
         if response and _body_max_size_exceeded(
-            len(process_response.body),
+            len(response.body),
             self._default_warnsize,
             self._default_maxsize,
             request.url,
