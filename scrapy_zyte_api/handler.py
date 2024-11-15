@@ -23,6 +23,27 @@ from .utils import USER_AGENT
 logger = logging.getLogger(__name__)
 
 
+def _body_max_size_exceeded(
+    body_size: int,
+    warnsize: Optional[int],
+    maxsize: Optional[int],
+    request_url: str,
+) -> bool:
+    if warnsize and body_size > warnsize:
+        logger.warning(
+            f"Actual response size {body_size} larger than "
+            f"download warn size {warnsize} in request {request_url}."
+        )
+
+    if maxsize and body_size > maxsize:
+        logger.warning(
+            f"Dropping the response for {request_url}: actual response size "
+            f"{body_size} larger than download max size {maxsize}."
+        )
+        return True
+    return False
+
+
 def _truncate_str(obj, index, text, limit):
     if len(text) <= limit:
         return
@@ -92,6 +113,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 f"({self._truncate_limit}) is invalid. It must be 0 or a "
                 f"positive integer."
             )
+        self._default_maxsize = settings.getint("DOWNLOAD_MAXSIZE")
+        self._default_warnsize = settings.getint("DOWNLOAD_WARNSIZE")
+
         crawler.signals.connect(self.engine_started, signal=signals.engine_started)
         self._crawler = crawler
         self._fallback_handler = None
@@ -231,7 +255,18 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         finally:
             self._update_stats(api_params)
 
-        return _process_response(api_response, request, self._cookie_jars)
+        response = _process_response(
+            api_response=api_response, request=request, cookie_jars=self._cookie_jars
+        )
+        if response and _body_max_size_exceeded(
+            len(response.body),
+            self._default_warnsize,
+            self._default_maxsize,
+            request.url,
+        ):
+            return None
+
+        return response
 
     def _process_request_error(self, request, error):
         detail = (error.parsed.data or {}).get("detail", error.message)
