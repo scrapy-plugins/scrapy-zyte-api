@@ -251,12 +251,11 @@ def _may_use_browser(api_params: Dict[str, Any]) -> bool:
     for key in _BROWSER_KEYS:
         if api_params.get(key, _DEFAULT_API_PARAMS[key]):
             return True
-    for key in _EXTRACT_KEYS:
-        extract_from = _get_extract_from(api_params, key)
-        if extract_from == "browserHtml":
-            return True
-        elif extract_from == "httpResponseBody":
-            return False
+    extract_froms = _get_extract_froms(api_params)
+    if "browserHtml" in extract_froms:
+        return True
+    if "httpResponseBody" in extract_froms:
+        return False
     if api_params.get("httpResponseBody", _DEFAULT_API_PARAMS["httpResponseBody"]):
         return False
     return True
