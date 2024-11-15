@@ -6,6 +6,7 @@ from scrapy_zyte_api._params import _may_use_browser
 @pytest.mark.parametrize(
     ("params", "result"),
     (
+        ({}, True),
         ({"product": True}, True),
         ({"product": True, "productOptions": {"extractFrom": "browserHtml"}}, True),
         (

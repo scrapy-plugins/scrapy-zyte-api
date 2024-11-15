@@ -381,20 +381,20 @@ def merge_dicts(*dicts):
                 {"browserHtml": False, "screenshot": True},
                 {"browserHtml": True, "screenshot": True},
                 {"product": True, "productOptions": {"extractFrom": "browserHtml"}},
+                {"serp": True, "serpOptions": {"extractFrom": "browserHtml"}},
             )
         ),
-        # If neither browserHtml nor screenshot are enabled, different
-        # fragments do *not* make for different fingerprints. Same for
-        # extraction types if browserHtml is not set in # *Options.extractFrom.
+        # If there is no clear indication of whether the requests is an HTTP
+        # request or a browser request, different fragments make for different
+        # fingerprints, to be safe.
         *(
             (
                 merge_dicts(body, headers, unknown, browser),
-                True,
+                False,
             )
             for body in (
                 {},
                 {"httpResponseBody": False},
-                {"httpResponseBody": True},
             )
             for headers in (
                 {},
@@ -412,10 +412,39 @@ def merge_dicts(*dicts):
                 {"screenshot": False},
                 {"browserHtml": False, "screenshot": False},
                 {"product": True},
+            )
+        ),
+        # If there is a clear indication that an HTTP requests is used instead
+        # of a browser request, different fragments do *not* make for different
+        # fingerprints.
+        *(
+            (
+                merge_dicts(body, headers, unknown, browser),
+                True,
+            )
+            for body in (
+                {"httpResponseBody": True},
+                {"serp": True},
                 {
                     "product": True,
                     "productOptions": {"extractFrom": "httpResponseBody"},
                 },
+            )
+            for headers in (
+                {},
+                {"httpResponseHeaders": False},
+                {"httpResponseHeaders": True},
+            )
+            for unknown in (
+                {},
+                {"unknown": False},
+                {"unknown": True},
+            )
+            for browser in (
+                {},
+                {"browserHtml": False},
+                {"screenshot": False},
+                {"browserHtml": False, "screenshot": False},
             )
         ),
     ),
