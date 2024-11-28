@@ -467,21 +467,19 @@ def _warn_about_request_headers(
     request: Request,
     skip_headers: SKIP_HEADER_T,
 ):
-    if not request.headers:
-        return
-    for k, v in request.headers.items():
-        if not v:
+    for name, values in request.headers.items():
+        if not values:
             continue
-        lowercase_k = k.strip().lower()
-        v = b",".join(v)
-        if skip_headers.get(lowercase_k) in (ANY_VALUE, v):
+        lowercase_name = name.strip().lower()
+        value = b",".join(values)
+        if skip_headers.get(lowercase_name) in (ANY_VALUE, value):
             continue
         logger.warning(
             f"Request {request} enables 'serp', which cannot be combined with "
-            f"request headers. However, the request also defines header {k}. "
-            f"The header will not be mapped to any Zyte API request field. To "
-            f"silence this warning, remove the header from the request or add "
-            f"it to the ZYTE_API_SKIP_HEADERS setting."
+            f"request headers. However, the request also defines header "
+            f"{name!r}. The header will not be mapped to any Zyte API request "
+            f"field. To silence this warning, remove the header from the "
+            f"request or add it to the ZYTE_API_SKIP_HEADERS setting."
         )
 
 

@@ -3713,3 +3713,65 @@ async def test_middleware_headers_custom_middleware_before_skip():
     param_parser = handler._param_parser
     api_params = param_parser.parse(request)
     assert "customHttpRequestHeaders" not in api_params
+
+
+@pytest.mark.parametrize(
+    ("headers", "warnings"),
+    (
+        (
+            {},
+            [],
+        ),
+        (
+            {"Unset-Header": None},
+            [],
+        ),
+        (
+            {"Empty-Header": ""},
+            ["defines header b'Empty-Header'"],
+        ),
+        (
+            {"Foo": "Bar"},
+            ["defines header b'Foo'"],
+        ),
+        # ZYTE_API_SKIP_HEADERS
+        (
+            {" cOoKiE ": "foo=bar"},
+            [],
+        ),
+        # The warning remains if *some* headers do not trigger a warning.
+        (
+            {"Foo": "Bar", "Unset-Header": None},
+            ["defines header b'Foo'"],
+        ),
+        (
+            {"Foo": "Bar", " cOoKiE ": "foo=bar"},
+            ["defines header b'Foo'"],
+        ),
+        # 1 warning per header
+        (
+            {"Foo": "Bar", "Baz": "Qux"},
+            ["defines header b'Foo'", "defines header b'Baz'"],
+        ),
+    ),
+)
+@ensureDeferred
+async def test_serp_header_warning(headers, warnings, caplog):
+    """serp does not support headers."""
+    request = Request(
+        url="https://example.com",
+        headers=headers,
+        meta={"zyte_api_automap": {"serp": True}},
+    )
+    settings = {"ZYTE_API_TRANSPARENT_MODE": True}
+    crawler = await get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        param_parser.parse(request)
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records

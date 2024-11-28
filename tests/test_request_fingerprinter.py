@@ -429,6 +429,21 @@ def merge_dicts(*dicts):
                     "product": True,
                     "productOptions": {"extractFrom": "httpResponseBody"},
                 },
+                {
+                    "serp": True,
+                    "serpOptions": {"extractFrom": "httpResponseBody"},
+                },
+                # productOptions should not influence serp, or anything else if
+                # product is not enabled.
+                {
+                    "productOptions": {"extractFrom": "browserHtml"},
+                    "serp": True,
+                },
+                {
+                    "product": False,
+                    "productOptions": {"extractFrom": "browserHtml"},
+                    "serp": True,
+                },
             )
             for headers in (
                 {},
