@@ -3752,52 +3752,61 @@ async def test_middleware_headers_custom_middleware_before_skip():
 
 
 @pytest.mark.parametrize(
-    ("headers", "warnings"),
+    ("extract_from", "headers", "warnings"),
     (
-        (
-            {},
-            [],
-        ),
-        (
-            {"Unset-Header": None},
-            [],
-        ),
-        (
-            {"Empty-Header": ""},
-            ["defines header b'Empty-Header'"],
-        ),
-        (
-            {"Foo": "Bar"},
-            ["defines header b'Foo'"],
-        ),
-        # ZYTE_API_SKIP_HEADERS
-        (
-            {" cOoKiE ": "foo=bar"},
-            [],
-        ),
-        # The warning remains if *some* headers do not trigger a warning.
-        (
-            {"Foo": "Bar", "Unset-Header": None},
-            ["defines header b'Foo'"],
-        ),
-        (
-            {"Foo": "Bar", " cOoKiE ": "foo=bar"},
-            ["defines header b'Foo'"],
-        ),
-        # 1 warning per header
-        (
-            {"Foo": "Bar", "Baz": "Qux"},
-            ["defines header b'Foo'", "defines header b'Baz'"],
+        *(
+            (extract_from, headers, warnings)
+            for extract_from in (None, "httpResponseBody", "browserHtml")
+            for headers, warnings in (
+                (
+                    {},
+                    [],
+                ),
+                (
+                    {"Unset-Header": None},
+                    [],
+                ),
+                (
+                    {"Empty-Header": ""},
+                    ["defines header b'Empty-Header'"],
+                ),
+                (
+                    {"Foo": "Bar"},
+                    ["defines header b'Foo'"],
+                ),
+                # ZYTE_API_SKIP_HEADERS
+                (
+                    {" cOoKiE ": "foo=bar"},
+                    [],
+                ),
+                # The warning remains if *some* headers do not trigger a warning.
+                (
+                    {"Foo": "Bar", "Unset-Header": None},
+                    ["defines header b'Foo'"],
+                ),
+                (
+                    {"Foo": "Bar", " cOoKiE ": "foo=bar"},
+                    ["defines header b'Foo'"],
+                ),
+                # 1 warning per header
+                (
+                    {"Foo": "Bar", "Baz": "Qux"},
+                    ["defines header b'Foo'", "defines header b'Baz'"],
+                ),
+            )
         ),
     ),
 )
 @ensureDeferred
-async def test_serp_header_warning(headers, warnings, caplog):
+async def test_serp_header_mapping(extract_from, headers, warnings, caplog):
     """serp does not support headers."""
+    meta = {"serp": True}
+    if extract_from:
+        meta["serpOptions"] = {"extractFrom": extract_from}
     request = Request(
         url="https://example.com",
         headers=headers,
-        meta={"zyte_api_automap": {"serp": True}},
+        meta={"zyte_api_automap": meta},
     )
     settings = {"ZYTE_API_TRANSPARENT_MODE": True}
     crawler = await get_crawler(settings)
@@ -3805,7 +3814,9 @@ async def test_serp_header_warning(headers, warnings, caplog):
     param_parser = handler._param_parser
     caplog.clear()
     with caplog.at_level("WARNING"):
-        param_parser.parse(request)
+        api_params = param_parser.parse(request)
+    assert "customHttpRequestHeaders" not in api_params
+    assert "requestHeaders" not in api_params
     if warnings:
         for warning in warnings:
             assert warning in caplog.text
@@ -3816,7 +3827,6 @@ async def test_serp_header_warning(headers, warnings, caplog):
 @pytest.mark.parametrize(
     "meta,expected,warnings",
     [
-        # device
         (
             {},
             {"httpResponseBody": True, "httpResponseHeaders": True},
@@ -3830,6 +3840,11 @@ async def test_serp_header_warning(headers, warnings, caplog):
         (
             {"device": "mobile"},
             {"device": "mobile", "httpResponseBody": True, "httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {"device": "auto"},  # Unknown parameter value
+            {"device": "auto", "httpResponseBody": True, "httpResponseHeaders": True},
             [],
         ),
     ],
