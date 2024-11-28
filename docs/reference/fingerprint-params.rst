@@ -10,11 +10,8 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
 -   :http:`request:url` (:func:`canonicalized <w3lib.url.canonicalize_url>`).
 
     For URLs that include a URL fragment, like ``https://example.com#foo``, URL
-    canonicalization keeps the URL fragment if :http:`request:browserHtml` or
-    :http:`request:screenshot` are enabled, or if extractFrom_ is set to
-    ``browserHtml``.
-
-    .. _extractFrom: https://docs.zyte.com/zyte-api/usage/extract.html#extraction-source
+    canonicalization keeps the URL fragment if the request *may* be a browser
+    request.
 
 -   Request attribute parameters (:http:`request:httpRequestBody`,
     :http:`request:httpRequestText`, :http:`request:httpRequestMethod`), except
@@ -25,9 +22,9 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
 
 -   Output parameters (:http:`request:browserHtml`,
     :http:`request:httpResponseBody`, :http:`request:httpResponseHeaders`,
-    :http:`request:responseCookies`, :http:`request:screenshot`, and
+    :http:`request:responseCookies`, :http:`request:screenshot`,
     :ref:`automatic extraction outputs <zapi-extract-fields>` like
-    :http:`request:product`).
+    :http:`request:product`, and :http:`request:customAttributes`).
 
     Same for :http:`request:networkCapture`, although it is not a proper output
     parameters (it needs to be combined with another browser rendering
@@ -36,7 +33,8 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
 -   Rendering option parameters (:http:`request:actions`,
     :http:`request:device`, :http:`request:javascript`,
     :http:`request:screenshotOptions`, :http:`request:viewport`, and automatic
-    extraction options like :http:`request:productOptions`).
+    extraction options like :http:`request:productOptions` or
+    :http:`request:customAttributesOptions`).
 
 -   :http:`request:geolocation`.
 
@@ -45,6 +43,8 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
 -   :http:`request:followRedirect`.
 
 -   :http:`request:echoData`.
+
+-   :http:`request:tags`.
 
 The following Zyte API parameters are *not* taken into account for request
 fingerprinting:

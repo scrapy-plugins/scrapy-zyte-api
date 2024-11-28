@@ -2155,6 +2155,28 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
                 EXTRACT_KEY: True,
                 f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
                 EXTRACT_KEY_2: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                EXTRACT_KEY_2: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        # If only 2 extractFrom is defined out of 2 extraction types, it is
+        # assumed to be the same for both extraction types.
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                EXTRACT_KEY_2: True,
             },
             {
                 EXTRACT_KEY: True,
@@ -2170,18 +2192,13 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
             {"Referer": "a"},
             {
                 EXTRACT_KEY: True,
-                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
                 EXTRACT_KEY_2: True,
-                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
             },
             {
                 EXTRACT_KEY: True,
-                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
                 EXTRACT_KEY_2: True,
-                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
-                "customHttpRequestHeaders": [
-                    {"name": "Referer", "value": "a"},
-                ],
                 "requestHeaders": {"referer": "a"},
             },
             [],

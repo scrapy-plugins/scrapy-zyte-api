@@ -4,15 +4,26 @@ Changes
 Unreleased
 ----------
 
-* Added automatic mapping support for new Zyte API request fields:
-  :http:`request:ipType`, :http:`request:followRedirect`,
-  :http:`request:session`, :http:`request:networkCapture`,
-  :http:`request:serp`, :http:`request:serpOptions`.
+* Added :ref:`automatic mapping <automap>` support for new Zyte API request
+  fields:
+  :http:`request:customAttributes`,
+  :http:`request:customAttributesOptions`,
+  :http:`request:ipType`,
+  :http:`request:followRedirect`,
+  :http:`request:forumThread`,
+  :http:`request:forumThreadOptions`,
+  :http:`request:jobPostingNavigation`,
+  :http:`request:jobPostingNavigationOptions`,
+  :http:`request:networkCapture`,
+  :http:`request:serp`,
+  :http:`request:serpOptions`,
+  :http:`request:session`,
+  :http:`request:tags`.
 
-  * You will be warned when using their default values unnecessarily.
+  * You will now be warned when using their default values unnecessarily.
 
   * The following fields no longer affect request fingerprinting (i.e. 2
-    request identical except for the value of that field are considered
+    request identical except for the value of that field are now considered
     duplicate requests):
     :http:`request:ipType`, :http:`request:session`.
 
@@ -30,7 +41,10 @@ Unreleased
   :http:`extractFrom <request:productOptions.extractFrom>` value, the URL
   fragment is now taken into account for request fingerprinting, i.e.
   ``https://example.com#a`` and ``https://example.com#b`` are *not* considered
-  duplicate requests anymore in that scenario.
+  duplicate requests anymore in those scenarios.
+
+* Fixes ``"auto"`` being considered the default value of :http:`request:device`
+  instead of ``"desktop"``.
 
 0.25.1 (2024-11-12)
 -------------------

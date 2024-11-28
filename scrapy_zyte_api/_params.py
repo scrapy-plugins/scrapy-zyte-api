@@ -178,6 +178,11 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
     "productNavigationOptions": {
         "default": {},
     },
+    # NOTE: is_extract_type is not set to True here because, for everything
+    # that matters when it comes to automatic parameter mapping and request
+    # fingerprinting, this parameter is not like the other extraction
+    # parameters, e.g. it can (in fact, has to) be combined with other
+    # extraction parameters, and has no extractFrom option.
     "customAttributes": {
         "default": None,
     },
