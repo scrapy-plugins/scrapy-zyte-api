@@ -78,6 +78,9 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
         "default": {},
         "changes_fingerprint": False,
     },
+    "tags": {
+        "default": {},
+    },
     "ipType": {
         "default": None,
         "changes_fingerprint": False,
@@ -133,11 +136,25 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
     "articleNavigationOptions": {
         "default": {},
     },
+    "forumThread": {
+        "default": False,
+        "is_extract_type": True,
+    },
+    "forumThreadOptions": {
+        "default": {},
+    },
     "jobPosting": {
         "default": False,
         "is_extract_type": True,
     },
     "jobPostingOptions": {
+        "default": {},
+    },
+    "jobPostingNavigation": {
+        "default": False,
+        "is_extract_type": True,
+    },
+    "jobPostingNavigationOptions": {
         "default": {},
     },
     "product": {
@@ -159,6 +176,12 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
         "is_extract_type": True,
     },
     "productNavigationOptions": {
+        "default": {},
+    },
+    "customAttributes": {
+        "default": None,
+    },
+    "customAttributesOptions": {
         "default": {},
     },
     "geolocation": {
@@ -198,7 +221,7 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
         "default": [],
     },
     "device": {
-        "default": "auto",
+        "default": "desktop",
     },
     "cookieManagement": {
         "default": "auto",
