@@ -1755,7 +1755,6 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
             {"X-Crawlera-Profile": "desktop"},
             {},
             {
-                "device": "desktop",
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
             },
@@ -3237,6 +3236,15 @@ async def test_automap_default_parameter_cleanup(meta, expected, warnings, caplo
     "default_params,meta,expected,warnings",
     [
         (
+            {},
+            {},
+            {
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            [],
+        ),
+        (
             {"browserHtml": True},
             {"screenshot": True, "browserHtml": False},
             {
@@ -3245,8 +3253,19 @@ async def test_automap_default_parameter_cleanup(meta, expected, warnings, caplo
             [],
         ),
         (
-            {},
-            {},
+            {
+                "browserHtml": True,
+                "networkCapture": [{"filterType": "url", "value": "/api/"}],
+            },
+            {"networkCapture": None},
+            {
+                "browserHtml": True,
+            },
+            [],
+        ),
+        (
+            {"device": "mobile"},
+            {"device": "desktop"},
             {
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
