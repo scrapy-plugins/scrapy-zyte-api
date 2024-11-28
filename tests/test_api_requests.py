@@ -3775,3 +3775,46 @@ async def test_serp_header_warning(headers, warnings, caplog):
             assert warning in caplog.text
     else:
         assert not caplog.records
+
+
+@pytest.mark.parametrize(
+    "meta,expected,warnings",
+    [
+        # device
+        (
+            {},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            [],
+        ),
+        (
+            {"device": "desktop"},
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            ["'device' parameter with its default value, 'desktop'"],
+        ),
+        (
+            {"device": "mobile"},
+            {"device": "mobile", "httpResponseBody": True, "httpResponseHeaders": True},
+            [],
+        ),
+    ],
+)
+@ensureDeferred
+async def test_unneeded_params(meta, expected, warnings, caplog):
+    """When a Zyte API parameter is set to its default value with
+    zyte_api_automap, the parameter is removed with a warning."""
+    request = Request(url="https://example.com")
+    request.meta["zyte_api_automap"] = meta
+    settings = {"ZYTE_API_TRANSPARENT_MODE": True}
+    crawler = await get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    api_params.pop("url")
+    assert api_params == expected
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
