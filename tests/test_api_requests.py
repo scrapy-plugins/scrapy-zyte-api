@@ -3800,7 +3800,7 @@ async def test_middleware_headers_custom_middleware_before_skip():
 @ensureDeferred
 async def test_serp_header_mapping(extract_from, headers, warnings, caplog):
     """serp does not support headers."""
-    meta = {"serp": True}
+    meta: Dict[str, Any] = {"serp": True}
     if extract_from:
         meta["serpOptions"] = {"extractFrom": extract_from}
     request = Request(
