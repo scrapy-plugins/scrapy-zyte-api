@@ -23,20 +23,24 @@ from zyte_common_items import (
     AutoArticleListPage,
     AutoArticleNavigationPage,
     AutoArticlePage,
+    AutoForumThreadPage,
     AutoJobPostingNavigationPage,
     AutoJobPostingPage,
     AutoProductListPage,
     AutoProductNavigationPage,
     AutoProductPage,
+    AutoSerpPage,
     CustomAttributes,
     CustomAttributesMetadata,
     CustomAttributesValues,
+    ForumThread,
     Item,
     JobPosting,
     JobPostingNavigation,
     Product,
     ProductList,
     ProductNavigation,
+    Serp,
 )
 from zyte_common_items.fields import is_auto_field
 
@@ -58,18 +62,22 @@ _ITEM_KEYWORDS: Dict[type, str] = {
     Article: "article",
     ArticleList: "articleList",
     ArticleNavigation: "articleNavigation",
+    ForumThread: "forumThread",
     JobPosting: "jobPosting",
     JobPostingNavigation: "jobPostingNavigation",
+    Serp: "serp",
 }
 _AUTO_PAGES: Set[type] = {
     AutoArticlePage,
     AutoArticleListPage,
     AutoArticleNavigationPage,
+    AutoForumThreadPage,
     AutoJobPostingPage,
     AutoJobPostingNavigationPage,
     AutoProductPage,
     AutoProductListPage,
     AutoProductNavigationPage,
+    AutoSerpPage,
 }
 
 

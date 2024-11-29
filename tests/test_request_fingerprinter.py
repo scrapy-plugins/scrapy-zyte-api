@@ -381,20 +381,20 @@ def merge_dicts(*dicts):
                 {"browserHtml": False, "screenshot": True},
                 {"browserHtml": True, "screenshot": True},
                 {"product": True, "productOptions": {"extractFrom": "browserHtml"}},
+                {"serp": True, "serpOptions": {"extractFrom": "browserHtml"}},
             )
         ),
-        # If neither browserHtml nor screenshot are enabled, different
-        # fragments do *not* make for different fingerprints. Same for
-        # extraction types if browserHtml is not set in # *Options.extractFrom.
+        # If there is no clear indication of whether the requests is an HTTP
+        # request or a browser request, different fragments make for different
+        # fingerprints, to be safe.
         *(
             (
                 merge_dicts(body, headers, unknown, browser),
-                True,
+                False,
             )
             for body in (
                 {},
                 {"httpResponseBody": False},
-                {"httpResponseBody": True},
             )
             for headers in (
                 {},
@@ -412,10 +412,54 @@ def merge_dicts(*dicts):
                 {"screenshot": False},
                 {"browserHtml": False, "screenshot": False},
                 {"product": True},
+            )
+        ),
+        # If there is a clear indication that an HTTP requests is used instead
+        # of a browser request, different fragments do *not* make for different
+        # fingerprints.
+        *(
+            (
+                merge_dicts(body, headers, unknown, browser),
+                True,
+            )
+            for body in (
+                {"httpResponseBody": True},
+                {"serp": True},
                 {
                     "product": True,
                     "productOptions": {"extractFrom": "httpResponseBody"},
                 },
+                {
+                    "serp": True,
+                    "serpOptions": {"extractFrom": "httpResponseBody"},
+                },
+                # productOptions should not influence serp, or anything else if
+                # product is not enabled.
+                {
+                    "productOptions": {"extractFrom": "browserHtml"},
+                    "serp": True,
+                },
+                {
+                    "product": False,
+                    "productOptions": {"extractFrom": "browserHtml"},
+                    "serp": True,
+                },
+            )
+            for headers in (
+                {},
+                {"httpResponseHeaders": False},
+                {"httpResponseHeaders": True},
+            )
+            for unknown in (
+                {},
+                {"unknown": False},
+                {"unknown": True},
+            )
+            for browser in (
+                {},
+                {"browserHtml": False},
+                {"screenshot": False},
+                {"browserHtml": False, "screenshot": False},
             )
         ),
     ),
@@ -668,3 +712,58 @@ async def test_page_params():
         assert no_params_fingerprint != some_param_fingerprint
         assert no_params_fingerprint != other_param_fingerprint
         assert some_param_fingerprint != other_param_fingerprint
+
+
+@pytest.mark.parametrize(
+    ("settings", "meta1", "meta2", "fingerprint_matches"),
+    (
+        # Enabling sessions for a request does not change its fingerprint.
+        (
+            {},
+            {},
+            {
+                "zyte_api_session_enabled": True,
+            },
+            True,
+        ),
+        *(
+            (
+                {
+                    "ZYTE_API_SESSION_ENABLED": True,
+                },
+                {},
+                {
+                    "zyte_api_session_params": params,
+                },
+                same_fingerprint,
+            )
+            for params, same_fingerprint in (
+                # Certain session initialization params do not affect request
+                # fingerprinting.
+                ({}, True),
+                ({"browserHtml": True}, True),
+                ({"requestHeaders": {"referer": "https://b.example"}}, True),
+                ({"tags": {"foo": "bar"}}, True),
+                ({"ipType": "residential"}, True),
+            )
+        ),
+    ),
+)
+@ensureDeferred
+async def test_session_management(settings, meta1, meta2, fingerprint_matches):
+    """When certain parameters of the equivalent to sessionContextParameters
+    from the session management API are set, fingerprints should be affected
+    the same way as they are with sessionContextParameters."""
+    request1 = Request("https://example.com", meta=meta1)
+    request2 = Request("https://example.com", meta=meta2)
+
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True, **settings})
+    fingerprinter = crawler.request_fingerprinter
+
+    fingerprint1 = fingerprinter.fingerprint(request1)
+    fingerprint2 = fingerprinter.fingerprint(request2)
+
+    if fingerprint_matches:
+        assert fingerprint1 == fingerprint2
+    else:
+        assert fingerprint1 != fingerprint2
