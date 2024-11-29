@@ -2,7 +2,7 @@ from base64 import b64decode, b64encode
 from copy import copy
 from logging import getLogger
 from os import environ
-from typing import Any, Dict, List, Mapping, Optional, Set, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple, Union
 from warnings import warn
 
 from scrapy import Request
@@ -294,7 +294,7 @@ def _iter_headers(
     api_params: Dict[str, Any],
     request: Request,
     header_parameter: str,
-):
+) -> Iterable[Tuple[bytes, bytes, bytes]]:
     headers = api_params.get(header_parameter)
     if headers not in (None, True):
         logger.warning(
@@ -310,8 +310,8 @@ def _iter_headers(
             continue
         decoded_k = k.decode()
         lowercase_k = k.strip().lower()
-        v = b",".join(v)
-        decoded_v = v.decode()
+        joined_v = b",".join(v)
+        decoded_v = joined_v.decode()
 
         if lowercase_k.startswith(b"x-crawlera-"):
             for spm_header_suffix, zapi_request_param in (
@@ -439,7 +439,7 @@ def _iter_headers(
                     )
             continue
 
-        yield k, lowercase_k, v
+        yield k, lowercase_k, joined_v
 
 
 def _map_custom_http_request_headers(
@@ -465,7 +465,7 @@ def _map_request_headers(
     *,
     api_params: Dict[str, Any],
     request: Request,
-    browser_headers: Dict[str, str],
+    browser_headers: Dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
 ):
     request_headers = {}
@@ -481,7 +481,7 @@ def _map_request_headers(
             lowercase_k
         ] not in (ANY_VALUE, v):
             logger.warning(
-                f"Request {request} defines header {k}, which "
+                f"Request {request} defines header {k.decode()}, which "
                 f"cannot be mapped into the Zyte API requestHeaders "
                 f"parameter. See the ZYTE_API_BROWSER_HEADERS setting."
             )
@@ -533,7 +533,7 @@ def _set_request_headers_from_request(
     api_params: Dict[str, Any],
     request: Request,
     skip_headers: SKIP_HEADER_T,
-    browser_headers: Dict[str, str],
+    browser_headers: Dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
 ):
     """Updates *api_params*, in place, based on *request*."""
@@ -768,7 +768,7 @@ def _update_api_params_from_request(
     default_params: Dict[str, Any],
     meta_params: Dict[str, Any],
     skip_headers: SKIP_HEADER_T,
-    browser_headers: Dict[str, str],
+    browser_headers: Dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
@@ -900,7 +900,7 @@ def _get_automap_params(
     default_enabled: bool,
     default_params: Dict[str, Any],
     skip_headers: SKIP_HEADER_T,
-    browser_headers: Dict[str, str],
+    browser_headers: Dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
     cookies_enabled: bool,
     cookie_jars: Optional[Dict[Any, CookieJar]],
@@ -947,7 +947,7 @@ def _get_api_params(
     transparent_mode: bool,
     automap_params: Dict[str, Any],
     skip_headers: SKIP_HEADER_T,
-    browser_headers: Dict[str, str],
+    browser_headers: Dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
     job_id: Optional[str],
     cookies_enabled: bool,
@@ -1044,7 +1044,7 @@ def _load_mw_skip_headers(crawler):
     return mw_skip_headers
 
 
-def _load_browser_headers(settings):
+def _load_browser_headers(settings) -> Dict[bytes, str]:
     browser_headers = settings.getdict(
         "ZYTE_API_BROWSER_HEADERS",
         {"Referer": "referer"},

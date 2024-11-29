@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager, contextmanager
 from os import environ
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Dict, Optional
 
+from packaging.version import Version
 from scrapy import Spider
+from scrapy import __version__ as SCRAPY_VERSION
 from scrapy.crawler import Crawler
 from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler as _get_crawler
@@ -14,7 +16,7 @@ from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 _API_KEY = "a"
 
 DEFAULT_CLIENT_CONCURRENCY = AsyncClient(api_key=_API_KEY).n_conn
-SETTINGS_T = Dict[Union[Type, str], Any]
+SETTINGS_T = Dict[str, Any]
 SETTINGS: SETTINGS_T = {
     "DOWNLOAD_HANDLERS": {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
@@ -25,13 +27,16 @@ SETTINGS: SETTINGS_T = {
         "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
     },
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
-    "REQUEST_FINGERPRINTER_IMPLEMENTATION": "2.7",  # Silence deprecation warning
     "SPIDER_MIDDLEWARES": {
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
     },
     "ZYTE_API_KEY": _API_KEY,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
 }
+if Version(SCRAPY_VERSION) < Version("2.12"):
+    SETTINGS["REQUEST_FINGERPRINTER_IMPLEMENTATION"] = (
+        "2.7"  # Silence deprecation warning
+    )
 try:
     import scrapy_poet  # noqa: F401
 except ImportError:
