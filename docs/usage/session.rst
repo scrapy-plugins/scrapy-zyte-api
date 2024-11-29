@@ -71,7 +71,7 @@ By default, scrapy-zyte-api will maintain up to 8 sessions per domain, each
 initialized with a :ref:`browser request <zapi-browser>` targeting the URL
 of the first request that will use the session. Sessions are automatically
 rotated among requests, and refreshed as they expire or get banned. You can
-customize most of this logic though request metadata, settings and
+customize most of this logic through request metadata, settings and
 :ref:`session config overrides <session-configs>`.
 
 For session management to work as expected, your
