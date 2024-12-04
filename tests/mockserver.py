@@ -241,6 +241,13 @@ class DefaultResource(Resource):
                     },
                 }
 
+            if request_data.get("productNavigation") is True:
+                response_data["productNavigation"] = {
+                    "url": response_data["url"],
+                    "name": "Product navigation",
+                    "pageNumber": 0,
+                }
+
         return json.dumps(response_data).encode()
 
 

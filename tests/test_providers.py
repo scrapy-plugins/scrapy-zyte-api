@@ -31,6 +31,7 @@ from zyte_common_items import (
     CustomAttributes,
     CustomAttributesValues,
     Product,
+    ProductNavigation,
 )
 from zyte_common_items.fields import auto_field
 
@@ -66,6 +67,13 @@ class ProductPage(BasePage):
     html: BrowserHtml
     response: BrowserResponse
     product: Product
+
+
+@attrs.define
+class ProductNavigationPage(BasePage):
+    html: BrowserHtml
+    response: BrowserResponse
+    product_nav: ProductNavigation
 
 
 class ZyteAPISpider(Spider):
@@ -1723,3 +1731,50 @@ async def test_auto_field_stats_auto_field_meta(mockserver):
 
     # Reset rules
     default_registry.__init__()  # type: ignore[misc]
+
+
+class ZyteAPIMultipleSpider(Spider):
+    url: str
+
+    def start_requests(self):
+        yield Request(self.url, callback=self.parse_)
+
+    def parse_(
+        self,
+        response: DummyResponse,
+        page: ProductPage,
+        nav_page: ProductNavigationPage,
+    ):
+        yield {
+            "html": page.html,
+            "response_html": page.response.html,
+            "product": page.product,
+            "productNavigation": nav_page.product_nav,
+        }
+
+
+@ensureDeferred
+async def test_multiple_types(mockserver):
+    settings = create_scrapy_settings()
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+    item, url, _ = await crawl_single_item(
+        ZyteAPIMultipleSpider, HtmlResource, settings
+    )
+    assert item["html"] == "<html><body>Hello<h1>World!</h1></body></html>"
+    assert item["response_html"] == "<html><body>Hello<h1>World!</h1></body></html>"
+    assert item["product"] == Product.from_dict(
+        dict(
+            url=url,
+            name="Product name",
+            price="10",
+            currency="USD",
+        )
+    )
+    assert item["productNavigation"] == ProductNavigation.from_dict(
+        dict(
+            url=url,
+            name="Product navigation",
+            pageNumber=0,
+        )
+    )
