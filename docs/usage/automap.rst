@@ -45,7 +45,7 @@ Changing parameters
 
 You may set :reqmeta:`zyte_api_automap` in :attr:`Request.meta
 <scrapy.http.Request.meta>` to a :class:`dict` of Zyte API parameters to add,
-modify, or remove (by setting to ``False``) automatic request parameters. This
+modify, or remove (by setting to ``None``) automatic request parameters. This
 also works in :ref:`transparent mode <transparent>`.
 
 Enabling :http:`request:browserHtml`, :http:`request:screenshot`, or an
