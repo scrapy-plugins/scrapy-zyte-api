@@ -31,7 +31,10 @@ class _BaseMiddleware:
             return
 
         downloader = self._crawler.engine.downloader
-        slot_id = downloader._get_slot_key(request, spider)
+        try:
+            slot_id = downloader.get_slot_key(request)
+        except AttributeError:  # Scrapy < 2.12
+            slot_id = downloader._get_slot_key(request, spider)
         if not isinstance(slot_id, str) or not slot_id.startswith(self._slot_prefix):
             slot_id = f"{self._slot_prefix}{slot_id}"
             request.meta["download_slot"] = slot_id
