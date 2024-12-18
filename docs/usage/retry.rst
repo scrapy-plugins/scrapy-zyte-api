@@ -58,10 +58,11 @@ including ready-to-use examples.
 
 In scrapy-zyte-api, use the :setting:`ZYTE_API_RETRY_POLICY` setting or the
 :reqmeta:`zyte_api_retry_policy` :attr:`Request.meta
-<scrapy.http.Request.meta>` key to point to a custom retry policy or to its
-import path, to override the default retry policy:
+<scrapy.http.Request.meta>` key to point to the import path of a retry policy
+to use. For example, to switch to the :ref:`aggressive retry policy
+<aggressive-retry-policy>`:
 
 .. code-block:: python
     :caption: settings.py
 
-    ZYTE_API_RETRY_POLICY = "project.retry_policies.CUSTOM_RETRY_POLICY"
+    ZYTE_API_RETRY_POLICY = "zyte_api.aggressive_retrying"
