@@ -19,8 +19,8 @@ except ImportError:
     from logging import Logger
     from typing import Type
 
-    from scrapy.downloadermiddlewares.retry import (
-        logger as retry_logger,  # type: ignore[attr-defined]
+    from scrapy.downloadermiddlewares.retry import (  # type: ignore[attr-defined] # isort: skip
+        logger as retry_logger,
     )
 
     def get_retry_request(
