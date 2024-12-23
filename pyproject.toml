@@ -15,12 +15,12 @@ files = [
 ]
 
 [tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:::twisted",
+]
 junit_family = "xunit2"
 testpaths = [
     "scrapy_zyte_api/",
     "tests/"
 ]
 minversion = "6.0"
-filterwarnings = [
-    "ignore::DeprecationWarning:twisted.web.http",
-]
