@@ -26,7 +26,7 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
 -   Output parameters (:http:`request:browserHtml`,
     :http:`request:httpResponseBody`, :http:`request:httpResponseHeaders`,
     :http:`request:responseCookies`, :http:`request:screenshot`, and
-    :ref:`automatic extraction outputs <zyte-api-extract-fields>` like
+    :ref:`automatic extraction outputs <zapi-extract-fields>` like
     :http:`request:product`)
 
 -   Rendering option parameters (:http:`request:actions`,

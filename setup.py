@@ -25,15 +25,15 @@ setuptools.setup(
     install_requires=[
         "packaging>=20.0",
         "scrapy>=2.0.1",
-        "zyte-api>=0.4.8",
+        "zyte-api>=0.5.1",
     ],
     extras_require={
         # Sync with [testenv:pinned-provider] @ tox.ini
         "provider": [
             "andi>=0.6.0",
-            "scrapy-poet>=0.19.0",
-            "web-poet>=0.15.1",
-            "zyte-common-items>=0.8.0",
+            "scrapy-poet>=0.22.3",
+            "web-poet>=0.17.0",
+            "zyte-common-items>=0.24.0",
         ]
     },
     classifiers=[
@@ -43,10 +43,10 @@ setuptools.setup(
         "Natural Language :: English",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
     ],
 )

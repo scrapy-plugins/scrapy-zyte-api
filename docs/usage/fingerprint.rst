@@ -13,7 +13,7 @@ For example, a request for :http:`request:browserHtml` and a request for
 requests. Similarly, requests with the same target URL but different
 :http:`request:actions` are also considered different requests.
 
-Use :ref:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` to define a custom
+Use :setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` to define a custom
 request fingerprinting for requests that do not go through Zyte API.
 
 
@@ -27,7 +27,7 @@ to interpret 2 different requests as being the same.
 
 To avoid most issues, use :ref:`automatic request parameters <automap>`, either
 through :ref:`transparent mode <transparent>` or setting
-:ref:`zyte_api_automap` to ``True`` in :attr:`Request.meta
+:reqmeta:`zyte_api_automap` to ``True`` in :attr:`Request.meta
 <scrapy.http.Request.meta>`, and then use :class:`~scrapy.http.Request`
 attributes instead of :attr:`Request.meta <scrapy.http.Request.meta>` as much
 as possible. Unlike :attr:`Request.meta <scrapy.http.Request.meta>`,

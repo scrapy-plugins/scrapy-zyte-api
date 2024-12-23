@@ -1,20 +1,18 @@
 import json
 import logging
 from copy import deepcopy
-from typing import Generator, Optional, Union
+from typing import Any, Generator, Optional, Union
 
 from scrapy import Spider, signals
-from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
-from scrapy.utils.misc import load_object
+from scrapy.utils.misc import create_instance, load_object
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
-from zyte_api.aio.client import AsyncClient, create_session
-from zyte_api.aio.errors import RequestError
+from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
 from zyte_api.constants import API_URL
 
@@ -23,6 +21,27 @@ from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 from .utils import USER_AGENT
 
 logger = logging.getLogger(__name__)
+
+
+def _body_max_size_exceeded(
+    body_size: int,
+    warnsize: Optional[int],
+    maxsize: Optional[int],
+    request_url: str,
+) -> bool:
+    if warnsize and body_size > warnsize:
+        logger.warning(
+            f"Actual response size {body_size} larger than "
+            f"download warn size {warnsize} in request {request_url}."
+        )
+
+    if maxsize and body_size > maxsize:
+        logger.warning(
+            f"Dropping the response for {request_url}: actual response size "
+            f"{body_size} larger than download max size {maxsize}."
+        )
+        return True
+    return False
 
 
 def _truncate_str(obj, index, text, limit):
@@ -53,11 +72,12 @@ def _load_retry_policy(settings):
     return policy
 
 
-class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
+class _ScrapyZyteAPIBaseDownloadHandler:
+    lazy = False
+
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncClient = None
+        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
     ):
-        super().__init__(settings=settings, crawler=crawler)
         if not settings.getbool("ZYTE_API_ENABLED", True):
             raise NotConfigured(
                 "Zyte API is disabled. Set ZYTE_API_ENABLED to True to enable it."
@@ -68,8 +88,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
             # We keep the client in the crawler object to prevent multiple,
             # duplicate clients with the same settings to be used.
             # https://github.com/scrapy-plugins/scrapy-zyte-api/issues/58
-            crawler.zyte_api_client = client
-        self._client: AsyncClient = crawler.zyte_api_client
+            crawler.zyte_api_client = client  # type: ignore[attr-defined]
+        self._client: AsyncZyteAPI = crawler.zyte_api_client  # type: ignore[attr-defined]
         logger.info("Using a Zyte API key starting with %r", self._client.api_key[:7])
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
@@ -84,11 +104,8 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         )
         self._param_parser = _ParamParser(crawler)
         self._retry_policy = _load_retry_policy(settings)
+        assert crawler.stats
         self._stats = crawler.stats
-        self._session = create_session(
-            connection_pool_size=self._client.n_conn,
-            trust_env=settings.getbool("ZYTE_API_USE_ENV_PROXY"),
-        )
         self._must_log_request = settings.getbool("ZYTE_API_LOG_REQUESTS", False)
         self._truncate_limit = settings.getint("ZYTE_API_LOG_REQUESTS_TRUNCATE", 64)
         if self._truncate_limit < 0:
@@ -97,13 +114,23 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 f"({self._truncate_limit}) is invalid. It must be 0 or a "
                 f"positive integer."
             )
-        crawler.signals.connect(self.engine_started, signal=signals.engine_started)
-        if not hasattr(self, "_crawler"):  # Scrapy 2.1 and earlier
-            self._crawler = crawler
+        self._default_maxsize = settings.getint("DOWNLOAD_MAXSIZE")
+        self._default_warnsize = settings.getint("DOWNLOAD_WARNSIZE")
 
-    def engine_started(self):
+        crawler.signals.connect(self.engine_started, signal=signals.engine_started)
+        self._crawler = crawler
+        self._fallback_handler = None
+        self._trust_env = settings.getbool("ZYTE_API_USE_ENV_PROXY")
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler.settings, crawler)
+
+    async def engine_started(self):
+        self._session = self._client.session(trust_env=self._trust_env)
         if not self._cookies_enabled:
             return
+        assert self._crawler.engine
         for middleware in self._crawler.engine.downloader.middleware.middlewares:
             if isinstance(middleware, self._cookie_mw_cls):
                 self._cookie_jars = middleware.jars
@@ -120,7 +147,7 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
     @staticmethod
     def _build_client(settings):
         try:
-            return AsyncClient(
+            return AsyncZyteAPI(
                 # To allow users to have a key defined in Scrapy settings and
                 # in a environment variable, and be able to cause the
                 # environment variable to be used instead of the setting by
@@ -141,13 +168,18 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
                 "Your Zyte API key is not set. Set ZYTE_API_KEY to your API key."
             )
 
+    def _create_handler(self, path: Any) -> Any:
+        dhcls = load_object(path)
+        return create_instance(dhcls, settings=None, crawler=self._crawler)
+
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._param_parser.parse(request)
         if api_params is not None:
             return deferred_from_coro(
                 self._download_request(api_params, request, spider)
             )
-        return super().download_request(request, spider)
+        assert self._fallback_handler
+        return self._fallback_handler.download_request(request, spider)
 
     def _update_stats(self, api_params):
         prefix = "scrapy-zyte-api"
@@ -206,37 +238,48 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
         # Define url by default
         retrying = request.meta.get("zyte_api_retry_policy")
         if retrying:
-            retrying = load_object(retrying)
+            if isinstance(retrying, str):  # Scrapy < 2.4 doesn't have this check
+                retrying = load_object(retrying)
         else:
             retrying = self._retry_policy
         self._log_request(api_params)
 
         try:
-            api_response = await self._client.request_raw(
-                api_params,
-                session=self._session,
-                retrying=retrying,
-            )
+            api_response = await self._session.get(api_params, retrying=retrying)
         except RequestError as error:
             self._process_request_error(request, error)
             raise
         except Exception as er:
-            logger.error(
+            logger.debug(
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
             )
             raise
         finally:
             self._update_stats(api_params)
 
-        return _process_response(api_response, request, self._cookie_jars)
+        response = _process_response(
+            api_response=api_response, request=request, cookie_jars=self._cookie_jars
+        )
+        if response and _body_max_size_exceeded(
+            len(response.body),
+            self._default_warnsize,
+            self._default_maxsize,
+            request.url,
+        ):
+            return None
+
+        return response
 
     def _process_request_error(self, request, error):
         detail = (error.parsed.data or {}).get("detail", error.message)
-        logger.error(
+        logger.debug(
             f"Got Zyte API error (status={error.status}, "
             f"type={error.parsed.type!r}, request_id={error.request_id!r}) "
             f"while processing URL ({request.url}): {detail}"
         )
+        assert self._crawler
+        assert self._crawler.engine
+        assert self._crawler.spider
         for status, error_type, close_reason in (
             (401, "/auth/key-not-found", "zyte_api_bad_key"),
             (403, "/auth/account-suspended", "zyte_api_suspended_account"),
@@ -260,8 +303,39 @@ class ScrapyZyteAPIDownloadHandler(HTTPDownloadHandler):
 
     @inlineCallbacks
     def close(self) -> Generator:
-        yield super().close()
+        if self._fallback_handler:
+            yield self._fallback_handler.close()
         yield deferred_from_coro(self._close())
 
     async def _close(self) -> None:  # NOQA
         await self._session.close()
+
+
+class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
+    def __init__(
+        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+    ):
+        super().__init__(settings, crawler, client)
+        self._fallback_handler = self._create_handler(
+            "scrapy.core.downloader.handlers.http.HTTPDownloadHandler"
+        )
+
+
+class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
+    def __init__(
+        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+    ):
+        super().__init__(settings, crawler, client)
+        self._fallback_handler = self._create_handler(
+            settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER")
+        )
+
+
+class ScrapyZyteAPIHTTPSDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
+    def __init__(
+        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+    ):
+        super().__init__(settings, crawler, client)
+        self._fallback_handler = self._create_handler(
+            settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER")
+        )

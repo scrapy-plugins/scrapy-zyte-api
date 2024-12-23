@@ -5,7 +5,7 @@ Manual request parameters
 =========================
 
 To send a Scrapy request through Zyte API with manually-defined Zyte API
-request parameters, define your parameters in the :ref:`zyte_api` key in
+request parameters, define your parameters in the :reqmeta:`zyte_api` key in
 :attr:`Request.meta <scrapy.http.Request.meta>` as a :class:`dict`.
 
 The only exception is the :http:`request:url` parameter, which should not be
@@ -64,4 +64,4 @@ remember to also request :http:`request:httpResponseHeaders`:
             # "<html>…</html>"
 
 To learn more about Zyte API parameters, see the upstream :ref:`usage
-<zyte-api-usage>` and :ref:`API reference <zyte-api-reference>` pages.
+<zapi-usage>` and :ref:`API reference <zapi-reference>` pages.
