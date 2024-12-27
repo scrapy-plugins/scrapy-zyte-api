@@ -18,10 +18,11 @@ else:
     from scrapy.settings.default_settings import (
         REQUEST_FINGERPRINTER_CLASS as ScrapyRequestFingerprinter,
     )
-    from scrapy.utils.misc import create_instance, load_object
+    from scrapy.utils.misc import load_object
     from w3lib.url import canonicalize_url
 
     from ._params import _REQUEST_PARAMS, _ParamParser, _uses_browser
+    from .utils import _build_from_crawler
 
     class ScrapyZyteAPIRequestFingerprinter:
         @classmethod
@@ -38,15 +39,14 @@ else:
             else:
                 self._has_poet = True
                 RequestFingerprinter = ScrapyPoetRequestFingerprinter
-            self._fallback_request_fingerprinter = create_instance(
+            self._fallback_request_fingerprinter = _build_from_crawler(
                 load_object(
                     settings.get(
                         "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS",
                         RequestFingerprinter,
                     )
                 ),
-                settings=crawler.settings,
-                crawler=crawler,
+                crawler,
             )
             if self._has_poet and not isinstance(
                 self._fallback_request_fingerprinter, cast(type, RequestFingerprinter)

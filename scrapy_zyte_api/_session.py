@@ -4,19 +4,7 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from functools import partial
 from logging import getLogger
-from typing import (
-    Any,
-    DefaultDict,
-    Deque,
-    Dict,
-    List,
-    Optional,
-    Set,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, DefaultDict, Deque, Dict, List, Optional, Set, Type, Union, cast
 from uuid import uuid4
 from weakref import WeakKeyDictionary
 
@@ -25,12 +13,12 @@ from scrapy.crawler import Crawler
 from scrapy.exceptions import CloseSpider, IgnoreRequest
 from scrapy.http import Response
 from scrapy.utils.httpobj import urlparse_cached
-from scrapy.utils.misc import create_instance, load_object
+from scrapy.utils.misc import load_object
 from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
 from zyte_api import RequestError, RetryFactory
 
-from scrapy_zyte_api.utils import _DOWNLOAD_NEEDS_SPIDER
+from .utils import _DOWNLOAD_NEEDS_SPIDER, _build_from_crawler
 
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
@@ -169,17 +157,6 @@ except ImportError:  # pragma: no cover
         return d.asFuture(_get_asyncio_event_loop())
 
 
-try:
-    from scrapy.utils.misc import build_from_crawler
-except ImportError:
-    T = TypeVar("T")
-
-    def build_from_crawler(
-        objcls: Type[T], crawler: Crawler, /, *args: Any, **kwargs: Any
-    ) -> T:
-        return create_instance(objcls, settings=None, crawler=crawler, *args, **kwargs)  # type: ignore[misc]
-
-
 class PoolError(ValueError):
     pass
 
@@ -216,7 +193,7 @@ class SessionConfig:
 
         checker_cls = settings.get("ZYTE_API_SESSION_CHECKER", None)
         if checker_cls:
-            self._checker = build_from_crawler(load_object(checker_cls), crawler)
+            self._checker = _build_from_crawler(load_object(checker_cls), crawler)
         else:
             self._checker = None
         self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
@@ -630,7 +607,7 @@ class _SessionManager:
         except KeyError:
             cls = session_config_registry.session_config_cls(request)
             if cls not in self._session_config_map:
-                self._session_config_map[cls] = build_from_crawler(cls, self._crawler)
+                self._session_config_map[cls] = _build_from_crawler(cls, self._crawler)
             self._session_config_cache[request] = self._session_config_map[cls]
             return self._session_config_map[cls]
 
