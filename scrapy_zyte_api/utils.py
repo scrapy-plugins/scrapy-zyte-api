@@ -30,3 +30,18 @@ _REQUEST_ERROR_HAS_QUERY = _PYTHON_ZYTE_API_VERSION >= _PYTHON_ZYTE_API_0_5_2
 _RESPONSE_HAS_ATTRIBUTES = _SCRAPY_VERSION >= _SCRAPY_2_6_0
 _RESPONSE_HAS_IP_ADDRESS = _SCRAPY_VERSION >= _SCRAPY_2_1_0
 _RESPONSE_HAS_PROTOCOL = _SCRAPY_VERSION >= _SCRAPY_2_5_0
+
+try:
+    from scrapy.utils.misc import build_from_crawler as _build_from_crawler
+except ImportError:  # Scrapy < 2.12
+    from typing import Any, TypeVar
+
+    from scrapy.crawler import Crawler
+    from scrapy.utils.misc import create_instance
+
+    T = TypeVar("T")
+
+    def _build_from_crawler(
+        objcls: type[T], crawler: Crawler, /, *args: Any, **kwargs: Any
+    ) -> T:
+        return create_instance(objcls, None, crawler, *args, **kwargs)
