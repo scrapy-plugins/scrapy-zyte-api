@@ -1,6 +1,14 @@
 Changes
 =======
 
+0.25.2 (2024-12-30)
+-------------------
+
+* Improved Scrapy 2.12 support (typing, deprecations).
+
+* The :ref:`retry-policy` page now shows how to configure the :ref:`aggressive
+  retry policy <aggressive-retry-policy>`.
+
 0.25.1 (2024-11-12)
 -------------------
 
