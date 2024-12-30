@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.25.2 (YYYY-MM-DD)
+0.25.2 (2024-12-30)
 -------------------
 
 * Improved Scrapy 2.12 support (typing, deprecations).
