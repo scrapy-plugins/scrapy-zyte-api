@@ -72,6 +72,12 @@ class DefaultResource(Resource):
             return RequestCountResource()
         return self
 
+    def render_GET(self, request):
+        referer = request.getHeader(b"Referer")
+        if referer:
+            request.responseHeaders.setRawHeaders(b"Referer", [referer])
+        return b""
+
     def render_POST(self, request):
         DefaultResource.request_count += 1
         request_data = json.loads(request.content.read())
@@ -184,6 +190,22 @@ class DefaultResource(Resource):
             response_data["httpResponseHeaders"] = [
                 {"name": "test_header", "value": "test_value"}
             ]
+            headers = request_data.get("customHttpRequestHeaders", [])
+            for header in headers:
+                if header["name"].strip().lower() == "referer":
+                    referer = header["value"]
+                    break
+            else:
+                headers = request_data.get("requestHeaders", {})
+                if "referer" in headers:
+                    referer = headers["referer"]
+                else:
+                    referer = None
+            if referer is not None:
+                assert isinstance(response_data["httpResponseHeaders"], list)
+                response_data["httpResponseHeaders"].append(
+                    {"name": "Referer", "value": referer}
+                )
 
         actions = request_data.get("actions")
         if actions:
