@@ -20,6 +20,7 @@ else:
         # Zyte API requests.
         ({}, {}, {}, True),
         (SETTINGS, {"zyte_api_automap": False}, {}, True),
+        (SETTINGS, {"zyte_api_automap": True}, {}, False),
         (SETTINGS, {}, {}, False if ADDON_SUPPORT else True),
         (
             SETTINGS,
@@ -77,6 +78,53 @@ else:
             {"Referer": "https://example.com"},
             False,
         ),
+        # Setting DEFAULT_REQUEST_HEADERS["Referer] works as long as the
+        # middleware is not configured to set the Referer, since the
+        # middleware takes precedence.
+        ({"DEFAULT_REQUEST_HEADERS": {"Referer": "https://example.com"}}, {}, {}, True),
+        (
+            {
+                "DEFAULT_REQUEST_HEADERS": {"Referer": "https://example.com"},
+                "REFERER_ENABLED": False,
+            },
+            {},
+            {},
+            "https://example.com",
+        ),
+        (
+            {**SETTINGS, "DEFAULT_REQUEST_HEADERS": {"Referer": "https://example.com"}},
+            {"zyte_api_automap": False},
+            {},
+            True,
+        ),
+        (
+            {
+                **SETTINGS,
+                "DEFAULT_REQUEST_HEADERS": {"Referer": "https://example.com"},
+                "REFERER_ENABLED": False,
+            },
+            {"zyte_api_automap": False},
+            {},
+            "https://example.com",
+        ),
+        (
+            {**SETTINGS, "DEFAULT_REQUEST_HEADERS": {"Referer": "https://example.com"}},
+            {"zyte_api_automap": True},
+            {},
+            "https://example.com",
+        ),
+        (
+            {**SETTINGS, "DEFAULT_REQUEST_HEADERS": {"Referer": "https://example.com"}},
+            {},
+            {},
+            "https://example.com" if ADDON_SUPPORT else True,
+        ),
+        (
+            {**SETTINGS, "DEFAULT_REQUEST_HEADERS": {"Referer": "https://example.com"}},
+            {"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": True}},
+            {},
+            False,
+        ),
         # Setting the header through a Zyte API parameter
         # (customHttpRequestHeaders or requestHeaders) always works.
         (
@@ -92,6 +140,32 @@ else:
             "https://example.com",
         ),
         (
+            {
+                **SETTINGS,
+                "ZYTE_API_AUTOMAP_PARAMS": {
+                    "customHttpRequestHeaders": [
+                        {"name": "Referer", "value": "https://example.com"},
+                    ],
+                },
+            },
+            {"zyte_api_automap": True},
+            {},
+            "https://example.com",
+        ),
+        (
+            {
+                **SETTINGS,
+                "ZYTE_API_AUTOMAP_PARAMS": {
+                    "customHttpRequestHeaders": [
+                        {"name": "Referer", "value": "https://example.com"},
+                    ],
+                },
+            },
+            {},
+            {},
+            "https://example.com" if ADDON_SUPPORT else True,
+        ),
+        (
             SETTINGS,
             {
                 "zyte_api_automap": {
@@ -100,6 +174,28 @@ else:
             },
             {},
             "https://example.com",
+        ),
+        (
+            {
+                **SETTINGS,
+                "ZYTE_API_AUTOMAP_PARAMS": {
+                    "requestHeaders": {"referer": "https://example.com"},
+                },
+            },
+            {"zyte_api_automap": True},
+            {},
+            "https://example.com",
+        ),
+        (
+            {
+                **SETTINGS,
+                "ZYTE_API_AUTOMAP_PARAMS": {
+                    "requestHeaders": {"referer": "https://example.com"},
+                },
+            },
+            {},
+            {},
+            "https://example.com" if ADDON_SUPPORT else True,
         ),
         (
             SETTINGS,
@@ -116,12 +212,46 @@ else:
             "https://example.com",
         ),
         (
+            {
+                **SETTINGS,
+                "ZYTE_API_DEFAULT_PARAMS": {
+                    "customHttpRequestHeaders": [
+                        {"name": "Referer", "value": "https://example.com"},
+                    ],
+                },
+            },
+            {
+                "zyte_api": {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                }
+            },
+            {},
+            "https://example.com",
+        ),
+        (
             SETTINGS,
             {
                 "zyte_api": {
                     "httpResponseBody": True,
                     "httpResponseHeaders": True,
                     "requestHeaders": {"referer": "https://example.com"},
+                }
+            },
+            {},
+            "https://example.com",
+        ),
+        (
+            {
+                **SETTINGS,
+                "ZYTE_API_DEFAULT_PARAMS": {
+                    "requestHeaders": {"referer": "https://example.com"},
+                },
+            },
+            {
+                "zyte_api": {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
                 }
             },
             {},

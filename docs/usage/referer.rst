@@ -32,22 +32,21 @@ How to override?
 To set the header anyway when using :ref:`transparent mode <transparent>` or
 :ref:`automatic request parameters <automap>`, do any of the following:
 
--  Set :setting:`ZYTE_API_REFERRER_POLICY` to ``"scrapy-default"`` or to some
-   other value supported by the :setting:`REFERRER_POLICY` setting.
-
--  Set the :reqmeta:`referrer_policy` request metadata key on the specific Zyte
-   API requests where you want to allow the header, to ``"scrapy-default"`` or
+-  Set the :setting:`ZYTE_API_REFERRER_POLICY` setting or the
+   :reqmeta:`referrer_policy` request metadata key to ``"scrapy-default"`` or
    to some other value supported by the :setting:`REFERRER_POLICY` setting.
 
--  Set the header through
-   :attr:`Request.headers <scrapy.http.Request.headers>`.
+-  Set the header through the :setting:`DEFAULT_REQUEST_HEADERS` setting or
+   the :attr:`Request.headers <scrapy.http.Request.headers>` attribute.
 
 -  Set the header through the :http:`request:customHttpRequestHeaders` field
    (for :ref:`HTTP requests <zapi-http>`) or the :http:`request:requestHeaders`
-   field (for :ref:`browser requests <zapi-browser>`) in the
+   field (for :ref:`browser requests <zapi-browser>`) through the
+   :setting:`ZYTE_API_AUTOMAP_PARAMS` setting or the
    :reqmeta:`zyte_api_automap` request metadata key.
 
 When using :ref:`manual request parameters <manual>`, you always need to set
 the header through the :http:`request:customHttpRequestHeaders` or
-:http:`request:requestHeaders` field in the :reqmeta:`zyte_api` request
+:http:`request:requestHeaders` field through the
+:setting:`ZYTE_API_DEFAULT_PARAMS` setting or the :reqmeta:`zyte_api` request
 metadata key.
