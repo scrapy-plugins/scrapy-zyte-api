@@ -1,3 +1,5 @@
+from copy import copy
+
 import pytest
 from pytest_twisted import ensureDeferred
 from scrapy import Spider, signals
@@ -262,6 +264,7 @@ else:
 @ensureDeferred
 async def test_main(settings, meta, headers, expected, mockserver):
     items = []
+    settings = copy(settings)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     start_url = mockserver.urljoin("/a")
     follow_up_url = mockserver.urljoin("/b")
