@@ -6,6 +6,7 @@ from zyte_api import zyte_api_retrying
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPIRefererSpiderMiddleware,
     ScrapyZyteAPISessionDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
@@ -101,6 +102,9 @@ class Addon:
             667,
         )
         _setdefault(settings, "SPIDER_MIDDLEWARES", ScrapyZyteAPISpiderMiddleware, 100)
+        _setdefault(
+            settings, "SPIDER_MIDDLEWARES", ScrapyZyteAPIRefererSpiderMiddleware, 1000
+        )
         settings.set(
             "TWISTED_REACTOR",
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor",

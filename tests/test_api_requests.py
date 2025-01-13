@@ -3292,22 +3292,6 @@ async def test_middleware_headers_start_requests():
 
 
 @ensureDeferred
-async def test_middleware_headers_cb_requests():
-    """Callback requests will include the Referer parameter if the Referer
-    middleware is not disabled."""
-    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
-    request = Request(url="https://example.com")
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert api_params["customHttpRequestHeaders"] == [
-        {"name": "Referer", "value": request.url},
-    ]
-
-
-@ensureDeferred
 async def test_middleware_headers_cb_requests_disable():
     """Callback requests will not include the Referer parameter if the Referer
     middleware is disabled."""
@@ -3370,7 +3354,6 @@ async def test_middleware_headers_default():
     param_parser = handler._param_parser
     api_params = param_parser.parse(request)
     assert api_params["customHttpRequestHeaders"] == [
-        {"name": "Referer", "value": request.url},
         {
             "name": "Accept",
             "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -3482,7 +3465,6 @@ async def test_middleware_headers_request_headers():
             "value": DEFAULT_ACCEPT_ENCODING,
         },
         {"name": "User-Agent", "value": DEFAULT_USER_AGENT},
-        {"name": "Referer", "value": request.url},
     ]
 
 
@@ -3581,9 +3563,7 @@ async def test_middleware_headers_custom_middleware_before():
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
     api_params = param_parser.parse(request)
-    assert api_params["customHttpRequestHeaders"] == [
-        {"name": "Referer", "value": request.url},
-    ]
+    assert "customHttpRequestHeaders" not in api_params
 
 
 class CustomValuesDownloaderMiddleware:
@@ -3620,7 +3600,6 @@ async def test_middleware_headers_custom_middleware_before_custom():
     param_parser = handler._param_parser
     api_params = param_parser.parse(request)
     assert api_params["customHttpRequestHeaders"] == [
-        {"name": "Referer", "value": "https://referrer.example"},
         {
             "name": "Accept",
             "value": "text/html",
@@ -3631,6 +3610,7 @@ async def test_middleware_headers_custom_middleware_before_custom():
             "name": "Accept-Encoding",
             "value": "br",
         },
+        {"name": "Referer", "value": "https://referrer.example"},
     ]
 
 

@@ -29,6 +29,7 @@ SETTINGS: SETTINGS_T = {
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "SPIDER_MIDDLEWARES": {
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
+        "scrapy_zyte_api.ScrapyZyteAPIRefererSpiderMiddleware": 1000,
     },
     "ZYTE_API_KEY": _API_KEY,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",

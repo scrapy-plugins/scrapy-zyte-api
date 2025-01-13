@@ -201,3 +201,38 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
         async for item_or_request in result:
             self._process_output_item_or_request(item_or_request, spider)
             yield item_or_request
+
+
+class ScrapyZyteAPIRefererSpiderMiddleware:
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        self._default_policy = crawler.settings.get(
+            "ZYTE_API_REFERRER_POLICY", "no-referrer"
+        )
+        self._param_parser = _ParamParser(crawler, cookies_enabled=False)
+
+    def process_spider_output(self, response, result, spider):
+        for item_or_request in result:
+            self._process_output_item_or_request(item_or_request, spider)
+            yield item_or_request
+
+    async def process_spider_output_async(self, response, result, spider):
+        async for item_or_request in result:
+            self._process_output_item_or_request(item_or_request, spider)
+            yield item_or_request
+
+    def _process_output_item_or_request(self, item_or_request, spider):
+        if not isinstance(item_or_request, Request):
+            return
+        self._process_output_request(item_or_request, spider)
+
+    def _process_output_request(self, request, spider):
+        if self._is_zyte_api_request(request):
+            request.meta.setdefault("referrer_policy", self._default_policy)
+
+    def _is_zyte_api_request(self, request):
+        return self._param_parser.parse(request) is not None

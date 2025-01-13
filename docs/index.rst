@@ -30,6 +30,7 @@ either :ref:`globally <transparent>` or :ref:`per request <automap>`, or
    usage/stats
    usage/fingerprint
    usage/proxy
+   usage/referer
 
 .. toctree::
    :caption: Reference
