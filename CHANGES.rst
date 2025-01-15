@@ -1,6 +1,14 @@
 Changes
 =======
 
+0.26.0 (YYYY-MM-DD)
+-------------------
+
+* :ref:`referer` is now disabled by default for Zyte API requests. This can be
+  configured with the new :setting:`ZYTE_API_REFERRER_POLICY` setting.
+
+* CI improvements.
+
 0.25.2 (2024-12-30)
 -------------------
 
