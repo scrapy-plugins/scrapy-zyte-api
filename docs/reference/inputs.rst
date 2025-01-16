@@ -40,6 +40,8 @@ Inputs
 
 -   :class:`zyte_common_items.ProductNavigation`
 
+-   :class:`zyte_common_items.Serp`
+
 Additional inputs and input annotations are also provided:
 
 Built-in inputs
