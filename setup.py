@@ -33,7 +33,7 @@ setuptools.setup(
             "andi>=0.6.0",
             "scrapy-poet>=0.22.3",
             "web-poet>=0.17.0",
-            "zyte-common-items>=0.24.0",
+            "zyte-common-items>=0.27.0",
         ]
     },
     classifiers=[

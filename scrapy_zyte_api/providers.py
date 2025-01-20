@@ -28,6 +28,7 @@ from zyte_common_items import (
     AutoProductListPage,
     AutoProductNavigationPage,
     AutoProductPage,
+    AutoSerpPage,
     CustomAttributes,
     CustomAttributesMetadata,
     CustomAttributesValues,
@@ -37,6 +38,7 @@ from zyte_common_items import (
     Product,
     ProductList,
     ProductNavigation,
+    Serp,
 )
 from zyte_common_items.fields import is_auto_field
 
@@ -60,6 +62,7 @@ _ITEM_KEYWORDS: Dict[type, str] = {
     ArticleNavigation: "articleNavigation",
     JobPosting: "jobPosting",
     JobPostingNavigation: "jobPostingNavigation",
+    Serp: "serp",
 }
 _AUTO_PAGES: Set[type] = {
     AutoArticlePage,
@@ -70,6 +73,7 @@ _AUTO_PAGES: Set[type] = {
     AutoProductPage,
     AutoProductListPage,
     AutoProductNavigationPage,
+    AutoSerpPage,
 }
 
 
@@ -93,6 +97,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         ProductList,
         ProductNavigation,
         Screenshot,
+        Serp,
     }
 
     def __init__(self, *args, **kwargs):
