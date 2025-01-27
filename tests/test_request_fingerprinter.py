@@ -106,8 +106,9 @@ async def test_headers():
     assert fingerprint1 == fingerprint2
 
 
-def test_cookies():
-    crawler = get_crawler()
+@ensureDeferred
+async def test_cookies():
+    crawler = await get_crawler()
     fingerprinter = create_instance(
         ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
     )

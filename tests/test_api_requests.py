@@ -29,6 +29,7 @@ from scrapy_zyte_api.handler import _ParamParser
 from scrapy_zyte_api.responses import _process_response
 
 from . import (
+    DEFAULT_AUTOMAP_PARAMS,
     DEFAULT_CLIENT_CONCURRENCY,
     SETTINGS,
     SETTINGS_T,
@@ -47,12 +48,6 @@ EXTRACT_KEY_2 = next(EXTRACT_KEYS_ITER)
 DEFAULT_ACCEPT_ENCODING = ", ".join(
     encoding.decode() for encoding in ACCEPTED_ENCODINGS
 )
-
-DEFAULT_AUTOMAP_PARAMS: Dict[str, Any] = {
-    "httpResponseBody": True,
-    "httpResponseHeaders": True,
-    "responseCookies": True,
-}
 
 
 def sort_dict_list(dict_list):
