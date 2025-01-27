@@ -24,6 +24,8 @@ else:
     from ._params import _REQUEST_PARAMS, _ParamParser, _uses_browser
     from .utils import _build_from_crawler
 
+    _Undefined = object()
+
     class ScrapyZyteAPIRequestFingerprinter:
         @classmethod
         def from_crawler(cls, crawler):
@@ -68,7 +70,7 @@ else:
                 )
                 self._has_poet = False
             self._cache: "WeakKeyDictionary[Request, bytes]" = WeakKeyDictionary()
-            self._param_parser = _ParamParser(crawler, cookies_enabled=False)
+            self._param_parser = _ParamParser(crawler)
 
         def _normalize_params(self, api_params):
             api_params["url"] = canonicalize_url(
@@ -81,9 +83,19 @@ else:
                     api_params.pop("httpRequestText").encode()
                 ).decode()
 
+            if (
+                "responseCookies" not in api_params
+                and "responseCookies" in api_params.get("experimental", {})
+            ):
+                api_params["responseCookies"] = api_params["experimental"].pop(
+                    "responseCookies"
+                )
+
             for key, value in _REQUEST_PARAMS.items():
                 if value["changes_fingerprint"] is False:
                     api_params.pop(key, None)
+                elif value["default"] == api_params.get(key, _Undefined):
+                    api_params.pop(key)
 
         def fingerprint(self, request):
             if request in self._cache:

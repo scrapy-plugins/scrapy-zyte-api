@@ -29,15 +29,14 @@ Automatic mapping
     :http:`request:requestHeaders` for browser requests. See
     :ref:`header-mapping` and :ref:`request-unsupported` for details.
 
--   If :setting:`ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED` is ``True``,
-    :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` is ``True`` (default),
-    and :attr:`Request.meta <scrapy.http.Request.meta>` does not set
+-   If the :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` is ``True``
+    (default), and :attr:`Request.meta <scrapy.http.Request.meta>` does not set
     :reqmeta:`dont_merge_cookies <scrapy:dont_merge_cookies>` to ``True``:
 
-    -   :http:`request:experimental.responseCookies` becomes ``True``.
+    -   :http:`request:responseCookies` becomes ``True``.
 
     -   Cookies from the :reqmeta:`cookiejar <scrapy:cookiejar>` become
-        :http:`request:experimental.requestCookies`.
+        :http:`request:requestCookies`.
 
         All cookies from the cookie jar are set, regardless of their cookie
         domain. This is because Zyte API requests may involve requests to
@@ -117,20 +116,18 @@ following parameters:
                 "value": "application/json"
             }
         ],
-        "experimental": {
-            "requestCookies": [
-                {
-                    "name": "a",
-                    "value": "b",
-                    "domain": ""
-                }
-            ],
-            "responseCookies": true
-        },
         "httpResponseBody": true,
         "httpResponseHeaders": true,
         "httpRequestBody": "eyJmb28iOiAiYmFyIn0=",
         "httpRequestMethod": "POST",
+        "requestCookies": [
+            {
+                "name": "a",
+                "value": "b",
+                "domain": ""
+            }
+        ],
+        "responseCookies": true,
         "url": "https://httpbin.org/anything"
     }
 

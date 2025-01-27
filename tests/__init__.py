@@ -15,6 +15,12 @@ from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 
 _API_KEY = "a"
 
+DEFAULT_AUTOMAP_PARAMS: Dict[str, Any] = {
+    "httpResponseBody": True,
+    "httpResponseHeaders": True,
+    "responseCookies": True,
+}
+
 DEFAULT_CLIENT_CONCURRENCY = AsyncClient(api_key=_API_KEY).n_conn
 SETTINGS_T = Dict[str, Any]
 SETTINGS: SETTINGS_T = {

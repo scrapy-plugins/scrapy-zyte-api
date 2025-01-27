@@ -30,7 +30,8 @@ def _process_cookies(
 ):
     if not cookie_jars:
         return
-    response_cookies = api_response.get("experimental", {}).get("responseCookies")
+    old_response_cookies = api_response.get("experimental", {}).get("responseCookies")
+    response_cookies = api_response.get("responseCookies", old_response_cookies)
     if not response_cookies:
         return
     cookie_jar = _get_cookie_jar(request, cookie_jars)

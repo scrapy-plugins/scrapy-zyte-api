@@ -42,10 +42,9 @@ The following Zyte API parameters are *not* taken into account for request
 fingerprinting:
 
 -   Request header parameters (:http:`request:customHttpRequestHeaders`,
-    :http:`request:requestHeaders`)
+    :http:`request:requestHeaders`, :http:`request:requestCookies`)
 
--   Request cookie parameters (:http:`request:cookieManagement`,
-    :http:`request:requestCookies`)
+-   :http:`request:cookieManagement`
 
 -   Session handling parameters (:http:`request:sessionContext`,
     :http:`request:sessionContextParameters`)
