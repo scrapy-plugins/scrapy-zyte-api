@@ -6,8 +6,8 @@ Automatic request parameters
 
 To send a Scrapy request through Zyte API letting Zyte API request parameters
 be automatically chosen based on the parameters of that Scrapy request, set the
-:ref:`zyte_api_automap` key in :attr:`Request.meta <scrapy.http.Request.meta>`
-to ``True``.
+:reqmeta:`zyte_api_automap` key in :attr:`Request.meta
+<scrapy.http.Request.meta>` to ``True``.
 
 For example:
 
@@ -31,7 +31,7 @@ For example:
             print(response.text)
             # "<html>…</html>"
 
-In :ref:`transparent mode <transparent>`, :ref:`zyte_api_automap` is ``True``
+In :ref:`transparent mode <transparent>`, :reqmeta:`zyte_api_automap` is ``True``
 by default.
 
 See :ref:`request` to learn how exactly request parameters are mapped when
@@ -43,7 +43,7 @@ using automatic request parameters.
 Changing parameters
 ===================
 
-You may set :ref:`zyte_api_automap` in :attr:`Request.meta
+You may set :reqmeta:`zyte_api_automap` in :attr:`Request.meta
 <scrapy.http.Request.meta>` to a :class:`dict` of Zyte API parameters to add,
 modify, or remove (by setting to ``False``) automatic request parameters. This
 also works in :ref:`transparent mode <transparent>`.

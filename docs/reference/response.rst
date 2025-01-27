@@ -98,6 +98,7 @@ would look as follows:
         #     "screenshot": "iVBORw0KGgoAAAANSUh…",
         # }
         from base64 import b64decode
+
         print(b64decode(response.raw_api_response["screenshot"]))
         # b'\x89PNG\r\n\x1a\n\x00\x00\x00\r…'
 

@@ -64,7 +64,7 @@ def raw_api_response_browser():
         "echoData": {"some_value": "here"},
         "httpResponseHeaders": [
             {"name": "Content-Type", "value": "text/html"},
-            {"name": "Content-Length", "value": len(PAGE_CONTENT)},
+            {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
         ],
         "statusCode": 200,
         "responseCookies": INPUT_COOKIES,
@@ -78,7 +78,7 @@ def raw_api_response_body():
         "echoData": {"some_value": "here"},
         "httpResponseHeaders": [
             {"name": "Content-Type", "value": "text/html"},
-            {"name": "Content-Length", "value": len(PAGE_CONTENT)},
+            {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
         ],
         "statusCode": 200,
         "responseCookies": INPUT_COOKIES,
@@ -93,7 +93,7 @@ def raw_api_response_mixed():
         "echoData": {"some_value": "here"},
         "httpResponseHeaders": [
             {"name": "Content-Type", "value": "text/html"},
-            {"name": "Content-Length", "value": len(PAGE_CONTENT_2)},
+            {"name": "Content-Length", "value": str(len(PAGE_CONTENT_2))},
         ],
         "statusCode": 200,
         "responseCookies": INPUT_COOKIES,
@@ -194,7 +194,7 @@ def test_non_utf8_response():
         "browserHtml": content,
         "httpResponseHeaders": [
             {"name": "Content-Type", "value": "text/html; charset=iso-8859-1"},
-            {"name": "Content-Length", "value": len(content)},
+            {"name": "Content-Length", "value": str(len(content))},
         ],
     }
 
@@ -337,7 +337,7 @@ def test__process_response_no_body():
         "product": {"name": "shoes"},
     }
 
-    resp = _process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
 
     assert isinstance(resp, Response)
     assert resp.body == b""
@@ -435,8 +435,7 @@ def test__process_response_body_and_headers(encoding, content_type):
             "utf-16-le",
         ),
         (
-            """<html><head><meta http-equiv="Content-Type" content="text/html; charset="gb2312">
-            </head><body>✨</body></html>""",
+            """<html><head><meta http-equiv="Content-Type" content="text/html; charset="gb2312"></head><body>✨</body></html>""",
             "✨",
             "gb18030",
             None,
@@ -507,7 +506,7 @@ def test__process_response_non_text():
             }
         ],
     }
-    resp = _process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
 
     assert isinstance(resp, Response)
     with pytest.raises(NotSupported):

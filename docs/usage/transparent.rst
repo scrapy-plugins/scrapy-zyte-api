@@ -4,15 +4,16 @@
 Transparent mode
 ================
 
-Set :ref:`ZYTE_API_TRANSPARENT_MODE` to ``True`` to handle requests as follows:
+Set :setting:`ZYTE_API_TRANSPARENT_MODE` to ``True`` to handle requests as
+follows:
 
 -   By default, requests are sent with :ref:`automatic request
     parameters <automap>`.
 
--   Requests with :ref:`zyte_api` set to a ``dict`` are sent with :ref:`manual
-    request parameters <manual>`.
+-   Requests with :reqmeta:`zyte_api` set to a ``dict`` are sent with
+    :ref:`manual request parameters <manual>`.
 
--   Requests with :ref:`zyte_api_automap` set to ``False`` are *not* sent
+-   Requests with :reqmeta:`zyte_api_automap` set to ``False`` are *not* sent
     through Zyte API.
 
 For example:

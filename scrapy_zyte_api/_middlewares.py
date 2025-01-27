@@ -1,15 +1,13 @@
-import logging
+from logging import getLogger
 from typing import cast
 
-from scrapy import Request, signals
+from scrapy import Request
 from scrapy.exceptions import IgnoreRequest
-from zyte_api.aio.errors import RequestError
+from zyte_api import RequestError
 
 from ._params import _ParamParser
 
-logger = logging.getLogger(__name__)
-
-
+logger = getLogger(__name__)
 _start_requests_processed = object()
 
 
@@ -23,18 +21,26 @@ class _BaseMiddleware:
     def __init__(self, crawler):
         self._param_parser = _ParamParser(crawler, cookies_enabled=False)
         self._crawler = crawler
+        self._preserve_delay = crawler.settings.getbool(
+            "ZYTE_API_PRESERVE_DELAY",
+            not crawler.settings.getbool("AUTOTHROTTLE_ENABLED"),
+        )
 
     def slot_request(self, request, spider, force=False):
         if not force and self._param_parser.parse(request) is None:
             return
 
         downloader = self._crawler.engine.downloader
-        slot_id = downloader._get_slot_key(request, spider)
+        try:
+            slot_id = downloader.get_slot_key(request)
+        except AttributeError:  # Scrapy < 2.12
+            slot_id = downloader._get_slot_key(request, spider)
         if not isinstance(slot_id, str) or not slot_id.startswith(self._slot_prefix):
             slot_id = f"{self._slot_prefix}{slot_id}"
             request.meta["download_slot"] = slot_id
-        _, slot = downloader._get_slot(request, spider)
-        slot.delay = 0
+        if not self._preserve_delay:
+            _, slot = downloader._get_slot(request, spider)
+            slot.delay = 0
 
 
 class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
@@ -50,8 +56,8 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
                 f"{self._max_requests}. The spider will close when it's "
                 f"reached."
             )
+        self._request_count = 0
 
-        crawler.signals.connect(self.open_spider, signal=signals.spider_opened)
         crawler.signals.connect(
             self._start_requests_processed, signal=_start_requests_processed
         )
@@ -79,7 +85,11 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
                 return middleware
         return None
 
-    def open_spider(self, spider):
+    def _check_spm_conflict(self, spider):
+        checked = getattr(self, "_checked_spm_conflict", False)
+        if checked:
+            return
+        self._checked_spm_conflict = True
         settings = self._crawler.settings
         in_transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         spm_mw = self._get_spm_mw()
@@ -113,32 +123,20 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         self._maybe_close()
 
     def process_request(self, request, spider):
+        self._check_spm_conflict(spider)
+
         if self._param_parser.parse(request) is None:
             return
 
-        self.slot_request(request, spider, force=True)
-
-        if self._max_requests_reached(self._crawler.engine.downloader):
+        self._request_count += 1
+        if self._max_requests and self._request_count > self._max_requests:
             self._crawler.engine.close_spider(spider, "closespider_max_zapi_requests")
             raise IgnoreRequest(
                 f"The request {request} is skipped as {self._max_requests} max "
                 f"Zyte API requests have been reached."
             )
 
-    def _max_requests_reached(self, downloader) -> bool:
-        if not self._max_requests:
-            return False
-
-        zapi_req_count = self._crawler.stats.get_value("scrapy-zyte-api/processed", 0)
-        download_req_count = sum(
-            [
-                len(slot.transferring)
-                for slot_id, slot in downloader.slots.items()
-                if slot_id.startswith(self._slot_prefix)
-            ]
-        )
-        total_requests = zapi_req_count + download_req_count
-        return total_requests >= self._max_requests
+        self.slot_request(request, spider, force=True)
 
     def process_exception(self, request, exception, spider):
         if (
@@ -170,25 +168,71 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
         super().__init__(crawler)
         self._send_signal = crawler.signals.send_catch_log
 
+    @staticmethod
+    def _get_header_set(request):
+        return {header.strip().lower() for header in request.headers}
+
     def process_start_requests(self, start_requests, spider):
         # Mark start requests and reports to the downloader middleware the
         # number of them once all have been processed.
         count = 0
         for request in start_requests:
             request.meta["is_start_request"] = True
-            self.slot_request(request, spider)
+            self._process_output_request(request, spider)
             yield request
             count += 1
         self._send_signal(_start_requests_processed, count=count)
 
+    def _process_output_request(self, request, spider):
+        request.meta["_pre_mw_headers"] = self._get_header_set(request)
+        self.slot_request(request, spider)
+
+    def _process_output_item_or_request(self, item_or_request, spider):
+        if not isinstance(item_or_request, Request):
+            return
+        self._process_output_request(item_or_request, spider)
+
     def process_spider_output(self, response, result, spider):
         for item_or_request in result:
-            if isinstance(item_or_request, Request):
-                self.slot_request(item_or_request, spider)
+            self._process_output_item_or_request(item_or_request, spider)
             yield item_or_request
 
     async def process_spider_output_async(self, response, result, spider):
         async for item_or_request in result:
-            if isinstance(item_or_request, Request):
-                self.slot_request(item_or_request, spider)
+            self._process_output_item_or_request(item_or_request, spider)
             yield item_or_request
+
+
+class ScrapyZyteAPIRefererSpiderMiddleware:
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        self._default_policy = crawler.settings.get(
+            "ZYTE_API_REFERRER_POLICY", "no-referrer"
+        )
+        self._param_parser = _ParamParser(crawler, cookies_enabled=False)
+
+    def process_spider_output(self, response, result, spider):
+        for item_or_request in result:
+            self._process_output_item_or_request(item_or_request, spider)
+            yield item_or_request
+
+    async def process_spider_output_async(self, response, result, spider):
+        async for item_or_request in result:
+            self._process_output_item_or_request(item_or_request, spider)
+            yield item_or_request
+
+    def _process_output_item_or_request(self, item_or_request, spider):
+        if not isinstance(item_or_request, Request):
+            return
+        self._process_output_request(item_or_request, spider)
+
+    def _process_output_request(self, request, spider):
+        if self._is_zyte_api_request(request):
+            request.meta.setdefault("referrer_policy", self._default_policy)
+
+    def _is_zyte_api_request(self, request):
+        return self._param_parser.parse(request) is not None
