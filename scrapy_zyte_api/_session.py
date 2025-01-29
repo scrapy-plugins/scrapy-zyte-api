@@ -25,6 +25,25 @@ SESSION_INIT_META_KEY = "_is_session_init_request"
 ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
 
 
+def get_request_session_id(request: Request) -> Optional[str]:
+    """Return the session ID of *request*, or ``None`` if it does not have a
+    session ID assigned."""
+    for meta_key in ZYTE_API_META_KEYS:
+        if meta_key not in request.meta:
+            continue
+        session_id = request.meta[meta_key].get("session", {}).get("id", None)
+        if session_id:
+            return session_id
+    logger.warning(
+        f"Request {request} had no session ID assigned, unexpectedly. "
+        f"If you are sure this issue is not caused by your own code, "
+        f"please report this at "
+        f"https://github.com/scrapy-plugins/scrapy-zyte-api/issues/new "
+        f"providing a minimal, reproducible example."
+    )
+    return None
+
+
 def is_session_init_request(request):
     """Return ``True`` if the request is a :ref:`session initialization request
     <session-init>` or ``False`` otherwise."""
@@ -208,6 +227,61 @@ class SessionConfig:
         keys as described in :ref:`enable-sessions`.
         """
         return request.meta.get("zyte_api_session_enabled", self._enabled)
+
+    def process_request(self, request: Request) -> Optional[Request]:
+        """Process *request* after it has been assigned a session.
+
+        Return ``None`` to send the request as is, or return a new request
+        object to replace the original request.
+
+        The default implementation does not modify the request.
+
+        You can combine this method and :meth:`check` to modify requests based
+        on session initialization responses. For example:
+
+        #.  In :meth:`__init__`, create a dictionary to store session data:
+
+            .. code-block:: python
+
+                def __init__(self, crawler):
+                    super().__init__(crawler)
+                    self.session_data = {}
+
+        #.  In :meth:`check`, store data from the session initialization
+            response in ``session_data``:
+
+            .. code-block:: python
+
+                def check(self, response: Response, request: Request) -> bool:
+                    if scrapy_zyte_api.is_session_init_request(request):
+                        session_id = scrapy_zyte_api.get_request_session_id(request)
+                        self.session_data[session_id] = {
+                            "csrf_token": response.css(".csrf-token::text").get(),
+                        }
+                    return super().check(response, request)
+
+        #.  In :meth:`process_request`, read the session data and act
+            accordingly, either modifying the request in place where possible,
+            e.g.:
+
+            .. code-block:: python
+
+                def process_request(self, request: Request) -> Optional[Request]:
+                    session_id = scrapy_zyte_api.get_request_session_id(request)
+                    csrf_token = self.session_data[session_id]["csrf_token"]
+                    request.headers["CSRF-Token"] = csrf_token
+
+            Or returning an entirely new request, e.g.:
+
+            .. code-block:: python
+
+                def process_request(self, request: Request) -> Optional[Request]:
+                    session_id = get_request_session_id(request)
+                    csrf_token = self.session_data[session_id]["csrf_token"]
+                    new_url = w3lib.url.add_or_replace_parameter(request.url, "csrf_token", csrf_token)
+                    return request.replace(url=new_url)
+        """
+        return None
 
     def pool(self, request: Request) -> str:
         """Return the ID of the session pool to use for *request*.
@@ -766,22 +840,6 @@ class _SessionManager:
         """
         return request.meta.get(SESSION_INIT_META_KEY, False)
 
-    def _get_request_session_id(self, request: Request) -> Optional[str]:
-        for meta_key in ZYTE_API_META_KEYS:
-            if meta_key not in request.meta:
-                continue
-            session_id = request.meta[meta_key].get("session", {}).get("id", None)
-            if session_id:
-                return session_id
-        logger.warning(
-            f"Request {request} had no session ID assigned, unexpectedly. "
-            f"If you are sure this issue is not caused by your own code, "
-            f"please report this at "
-            f"https://github.com/scrapy-plugins/scrapy-zyte-api/issues/new "
-            f"providing a minimal, reproducible example."
-        )
-        return None
-
     def _start_session_refresh(self, session_id: str, request: Request, pool: str):
         try:
             self._pools[pool].remove(session_id)
@@ -799,10 +857,19 @@ class _SessionManager:
             pass
 
     def _start_request_session_refresh(self, request: Request, pool: str):
-        session_id = self._get_request_session_id(request)
+        session_id = get_request_session_id(request)
         if session_id is None:
             return
         self._start_session_refresh(session_id, request, pool)
+
+    @staticmethod
+    def allow_new_session_assignments(request):
+        # Since a response has been received or an exception raised, allow new
+        # session assignments for this request, e.g. if a new request based on
+        # this one (e.g. requests.replace()) is returned by the
+        # process_response or process_exception methods of a later downloader
+        # middleware.
+        request.meta.pop("_zyte_api_session_assigned", None)
 
     async def check(self, response: Response, request: Request) -> bool:
         """Check the response for signs of session expiration, update the
@@ -838,16 +905,23 @@ class _SessionManager:
             self._start_request_session_refresh(request, pool)
         return False
 
-    async def assign(self, request: Request):
-        """Assign a working session to *request*."""
+    async def assign(self, request: Request) -> Optional[Request]:
+        """Assign a working session to *request*.
+
+        If the session config creates a new request instead of modifying the
+        request in place, return that new request, to replace the received
+        request.
+        """
         assert self._crawler.stats
         with self._fatal_error_handler:
-            if self.is_init_request(request):
-                return
+            if self.is_init_request(request) or request.meta.get(
+                "_zyte_api_session_assigned", False
+            ):
+                return None
             session_config = self._get_session_config(request)
             if not session_config.enabled(request):
                 self._crawler.stats.inc_value("scrapy-zyte-api/sessions/use/disabled")
-                return
+                return None
             session_id = await self._next(request)
             # Note: If there is a session set already (e.g. a request being
             # retried), it is overridden.
@@ -870,6 +944,13 @@ class _SessionManager:
                 request.meta[meta_key] = {}
             request.meta[meta_key]["session"] = {"id": session_id}
             request.meta.setdefault("dont_merge_cookies", True)
+            # Mark this request as having a session assigned already, so that
+            # if a later downloader middleware process_request call returns a
+            # new request object (with a shallow copy of its meta), a new call
+            # to the process_request method of the session management
+            # middleware does not assign a new session again.
+            request.meta.setdefault("_zyte_api_session_assigned", True)
+            return session_config.process_request(request)
 
     def is_enabled(self, request: Request) -> bool:
         session_config = self._get_session_config(request)
@@ -882,7 +963,7 @@ class _SessionManager:
             self._crawler.stats.inc_value(
                 f"scrapy-zyte-api/sessions/pools/{pool}/use/failed"
             )
-            session_id = self._get_request_session_id(request)
+            session_id = get_request_session_id(request)
             if session_id is not None:
                 self._errors[session_id] += 1
                 if self._errors[session_id] < self._max_errors:
@@ -909,14 +990,19 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         self._crawler = crawler
         self._sessions = _SessionManager(crawler)
 
-    async def process_request(self, request: Request, spider: Spider) -> None:
-        await self._sessions.assign(request)
+    async def process_request(
+        self, request: Request, spider: Spider
+    ) -> Optional[Request]:
+        return await self._sessions.assign(request)
 
     async def process_response(
         self, request: Request, response: Response, spider: Spider
     ) -> Union[Request, Response, None]:
         if isinstance(response, DummyResponse):
             return response
+
+        self._sessions.allow_new_session_assignments(request)
+
         passed = await self._sessions.check(response, request)
         if not passed:
             new_request_or_none = get_retry_request(
@@ -938,6 +1024,8 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             or not self._sessions.is_enabled(request)
         ):
             return None
+
+        self._sessions.allow_new_session_assignments(request)
 
         if exception.parsed.type == "/problem/session-expired":
             self._sessions.handle_expiration(request)

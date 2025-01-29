@@ -1,7 +1,7 @@
 from collections import deque
 from copy import copy, deepcopy
 from math import floor
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 from unittest.mock import patch
 
 import pytest
@@ -19,6 +19,7 @@ from scrapy_zyte_api import (
     SESSION_DEFAULT_RETRY_POLICY,
     LocationSessionConfig,
     SessionConfig,
+    get_request_session_id,
     is_session_init_request,
     session_config,
 )
@@ -2079,6 +2080,123 @@ async def test_session_config_no_web_poet(mockserver):
         @session_config(["example.com"])
         class CustomSessionConfig(SessionConfig):
             pass
+
+
+@ensureDeferred
+async def test_session_config_process_request_change_request(mockserver):
+    pytest.importorskip("web_poet")
+
+    @session_config("example.com")
+    class CustomSessionConfig(SessionConfig):
+
+        def __init__(self, crawler):
+            super().__init__(crawler)
+            self.session_data = {}
+
+        def check(self, response: Response, request: Request) -> bool:
+            if is_session_init_request(request):
+                session_id = get_request_session_id(request)
+                self.session_data[session_id] = {"foo": "bar"}
+            return super().check(response, request)
+
+        def process_request(self, request: Request) -> Optional[Request]:
+            session_id = get_request_session_id(request)
+            foo = self.session_data[session_id]["foo"]
+            request.headers["foo"] = foo
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+    request_headers = []
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            request_headers.append(response.request.headers["foo"])
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    assert request_headers == [b"bar"]
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+    }
+
+    # Clean up the session config registry, and check it, otherwise we could
+    # affect other tests.
+
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@ensureDeferred
+async def test_session_config_process_request_new_request(mockserver):
+    pytest.importorskip("web_poet")
+
+    @session_config("example.com")
+    class CustomSessionConfig(SessionConfig):
+
+        def __init__(self, crawler):
+            super().__init__(crawler)
+            self.session_data = {}
+
+        def check(self, response: Response, request: Request) -> bool:
+            if is_session_init_request(request):
+                session_id = get_request_session_id(request)
+                self.session_data[session_id] = {"foo": "bar"}
+            return super().check(response, request)
+
+        def process_request(self, request: Request) -> Optional[Request]:
+            session_id = get_request_session_id(request)
+            foo = self.session_data[session_id]["foo"]
+            new_url = request.url.rstrip("/") + f"/{foo}"
+            return request.replace(url=new_url)
+
+    settings = {
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+    output_urls = []
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            output_urls.append(response.url)
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    assert output_urls == ["https://example.com/bar"]
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
+    }
+
+    # Clean up the session config registry, and check it, otherwise we could
+    # affect other tests.
+
+    session_config_registry.__init__()  # type: ignore[misc]
 
 
 @ensureDeferred
