@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.27.0 (unreleased)
+0.27.0 (2025-02-04)
 -------------------
 
 * :ref:`scrapy-poet integration <scrapy-poet>` now supports
