@@ -21,6 +21,7 @@ from ._session import (
     LocationSessionConfig,
     ScrapyZyteAPISessionDownloaderMiddleware,
     SessionConfig,
+    get_request_session_id,
     is_session_init_request,
     session_config,
 )
