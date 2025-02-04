@@ -1,5 +1,5 @@
 from collections import defaultdict
-from copy import copy
+from copy import deepcopy
 from typing import Annotated
 
 import pytest
@@ -98,7 +98,7 @@ class ZyteAPIProviderMetaSpider(Spider):
 
 @ensureDeferred
 async def test_provider(mockserver):
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     item, url, _ = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
@@ -145,7 +145,7 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     port = get_ephemeral_port()
     handle_urls(f"{fresh_mockserver.host}:{port}")(MyPage)
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
     item, url, _ = await crawl_single_item(
@@ -172,7 +172,7 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     port = get_ephemeral_port()
     handle_urls(f"{fresh_mockserver.host}:{port}")(MyPage)
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
     item, url, _ = await crawl_single_item(
@@ -200,7 +200,7 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
     port = get_ephemeral_port()
     handle_urls(f"{fresh_mockserver.host}:{port}")(MyPage)
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1}
     item, url, _ = await crawl_single_item(
@@ -218,7 +218,7 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
 
 @ensureDeferred
 async def test_provider_params_setting(mockserver):
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_PROVIDER_PARAMS"] = PROVIDER_PARAMS
@@ -229,7 +229,7 @@ async def test_provider_params_setting(mockserver):
 
 @ensureDeferred
 async def test_provider_params_meta(mockserver):
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     _, _, crawler = await crawl_single_item(
@@ -241,7 +241,7 @@ async def test_provider_params_meta(mockserver):
 
 @ensureDeferred
 async def test_provider_params_remove_unused_options(mockserver):
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_PROVIDER_PARAMS"] = {
@@ -271,7 +271,7 @@ async def test_provider_extractfrom(mockserver):
                 "product2": page.product,
             }
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
@@ -301,7 +301,7 @@ async def test_provider_extractfrom_double(mockserver, caplog):
                 "product": page.product,
             }
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
@@ -322,7 +322,7 @@ async def test_provider_extractfrom_override(mockserver):
                 "product": page.product,
             }
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_PROVIDER_PARAMS"] = {
@@ -355,7 +355,7 @@ async def test_provider_geolocation(mockserver):
                 "product": page.product,
             }
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
@@ -374,7 +374,7 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
         def parse_(self, response: DummyResponse, page: GeoProductPage):  # type: ignore[override]
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
@@ -412,7 +412,7 @@ async def test_provider_custom_attrs(mockserver, annotation):
                 "custom_attrs": page.custom_attrs,
             }
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
@@ -455,7 +455,7 @@ async def test_provider_custom_attrs_values(mockserver):
                 "custom_attrs": page.custom_attrs,
             }
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
@@ -490,7 +490,7 @@ class RecordingHandler(ScrapyZyteAPIDownloadHandler):
 
 
 def provider_settings(server):
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = server.urljoin("/")
     settings["ZYTE_API_TRANSPARENT_MODE"] = True
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
@@ -1112,7 +1112,7 @@ async def test_provider_actions(mockserver, caplog):
                 "action_results": page.actions,
             }
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
@@ -1150,7 +1150,7 @@ async def test_auto_field_stats_not_enabled(mockserver):
         def parse(self, response: DummyResponse, product: Product):
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     _, _, crawler = await crawl_single_item(TestSpider, HtmlResource, settings)
@@ -1205,7 +1205,7 @@ async def test_auto_field_stats_no_override(mockserver):
         def parse(self, response: DummyResponse, product: Product):
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["STATS_CLASS"] = OnlyOnceStatsCollector
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
@@ -1254,7 +1254,7 @@ async def test_auto_field_stats_partial_override(mockserver):
         def parse(self, response: DummyResponse, product: Product):
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -1406,7 +1406,7 @@ async def test_auto_field_stats_full_override(mockserver):
         def parse(self, response: DummyResponse, product: Product):
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -1443,7 +1443,7 @@ async def test_auto_field_stats_callback_override(mockserver):
             product.name = "foo"
             yield product
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -1494,7 +1494,7 @@ async def test_auto_field_stats_item_page_override(mockserver):
         def parse(self, response: DummyResponse, page: MyProductPage):
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -1560,7 +1560,7 @@ async def test_auto_field_stats_alt_page_override(mockserver):
         def parse(self, response: DummyResponse, page: AltProductPage):
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -1611,7 +1611,7 @@ async def test_auto_field_stats_non_auto_override(mockserver):
         def parse(self, response: DummyResponse, product: Product):
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -1656,7 +1656,7 @@ async def test_auto_field_stats_auto_field_decorator(mockserver):
         def parse(self, response: DummyResponse, product: Product):
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -1702,7 +1702,7 @@ async def test_auto_field_stats_auto_field_meta(mockserver):
         def parse(self, response: DummyResponse, product: Product):
             pass
 
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -1745,7 +1745,7 @@ class ZyteAPIMultipleSpider(Spider):
 
 @ensureDeferred
 async def test_multiple_types(mockserver):
-    settings = copy(SETTINGS)
+    settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     item, url, _ = await crawl_single_item(
