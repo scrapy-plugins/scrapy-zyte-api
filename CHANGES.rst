@@ -22,10 +22,10 @@ Unreleased
 
   * You will now be warned when using their default values unnecessarily.
 
-  * The following fields no longer affect request fingerprinting (i.e. 2
-    request identical except for the value of that field are now considered
-    duplicate requests):
-    :http:`request:ipType`, :http:`request:session`.
+  * By default, the following fields no longer affect request fingerprinting
+    (i.e. 2 request identical except for the value of that field are now
+    considered duplicate requests): :http:`request:ipType`,
+    :http:`request:session`.
 
   * When enabling :http:`request:serp`, :http:`request:httpResponseBody` and
     :http:`request:httpResponseHeaders` will no longer be enabled by default,
