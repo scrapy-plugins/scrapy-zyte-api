@@ -47,7 +47,7 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
 -   :http:`request:tags`.
 
 The following Zyte API parameters are *not* taken into account for request
-fingerprinting:
+fingerprinting by default:
 
 -   Request header parameters (:http:`request:customHttpRequestHeaders`,
     :http:`request:requestHeaders`).

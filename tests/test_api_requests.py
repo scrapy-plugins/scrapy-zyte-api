@@ -2169,7 +2169,7 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
-        # If only 2 extractFrom is defined out of 2 extraction types, it is
+        # If only 1 extractFrom is defined out of 2 extraction types, it is
         # assumed to be the same for both extraction types.
         (
             {"Referer": "a"},
