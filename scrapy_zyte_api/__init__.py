@@ -8,6 +8,7 @@ if _NEEDS_EARLY_REACTOR:
 from ._annotations import ExtractFrom, actions, custom_attrs
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPIRefererSpiderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
 from ._page_inputs import Actions, Geolocation, Screenshot
@@ -20,6 +21,7 @@ from ._session import (
     LocationSessionConfig,
     ScrapyZyteAPISessionDownloaderMiddleware,
     SessionConfig,
+    get_request_session_id,
     is_session_init_request,
     session_config,
 )

@@ -321,7 +321,8 @@ Overriding session configs
 For spiders that target a single website, using settings and request metadata
 keys for :ref:`session initialization <session-init>` and :ref:`session
 checking <session-check>` should do the job. However, for broad-crawl spiders,
-:doc:`multi-website spiders <zyte-spider-templates:index>`, or for code
+:doc:`multi-website spiders <zyte-spider-templates:index>`, to modify
+session-using requests based on session initialization responses, or for code
 reusability purposes, you might want to define different session configs for
 different websites.
 
@@ -352,6 +353,10 @@ to tell whether a request is a :ref:`session initialization request
 <session-init>` or not, use :func:`~scrapy_zyte_api.is_session_init_request`:
 
 .. autofunction:: scrapy_zyte_api.is_session_init_request
+
+To get the session ID of a given request, use:
+
+.. autofunction:: scrapy_zyte_api.get_request_session_id
 
 Classes decorated with :func:`~scrapy_zyte_api.session_config` are registered
 into :data:`~scrapy_zyte_api.session_config_registry`:

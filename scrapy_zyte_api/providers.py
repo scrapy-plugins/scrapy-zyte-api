@@ -101,6 +101,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         ProductList,
         ProductNavigation,
         Screenshot,
+        Serp,
     }
 
     def __init__(self, *args, **kwargs):

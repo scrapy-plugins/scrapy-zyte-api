@@ -8,6 +8,7 @@ from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPIRefererSpiderMiddleware,
     ScrapyZyteAPISessionDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
@@ -148,6 +149,7 @@ BASE_EXPECTED = {
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "SPIDER_MIDDLEWARES": {
         ScrapyZyteAPISpiderMiddleware: 100,
+        ScrapyZyteAPIRefererSpiderMiddleware: 1000,
     },
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
     "ZYTE_API_FALLBACK_HTTPS_HANDLER": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",

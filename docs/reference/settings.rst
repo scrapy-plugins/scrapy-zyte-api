@@ -286,6 +286,22 @@ For example:
     }
 
 
+.. setting:: ZYTE_API_REFERRER_POLICY
+
+ZYTE_API_REFERRER_POLICY
+========================
+
+Default: ``"no-referrer"``
+
+:setting:`REFERRER_POLICY` to apply to Zyte API requests when using
+:ref:`transparent mode <transparent>` or :ref:`automatic request parameters
+<automap>`.
+
+The :reqmeta:`referrer_policy` request metadata key takes precedence.
+
+See :ref:`referer`.
+
+
 .. setting:: ZYTE_API_RETRY_POLICY
 
 ZYTE_API_RETRY_POLICY

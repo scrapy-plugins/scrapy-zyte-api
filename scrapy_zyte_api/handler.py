@@ -9,7 +9,7 @@ from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
 from scrapy.settings import Settings
 from scrapy.utils.defer import deferred_from_coro
-from scrapy.utils.misc import create_instance, load_object
+from scrapy.utils.misc import load_object
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api import AsyncZyteAPI, RequestError
@@ -18,7 +18,7 @@ from zyte_api.constants import API_URL
 
 from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
-from .utils import USER_AGENT
+from .utils import USER_AGENT, _build_from_crawler
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     def _create_handler(self, path: Any) -> Any:
         dhcls = load_object(path)
-        return create_instance(dhcls, settings=None, crawler=self._crawler)
+        return _build_from_crawler(dhcls, self._crawler)
 
     def download_request(self, request: Request, spider: Spider) -> Deferred:
         api_params = self._param_parser.parse(request)
