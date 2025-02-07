@@ -18,7 +18,7 @@ request fingerprinting for requests that do not go through Zyte API.
 
 
 Request fingerprinting below Scrapy 2.7
-----------------------------------------
+---------------------------------------
 
 If you have a Scrapy version lower than Scrapy 2.7, Zyte API parameters are not
 taken into account for request fingerprinting. This can cause some Scrapy
