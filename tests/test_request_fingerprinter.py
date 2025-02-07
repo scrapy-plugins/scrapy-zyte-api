@@ -1,3 +1,5 @@
+from copy import copy
+
 import pytest
 from packaging.version import Version
 from pytest_twisted import ensureDeferred
@@ -11,7 +13,7 @@ from scrapy.utils.misc import create_instance
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
 
-from . import get_crawler
+from . import SETTINGS, get_crawler
 
 try:
     import scrapy_poet
@@ -714,6 +716,12 @@ async def test_page_params():
         assert some_param_fingerprint != other_param_fingerprint
 
 
+NO_SESSION_DOWNLOADER_MIDDLEWARES = copy(SETTINGS["DOWNLOADER_MIDDLEWARES"])
+del NO_SESSION_DOWNLOADER_MIDDLEWARES[
+    "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware"
+]
+
+
 @pytest.mark.parametrize(
     ("settings", "meta1", "meta2", "fingerprint_matches"),
     (
@@ -829,6 +837,17 @@ async def test_page_params():
                 "zyte_api_session_enabled": True,
             },
             False,
+        ),
+        # If the session middleware is disabled, request fingerprinting still
+        # works as expected, ignoring anything about the session management
+        # API.
+        (
+            {"DOWNLOADER_MIDDLEWARES": NO_SESSION_DOWNLOADER_MIDDLEWARES},
+            {},
+            {
+                "zyte_api_session_enabled": True,
+            },
+            True,
         ),
     ),
 )
