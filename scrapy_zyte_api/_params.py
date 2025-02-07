@@ -213,10 +213,10 @@ _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
     },
     "sessionContext": {
         "default": [],
-        "changes_fingerprint": False,
     },
     "sessionContextParameters": {
         "default": {},
+        "changes_fingerprint": False,
     },
     "session": {
         "default": {},

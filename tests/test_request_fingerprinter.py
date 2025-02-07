@@ -726,34 +726,114 @@ async def test_page_params():
             },
             True,
         ),
-        *(
-            (
-                {
-                    "ZYTE_API_SESSION_ENABLED": True,
-                },
-                {},
-                {
-                    "zyte_api_session_params": params,
-                },
-                same_fingerprint,
-            )
-            for params, same_fingerprint in (
-                # Certain session initialization params do not affect request
-                # fingerprinting.
-                ({}, True),
-                ({"browserHtml": True}, True),
-                ({"requestHeaders": {"referer": "https://b.example"}}, True),
-                ({"tags": {"foo": "bar"}}, True),
-                ({"ipType": "residential"}, True),
-            )
+        # Session pool IDs affect fingerprinting, but session initialization
+        # parameters do not.
+        #
+        # When using server-managed requests, that means that a different
+        # sessionContext parameter affects the fingerprint, while a different
+        # sessionContextParameters does not, even if sessionContext remains the
+        # same (which would be a user error).
+        (
+            {},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "bar"}]}},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "bar"}]}},
+            True,
+        ),
+        (
+            {},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "bar"}]}},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "baz"}]}},
+            False,
+        ),
+        (
+            {},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "bar"}]}},
+            {"zyte_api_automap": True},
+            False,
+        ),
+        (
+            {},
+            {
+                "zyte_api_automap": {
+                    "sessionContext": [{"foo": "bar"}],
+                    "sessionContextParameters": {"actions": [{"action": "a"}]},
+                }
+            },
+            {
+                "zyte_api_automap": {
+                    "sessionContext": [{"foo": "bar"}],
+                    "sessionContextParameters": {"actions": [{"action": "b"}]},
+                }
+            },
+            True,
+        ),
+        (
+            {},
+            {
+                "zyte_api_automap": {
+                    "sessionContext": [{"foo": "bar"}],
+                    "sessionContextParameters": {"actions": [{"action": "a"}]},
+                }
+            },
+            {
+                "zyte_api_automap": {
+                    "sessionContext": [{"foo": "baz"}],
+                    "sessionContextParameters": {"actions": [{"action": "a"}]},
+                }
+            },
+            False,
+        ),
+        #
+        # When using the session management API, that means that provided
+        # session management is enabled, the session pool assigned to a request
+        # affects its fingerprint, while session initialization parameters do
+        # not.
+        (
+            {"ZYTE_API_SESSION_ENABLED": True},
+            {"zyte_api_session_location": {"postalCode": "10001"}},
+            {"zyte_api_session_location": {"postalCode": "10001"}},
+            True,
+        ),
+        (
+            {"ZYTE_API_SESSION_ENABLED": True},
+            {"zyte_api_session_location": {"postalCode": "10001"}},
+            {"zyte_api_session_location": {"postalCode": "10002"}},
+            False,
+        ),
+        (
+            {},
+            {"zyte_api_session_location": {"postalCode": "10001"}},
+            {"zyte_api_session_location": {"postalCode": "10002"}},
+            True,
+        ),
+        (
+            {},
+            {
+                "zyte_api_session_pool": "a",
+                "zyte_api_session_params": {"geolocation": "EI"},
+            },
+            {
+                "zyte_api_session_pool": "a",
+                "zyte_api_session_params": {"geolocation": "GB"},
+            },
+            True,
+        ),
+        (
+            {},
+            {
+                "zyte_api_session_pool": "a",
+                "zyte_api_session_params": {"geolocation": "EI"},
+            },
+            {
+                "zyte_api_session_pool": "b",
+                "zyte_api_session_params": {"geolocation": "EI"},
+            },
+            True,
         ),
     ),
 )
 @ensureDeferred
-async def test_session_management(settings, meta1, meta2, fingerprint_matches):
-    """When certain parameters of the equivalent to sessionContextParameters
-    from the session management API are set, fingerprints should be affected
-    the same way as they are with sessionContextParameters."""
+async def test_session_pool_ids(settings, meta1, meta2, fingerprint_matches):
     request1 = Request("https://example.com", meta=meta1)
     request2 = Request("https://example.com", meta=meta2)
 

@@ -31,10 +31,10 @@ Unreleased
     :http:`request:httpResponseHeaders` will no longer be enabled by default,
     and header mapping is disabled.
 
-* :http:`request:sessionContextParameters` now affects request fingerprinting:
-  2 requests identical except for their
-  :http:`request:sessionContextParameters` value are *not* considered duplicate
-  requests any longer.
+* Session pool IDs, of server-managed sessions (:http:`request:sessionContext`)
+  or :ref:`set through the session management API <session-pools>`, now affect
+  request fingerprinting: 2 requests identical except for their session pool ID
+  are *not* considered duplicate requests any longer.
 
 * When it is not clear whether a request will use browser rendering or not,
   e.g. an :ref:`automatic extraction request <zapi-extract>` without an

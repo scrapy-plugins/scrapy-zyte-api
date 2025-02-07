@@ -38,7 +38,11 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
 
 -   :http:`request:geolocation`.
 
--   :http:`request:sessionContextParameters`.
+-   :http:`request:sessionContext`.
+
+    When using the :ref:`session management API <session>`, :ref:`session pool
+    IDs <session-pools>` are treated the same as
+    :http:`request:sessionContext`.
 
 -   :http:`request:followRedirect`.
 
@@ -55,8 +59,13 @@ fingerprinting by default:
 -   Request cookie parameters (:http:`request:cookieManagement`,
     :http:`request:requestCookies`).
 
--   Session ID parameters (:http:`request:sessionContext`,
-    :http:`request:session.id`).
+-   :http:`request:sessionContextParameters`.
+
+    When using the :ref:`session management API <session>`, :ref:`session
+    initialization parameters <session-init>` are treated the same as
+    :http:`request:sessionContextParameters`.
+
+-   :http:`request:session.id`.
 
 -   :http:`request:ipType`.
 

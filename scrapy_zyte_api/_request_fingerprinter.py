@@ -1,5 +1,8 @@
+from functools import cached_property
 from logging import getLogger
 from typing import TYPE_CHECKING, cast
+
+from ._session import ScrapyZyteAPISessionDownloaderMiddleware
 
 logger = getLogger(__name__)
 
@@ -69,6 +72,7 @@ else:
                 self._has_poet = False
             self._cache: "WeakKeyDictionary[Request, bytes]" = WeakKeyDictionary()
             self._param_parser = _ParamParser(crawler, cookies_enabled=False)
+            self._crawler = crawler
 
         def _normalize_params(self, api_params):
             api_params["url"] = canonicalize_url(
@@ -85,11 +89,39 @@ else:
                 if not value.get("changes_fingerprint", True):
                     api_params.pop(key, None)
 
+        @cached_property
+        def _session_mw(self):
+            try:
+                mw = self._crawler.get_downloader_middleware(
+                    ScrapyZyteAPISessionDownloaderMiddleware
+                )
+            except AttributeError:  # Scrapy < 2.12
+                for component in self._crawler.engine.downloader.middleware.middlewares:
+                    if isinstance(component, ScrapyZyteAPISessionDownloaderMiddleware):
+                        mw = component
+                        break
+                else:
+                    mw = None
+            if mw is None:
+
+                class NoOpSessionDownloaderMiddleware:
+                    def get_pool(self, request):
+                        return None
+
+                mw = NoOpSessionDownloaderMiddleware()
+            return mw
+
+        def _get_pool(self, request: Request) -> str:
+            return self._session_mw.get_pool(request)
+
         def fingerprint(self, request):
             if request in self._cache:
                 return self._cache[request]
             api_params = self._param_parser.parse(request)
             if api_params is not None:
+                session_pool = self._get_pool(request)
+                if session_pool is not None:
+                    api_params.setdefault("sessionContext", session_pool)
                 self._normalize_params(api_params)
                 fingerprint = json.dumps(api_params, sort_keys=True).encode()
                 if self._has_poet:

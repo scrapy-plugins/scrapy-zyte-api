@@ -267,6 +267,11 @@ sessions:
     <session-check>`, a :ref:`session initialization request <session-init>` is
     triggered to replace that session in the session pool.
 
+The session pool assigned to a request affects the :ref:`fingerprint
+<fingerprint>` of the request. 2 requests with a different session pool ID are
+considered different requests, i.e. not duplicate requests, even if they are
+otherwise identical.
+
 
 .. _optimize-sessions:
 
