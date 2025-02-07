@@ -717,15 +717,6 @@ async def test_page_params():
 @pytest.mark.parametrize(
     ("settings", "meta1", "meta2", "fingerprint_matches"),
     (
-        # Enabling sessions for a request does not change its fingerprint.
-        (
-            {},
-            {},
-            {
-                "zyte_api_session_enabled": True,
-            },
-            True,
-        ),
         # Session pool IDs affect fingerprinting, but session initialization
         # parameters do not.
         #
@@ -807,7 +798,7 @@ async def test_page_params():
             True,
         ),
         (
-            {},
+            {"ZYTE_API_SESSION_ENABLED": True},
             {
                 "zyte_api_session_pool": "a",
                 "zyte_api_session_params": {"geolocation": "EI"},
@@ -819,7 +810,7 @@ async def test_page_params():
             True,
         ),
         (
-            {},
+            {"ZYTE_API_SESSION_ENABLED": True},
             {
                 "zyte_api_session_pool": "a",
                 "zyte_api_session_params": {"geolocation": "EI"},
@@ -828,7 +819,16 @@ async def test_page_params():
                 "zyte_api_session_pool": "b",
                 "zyte_api_session_params": {"geolocation": "EI"},
             },
-            True,
+            False,
+        ),
+        # Enabling sessions for a request *does* change its fingerprint.
+        (
+            {},
+            {},
+            {
+                "zyte_api_session_enabled": True,
+            },
+            False,
         ),
     ),
 )

@@ -29,6 +29,8 @@ jobs:
           toxenv: pinned-scrapy-2x5
         - python-version: '3.9'
           toxenv: pinned-scrapy-2x6
+        - python-version: '3.9'
+          toxenv: pinned-scrapy-2x7
         - python-version: '3.10'
         - python-version: '3.11'
         - python-version: '3.12'
