@@ -604,6 +604,11 @@ class _SessionManager:
         for pool, size in pool_sizes.items():
             self._pending_initial_sessions[pool] = size
 
+        self._max_check_failures = settings.getint(
+            "ZYTE_API_SESSION_MAX_CHECK_FAILURES", 1
+        )
+        self._check_failures: Dict[str, int] = defaultdict(int)
+
         self._max_errors = settings.getint("ZYTE_API_SESSION_MAX_ERRORS", 1)
         self._errors: Dict[str, int] = defaultdict(int)
 
@@ -902,6 +907,11 @@ class _SessionManager:
                 )
                 if passed:
                     return True
+                session_id = get_request_session_id(request)
+                if session_id is not None:
+                    self._check_failures[session_id] += 1
+                    if self._check_failures[session_id] < self._max_check_failures:
+                        return False
             self._start_request_session_refresh(request, pool)
         return False
 

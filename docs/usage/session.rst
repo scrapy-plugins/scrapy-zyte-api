@@ -263,9 +263,11 @@ sessions:
 
 -   When a response associated with a session pool indicates that the session
     expired, an error over the limit (see
-    :setting:`ZYTE_API_SESSION_MAX_ERRORS`), or a failed :ref:`validity check
-    <session-check>`, a :ref:`session initialization request <session-init>` is
-    triggered to replace that session in the session pool.
+    :setting:`ZYTE_API_SESSION_MAX_ERRORS`), or a :ref:`validity check
+    <session-check>` failure over the limit (see
+    :setting:`ZYTE_API_SESSION_MAX_CHECK_FAILURES`), a :ref:`session
+    initialization request <session-init>` is triggered to replace that
+    session in the session pool.
 
 
 .. _optimize-sessions:
@@ -298,12 +300,15 @@ Here are some things you can try:
     counterproductive.
 
 -   By default, sessions are discarded as soon as an :ref:`unsuccessful
-    response <zapi-unsuccessful-responses>` is received.
+    response <zapi-unsuccessful-responses>` is received or a :ref:`validity
+    check <session-check>` is failed.
 
     However, on some websites sessions may remain valid even after a few
-    unsuccessful responses. If that is the case, you might want to increase
-    :setting:`ZYTE_API_SESSION_MAX_ERRORS` to require a higher number of
-    unsuccessful responses before discarding a session.
+    unsuccessful responses or validity check failures. If that is the case, you
+    might want to increase the corresponding setting,
+    :setting:`ZYTE_API_SESSION_MAX_ERRORS` or
+    :setting:`ZYTE_API_SESSION_MAX_CHECK_FAILURES`, to require a higher number
+    of the corresponding outcome before discarding a session.
 
 If you do not need :ref:`session checking <session-check>` and your
 :ref:`initialization parameters <session-init>` are only
