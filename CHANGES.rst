@@ -1,6 +1,11 @@
 Changes
 =======
 
+0.28.0 (unreleased)
+-------------------
+
+* New setting: :setting:`ZYTE_API_SESSION_MAX_CHECK_FAILURES`.
+
 0.27.0 (2025-02-04)
 -------------------
 
@@ -381,12 +386,12 @@ Changes
 0.12.1 (2023-09-29)
 -------------------
 
-* The new ``_ZYTE_API_USER_AGENT`` setting allows customizing the user agent 
+* The new ``_ZYTE_API_USER_AGENT`` setting allows customizing the user agent
   string reported to Zyte API.
-  
-  Note that this setting is only meant for libraries and frameworks built on 
-  top of scrapy-zyte-api, to report themselves to Zyte API, for client software 
-  tracking and monitoring purposes. The value of this setting is *not* the 
+
+  Note that this setting is only meant for libraries and frameworks built on
+  top of scrapy-zyte-api, to report themselves to Zyte API, for client software
+  tracking and monitoring purposes. The value of this setting is *not* the
   ``User-Agent`` header sent to upstream websites when using Zyte API.
 
 
