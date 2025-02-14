@@ -27,8 +27,8 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
     :http:`request:product`, and :http:`request:customAttributes`).
 
     Same for :http:`request:networkCapture`, although it is not a proper output
-    parameters (it needs to be combined with another browser rendering
-    parameter to work).
+    parameter (it needs to be combined with another browser rendering parameter
+    to work).
 
 -   Rendering option parameters (:http:`request:actions`,
     :http:`request:device`, :http:`request:javascript`,
