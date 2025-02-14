@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from copy import deepcopy
 from typing import Any, Generator, Optional, Union
 
@@ -18,7 +19,11 @@ from zyte_api.constants import API_URL
 
 from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
-from .utils import USER_AGENT, _build_from_crawler
+from .utils import (
+    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    USER_AGENT,
+    _build_from_crawler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +126,8 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self._crawler = crawler
         self._fallback_handler = None
         self._trust_env = settings.getbool("ZYTE_API_USE_ENV_PROXY")
+
+        self._autothrottle_is_enabled = settings.getbool("AUTOTHROTTLE_ENABLED")
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -244,6 +251,8 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             retrying = self._retry_policy
         self._log_request(api_params)
 
+        start_time = time.time()
+
         try:
             api_response = await self._session.get(api_params, retrying=retrying)
         except RequestError as error:
@@ -255,6 +264,17 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
             raise
         finally:
+            # If AutoThrottle is enabled, and autothrottle_dont_adjust_delay is
+            # not set or not supported, we do not set download_latency, as it
+            # would cause AutoThrottle to adjust the download delay of the
+            # request slot, and we do not want AutoThrottle to do that for Zyte
+            # API slots since Zyte API already handles throtling.
+            if (
+                not self._autothrottle_is_enabled
+                or _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT
+                and request.meta.get("autothrottle_dont_adjust_delay", False)
+            ):
+                request.meta["download_latency"] = time.time() - start_time
             self._update_stats(api_params)
 
         response = _process_response(
