@@ -6,6 +6,7 @@ from scrapy.exceptions import IgnoreRequest
 from zyte_api import RequestError
 
 from ._params import _ParamParser
+from .utils import _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT
 
 logger = getLogger(__name__)
 _start_requests_processed = object()
@@ -29,6 +30,9 @@ class _BaseMiddleware:
     def slot_request(self, request, spider, force=False):
         if not force and self._param_parser.parse(request) is None:
             return
+
+        if _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT:
+            request.meta.setdefault("autothrottle_dont_adjust_delay", True)
 
         downloader = self._crawler.engine.downloader
         try:

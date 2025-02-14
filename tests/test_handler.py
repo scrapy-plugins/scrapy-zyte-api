@@ -246,6 +246,17 @@ async def test_retry_policy(
 
 
 @ensureDeferred
+async def test_download_latency(mockserver):
+    async with make_handler({}, mockserver.urljoin("/")) as handler:
+        meta = {"zyte_api": {"foo": "bar"}}
+        request = Request("https://example.com", meta=meta)
+        assert "download_latency" not in request.meta
+        await handler.download_request(request, None)
+        assert isinstance(request.meta["download_latency"], float)
+        assert request.meta["download_latency"] > 0.0
+
+
+@ensureDeferred
 async def test_stats(mockserver):
     async with make_handler({}, mockserver.urljoin("/")) as handler:
         scrapy_stats = handler._stats
