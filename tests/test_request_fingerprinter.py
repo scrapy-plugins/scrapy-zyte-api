@@ -1,3 +1,5 @@
+from copy import copy
+
 import pytest
 from packaging.version import Version
 from pytest_twisted import ensureDeferred
@@ -11,7 +13,7 @@ from scrapy.utils.misc import create_instance
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
 
-from . import get_crawler
+from . import SETTINGS, get_crawler
 
 try:
     import scrapy_poet
@@ -381,20 +383,20 @@ def merge_dicts(*dicts):
                 {"browserHtml": False, "screenshot": True},
                 {"browserHtml": True, "screenshot": True},
                 {"product": True, "productOptions": {"extractFrom": "browserHtml"}},
+                {"serp": True, "serpOptions": {"extractFrom": "browserHtml"}},
             )
         ),
-        # If neither browserHtml nor screenshot are enabled, different
-        # fragments do *not* make for different fingerprints. Same for
-        # extraction types if browserHtml is not set in # *Options.extractFrom.
+        # If there is no clear indication of whether the requests is an HTTP
+        # request or a browser request, different fragments make for different
+        # fingerprints, to be safe.
         *(
             (
                 merge_dicts(body, headers, unknown, browser),
-                True,
+                False,
             )
             for body in (
                 {},
                 {"httpResponseBody": False},
-                {"httpResponseBody": True},
             )
             for headers in (
                 {},
@@ -412,10 +414,54 @@ def merge_dicts(*dicts):
                 {"screenshot": False},
                 {"browserHtml": False, "screenshot": False},
                 {"product": True},
+            )
+        ),
+        # If there is a clear indication that an HTTP requests is used instead
+        # of a browser request, different fragments do *not* make for different
+        # fingerprints.
+        *(
+            (
+                merge_dicts(body, headers, unknown, browser),
+                True,
+            )
+            for body in (
+                {"httpResponseBody": True},
+                {"serp": True},
                 {
                     "product": True,
                     "productOptions": {"extractFrom": "httpResponseBody"},
                 },
+                {
+                    "serp": True,
+                    "serpOptions": {"extractFrom": "httpResponseBody"},
+                },
+                # productOptions should not influence serp, or anything else if
+                # product is not enabled.
+                {
+                    "productOptions": {"extractFrom": "browserHtml"},
+                    "serp": True,
+                },
+                {
+                    "product": False,
+                    "productOptions": {"extractFrom": "browserHtml"},
+                    "serp": True,
+                },
+            )
+            for headers in (
+                {},
+                {"httpResponseHeaders": False},
+                {"httpResponseHeaders": True},
+            )
+            for unknown in (
+                {},
+                {"unknown": False},
+                {"unknown": True},
+            )
+            for browser in (
+                {},
+                {"browserHtml": False},
+                {"screenshot": False},
+                {"browserHtml": False, "screenshot": False},
             )
         ),
     ),
@@ -668,3 +714,155 @@ async def test_page_params():
         assert no_params_fingerprint != some_param_fingerprint
         assert no_params_fingerprint != other_param_fingerprint
         assert some_param_fingerprint != other_param_fingerprint
+
+
+NO_SESSION_DOWNLOADER_MIDDLEWARES = copy(SETTINGS["DOWNLOADER_MIDDLEWARES"])
+del NO_SESSION_DOWNLOADER_MIDDLEWARES[
+    "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware"
+]
+
+
+@pytest.mark.parametrize(
+    ("settings", "meta1", "meta2", "fingerprint_matches"),
+    (
+        # Session pool IDs affect fingerprinting, but session initialization
+        # parameters do not.
+        #
+        # When using server-managed requests, that means that a different
+        # sessionContext parameter affects the fingerprint, while a different
+        # sessionContextParameters does not, even if sessionContext remains the
+        # same (which would be a user error).
+        (
+            {},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "bar"}]}},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "bar"}]}},
+            True,
+        ),
+        (
+            {},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "bar"}]}},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "baz"}]}},
+            False,
+        ),
+        (
+            {},
+            {"zyte_api_automap": {"sessionContext": [{"foo": "bar"}]}},
+            {"zyte_api_automap": True},
+            False,
+        ),
+        (
+            {},
+            {
+                "zyte_api_automap": {
+                    "sessionContext": [{"foo": "bar"}],
+                    "sessionContextParameters": {"actions": [{"action": "a"}]},
+                }
+            },
+            {
+                "zyte_api_automap": {
+                    "sessionContext": [{"foo": "bar"}],
+                    "sessionContextParameters": {"actions": [{"action": "b"}]},
+                }
+            },
+            True,
+        ),
+        (
+            {},
+            {
+                "zyte_api_automap": {
+                    "sessionContext": [{"foo": "bar"}],
+                    "sessionContextParameters": {"actions": [{"action": "a"}]},
+                }
+            },
+            {
+                "zyte_api_automap": {
+                    "sessionContext": [{"foo": "baz"}],
+                    "sessionContextParameters": {"actions": [{"action": "a"}]},
+                }
+            },
+            False,
+        ),
+        #
+        # When using the session management API, that means that provided
+        # session management is enabled, the session pool assigned to a request
+        # affects its fingerprint, while session initialization parameters do
+        # not.
+        (
+            {"ZYTE_API_SESSION_ENABLED": True},
+            {"zyte_api_session_location": {"postalCode": "10001"}},
+            {"zyte_api_session_location": {"postalCode": "10001"}},
+            True,
+        ),
+        (
+            {"ZYTE_API_SESSION_ENABLED": True},
+            {"zyte_api_session_location": {"postalCode": "10001"}},
+            {"zyte_api_session_location": {"postalCode": "10002"}},
+            False,
+        ),
+        (
+            {},
+            {"zyte_api_session_location": {"postalCode": "10001"}},
+            {"zyte_api_session_location": {"postalCode": "10002"}},
+            True,
+        ),
+        (
+            {"ZYTE_API_SESSION_ENABLED": True},
+            {
+                "zyte_api_session_pool": "a",
+                "zyte_api_session_params": {"geolocation": "EI"},
+            },
+            {
+                "zyte_api_session_pool": "a",
+                "zyte_api_session_params": {"geolocation": "GB"},
+            },
+            True,
+        ),
+        (
+            {"ZYTE_API_SESSION_ENABLED": True},
+            {
+                "zyte_api_session_pool": "a",
+                "zyte_api_session_params": {"geolocation": "EI"},
+            },
+            {
+                "zyte_api_session_pool": "b",
+                "zyte_api_session_params": {"geolocation": "EI"},
+            },
+            False,
+        ),
+        # Enabling sessions for a request *does* change its fingerprint.
+        (
+            {},
+            {},
+            {
+                "zyte_api_session_enabled": True,
+            },
+            False,
+        ),
+        # If the session middleware is disabled, request fingerprinting still
+        # works as expected, ignoring anything about the session management
+        # API.
+        (
+            {"DOWNLOADER_MIDDLEWARES": NO_SESSION_DOWNLOADER_MIDDLEWARES},
+            {},
+            {
+                "zyte_api_session_enabled": True,
+            },
+            True,
+        ),
+    ),
+)
+@ensureDeferred
+async def test_session_pool_ids(settings, meta1, meta2, fingerprint_matches):
+    request1 = Request("https://example.com", meta=meta1)
+    request2 = Request("https://example.com", meta=meta2)
+
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True, **settings})
+    fingerprinter = crawler.request_fingerprinter
+
+    fingerprint1 = fingerprinter.fingerprint(request1)
+    fingerprint2 = fingerprinter.fingerprint(request2)
+
+    if fingerprint_matches:
+        assert fingerprint1 == fingerprint2
+    else:
+        assert fingerprint1 != fingerprint2

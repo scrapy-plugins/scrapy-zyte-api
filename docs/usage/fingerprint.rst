@@ -17,10 +17,10 @@ Use :setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` to define a custom
 request fingerprinting for requests that do not go through Zyte API.
 
 
-Request fingerprinting before Scrapy 2.7
-----------------------------------------
+Request fingerprinting below Scrapy 2.7
+---------------------------------------
 
-If you have a Scrapy version older than Scrapy 2.7, Zyte API parameters are not
+If you have a Scrapy version lower than Scrapy 2.7, Zyte API parameters are not
 taken into account for request fingerprinting. This can cause some Scrapy
 components, like the filter of duplicate requests or the HTTP cache extension,
 to interpret 2 different requests as being the same.

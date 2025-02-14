@@ -22,242 +22,244 @@ _NoDefault = object()
 # Map of all known root Zyte API request params and how they need to be
 # handled. Sorted by appearance in
 # https://docs.zyte.com/zyte-api/usage/reference.html.
+#
+# *default* indicates the default value of a given parameter. It is used by
+# automatic parameter mapping to not send parameters with their default value
+# to the server, and warn when they are unnecessarily defined by users with
+# those values (it could still be necessary to override a non-default value set
+# by a lower-priority setting).
+#
+# *is_extract_type* (default: False) indicates that the given request field is
+# an extract output field, with the following effects:
+#
+# -   httpResponseBody and httpResponseHeaders are not enabled by default if an
+#     extract type field is enabled.
+#
+# -   The extractFrom key of <type>Options is taken into account for the
+#     following:
+#
+#     -   If there is certainty that browser rendering is not used, the
+#         fragment part of the url field is ignored during request
+#         fingerprinting.
+#
+#     -   If there are headers to map, httpResponseBody in any extractFrom
+#         forces customHttpRequestHeaders to be used, browserHtml forces
+#         requestHeaders to be used, and in the absence of both, requestHeaders
+#         is used.
+#
+#         An exception is made for serp, which does not support header mapping.
+#
+#     *default_extract_from* can be used to indicate a value that can be
+#     assumed for <type>Options.extractFrom if not set. It defaults to
+#     _NoDefault, meaning it could be either httpResponseBody or browserHtml,
+#     since for most extraction types Zyte API may use a different default per
+#     domain. If browser rendering may be used, URL fragments are taken into
+#     account for request fingerprinting purposes.
+#
+# *is_browser_output* (default: False) indicates that the given request field
+# is an output that requires browser rendering. If any such output is enabled:
+#
+# -   httpResponseBody and httpResponseHeaders are not enabled by default.
+#
+# -   Header mapping with requestHeaders is used.
+#
+# -   URL fragments are taken into account for request fingerprinting purposes.
+#
+# *changes_fingerprint* (default: True) indicates that the value of the
+# corresponding field must be taken into account for request fingerprinting
+# purposes, i.e. 2 requests with a different value for that field but otherwise
+# identical should be treated as different requests, not as duplicate requests.
+#
 _REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
     "url": {
         "default": _NoDefault,
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "requestHeaders": {
         "default": {},
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
+        "changes_fingerprint": False,
+    },
+    "tags": {
+        "default": {},
+    },
+    "ipType": {
+        "default": None,
         "changes_fingerprint": False,
     },
     "httpRequestMethod": {
         "default": "GET",
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "httpRequestBody": {
         "default": "",
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "httpRequestText": {
         "default": "",
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "customHttpRequestHeaders": {
         "default": [],
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
         "changes_fingerprint": False,
     },
     "httpResponseBody": {
         "default": False,
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "httpResponseHeaders": {
         "default": False,
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "browserHtml": {
         "default": False,
-        "is_extract_type": False,
-        "requires_browser_rendering": True,
-        "changes_fingerprint": True,
+        "is_browser_output": True,
     },
     "screenshot": {
         "default": False,
-        "is_extract_type": False,
-        "requires_browser_rendering": True,
-        "changes_fingerprint": True,
+        "is_browser_output": True,
     },
     "screenshotOptions": {
         "default": {},
-        "is_extract_type": False,
-        "requires_browser_rendering": False,  # Not on its own.
-        "changes_fingerprint": True,
     },
     "article": {
         "default": False,
         "is_extract_type": True,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "articleOptions": {
         "default": {},
-        "is_extract_type": False,  # Not on its own.
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "articleList": {
         "default": False,
         "is_extract_type": True,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "articleListOptions": {
         "default": {},
-        "is_extract_type": False,  # Not on its own.
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "articleNavigation": {
         "default": False,
         "is_extract_type": True,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "articleNavigationOptions": {
         "default": {},
-        "is_extract_type": False,  # Not on its own.
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
+    },
+    "forumThread": {
+        "default": False,
+        "is_extract_type": True,
+    },
+    "forumThreadOptions": {
+        "default": {},
     },
     "jobPosting": {
         "default": False,
         "is_extract_type": True,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "jobPostingOptions": {
         "default": {},
-        "is_extract_type": False,  # Not on its own.
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
+    },
+    "jobPostingNavigation": {
+        "default": False,
+        "is_extract_type": True,
+    },
+    "jobPostingNavigationOptions": {
+        "default": {},
     },
     "product": {
         "default": False,
         "is_extract_type": True,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "productOptions": {
         "default": {},
-        "is_extract_type": False,  # Not on its own.
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "productList": {
         "default": False,
         "is_extract_type": True,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "productListOptions": {
         "default": {},
-        "is_extract_type": False,  # Not on its own.
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "productNavigation": {
         "default": False,
         "is_extract_type": True,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "productNavigationOptions": {
         "default": {},
-        "is_extract_type": False,  # Not on its own.
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
+    },
+    # NOTE: is_extract_type is not set to True here because, for everything
+    # that matters when it comes to automatic parameter mapping and request
+    # fingerprinting, this parameter is not like the other extraction
+    # parameters, e.g. it can (in fact, has to) be combined with other
+    # extraction parameters, and has no extractFrom option.
+    "customAttributes": {
+        "default": None,
+    },
+    "customAttributesOptions": {
+        "default": {},
     },
     "geolocation": {
         "default": None,
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "javascript": {
         "default": None,
-        "is_extract_type": False,
-        "requires_browser_rendering": False,  # Not on its own.
-        "changes_fingerprint": True,
     },
     "actions": {
         "default": [],
-        "is_extract_type": False,
-        "requires_browser_rendering": False,  # Not on its own.
-        "changes_fingerprint": True,
     },
     "jobId": {
         "default": None,
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
         "changes_fingerprint": False,
     },
     "echoData": {
         "default": None,
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
     },
     "viewport": {
         "default": {},
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
+    },
+    "followRedirect": {
+        "default": True,
     },
     "sessionContext": {
         "default": [],
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": False,  # Treated like headers.
     },
     "sessionContextParameters": {
         "default": {},
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": False,  # Treated like sessionContext.
+        "changes_fingerprint": False,
+    },
+    "session": {
+        "default": {},
+        "changes_fingerprint": False,
+    },
+    "networkCapture": {
+        "default": [],
     },
     "device": {
-        "default": "auto",
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,  # Treated like viewport.
+        "default": "desktop",
     },
     "cookieManagement": {
         "default": "auto",
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": False,  # Treated like headers.
+        "changes_fingerprint": False,
     },
     "requestCookies": {
         "default": [],
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": False,  # Treated like headers.
+        "changes_fingerprint": False,
     },
     "responseCookies": {
         "default": False,
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
-        "changes_fingerprint": True,
+    },
+    "serp": {
+        "default": False,
+        "is_extract_type": True,
+        "default_extract_from": "httpResponseBody",
+    },
+    "serpOptions": {
+        "default": {},
     },
     "experimental": {
         "default": {},
-        "is_extract_type": False,
-        "requires_browser_rendering": False,
         "changes_fingerprint": False,
     },
 }
 
 _BROWSER_KEYS = {
-    key for key, value in _REQUEST_PARAMS.items() if value["requires_browser_rendering"]
+    key
+    for key, value in _REQUEST_PARAMS.items()
+    if value.get("is_browser_output", False)
 }
 _EXTRACT_KEYS = {
-    key for key, value in _REQUEST_PARAMS.items() if value["is_extract_type"]
+    key for key, value in _REQUEST_PARAMS.items() if value.get("is_extract_type", False)
 }
 _BROWSER_OR_EXTRACT_KEYS = _BROWSER_KEYS | _EXTRACT_KEYS
 _DEFAULT_API_PARAMS = {
@@ -271,18 +273,20 @@ ANY_VALUE_T = Any
 SKIP_HEADER_T = Dict[bytes, Union[ANY_VALUE_T, str]]
 
 
-def _uses_browser(api_params: Dict[str, Any]) -> bool:
+def _may_use_browser(api_params: Dict[str, Any]) -> bool:
+    """Return ``False`` if *api_params* indicate with certainty that browser
+    rendering will not be used, or ``True`` otherwise."""
     for key in _BROWSER_KEYS:
-        if api_params.get(key, _REQUEST_PARAMS[key]["default"]):
+        if api_params.get(key, _DEFAULT_API_PARAMS[key]):
             return True
-    for key in _EXTRACT_KEYS:
-        options = api_params.get(f"{key}Options", {})
-        extract_from = options.get("extractFrom", None)
-        if extract_from == "browserHtml":
-            return True
-    # Note: This could be a “maybe”, e.g. if no extractFrom is specified, a
-    # extract key could be triggering browser rendering.
-    return False
+    extract_froms = _get_extract_froms(api_params)
+    if "browserHtml" in extract_froms:
+        return True
+    if "httpResponseBody" in extract_froms:
+        return False
+    if api_params.get("httpResponseBody", _DEFAULT_API_PARAMS["httpResponseBody"]):
+        return False
+    return True
 
 
 def _iter_headers(
@@ -485,13 +489,42 @@ def _map_request_headers(
         api_params["requestHeaders"] = request_headers
 
 
+def _warn_about_request_headers(
+    *,
+    api_params: Dict[str, Any],
+    request: Request,
+    skip_headers: SKIP_HEADER_T,
+):
+    for name, values in request.headers.items():
+        if not values:
+            continue
+        lowercase_name = name.strip().lower()
+        value = b",".join(values)
+        if skip_headers.get(lowercase_name) in (ANY_VALUE, value):
+            continue
+        logger.warning(
+            f"Request {request} enables 'serp', which cannot be combined with "
+            f"request headers. However, the request also defines header "
+            f"{name!r}. The header will not be mapped to any Zyte API request "
+            f"field. To silence this warning, remove the header from the "
+            f"request or add it to the ZYTE_API_SKIP_HEADERS setting."
+        )
+
+
+def _get_extract_from(api_params: Dict[str, Any], extract_type: str) -> Union[str, Any]:
+    options = api_params.get(f"{extract_type}Options", {})
+    default_extract_from = _REQUEST_PARAMS[extract_type].get(
+        "default_extract_from", _NoDefault
+    )
+    return options.get("extractFrom", default_extract_from)
+
+
 def _get_extract_froms(api_params: Dict[str, Any]) -> Set[str]:
     result = set()
     for key in _EXTRACT_KEYS:
         if not api_params.get(key, False):
             continue
-        options = api_params.get(f"{key}Options", {})
-        result.add(options.get("extractFrom", "browserHtml"))
+        result.add(_get_extract_from(api_params, key))
     return result
 
 
@@ -504,6 +537,14 @@ def _set_request_headers_from_request(
     browser_ignore_headers: SKIP_HEADER_T,
 ):
     """Updates *api_params*, in place, based on *request*."""
+    if api_params.get("serp", False):
+        _warn_about_request_headers(
+            api_params=api_params,
+            request=request,
+            skip_headers=skip_headers,
+        )
+        return
+
     custom_http_request_headers = api_params.get("customHttpRequestHeaders")
     request_headers = api_params.get("requestHeaders")
     response_body = api_params.get("httpResponseBody")
