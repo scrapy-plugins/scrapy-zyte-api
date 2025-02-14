@@ -771,6 +771,54 @@ async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mocks
     ),
 )
 @ensureDeferred
+async def test_max_check_failures(setting, value, mockserver):
+    retry_times = 2
+    settings = {
+        "RETRY_TIMES": retry_times,
+        "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
+        "ZYTE_API_SESSION_CHECKER": "tests.test_sessions.FalseUseChecker",
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+    if setting is not None:
+        settings["ZYTE_API_SESSION_MAX_CHECK_FAILURES"] = setting
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await crawler.crawl()
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": floor(
+            (retry_times + 1) / value
+        )
+        + 1,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-failed": retry_times + 1,
+    }
+
+
+@pytest.mark.parametrize(
+    ("setting", "value"),
+    (
+        (None, 1),
+        (0, 1),
+        (1, 1),
+        (2, 2),
+    ),
+)
+@ensureDeferred
 async def test_max_errors(setting, value, mockserver):
     retry_times = 2
     settings = {
