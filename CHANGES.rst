@@ -4,7 +4,49 @@ Changes
 0.28.0 (unreleased)
 -------------------
 
+* Added :ref:`automatic mapping <automap>` support for new Zyte API request
+  fields:
+  :http:`request:customAttributes`,
+  :http:`request:customAttributesOptions`,
+  :http:`request:ipType`,
+  :http:`request:followRedirect`,
+  :http:`request:forumThread`,
+  :http:`request:forumThreadOptions`,
+  :http:`request:jobPostingNavigation`,
+  :http:`request:jobPostingNavigationOptions`,
+  :http:`request:networkCapture`,
+  :http:`request:serp`,
+  :http:`request:serpOptions`,
+  :http:`request:session`,
+  :http:`request:tags`.
+
+  * You will now be warned when using their default values unnecessarily.
+
+  * By default, the following fields no longer affect request fingerprinting
+    (i.e. 2 request identical except for the value of that field are now
+    considered duplicate requests): :http:`request:ipType`,
+    :http:`request:session`.
+
+  * When enabling :http:`request:serp`, :http:`request:httpResponseBody` and
+    :http:`request:httpResponseHeaders` will no longer be enabled by default,
+    and header mapping is disabled.
+
+* Session pool IDs, of server-managed sessions (:http:`request:sessionContext`)
+  or :ref:`set through the session management API <session-pools>`, now affect
+  request fingerprinting: 2 requests identical except for their session pool ID
+  are *not* considered duplicate requests any longer.
+
+* When it is not clear whether a request will use browser rendering or not,
+  e.g. an :ref:`automatic extraction request <zapi-extract>` without an
+  :http:`extractFrom <request:productOptions.extractFrom>` value, the URL
+  fragment is now taken into account for request fingerprinting, i.e.
+  ``https://example.com#a`` and ``https://example.com#b`` are *not* considered
+  duplicate requests anymore in those scenarios.
+
 * New setting: :setting:`ZYTE_API_SESSION_MAX_CHECK_FAILURES`.
+
+* Fixes ``"auto"`` being considered the default value of :http:`request:device`
+  instead of ``"desktop"``.
 
 0.27.0 (2025-02-04)
 -------------------

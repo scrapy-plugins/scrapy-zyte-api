@@ -43,6 +43,7 @@ from scrapy_zyte_api import (
     actions,
     custom_attrs,
 )
+from scrapy_zyte_api._params import _EXTRACT_KEYS
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import _AUTO_PAGES, _ITEM_KEYWORDS, ZyteApiProvider
 
@@ -1132,6 +1133,10 @@ async def test_provider_actions(mockserver, caplog):
             },
         ]
     )
+
+
+def test_item_keywords():
+    assert set(_EXTRACT_KEYS) == set(_ITEM_KEYWORDS.values())
 
 
 def test_auto_pages_set():

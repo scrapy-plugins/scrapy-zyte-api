@@ -690,7 +690,7 @@ class _SessionManager:
             self._session_config_cache[request] = self._session_config_map[cls]
             return self._session_config_map[cls]
 
-    def _get_pool(self, request):
+    def get_pool(self, request):
         try:
             return self._pool_cache[request]
         except KeyError:
@@ -828,7 +828,7 @@ class _SessionManager:
         *request* is needed to determine the URL to use for request
         initialization.
         """
-        pool = self._get_pool(request)
+        pool = self.get_pool(request)
         if self._pending_initial_sessions[pool] >= 1:
             self._pending_initial_sessions[pool] -= 1
             session_id = await self._create_session(request, pool)
@@ -887,7 +887,7 @@ class _SessionManager:
             session_config = self._get_session_config(request)
             if not session_config.enabled(request):
                 return True
-            pool = self._get_pool(request)
+            pool = self.get_pool(request)
             try:
                 passed = session_config.check(response, request)
             except CloseSpider:
@@ -969,7 +969,7 @@ class _SessionManager:
     def handle_error(self, request: Request):
         assert self._crawler.stats
         with self._fatal_error_handler:
-            pool = self._get_pool(request)
+            pool = self.get_pool(request)
             self._crawler.stats.inc_value(
                 f"scrapy-zyte-api/sessions/pools/{pool}/use/failed"
             )
@@ -983,7 +983,7 @@ class _SessionManager:
     def handle_expiration(self, request: Request):
         assert self._crawler.stats
         with self._fatal_error_handler:
-            pool = self._get_pool(request)
+            pool = self.get_pool(request)
             self._crawler.stats.inc_value(
                 f"scrapy-zyte-api/sessions/pools/{pool}/use/expired"
             )
@@ -1050,6 +1050,13 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             request,
             spider=spider,
             reason=reason,
+        )
+
+    def get_pool(self, request: Request):
+        return (
+            self._sessions.get_pool(request)
+            if self._sessions.is_enabled(request)
+            else None
         )
 
 
