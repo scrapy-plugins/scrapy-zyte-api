@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager, contextmanager
+from copy import deepcopy
 from os import environ
 from typing import Any, Dict, Optional
 
@@ -68,11 +69,13 @@ class DummySpider(Spider):
 
 
 async def get_crawler(
-    settings=None, spider_cls=DummySpider, setup_engine=True, use_addon=False
+    settings=None, spider_cls=DummySpider, setup_engine=True, use_addon=False, poet=True
 ):
     settings = settings or {}
-    base_settings: SETTINGS_T = SETTINGS if not use_addon else SETTINGS_ADDON
+    base_settings: SETTINGS_T = deepcopy(SETTINGS if not use_addon else SETTINGS_ADDON)
     final_settings = {**base_settings, **settings}
+    if poet and _POET_ADDON_SUPPORT:
+        final_settings.setdefault("ADDONS", {})["scrapy_poet.Addon"] = 300
     crawler = _get_crawler(settings_dict=final_settings, spidercls=spider_cls)
     if setup_engine:
         await setup_crawler_engine(crawler)

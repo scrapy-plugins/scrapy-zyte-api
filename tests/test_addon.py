@@ -83,8 +83,10 @@ async def test_addon_fallback_explicit():
 
 @ensureDeferred
 async def test_addon_matching_settings():
-    crawler = await get_crawler_zyte_api({"ZYTE_API_TRANSPARENT_MODE": True})
-    addon_crawler = await get_crawler_zyte_api(use_addon=True)
+    crawler = await get_crawler_zyte_api(
+        {"ZYTE_API_TRANSPARENT_MODE": True}, poet=False
+    )
+    addon_crawler = await get_crawler_zyte_api(use_addon=True, poet=False)
     assert serialize_settings(crawler.settings) == serialize_settings(
         addon_crawler.settings
     )

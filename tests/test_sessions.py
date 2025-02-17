@@ -1260,10 +1260,11 @@ async def test_addon(manual_settings, addon_settings):
             "ZYTE_API_TRANSPARENT_MODE": True,
             "ZYTE_API_SESSION_ENABLED": True,
             **manual_settings,
-        }
+        },
+        poet=False,
     )
     addon_crawler = await get_crawler(
-        {"ZYTE_API_SESSION_ENABLED": True, **addon_settings}, use_addon=True
+        {"ZYTE_API_SESSION_ENABLED": True, **addon_settings}, use_addon=True, poet=False
     )
     assert serialize_settings(crawler.settings) == serialize_settings(
         addon_crawler.settings
