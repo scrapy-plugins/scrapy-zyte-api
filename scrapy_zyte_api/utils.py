@@ -47,3 +47,13 @@ except ImportError:  # Scrapy < 2.12
         objcls: type[T], crawler: Crawler, /, *args: Any, **kwargs: Any
     ) -> T:
         return create_instance(objcls, None, crawler, *args, **kwargs)
+
+
+try:
+    import scrapy_poet  # noqa: F401
+except ImportError:
+    _POET_ADDON_SUPPORT = False
+else:
+    _SCRAPY_POET_VERSION = Version(version("scrapy-poet"))
+    _SCRAPY_POET_0_26_0 = Version("0.26.0")
+    _POET_ADDON_SUPPORT = _SCRAPY_POET_VERSION >= _SCRAPY_POET_0_26_0

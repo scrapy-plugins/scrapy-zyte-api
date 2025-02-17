@@ -54,6 +54,19 @@ Changes
 * Fixes ``"auto"`` being considered the default value of :http:`request:device`
   instead of ``"desktop"``.
 
+* When using :doc:`scrapy-poet <scrapy-poet:index>` 0.26.0 or higher, the
+  scrapy-zyte-api add-on no longer adds
+  :class:`scrapy_poet.InjectionMiddleware` to
+  :setting:`DOWNLOADER_MIDDLEWARES`. Use the scrapy-poet add-on instead to
+  enable that and other Scrapy components required for scrapy-poet setup:
+
+  .. code-block:: python
+
+    ADDONS = {
+        "scrapy_poet.Addon": 300,
+        "scrapy_zyte_api.Addon": 500,
+    }
+
 0.27.0 (2025-02-04)
 -------------------
 
