@@ -11,6 +11,8 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 
+from .utils import _POET_ADDON_SUPPORT
+
 
 def _setdefault(settings, setting, cls, pos):
     setting_value = settings[setting]
@@ -119,7 +121,11 @@ class Addon:
         else:
             from scrapy_zyte_api.providers import ZyteApiProvider
 
-            _setdefault(settings, "DOWNLOADER_MIDDLEWARES", InjectionMiddleware, 543)
+            if not _POET_ADDON_SUPPORT:
+                _setdefault(
+                    settings, "DOWNLOADER_MIDDLEWARES", InjectionMiddleware, 543
+                )
+
             _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiProvider, 1100)
 
         if settings.getbool("ZYTE_API_SESSION_ENABLED", False):
