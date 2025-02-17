@@ -12,6 +12,7 @@ from zyte_api.aio.client import AsyncClient
 
 from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
+from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT
 
 _API_KEY = "a"
 
@@ -38,16 +39,21 @@ if Version(SCRAPY_VERSION) < Version("2.12"):
     SETTINGS["REQUEST_FINGERPRINTER_IMPLEMENTATION"] = (
         "2.7"  # Silence deprecation warning
     )
+
 try:
-    import scrapy_poet  # noqa: F401
+    from scrapy_poet import InjectionMiddleware
 except ImportError:
     pass
 else:
     assert isinstance(SETTINGS["DOWNLOADER_MIDDLEWARES"], dict)
-    SETTINGS["DOWNLOADER_MIDDLEWARES"]["scrapy_poet.InjectionMiddleware"] = 543
+
+    if not _POET_ADDON_SUPPORT:
+        SETTINGS["DOWNLOADER_MIDDLEWARES"][InjectionMiddleware] = 543
+
     SETTINGS["SCRAPY_POET_PROVIDERS"] = {
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100
     }
+
 SETTINGS_ADDON: SETTINGS_T = {
     "ADDONS": {
         Addon: 500,

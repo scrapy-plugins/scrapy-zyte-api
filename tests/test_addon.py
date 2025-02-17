@@ -13,6 +13,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
+from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT
 
 from . import get_crawler as get_crawler_zyte_api
 from . import get_download_handler, make_handler, serialize_settings
@@ -217,6 +218,14 @@ def test_no_poet_setting_changes(initial_settings, expected_settings):
     _test_setting_changes(initial_settings, expected_settings)
 
 
+EXPECTED_DOWNLOADER_MIDDLEWARES = {
+    ScrapyZyteAPIDownloaderMiddleware: 633,
+    ScrapyZyteAPISessionDownloaderMiddleware: 667,
+}
+if not _POET_ADDON_SUPPORT:
+    EXPECTED_DOWNLOADER_MIDDLEWARES[InjectionMiddleware] = 543
+
+
 @pytest.mark.skipif(
     not POET, reason="Test expectations assume scrapy-poet is installed"
 )
@@ -227,11 +236,7 @@ def test_no_poet_setting_changes(initial_settings, expected_settings):
             {},
             {
                 **BASE_EXPECTED,
-                "DOWNLOADER_MIDDLEWARES": {
-                    ScrapyZyteAPIDownloaderMiddleware: 633,
-                    ScrapyZyteAPISessionDownloaderMiddleware: 667,
-                    InjectionMiddleware: 543,
-                },
+                "DOWNLOADER_MIDDLEWARES": EXPECTED_DOWNLOADER_MIDDLEWARES,
                 "SCRAPY_POET_PROVIDERS": {
                     ZyteApiProvider: 1100,
                 },
