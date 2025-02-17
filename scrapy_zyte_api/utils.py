@@ -10,6 +10,7 @@ USER_AGENT = f"scrapy-zyte-api/{__version__} {PYTHON_ZYTE_API_USER_AGENT}"
 
 _PYTHON_ZYTE_API_VERSION = Version(version("zyte_api"))
 _PYTHON_ZYTE_API_0_5_2 = Version("0.5.2")
+_PYTHON_ZYTE_API_0_7_0 = Version("0.7.0")
 
 _SCRAPY_VERSION = Version(scrapy.__version__)
 _SCRAPY_2_1_0 = Version("2.1.0")
