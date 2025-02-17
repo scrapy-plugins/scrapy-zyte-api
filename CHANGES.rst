@@ -47,7 +47,7 @@ Changes
 
 * The :reqmeta:`download_latency` request metadata key is now set for Zyte API
   requests if it can be done without causing the :ref:`AutoThrottle extension
-  <topics-autothrottle>` to delay Zyte API request, e.g. if
+  <topics-autothrottle>` to delay Zyte API requests, e.g. if
   :setting:`AUTOTHROTTLE_ENABLED` is ``False`` (default) or you are using
   Scrapy 2.12+.
 
