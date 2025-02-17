@@ -24,12 +24,7 @@ from scrapy_zyte_api import (
     session_config,
 )
 from scrapy_zyte_api._session import SESSION_INIT_META_KEY, session_config_registry
-from scrapy_zyte_api.utils import (
-    _PYTHON_ZYTE_API_0_7_0,
-    _PYTHON_ZYTE_API_VERSION,
-    _RAW_CLASS_SETTING_SUPPORT,
-    _REQUEST_ERROR_HAS_QUERY,
-)
+from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT, _REQUEST_ERROR_HAS_QUERY
 
 from . import get_crawler, serialize_settings
 
@@ -1160,10 +1155,6 @@ class fast_forward:
             for outcomes, exhausted in (
                 (
                     (mock_request_error(status=status),),
-                    _PYTHON_ZYTE_API_VERSION < _PYTHON_ZYTE_API_0_7_0,
-                ),
-                (
-                    (mock_request_error(status=status),) * 2,
                     True,
                 ),
                 (
