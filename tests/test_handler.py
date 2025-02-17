@@ -22,7 +22,11 @@ from scrapy_zyte_api.handler import (
     _body_max_size_exceeded,
 )
 from scrapy_zyte_api.responses import ZyteAPITextResponse
-from scrapy_zyte_api.utils import _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT, USER_AGENT
+from scrapy_zyte_api.utils import (
+    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _POET_ADDON_SUPPORT,
+    USER_AGENT,
+)
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_T, UNSET
 from . import get_crawler as get_crawler_zyte_api
@@ -622,6 +626,8 @@ async def test_suspended_account_callback():
         "ZYTE_API_TRANSPARENT_MODE": True,
         **SETTINGS,
     }
+    if _POET_ADDON_SUPPORT:
+        settings["ADDONS"] = {"scrapy_poet.Addon": 300}
 
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")

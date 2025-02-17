@@ -46,6 +46,19 @@ Unreleased
 * Fixes ``"auto"`` being considered the default value of :http:`request:device`
   instead of ``"desktop"``.
 
+* When using :doc:`scrapy-poet <scrapy-poet:index>` 0.26.0 or higher, the
+  scrapy-zyte-api add-on no longer adds
+  :class:`scrapy_poet.InjectionMiddleware` to
+  :setting:`DOWNLOADER_MIDDLEWARES`. Use the scrapy-poet add-on instead to
+  enable that and other Scrapy components required for scrapy-poet setup:
+
+  .. code-block:: python
+
+    ADDONS = {
+        "scrapy_poet.Addon": 300,
+        "scrapy_zyte_api.Addon": 500,
+    }
+
 0.27.0 (2025-02-04)
 -------------------
 
@@ -426,12 +439,12 @@ Unreleased
 0.12.1 (2023-09-29)
 -------------------
 
-* The new ``_ZYTE_API_USER_AGENT`` setting allows customizing the user agent 
+* The new ``_ZYTE_API_USER_AGENT`` setting allows customizing the user agent
   string reported to Zyte API.
-  
-  Note that this setting is only meant for libraries and frameworks built on 
-  top of scrapy-zyte-api, to report themselves to Zyte API, for client software 
-  tracking and monitoring purposes. The value of this setting is *not* the 
+
+  Note that this setting is only meant for libraries and frameworks built on
+  top of scrapy-zyte-api, to report themselves to Zyte API, for client software
+  tracking and monitoring purposes. The value of this setting is *not* the
   ``User-Agent`` header sent to upstream websites when using Zyte API.
 
 

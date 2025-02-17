@@ -51,7 +51,8 @@ def is_session_init_request(request):
 
 
 class SessionRetryFactory(RetryFactory):
-    temporary_download_error_stop = stop_after_attempt(1)
+    download_error_stop = stop_after_attempt(1)  # python-zyte-api >= 0.7.0
+    temporary_download_error_stop = stop_after_attempt(1)  # python-zyte-api < 0.7.0
 
 
 SESSION_DEFAULT_RETRY_POLICY = SessionRetryFactory().build()
