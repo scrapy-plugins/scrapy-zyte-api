@@ -2474,6 +2474,46 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 },
             )
         ),
+        # When ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED is not True and
+        # requestCookies is manually set in the experimental namespace, it is
+        # made a root parameter with a deprecation warning.
+        # The experimental namespace is removed if it is now empty or kept
+        # otherwise.
+        *(
+            (
+                {},
+                REQUEST_INPUT_COOKIES_EMPTY,
+                {},
+                {
+                    "experimental": {
+                        "requestCookies": [{"name": "a", "value": "b"}],
+                        **input_experimental_extra,
+                    },
+                },
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    "requestCookies": [{"name": "a", "value": "b"}],
+                    "responseCookies": True,
+                    **output_params_extra,
+                },
+                [
+                    "include experimental.requestCookies, which is deprecated",
+                    "experimental.requestCookies will be removed, and its value will be set as requestCookies",
+                ],
+                [],
+            )
+            for input_experimental_extra, output_params_extra in (
+                (
+                    {},
+                    {},
+                ),
+                (
+                    {"foo": "bar"},
+                    {"experimental": {"foo": "bar"}},
+                ),
+            )
+        ),
         # dont_merge_cookies=True on request metadata disables cookies.
         *(
             (
