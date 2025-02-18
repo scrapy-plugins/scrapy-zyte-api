@@ -764,11 +764,6 @@ def _set_http_request_cookies_from_request(
                     f"experimental.requestCookies in your request to let "
                     f"automatic mapping work."
                 )
-        elif not experimental:
-            del experimental_params["requestCookies"]
-            if not experimental_params:
-                del api_params["experimental"]
-            api_params.setdefault("requestCookies", request_cookies)
         return
 
     if not experimental:
