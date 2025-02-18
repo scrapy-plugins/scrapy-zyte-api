@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.28.0 (unreleased)
+0.28.0 (2025-02-18)
 -------------------
 
 * Added :ref:`automatic mapping <automap>` support for new Zyte API request
