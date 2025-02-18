@@ -121,8 +121,9 @@ spider to use Zyte API for all requests, set the following setting as well:
 
     ZYTE_API_TRANSPARENT_MODE = True
 
-For :ref:`scrapy-poet integration <scrapy-poet>`, add the following provider to
-the ``SCRAPY_POET_PROVIDERS`` setting:
+For :ref:`scrapy-poet integration <scrapy-poet>`, :ref:`configure scrapy-poet
+<scrapy-poet:setup>` first, and then add the following provider to the
+``SCRAPY_POET_PROVIDERS`` setting:
 
 .. code-block:: python
     :caption: settings.py

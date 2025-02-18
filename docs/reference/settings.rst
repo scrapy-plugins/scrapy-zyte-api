@@ -432,6 +432,20 @@ Default: ``{}``
 overrides of :setting:`ZYTE_API_SESSION_POOL_SIZE` for those pools.
 
 
+.. setting:: ZYTE_API_SESSION_MAX_CHECK_FAILURES
+
+ZYTE_API_SESSION_MAX_CHECK_FAILURES
+===================================
+
+Default: ``1``
+
+Maximum number of :ref:`validity check <session-check>` failures allowed for
+any given session before discarding the session.
+
+You might want to increase this number if you find that a session may continue
+to work even after it fails a vaility check. See :ref:`optimize-sessions`.
+
+
 .. setting:: ZYTE_API_SESSION_MAX_ERRORS
 
 ZYTE_API_SESSION_MAX_ERRORS
@@ -447,8 +461,8 @@ You might want to increase this number if you find that a session may continue
 to work even after an unsuccessful response. See :ref:`optimize-sessions`.
 
 .. note:: This setting does not affect session checks
-    (:setting:`ZYTE_API_SESSION_CHECKER`). A session is always discarded the
-    first time it fails its session check.
+    (:setting:`ZYTE_API_SESSION_CHECKER`). See
+    :setting:`ZYTE_API_SESSION_MAX_CHECK_FAILURES`.
 
 
 .. setting:: ZYTE_API_SESSION_PARAMS

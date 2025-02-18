@@ -71,7 +71,7 @@ By default, scrapy-zyte-api will maintain up to 8 sessions per domain, each
 initialized with a :ref:`browser request <zapi-browser>` targeting the URL
 of the first request that will use the session. Sessions are automatically
 rotated among requests, and refreshed as they expire or get banned. You can
-customize most of this logic though request metadata, settings and
+customize most of this logic through request metadata, settings and
 :ref:`session config overrides <session-configs>`.
 
 For session management to work as expected, your
@@ -263,9 +263,16 @@ sessions:
 
 -   When a response associated with a session pool indicates that the session
     expired, an error over the limit (see
-    :setting:`ZYTE_API_SESSION_MAX_ERRORS`), or a failed :ref:`validity check
-    <session-check>`, a :ref:`session initialization request <session-init>` is
-    triggered to replace that session in the session pool.
+    :setting:`ZYTE_API_SESSION_MAX_ERRORS`), or a :ref:`validity check
+    <session-check>` failure over the limit (see
+    :setting:`ZYTE_API_SESSION_MAX_CHECK_FAILURES`), a :ref:`session
+    initialization request <session-init>` is triggered to replace that
+    session in the session pool.
+
+The session pool assigned to a request affects the :ref:`fingerprint
+<fingerprint>` of the request. 2 requests with a different session pool ID are
+considered different requests, i.e. not duplicate requests, even if they are
+otherwise identical.
 
 
 .. _optimize-sessions:
@@ -298,12 +305,15 @@ Here are some things you can try:
     counterproductive.
 
 -   By default, sessions are discarded as soon as an :ref:`unsuccessful
-    response <zapi-unsuccessful-responses>` is received.
+    response <zapi-unsuccessful-responses>` is received or a :ref:`validity
+    check <session-check>` is failed.
 
     However, on some websites sessions may remain valid even after a few
-    unsuccessful responses. If that is the case, you might want to increase
-    :setting:`ZYTE_API_SESSION_MAX_ERRORS` to require a higher number of
-    unsuccessful responses before discarding a session.
+    unsuccessful responses or validity check failures. If that is the case, you
+    might want to increase the corresponding setting,
+    :setting:`ZYTE_API_SESSION_MAX_ERRORS` or
+    :setting:`ZYTE_API_SESSION_MAX_CHECK_FAILURES`, to require a higher number
+    of the corresponding outcome before discarding a session.
 
 If you do not need :ref:`session checking <session-check>` and your
 :ref:`initialization parameters <session-init>` are only
@@ -321,7 +331,8 @@ Overriding session configs
 For spiders that target a single website, using settings and request metadata
 keys for :ref:`session initialization <session-init>` and :ref:`session
 checking <session-check>` should do the job. However, for broad-crawl spiders,
-:doc:`multi-website spiders <zyte-spider-templates:index>`, or for code
+:doc:`multi-website spiders <zyte-spider-templates:index>`, to modify
+session-using requests based on session initialization responses, or for code
 reusability purposes, you might want to define different session configs for
 different websites.
 
@@ -352,6 +363,10 @@ to tell whether a request is a :ref:`session initialization request
 <session-init>` or not, use :func:`~scrapy_zyte_api.is_session_init_request`:
 
 .. autofunction:: scrapy_zyte_api.is_session_init_request
+
+To get the session ID of a given request, use:
+
+.. autofunction:: scrapy_zyte_api.get_request_session_id
 
 Classes decorated with :func:`~scrapy_zyte_api.session_config` are registered
 into :data:`~scrapy_zyte_api.session_config_registry`:

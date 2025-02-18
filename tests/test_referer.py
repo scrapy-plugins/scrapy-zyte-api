@@ -1,9 +1,11 @@
-from copy import copy
+from copy import deepcopy
 
 import pytest
 from pytest_twisted import ensureDeferred
 from scrapy import Spider, signals
 from scrapy.utils.test import get_crawler
+
+from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT
 
 try:
     import scrapy.addons  # noqa: F401
@@ -264,8 +266,10 @@ else:
 @ensureDeferred
 async def test_main(settings, meta, headers, expected, mockserver):
     items = []
-    settings = copy(settings)
+    settings = deepcopy(settings)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    if _POET_ADDON_SUPPORT:
+        settings.setdefault("ADDONS", {})["scrapy_poet.Addon"] = 300
     start_url = mockserver.urljoin("/a")
     follow_up_url = mockserver.urljoin("/b")
 

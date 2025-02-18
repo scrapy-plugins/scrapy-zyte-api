@@ -22,7 +22,11 @@ from scrapy_zyte_api.handler import (
     _body_max_size_exceeded,
 )
 from scrapy_zyte_api.responses import ZyteAPITextResponse
-from scrapy_zyte_api.utils import USER_AGENT
+from scrapy_zyte_api.utils import (
+    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _POET_ADDON_SUPPORT,
+    USER_AGENT,
+)
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_T, UNSET
 from . import get_crawler as get_crawler_zyte_api
@@ -243,6 +247,79 @@ async def test_retry_policy(
 
         actual = request_call[0].kwargs["retrying"]
         assert actual == expected
+
+
+@pytest.mark.parametrize(
+    ("settings", "meta", "is_set"),
+    (
+        ({}, {"zyte_api": {"foo": "bar"}}, True),
+        (
+            {},
+            {"autothrottle_dont_adjust_delay": True, "zyte_api": {"foo": "bar"}},
+            True,
+        ),
+        (
+            {},
+            {"autothrottle_dont_adjust_delay": False, "zyte_api": {"foo": "bar"}},
+            True,
+        ),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"zyte_api": {"foo": "bar"}},
+            _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+        ),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"autothrottle_dont_adjust_delay": True, "zyte_api": {"foo": "bar"}},
+            _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+        ),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"autothrottle_dont_adjust_delay": False, "zyte_api": {"foo": "bar"}},
+            False,
+        ),
+        # Non-Zyte-API request, which uses the default Scrapy download handler,
+        # and hence always has download latency set.
+        ({}, {}, True),
+        ({}, {"autothrottle_dont_adjust_delay": True}, True),
+        ({}, {"autothrottle_dont_adjust_delay": False}, True),
+        ({"AUTOTHROTTLE_ENABLED": True}, {}, True),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"autothrottle_dont_adjust_delay": True},
+            True,
+        ),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"autothrottle_dont_adjust_delay": False},
+            True,
+        ),
+    ),
+)
+@ensureDeferred
+async def test_download_latency(settings, meta, is_set, mockserver):
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+
+    requests = []
+
+    class TestSpider(Spider):
+        name = "test"
+
+        def start_requests(self):
+            yield Request(mockserver.urljoin("/"), meta=meta)
+
+        def parse(self, response):
+            requests.append(response.request)
+
+    crawler = await get_crawler_zyte_api(settings, TestSpider, setup_engine=False)
+    await crawler.crawl(spidercls=TestSpider)
+    assert requests
+    request = requests[0]
+    if is_set:
+        assert isinstance(request.meta["download_latency"], float)
+        assert request.meta["download_latency"] > 0.0
+    else:
+        assert "download_latency" not in request.meta
 
 
 @ensureDeferred
@@ -549,6 +626,8 @@ async def test_suspended_account_callback():
         "ZYTE_API_TRANSPARENT_MODE": True,
         **SETTINGS,
     }
+    if _POET_ADDON_SUPPORT:
+        settings["ADDONS"] = {"scrapy_poet.Addon": 300}
 
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")

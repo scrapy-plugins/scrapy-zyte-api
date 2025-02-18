@@ -24,7 +24,7 @@ from twisted.internet.defer import Deferred
 from zyte_api.aio.errors import RequestError
 
 from scrapy_zyte_api._cookies import _get_cookie_jar
-from scrapy_zyte_api._params import _EXTRACT_KEYS, ANY_VALUE
+from scrapy_zyte_api._params import ANY_VALUE
 from scrapy_zyte_api.handler import _ParamParser
 from scrapy_zyte_api.responses import _process_response
 
@@ -40,10 +40,10 @@ from . import (
 )
 from .mockserver import DelayedResource, MockServer, produce_request_response
 
-# Pick one of the automatic extraction keys for testing purposes.
-EXTRACT_KEYS_ITER = iter(_EXTRACT_KEYS)
-EXTRACT_KEY = next(EXTRACT_KEYS_ITER)
-EXTRACT_KEY_2 = next(EXTRACT_KEYS_ITER)
+# Pick regular automatic extraction keys for testing purposes. Do not use serp,
+# as it has an irregular behavior.
+EXTRACT_KEY = "article"
+EXTRACT_KEY_2 = "productNavigation"
 
 DEFAULT_ACCEPT_ENCODING = ", ".join(
     encoding.decode() for encoding in ACCEPTED_ENCODINGS
@@ -1194,10 +1194,9 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
-        # If both httpResponseBody and browserHtml (or screenshot, or both, or
-        # automatic extraction properties) are True, implicitly or explicitly,
-        # Request.headers are mapped both as customHttpRequestHeaders and as
-        # requestHeaders.
+        # If both httpResponseBody and browserHtml (or screenshot) are True,
+        # implicitly or explicitly, Request.headers are mapped both as
+        # customHttpRequestHeaders and as requestHeaders.
         (
             {"Referer": "a"},
             {"browserHtml": True, "httpResponseBody": True},
@@ -1226,19 +1225,6 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
         ),
         (
             {"Referer": "a"},
-            {EXTRACT_KEY: True, "httpResponseBody": True},
-            {
-                "customHttpRequestHeaders": [
-                    {"name": "Referer", "value": "a"},
-                ],
-                **DEFAULT_AUTOMAP_PARAMS,
-                "requestHeaders": {"referer": "a"},
-                EXTRACT_KEY: True,
-            },
-            [],
-        ),
-        (
-            {"Referer": "a"},
             {"browserHtml": True, "screenshot": True, "httpResponseBody": True},
             {
                 "browserHtml": True,
@@ -1248,6 +1234,72 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
                 **DEFAULT_AUTOMAP_PARAMS,
                 "requestHeaders": {"referer": "a"},
                 "screenshot": True,
+            },
+            [],
+        ),
+        # When combined with httpResponseBody, automatic extraction properties
+        # only force requestHeaders mapping if extractFrom is set to
+        # browserHtml.
+        (
+            {"Referer": "a"},
+            {EXTRACT_KEY: True, "httpResponseBody": True},
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                **DEFAULT_AUTOMAP_PARAMS,
+                EXTRACT_KEY: True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                "httpResponseBody": True,
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                **DEFAULT_AUTOMAP_PARAMS,
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                "responseCookies": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+                "httpResponseBody": True,
+            },
+            {
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+                **DEFAULT_AUTOMAP_PARAMS,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+                "requestHeaders": {"referer": "a"},
+                EXTRACT_KEY: True,
             },
             [],
         ),
@@ -1763,11 +1815,11 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
         (
             {"X-Crawlera-Profile": "desktop"},
             {},
-            {
-                "device": "desktop",
-                **DEFAULT_AUTOMAP_PARAMS,
-            },
-            ["has been assigned to the matching Zyte API request parameter"],
+            DEFAULT_AUTOMAP_PARAMS,
+            [
+                "has been assigned to the matching Zyte API request parameter",
+                "unnecessarily defines the Zyte API 'device' parameter with its default value",
+            ],
         ),
         (
             {"X-Crawlera-Profile": "mobile"},
@@ -2172,11 +2224,13 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
                 EXTRACT_KEY: True,
                 f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
                 EXTRACT_KEY_2: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
             },
             {
                 EXTRACT_KEY: True,
                 f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
                 EXTRACT_KEY_2: True,
+                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
@@ -2185,22 +2239,37 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
+        # If only 1 extractFrom is defined out of 2 extraction types, it is
+        # assumed to be the same for both extraction types.
         (
             {"Referer": "a"},
             {
                 EXTRACT_KEY: True,
                 f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
                 EXTRACT_KEY_2: True,
-                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
             },
             {
                 EXTRACT_KEY: True,
                 f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
                 EXTRACT_KEY_2: True,
-                f"{EXTRACT_KEY_2}Options": {"extractFrom": "browserHtml"},
                 "customHttpRequestHeaders": [
                     {"name": "Referer", "value": "a"},
                 ],
+                "responseCookies": True,
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+                EXTRACT_KEY_2: True,
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+                EXTRACT_KEY_2: True,
                 "requestHeaders": {"referer": "a"},
                 "responseCookies": True,
             },
@@ -3820,6 +3889,12 @@ async def test_automap_default_parameter_cleanup(meta, expected, warnings, caplo
     "default_params,meta,expected,warnings",
     [
         (
+            {},
+            {},
+            DEFAULT_AUTOMAP_PARAMS,
+            [],
+        ),
+        (
             {"browserHtml": True},
             {"screenshot": True, "browserHtml": False},
             {
@@ -3829,8 +3904,20 @@ async def test_automap_default_parameter_cleanup(meta, expected, warnings, caplo
             [],
         ),
         (
-            {},
-            {},
+            {
+                "browserHtml": True,
+                "networkCapture": [{"filterType": "url", "value": "/api/"}],
+            },
+            {"networkCapture": None},
+            {
+                "browserHtml": True,
+                "responseCookies": True,
+            },
+            [],
+        ),
+        (
+            {"device": "mobile"},
+            {"device": "desktop"},
             DEFAULT_AUTOMAP_PARAMS,
             [],
         ),
@@ -4367,3 +4454,123 @@ async def test_middleware_headers_custom_middleware_before_skip():
     param_parser = handler._param_parser
     api_params = param_parser.parse(request)
     assert "customHttpRequestHeaders" not in api_params
+
+
+@pytest.mark.parametrize(
+    ("extract_from", "headers", "warnings"),
+    (
+        *(
+            (extract_from, headers, warnings)
+            for extract_from in (None, "httpResponseBody", "browserHtml")
+            for headers, warnings in (
+                (
+                    {},
+                    [],
+                ),
+                (
+                    {"Unset-Header": None},
+                    [],
+                ),
+                (
+                    {"Empty-Header": ""},
+                    ["defines header b'Empty-Header'"],
+                ),
+                (
+                    {"Foo": "Bar"},
+                    ["defines header b'Foo'"],
+                ),
+                # ZYTE_API_SKIP_HEADERS
+                (
+                    {" cOoKiE ": "foo=bar"},
+                    [],
+                ),
+                # The warning remains if *some* headers do not trigger a warning.
+                (
+                    {"Foo": "Bar", "Unset-Header": None},
+                    ["defines header b'Foo'"],
+                ),
+                (
+                    {"Foo": "Bar", " cOoKiE ": "foo=bar"},
+                    ["defines header b'Foo'"],
+                ),
+                # 1 warning per header
+                (
+                    {"Foo": "Bar", "Baz": "Qux"},
+                    ["defines header b'Foo'", "defines header b'Baz'"],
+                ),
+            )
+        ),
+    ),
+)
+@ensureDeferred
+async def test_serp_header_mapping(extract_from, headers, warnings, caplog):
+    """serp does not support headers."""
+    meta: Dict[str, Any] = {"serp": True}
+    if extract_from:
+        meta["serpOptions"] = {"extractFrom": extract_from}
+    request = Request(
+        url="https://example.com",
+        headers=headers,
+        meta={"zyte_api_automap": meta},
+    )
+    settings = {"ZYTE_API_TRANSPARENT_MODE": True}
+    crawler = await get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert "customHttpRequestHeaders" not in api_params
+    assert "requestHeaders" not in api_params
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
+
+
+@pytest.mark.parametrize(
+    "meta,expected,warnings",
+    [
+        (
+            {},
+            DEFAULT_AUTOMAP_PARAMS,
+            [],
+        ),
+        (
+            {"device": "desktop"},
+            DEFAULT_AUTOMAP_PARAMS,
+            ["'device' parameter with its default value, 'desktop'"],
+        ),
+        (
+            {"device": "mobile"},
+            {"device": "mobile", **DEFAULT_AUTOMAP_PARAMS},
+            [],
+        ),
+        (
+            {"device": "auto"},  # Unknown parameter value
+            {"device": "auto", **DEFAULT_AUTOMAP_PARAMS},
+            [],
+        ),
+    ],
+)
+@ensureDeferred
+async def test_unneeded_params(meta, expected, warnings, caplog):
+    """When a Zyte API parameter is set to its default value with
+    zyte_api_automap, the parameter is removed with a warning."""
+    request = Request(url="https://example.com")
+    request.meta["zyte_api_automap"] = meta
+    settings = {"ZYTE_API_TRANSPARENT_MODE": True}
+    crawler = await get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    api_params.pop("url")
+    assert api_params == expected
+    if warnings:
+        for warning in warnings:
+            assert warning in caplog.text
+    else:
+        assert not caplog.records
