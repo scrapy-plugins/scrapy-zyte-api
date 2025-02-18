@@ -1,8 +1,8 @@
 Changes
 =======
 
-Unreleased
-----------
+0.28.0 (unreleased)
+-------------------
 
 * Added :ref:`automatic mapping <automap>` support for new Zyte API request
   fields:
@@ -29,7 +29,7 @@ Unreleased
 
   * When enabling :http:`request:serp`, :http:`request:httpResponseBody` and
     :http:`request:httpResponseHeaders` will no longer be enabled by default,
-    and header mapping is disabled.
+    and :ref:`request header mapping <request-header-mapping>` is disabled.
 
 * Session pool IDs, of server-managed sessions (:http:`request:sessionContext`)
   or :ref:`set through the session management API <session-pools>`, now affect
@@ -42,6 +42,14 @@ Unreleased
   fragment is now taken into account for request fingerprinting, i.e.
   ``https://example.com#a`` and ``https://example.com#b`` are *not* considered
   duplicate requests anymore in those scenarios.
+
+* New setting: :setting:`ZYTE_API_SESSION_MAX_CHECK_FAILURES`.
+
+* The :reqmeta:`download_latency` request metadata key is now set for Zyte API
+  requests if it can be done without causing the :ref:`AutoThrottle extension
+  <topics-autothrottle>` to delay Zyte API requests, e.g. if
+  :setting:`AUTOTHROTTLE_ENABLED` is ``False`` (default) or you are using
+  Scrapy 2.12+.
 
 * Fixes ``"auto"`` being considered the default value of :http:`request:device`
   instead of ``"desktop"``.
