@@ -479,5 +479,6 @@ async def test_start_requests_items():
     crawler = get_crawler(TestSpider, settings_dict=SETTINGS)
     await crawler.crawl()
 
+    assert crawler.stats is not None
     assert crawler.stats.get_value("finish_reason") == "finished"
     assert "log_count/ERROR" not in crawler.stats.get_stats()
