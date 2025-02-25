@@ -14,6 +14,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
+from scrapy_zyte_api.utils import _START_REQUESTS_CAN_YIELD_ITEMS
 
 from . import SETTINGS
 from .mockserver import DelayedResource, MockServer
@@ -467,6 +468,7 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
     )
 
 
+@pytest.mark.skipif(not _START_REQUESTS_CAN_YIELD_ITEMS, reason="Scrapy < 2.12")
 @ensureDeferred
 async def test_start_requests_items():
 
