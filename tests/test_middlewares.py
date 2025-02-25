@@ -465,3 +465,19 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
         attribute,
         conflict,
     )
+
+
+@ensureDeferred
+async def test_start_requests_items():
+
+    class TestSpider(Spider):
+        name = "test"
+
+        def start_requests(self):
+            yield {"foo": "bar"}
+
+    crawler = get_crawler(TestSpider, settings_dict=SETTINGS)
+    await crawler.crawl()
+
+    assert crawler.stats.get_value("finish_reason") == "finished"
+    assert "log_count/ERROR" not in crawler.stats.get_stats()

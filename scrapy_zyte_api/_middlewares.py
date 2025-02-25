@@ -180,11 +180,12 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
         # Mark start requests and reports to the downloader middleware the
         # number of them once all have been processed.
         count = 0
-        for request in start_requests:
-            request.meta["is_start_request"] = True
-            self._process_output_request(request, spider)
-            yield request
-            count += 1
+        for item_or_request in start_requests:
+            if isinstance(item_or_request, Request):
+                count += 1
+                item_or_request.meta["is_start_request"] = True
+                self._process_output_request(item_or_request, spider)
+            yield item_or_request
         self._send_signal(_start_requests_processed, count=count)
 
     def _process_output_request(self, request, spider):
