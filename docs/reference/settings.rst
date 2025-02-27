@@ -136,16 +136,6 @@ Default: ``True``
 Can be set to ``False`` to disable scrapy-zyte-api.
 
 
-.. setting:: ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED
-
-ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED
-=====================================
-
-Default: ``False``
-
-See :ref:`request-automatic`.
-
-
 .. setting:: ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS
 
 ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS
@@ -217,11 +207,11 @@ If the cookies to be set during :ref:`request mapping <request>` exceed this
 limit, a warning is logged, and only as many cookies as the limit allows are
 set for the target request.
 
-To silence this warning, set :http:`request:experimental.requestCookies`
-manually, e.g. to an empty :class:`dict`.
+To silence this warning, set :http:`request:requestCookies` manually, e.g. to
+an empty :class:`dict`.
 
-Alternatively, if :http:`request:experimental.requestCookies` starts supporting
-more than 100 cookies, update this setting accordingly.
+Alternatively, if :http:`request:requestCookies` starts supporting more than
+100 cookies, update this setting accordingly.
 
 
 .. setting:: ZYTE_API_MAX_REQUESTS

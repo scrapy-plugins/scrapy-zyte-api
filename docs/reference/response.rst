@@ -19,12 +19,11 @@ Zyte API response parameters are mapped into :ref:`response class
     <scrapy_zyte_api.responses.ZyteAPIResponse.status>`.
 
 -   :http:`response:httpResponseHeaders` and
-    :http:`response:experimental.responseCookies` become
-    :class:`response.headers
+    :http:`response:responseCookies` become :class:`response.headers
     <scrapy_zyte_api.responses.ZyteAPIResponse.headers>`.
 
--   :http:`response:experimental.responseCookies` is also mapped into the
-    request :reqmeta:`cookiejar <scrapy:cookiejar>`.
+-   :http:`response:responseCookies` is also mapped into the request
+    :reqmeta:`cookiejar <scrapy:cookiejar>`.
 
 -   :http:`response:browserHtml` and :http:`response:httpResponseBody` are
     mapped into both

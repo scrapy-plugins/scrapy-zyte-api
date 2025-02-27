@@ -47,7 +47,7 @@ from scrapy_zyte_api._params import _EXTRACT_KEYS
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import _AUTO_PAGES, _ITEM_KEYWORDS, ZyteApiProvider
 
-from . import SETTINGS
+from . import DEFAULT_AUTOMAP_PARAMS, SETTINGS
 from .mockserver import get_ephemeral_port
 
 PROVIDER_PARAMS = {"geolocation": "IE"}
@@ -751,10 +751,10 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
     assert len(params) == 1
     assert params[0] == {
         "url": url,
-        "product": True,
         "httpResponseBody": True,
-        "productOptions": product_options,
         "httpResponseHeaders": True,
+        "product": True,
+        "productOptions": product_options,
     }
 
     assert type(item["page"].response) is AnyResponse
@@ -826,9 +826,8 @@ async def test_provider_any_response_product_extract_from_http_response_2(mockse
     assert params[0] == {
         "url": url,
         "product": True,
-        "httpResponseBody": True,
-        "httpResponseHeaders": True,
         "productOptions": product_options,
+        **DEFAULT_AUTOMAP_PARAMS,
     }
 
     assert type(item["page"].response) is AnyResponse
@@ -946,8 +945,7 @@ async def test_provider_any_response_http_response(mockserver):
     assert len(params) == 1
     assert params[0] == {
         "url": url,
-        "httpResponseBody": True,
-        "httpResponseHeaders": True,
+        **DEFAULT_AUTOMAP_PARAMS,
     }
 
     assert type(item["page"].response) is AnyResponse
@@ -979,8 +977,7 @@ async def test_provider_any_response_browser_http_response(mockserver):
     assert len(params) == 2
     assert params[0] == {
         "url": url,
-        "httpResponseBody": True,
-        "httpResponseHeaders": True,
+        **DEFAULT_AUTOMAP_PARAMS,
     }
     assert params[1] == {"url": url, "browserHtml": True}
 
@@ -1019,8 +1016,7 @@ async def test_provider_any_response_http_response_multiple_pages(mockserver):
     assert len(params) == 1
     assert params[0] == {
         "url": url,
-        "httpResponseBody": True,
-        "httpResponseHeaders": True,
+        **DEFAULT_AUTOMAP_PARAMS,
     }
     assert type(item["page1"].http_response) is HttpResponse
     assert type(item["page2"].http_response) is HttpResponse
@@ -1055,8 +1051,7 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
     assert len(params) == 2
     assert params[0] == {
         "url": url,
-        "httpResponseBody": True,
-        "httpResponseHeaders": True,
+        **DEFAULT_AUTOMAP_PARAMS,
     }
     assert params[1] == {"url": url, "browserHtml": True}
 
