@@ -313,6 +313,14 @@ def _iter_headers(
         joined_v = b",".join(v)
         decoded_v = joined_v.decode()
 
+        if lowercase_k.startswith(b"zyte-"):
+            logger.critical(
+                f"Request {request} defines header {decoded_k}.) "
+                "used in Zyte Api (proxy mode) that is not supposed "
+                "to be sent in Zyte Api (httpResponseBody mode)"
+            )
+            continue
+
         if lowercase_k.startswith(b"x-crawlera-"):
             for spm_header_suffix, zapi_request_param in (
                 (b"region", "geolocation"),
