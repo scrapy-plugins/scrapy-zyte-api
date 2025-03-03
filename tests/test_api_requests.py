@@ -1650,6 +1650,8 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
                 ("Browser-Html", ""),
                 ("Browser-Html", " false "),
                 ("Cookie-Management", "auto"),
+                ("Client", "custom-client"),
+                ("Override-Headers", "Accept,User-Agent"),
             )
         ),
         *(
