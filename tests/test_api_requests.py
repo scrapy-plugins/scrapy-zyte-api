@@ -1634,6 +1634,105 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
             },
             [],
         ),
+        # Proxy mode header handling.
+        *(
+            (
+                {f"Zyte-{input_k_suffix}": input_v},
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                },
+                ["This header has been dropped"],
+            )
+            for input_k_suffix, input_v in (
+                ("Foo", "Bar"),
+                ("Browser-Html", ""),
+                ("Browser-Html", " false "),
+                ("Cookie-Management", "auto"),
+            )
+        ),
+        *(
+            (
+                {f"Zyte-{input_k_suffix}": input_v},
+                {},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    output_k: output_v,
+                },
+                ["This header has been dropped"],
+            )
+            for input_k_suffix, input_v, output_k, output_v in (
+                ("Cookie-Management", "discard", "cookieManagement", "discard"),
+                ("Device", "mobile", "device", "mobile"),
+                ("Disable-Follow-Redirect", "true", "followRedirect", False),
+                ("Geolocation", "US", "geolocation", "US"),
+                ("IPType", "residential", "ipType", "residential"),
+                ("JobID", "1/2/3", "jobId", "1/2/3"),
+                (
+                    "Session-ID",
+                    "0cf3ef3d-a3c5-4c51-b967-53e5dea2c7c6",
+                    "session",
+                    {"id": "0cf3ef3d-a3c5-4c51-b967-53e5dea2c7c6"},
+                ),
+            )
+        ),
+        *(
+            (
+                {f"Zyte-{header_suffix}": header_v},
+                {k: v},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                    k: v,
+                },
+                ["This header has been dropped"],
+            )
+            for header_suffix, header_v, k, v in (
+                ("Cookie-Management", "auto", "cookieManagement", "discard"),
+                ("Geolocation", "US", "geolocation", "FR"),
+                ("IPType", "residential", "ipType", "datacenter"),
+                ("JobID", "1/2/3", "jobId", "4/5/6"),
+                (
+                    "Session-ID",
+                    "0cf3ef3d-a3c5-4c51-b967-53e5dea2c7c6",
+                    "session",
+                    {"id": "f3aadeec-e896-457a-9968-625326009a8e"},
+                ),
+            )
+        ),
+        *(
+            (
+                {f"Zyte-{header_suffix}": header_v},
+                {k: v},
+                {
+                    "httpResponseBody": True,
+                    "httpResponseHeaders": True,
+                },
+                ["This header has been dropped"],
+            )
+            for header_suffix, header_v, k, v in (
+                ("Device", "mobile", "device", "desktop"),
+                ("Disable-Follow-Redirect", "true", "followRedirect", True),
+            )
+        ),
+        (
+            {"Zyte-Browser-Html": "true"},
+            {},
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
+        (
+            {"Zyte-Browser-Html": "false"},
+            {"browserHtml": True},
+            {
+                "browserHtml": True,
+            },
+            ["This header has been dropped"],
+        ),
         # Zyte Smart Proxy Manager special header handling.
         (
             {"X-Crawlera-Foo": "Bar"},
