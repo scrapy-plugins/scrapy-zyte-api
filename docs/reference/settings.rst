@@ -453,7 +453,7 @@ Maximum number of :ref:`validity check <session-check>` failures allowed for
 any given session before discarding the session.
 
 You might want to increase this number if you find that a session may continue
-to work even after it fails a vaility check. See :ref:`optimize-sessions`.
+to work even after it fails a validity check. See :ref:`optimize-sessions`.
 
 
 .. setting:: ZYTE_API_SESSION_MAX_ERRORS
