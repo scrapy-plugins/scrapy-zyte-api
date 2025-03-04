@@ -1082,7 +1082,11 @@ def _get_api_params(
         api_params["jobId"] = job_id
 
     api_params["url"] = request.url
-
+    _map_custom_http_request_headers(
+        api_params=api_params,
+        request=request,
+        skip_headers=skip_headers
+    )
     return api_params
 
 
