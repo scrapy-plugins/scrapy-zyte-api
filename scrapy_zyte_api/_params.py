@@ -556,10 +556,10 @@ def _iter_headers(
         return
     if not request.headers:
         return
-    for k, v in request.headers.items():
-        if not v:
+    for k, vs in request.headers.items():
+        if not vs:
             continue
-        v = b",".join(v)
+        v = b",".join(vs)
         if _is_safe_header(k, v, api_params=api_params, request=request):
             yield k, k.strip().lower(), v
 

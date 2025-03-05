@@ -1058,7 +1058,7 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
 
 
 DEFAULT = object()
-UNSAFE_HEADER_HANDLING_SCENARIOS = [
+UNSAFE_HEADER_HANDLING_SCENARIOS: list[dict[str, Any]] = [
     *(
         # Unknown header
         {
