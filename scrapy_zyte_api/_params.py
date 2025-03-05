@@ -335,27 +335,37 @@ def _is_safe_header(k, v, /, *, api_params, request):
                     )
                 else:
                     processed_value = processor(decoded_v)
-                    api_params[zapi_request_param] = processed_value
-                    if decoded_v == processed_value:
-                        logger.warning(
-                            f"Request {request} defines header "
-                            f"{decoded_k}. This header has been dropped, "
-                            f"the HTTP API of Zyte API does not support "
-                            f"proxy mode headers, and its value "
-                            f"({decoded_v!r}) has been assigned to the "
-                            f"matching HTTP API request parameter, "
-                            f"{zapi_request_param!r}."
-                        )
+                    if processed_value != _DEFAULT_API_PARAMS[zapi_request_param]:
+                        api_params[zapi_request_param] = processed_value
+                        if decoded_v == processed_value:
+                            logger.warning(
+                                f"Request {request} defines header "
+                                f"{decoded_k}. This header has been dropped, "
+                                f"the HTTP API of Zyte API does not support "
+                                f"proxy mode headers, and its value "
+                                f"({decoded_v!r}) has been assigned to the "
+                                f"matching HTTP API request parameter, "
+                                f"{zapi_request_param!r}."
+                            )
+                        else:
+                            logger.warning(
+                                f"Request {request} defines header "
+                                f"{decoded_k}. This header has been dropped, "
+                                f"the HTTP API of Zyte API does not support "
+                                f"proxy mode headers, and its value "
+                                f"({decoded_v!r}) has been converted into "
+                                f"{processed_value!r} and assigned to the "
+                                f"matching HTTP API request parameter, "
+                                f"{zapi_request_param!r}."
+                            )
                     else:
                         logger.warning(
-                            f"Request {request} defines header "
-                            f"{decoded_k}. This header has been dropped, "
-                            f"the HTTP API of Zyte API does not support "
-                            f"proxy mode headers, and its value "
-                            f"({decoded_v!r}) has been converted into "
-                            f"{processed_value!r} and assigned to the "
-                            f"matching HTTP API request parameter, "
-                            f"{zapi_request_param!r}."
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support proxy mode headers, "
+                            f"and its value ({decoded_v!r}) matches the "
+                            f"default value of the matching HTTP API request "
+                            f"parameter, {zapi_request_param!r}."
                         )
                 break
         else:
@@ -421,7 +431,7 @@ def _is_safe_header(k, v, /, *, api_params, request):
                         f"request parameter, {zapi_request_param!r}, has "
                         f"already been defined on the request."
                     )
-                elif decoded_v in ("desktop", "mobile"):
+                elif decoded_v == "mobile":
                     api_params[zapi_request_param] = decoded_v
                     logger.warning(
                         f"Request {request} defines header {decoded_k}. "
@@ -429,6 +439,15 @@ def _is_safe_header(k, v, /, *, api_params, request):
                         f"Zyte API does not support Zyte Smart Proxy "
                         f"Manager headers, and its value ({decoded_v!r}) "
                         f"has been assigned to the matching Zyte API "
+                        f"request parameter, {zapi_request_param!r}."
+                    )
+                elif decoded_v == "desktop":
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and its value ({decoded_v!r}) "
+                        f"is the default value of the matching Zyte API "
                         f"request parameter, {zapi_request_param!r}."
                     )
                 else:
