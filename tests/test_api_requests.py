@@ -2086,6 +2086,9 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
             },
             ["This header has been dropped"],
         ),
+        # Even though device is not a supported parameter of browser requests
+        # at the time of writing, we map it, to support a future where browser
+        # requests may support the parameter.
         (
             {"X-Crawlera-Profile": "mobile"},
             {
@@ -2093,6 +2096,7 @@ async def test_automap_method(method, meta, expected, warnings, caplog):
             },
             {
                 "browserHtml": True,
+                "device": "mobile",
             },
             ["This header has been dropped"],
         ),
