@@ -248,9 +248,9 @@ class DefaultResource(Resource):
                     response_data["product"]["name"] += " (from httpResponseBody)"
 
             if "geolocation" in request_data:
-                response_data["product"][
-                    "name"
-                ] += f" (country {request_data['geolocation']})"
+                response_data["product"]["name"] += (
+                    f" (country {request_data['geolocation']})"
+                )
 
             if "customAttributes" in request_data:
                 response_data["customAttributes"] = {

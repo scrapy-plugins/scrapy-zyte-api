@@ -191,7 +191,13 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
 @ensureDeferred
 async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, product: Product, browser_response: BrowserResponse, my_item: MyItem):  # type: ignore[override]
+        def parse_(
+            self,
+            response: DummyResponse,
+            product: Product,
+            browser_response: BrowserResponse,
+            my_item: MyItem,
+        ):  # type: ignore[override]
             yield {
                 "product": product,
                 "my_item": my_item,
@@ -1178,7 +1184,6 @@ async def test_auto_field_stats_no_override(mockserver):
     duplicate_stat_calls: defaultdict[str, int] = defaultdict(int)
 
     class OnlyOnceStatsCollector(MemoryStatsCollector):
-
         def track_duplicate_stat_calls(self, key):
             if key.startswith("scrapy-zyte-api/auto_fields/") and key in self._stats:
                 duplicate_stat_calls[key] += 1
@@ -1238,7 +1243,6 @@ async def test_auto_field_stats_partial_override(mockserver):
     original item field, directly or as a fallback."""
 
     class MyProductPage(AutoProductPage):
-
         @field
         def brand(self):
             return "foo"
@@ -1294,7 +1298,6 @@ async def test_auto_field_stats_full_override(mockserver):
     # Copy-paste of fields from the AutoProductPage implementation, with type
     # hints removed.
     class MyProductPage(AutoProductPage):
-
         @field
         def additionalProperties(self):
             return self.product.additionalProperties
@@ -1478,7 +1481,6 @@ async def test_auto_field_stats_item_page_override(mockserver):
     itself."""
 
     class MyProductPage(AutoProductPage):
-
         @field
         def brand(self):
             return "foo"
@@ -1532,7 +1534,6 @@ async def test_auto_field_stats_alt_page_override(mockserver):
     configured page for that item, not the actual page requested."""
 
     class MyProductPage(AutoProductPage):
-
         @field
         def brand(self):
             return "foo"
@@ -1544,7 +1545,6 @@ async def test_auto_field_stats_alt_page_override(mockserver):
     handle_urls(f"{mockserver.host}:{mockserver.port}")(MyProductPage)
 
     class AltProductPage(AutoProductPage):
-
         @field
         def sku(self):
             return "foo"

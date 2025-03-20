@@ -471,7 +471,6 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
 @pytest.mark.skipif(not _START_REQUESTS_CAN_YIELD_ITEMS, reason="Scrapy < 2.12")
 @ensureDeferred
 async def test_start_requests_items():
-
     class TestSpider(Spider):
         name = "test"
 

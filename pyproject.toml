@@ -1,5 +1,47 @@
-[tool.black]
-target-version = ["py39", "py310", "py311", "py312", "py313"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scrapy-zyte-api"
+version = "0.28.0"
+description = "Client library to process URLs through Zyte API"
+authors = [{name = "Zyte Group Ltd", email = "info@zyte.com"}]
+license = "BSD-3-Clause"
+readme = "README.rst"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.9"
+# Sync with [pinned] @ tox.ini
+dependencies = [
+    "packaging>=20.0",
+    "scrapy>=2.0.1",
+    "zyte-api>=0.5.1",
+]
+
+[project.optional-dependencies]
+# Sync with [testenv:pinned-provider] @ tox.ini
+provider = [
+    "andi>=0.6.0",
+    "scrapy-poet>=0.22.3",
+    "web-poet>=0.17.0",
+    "zyte-common-items>=0.27.0",
+]
+
+[project.urls]
+source = "https://github.com/scrapy-plugins/scrapy-zyte-api"
+docs = "https://scrapy-zyte-api.readthedocs.io/en/latest/"
 
 [tool.bumpversion]
 current_version = "0.28.0"
@@ -17,11 +59,16 @@ regex = true
 filename = "docs/conf.py"
 
 [[tool.bumpversion.files]]
+filename = "pyproject.toml"
+parse = "version\\s*=\\s*['\"](?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
+
+[[tool.bumpversion.files]]
 filename = "scrapy_zyte_api/__version__.py"
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[tool.hatch.build.targets.sdist]
+include = [
+  "scrapy_zyte_api/*.py",
+]
 
 [tool.mypy]
 check_untyped_defs = true

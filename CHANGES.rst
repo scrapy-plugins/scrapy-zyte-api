@@ -1,6 +1,24 @@
 Changes
 =======
 
+0.29.0 (unreleased)
+-------------------
+
+-   Improve the removal and mapping of proxy headers accidentally included in
+    requests:
+
+    -   Remove or map :ref:`Zyte API proxy mode headers <zapi-proxy-headers>`
+        (``Zyte-…``), not only :ref:`Smart Proxy Manager headers
+        <spm-request-headers>` (``X-Crawlera-…``).
+
+    -   Remove or map headers defined through
+        :http:`request:customHttpRequestHeaders`, not only those defined in
+        :attr:`Request.headers <scrapy.http.Request.headers>`.
+
+-   Support :meth:`~scrapy.Spider.start_requests` yielding items, which is
+    possible since Scrapy 2.12.
+
+
 0.28.0 (2025-02-18)
 -------------------
 

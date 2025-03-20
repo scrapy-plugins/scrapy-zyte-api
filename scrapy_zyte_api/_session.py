@@ -121,8 +121,7 @@ except ImportError:  # pragma: no cover
             return new_request
         stats.inc_value(f"{stats_base_key}/max_reached")
         logger.error(
-            "Gave up retrying %(request)s (failed %(retry_times)d times): "
-            "%(reason)s",
+            "Gave up retrying %(request)s (failed %(retry_times)d times): %(reason)s",
             {"request": request, "retry_times": retry_times, "reason": reason},
             extra={"spider": spider},
         )
@@ -453,7 +452,6 @@ try:
 except ImportError:
 
     class SessionConfigRulesRegistry:
-
         def session_config_cls(self, request: Request) -> Type[SessionConfig]:
             return SessionConfig
 
@@ -522,8 +520,7 @@ except ImportError:
             and session configs are registered in their own rule registry.
             """
             raise RuntimeError(
-                "To use the @session_config decorator you first must install "
-                "web-poet."
+                "To use the @session_config decorator you first must install web-poet."
             )
 
 else:
@@ -532,14 +529,15 @@ else:
     from web_poet.rules import Strings
 
     class SessionConfigRulesRegistry(RulesRegistry):  # type: ignore[no-redef]
-
         def __init__(self):
             rules = [ApplyRule(for_patterns=Patterns(include=[""]), use=SessionConfig)]  # type: ignore[arg-type]
             super().__init__(rules=rules)
 
         def session_config_cls(self, request: Request) -> Type[SessionConfig]:
             cls = SessionConfig
-            overrides: Dict[Type[SessionConfig], Type[SessionConfig]] = self.overrides_for(request.url)  # type: ignore[assignment]
+            overrides: Dict[Type[SessionConfig], Type[SessionConfig]] = (
+                self.overrides_for(request.url)
+            )  # type: ignore[assignment]
             while cls in overrides:
                 cls = overrides[cls]
             return cls
@@ -563,7 +561,6 @@ else:
 
 
 class FatalErrorHandler:
-
     def __init__(self, crawler):
         self.crawler = crawler
 
@@ -593,7 +590,6 @@ session_config = session_config_registry.session_config
 
 
 class _SessionManager:
-
     def __init__(self, crawler: Crawler):
         self._crawler = crawler
 
@@ -992,7 +988,6 @@ class _SessionManager:
 
 
 class ScrapyZyteAPISessionDownloaderMiddleware:
-
     @classmethod
     def from_crawler(cls, crawler: Crawler):
         return cls(crawler)

@@ -744,7 +744,7 @@ def _set_http_response_headers_from_request(
         api_params.setdefault("httpResponseHeaders", True)
     elif (
         api_params.get("httpResponseHeaders") is False
-        and not default_params.get("httpResponseHeaders") is False
+        and default_params.get("httpResponseHeaders") is not False
     ):
         logger.warning(
             "You do not need to set httpResponseHeaders to False if "

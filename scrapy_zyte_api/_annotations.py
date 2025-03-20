@@ -11,8 +11,8 @@ class ExtractFrom(str, Enum):
     See :ref:`annotations`.
     """
 
-    httpResponseBody: str = "httpResponseBody"
-    browserHtml: str = "browserHtml"
+    httpResponseBody = "httpResponseBody"
+    browserHtml = "browserHtml"
 
 
 class _Selector(TypedDict, total=False):
