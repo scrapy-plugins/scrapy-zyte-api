@@ -536,8 +536,8 @@ else:
         def session_config_cls(self, request: Request) -> Type[SessionConfig]:
             cls = SessionConfig
             overrides: Dict[Type[SessionConfig], Type[SessionConfig]] = (
-                self.overrides_for(request.url)
-            )  # type: ignore[assignment]
+                self.overrides_for(request.url)  # type: ignore[assignment]
+            )
             while cls in overrides:
                 cls = overrides[cls]
             return cls

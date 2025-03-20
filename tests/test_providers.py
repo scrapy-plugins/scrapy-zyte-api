@@ -191,13 +191,13 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
 @ensureDeferred
 async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):
-        def parse_(
+        def parse_(  # type: ignore[override]
             self,
             response: DummyResponse,
             product: Product,
             browser_response: BrowserResponse,
             my_item: MyItem,
-        ):  # type: ignore[override]
+        ):
             yield {
                 "product": product,
                 "my_item": my_item,
