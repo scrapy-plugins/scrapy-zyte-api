@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.29.0 (unreleased)
+0.29.0 (2025-03-20)
 -------------------
 
 -   Improve the removal and mapping of proxy headers accidentally included in
