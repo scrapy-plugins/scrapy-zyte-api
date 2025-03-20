@@ -46,3 +46,27 @@ SESSION_AGGRESSIVE_RETRY_POLICY = _SESSION_AGGRESSIVE_RETRY_POLICY
 #: Instance of :class:`web_poet.rules.RulesRegistry` that holds :ref:`session
 #: configs <session-configs>`.
 session_config_registry = _session_config_registry
+
+__all__ = [
+    "ExtractFrom",
+    "Actions",
+    "Geolocation",
+    "Screenshot",
+    "ScrapyZyteAPIDownloadHandler",
+    "ScrapyZyteAPIRequestFingerprinter",
+    "ScrapyZyteAPIDownloaderMiddleware",
+    "ScrapyZyteAPIRefererSpiderMiddleware",
+    "ScrapyZyteAPISpiderMiddleware",
+    "ScrapyZyteAPISessionDownloaderMiddleware",
+    "Addon",
+    "actions",
+    "custom_attrs",
+    "get_request_session_id",
+    "is_session_init_request",
+    "session_config",
+    "session_config_registry",
+    "LocationSessionConfig",
+    "SessionConfig",
+    "SESSION_DEFAULT_RETRY_POLICY",
+    "SESSION_AGGRESSIVE_RETRY_POLICY",
+]

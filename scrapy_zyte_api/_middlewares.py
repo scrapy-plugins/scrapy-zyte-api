@@ -209,7 +209,6 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
 
 
 class ScrapyZyteAPIRefererSpiderMiddleware:
-
     @classmethod
     def from_crawler(cls, crawler):
         return cls(crawler)

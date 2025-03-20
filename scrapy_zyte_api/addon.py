@@ -88,12 +88,12 @@ class Addon:
                 "addon",
             )
 
-        settings["DOWNLOAD_HANDLERS"][
-            "http"
-        ] = "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPDownloadHandler"
-        settings["DOWNLOAD_HANDLERS"][
-            "https"
-        ] = "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler"
+        settings["DOWNLOAD_HANDLERS"]["http"] = (
+            "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPDownloadHandler"
+        )
+        settings["DOWNLOAD_HANDLERS"]["https"] = (
+            "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler"
+        )
         _setdefault(
             settings, "DOWNLOADER_MIDDLEWARES", ScrapyZyteAPIDownloaderMiddleware, 633
         )
