@@ -4,6 +4,7 @@ import pytest
 from pytest_twisted import ensureDeferred
 from scrapy import Request
 from scrapy.core.downloader.handlers.http import HTTP10DownloadHandler
+from scrapy.settings.default_settings import TWISTED_REACTOR
 from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api import (
@@ -154,11 +155,14 @@ BASE_EXPECTED = {
         ScrapyZyteAPISpiderMiddleware: 100,
         ScrapyZyteAPIRefererSpiderMiddleware: 1000,
     },
-    "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
     "ZYTE_API_FALLBACK_HTTPS_HANDLER": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
     "ZYTE_API_FALLBACK_HTTP_HANDLER": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
     "ZYTE_API_TRANSPARENT_MODE": True,
 }
+if TWISTED_REACTOR != "twisted.internet.asyncioreactor.AsyncioSelectorReactor":
+    BASE_EXPECTED["TWISTED_REACTOR"] = (
+        "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+    )
 
 
 @pytest.mark.skipif(

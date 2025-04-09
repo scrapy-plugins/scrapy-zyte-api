@@ -3422,8 +3422,16 @@ async def _process_request(crawler, request, is_start_request=False):
 
     spider_middlewares = crawler.engine.scraper.spidermw
     if is_start_request:
-        result = await spider_middlewares.process_start_requests([request], spider)
-        request = next(result)
+        if hasattr(spider_middlewares, "process_start_requests"):
+            result = await spider_middlewares.process_start_requests([request], spider)
+            request = next(result)
+        else:
+
+            async def start():
+                yield request
+
+            spider.start = start
+            request = await (await spider_middlewares.process_start(spider)).__anext__()
     else:
         response = Response(request.url, request=request)
         _, request, _ = await spider_middlewares.scrape_response(

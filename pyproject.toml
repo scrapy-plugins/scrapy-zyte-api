@@ -71,6 +71,9 @@ include = [
   "scrapy_zyte_api/*.py",
 ]
 
+[tool.hatch.metadata]
+allow-direct-references = true  # Needed while relaying on the Scrapy Git repo
+
 [tool.mypy]
 check_untyped_defs = true
 ignore_missing_imports = true
