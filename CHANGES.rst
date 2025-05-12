@@ -1,6 +1,16 @@
 Changes
 =======
 
+Unreleased
+----------
+
+-   Extended :doc:`Scrapy <scrapy:index>` support to :ref:`2.13.0+
+    <scrapy:release-2.13.0>`.
+
+-   Switched the minimum required version of :doc:`python-zyte-api
+    <python-zyte-api:index>` from ``0.5.1`` to ``0.6.0``.
+
+
 0.29.0 (2025-03-20)
 -------------------
 
