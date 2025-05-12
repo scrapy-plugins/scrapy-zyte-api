@@ -146,6 +146,26 @@ Default: ``False``
 See :ref:`request-automatic`.
 
 
+.. setting:: ZYTE_API_FALLBACK_HTTP_HANDLER
+
+ZYTE_API_FALLBACK_HTTP_HANDLER
+==============================
+
+Default: :setting:`DOWNLOAD_HANDLERS["http"] <scrapy:DOWNLOAD_HANDLERS>`
+
+Download handler to use for HTTP requests that do not go through Zyte API.
+
+
+.. setting:: ZYTE_API_FALLBACK_HTTPS_HANDLER
+
+ZYTE_API_FALLBACK_HTTPS_HANDLER
+===============================
+
+Default: :setting:`DOWNLOAD_HANDLERS["https"] <scrapy:DOWNLOAD_HANDLERS>`
+
+Download handler to use for HTTPS requests that do not go through Zyte API.
+
+
 .. setting:: ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS
 
 ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS
