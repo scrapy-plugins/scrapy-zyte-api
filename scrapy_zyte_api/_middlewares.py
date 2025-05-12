@@ -199,7 +199,8 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
         self._send_signal(_start_requests_processed, count=count)
 
     def _process_output_request(self, request, spider):
-        request.meta["_pre_mw_headers"] = self._get_header_set(request)
+        if "_pre_mw_headers" not in request.meta:
+            request.meta["_pre_mw_headers"] = self._get_header_set(request)
         self.slot_request(request, spider)
 
     def _process_output_item_or_request(self, item_or_request, spider):

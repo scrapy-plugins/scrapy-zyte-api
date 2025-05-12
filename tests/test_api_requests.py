@@ -3775,6 +3775,18 @@ async def test_middleware_headers_custom_middleware_before_skip():
     assert "customHttpRequestHeaders" not in params
 
 
+@ensureDeferred
+async def test_middleware_headers_request_copy():
+    """A copy of a request (e.g. due to request retrying or redirect following)
+    should not get default headers mapped to customHttpRequestHeaders."""
+    request = Request(url="https://example.com")
+    settings = {"ZYTE_API_TRANSPARENT_MODE": True}
+    params = await request_to_params(request, settings)
+    assert "customHttpRequestHeaders" not in params
+    params = await request_to_params(request.copy(), settings)
+    assert "customHttpRequestHeaders" not in params
+
+
 @pytest.mark.parametrize(
     ("extract_from", "headers", "warnings"),
     (
