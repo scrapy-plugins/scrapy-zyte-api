@@ -58,9 +58,7 @@ def sort_dict_list(dict_list):
 
 class ParamsDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     @deferred_f_from_coro_f
-    async def download_request(
-        self, request: Request, spider: Spider
-    ) -> Deferred[Response]:
+    async def download_request(self, request: Request, spider: Spider) -> Response:
         params = self._param_parser.parse(request)
         self._crawler.signals.send_catch_log(params_signal, params=params)
         return Response(request.url)
