@@ -1,8 +1,8 @@
 Changes
 =======
 
-Unreleased
-----------
+0.30.0 (unreleased)
+-------------------
 
 -   Extended :doc:`Scrapy <scrapy:index>` support to :ref:`2.13.0+
     <scrapy:release-2.13.0>`.
