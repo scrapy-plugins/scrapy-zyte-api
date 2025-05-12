@@ -26,8 +26,7 @@ requires-python = ">=3.9"
 # Sync with [pinned] @ tox.ini
 dependencies = [
     "packaging>=20.0",
-    # "scrapy>=2.0.1",
-    "scrapy @ git+https://github.com/scrapy/scrapy.git@c3a903ec8ffb743a3c1b347f23d1de7ca6e15f5e",  # async-seeds branch, #6715
+    "scrapy>=2.0.1",
     "zyte-api>=0.6.0",
 ]
 
@@ -70,9 +69,6 @@ filename = "scrapy_zyte_api/__version__.py"
 include = [
   "scrapy_zyte_api/*.py",
 ]
-
-[tool.hatch.metadata]
-allow-direct-references = true  # Needed while relaying on the Scrapy Git repo
 
 [tool.mypy]
 check_untyped_defs = true
