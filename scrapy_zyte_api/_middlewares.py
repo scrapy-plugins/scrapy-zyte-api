@@ -176,9 +176,19 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
     def _get_header_set(request):
         return {header.strip().lower() for header in request.headers}
 
-    def process_start_requests(self, start_requests, spider):
+    async def process_start(self, start):
         # Mark start requests and reports to the downloader middleware the
         # number of them once all have been processed.
+        count = 0
+        async for item_or_request in start:
+            if isinstance(item_or_request, Request):
+                count += 1
+                item_or_request.meta["is_start_request"] = True
+                self._process_output_request(item_or_request, None)
+            yield item_or_request
+        self._send_signal(_start_requests_processed, count=count)
+
+    def process_start_requests(self, start_requests, spider):
         count = 0
         for item_or_request in start_requests:
             if isinstance(item_or_request, Request):
@@ -189,7 +199,8 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
         self._send_signal(_start_requests_processed, count=count)
 
     def _process_output_request(self, request, spider):
-        request.meta["_pre_mw_headers"] = self._get_header_set(request)
+        if "_pre_mw_headers" not in request.meta:
+            request.meta["_pre_mw_headers"] = self._get_header_set(request)
         self.slot_request(request, spider)
 
     def _process_output_item_or_request(self, item_or_request, spider):

@@ -323,7 +323,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     @inlineCallbacks
     def close(self) -> Generator:
-        if self._fallback_handler:
+        if self._fallback_handler and hasattr(self._fallback_handler, "close"):
             yield self._fallback_handler.close()
         yield deferred_from_coro(self._close())
 
@@ -347,7 +347,10 @@ class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
-            settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER")
+            settings.get(
+                "ZYTE_API_FALLBACK_HTTP_HANDLER",
+                settings.getwithbase("DOWNLOAD_HANDLERS")["http"],
+            )
         )
 
 
@@ -357,5 +360,8 @@ class ScrapyZyteAPIHTTPSDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
-            settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER")
+            settings.get(
+                "ZYTE_API_FALLBACK_HTTPS_HANDLER",
+                settings.getwithbase("DOWNLOAD_HANDLERS")["https"],
+            )
         )

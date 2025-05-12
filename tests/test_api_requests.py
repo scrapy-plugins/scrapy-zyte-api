@@ -1,18 +1,17 @@
-import asyncio
-import inspect
 from asyncio import iscoroutine
 from collections import defaultdict
 from copy import copy
 from functools import partial
 from http.cookiejar import Cookie
 from inspect import isclass
-from typing import Any, Dict, Type, cast
+from typing import Any, Dict, List, Optional, Type, cast
 from unittest import mock
 
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
 from pytest_twisted import ensureDeferred
-from scrapy import Request, Spider, signals
+from scrapy import Request, Spider
+from scrapy.crawler import Crawler
 from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
 from scrapy.downloadermiddlewares.httpcompression import ACCEPTED_ENCODINGS
 from scrapy.exceptions import CloseSpider
@@ -20,13 +19,15 @@ from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
+from scrapy.utils.defer import deferred_f_from_coro_f
 from twisted.internet.defer import Deferred
 from zyte_api.aio.errors import RequestError
 
 from scrapy_zyte_api._cookies import _get_cookie_jar
 from scrapy_zyte_api._params import ANY_VALUE
-from scrapy_zyte_api.handler import _ParamParser
+from scrapy_zyte_api.handler import _ParamParser, _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.responses import _process_response
+from scrapy_zyte_api.utils import _ADDON_SUPPORT
 
 from . import (
     DEFAULT_CLIENT_CONCURRENCY,
@@ -48,9 +49,94 @@ DEFAULT_ACCEPT_ENCODING = ", ".join(
     encoding.decode() for encoding in ACCEPTED_ENCODINGS
 )
 
+params_signal = object()
+
 
 def sort_dict_list(dict_list):
     return sorted(dict_list, key=lambda i: sorted(i.items()))
+
+
+class ParamsDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
+    @deferred_f_from_coro_f
+    async def download_request(self, request: Request, spider: Spider) -> Response:
+        params = self._param_parser.parse(request)
+        self._crawler.signals.send_catch_log(params_signal, params=params)
+        return Response(request.url)
+
+
+def inject_cookies(
+    cookies: Optional[List[Dict[str, Any]]], request: Request, crawler: Crawler
+) -> None:
+    if cookies is None:
+        return
+    try:
+        cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+    except ValueError:
+        return
+
+    _cookie_jar = _get_cookie_jar(request, cookie_middleware.jars)
+    for cookie in cookies:
+        _cookie = Cookie(
+            version=1,
+            name=cookie["name"],
+            value=cookie["value"],
+            port=None,
+            port_specified=False,
+            domain=cookie.get("domain") or "",
+            domain_specified="domain" in cookie,
+            domain_initial_dot=cookie.get("domain", "").startswith("."),
+            path=cookie.get("path", "/"),
+            path_specified="path" in cookie,
+            secure=cookie.get("secure", False),
+            expires=cookie.get("expires", None),
+            discard=False,
+            comment=None,
+            comment_url=None,
+            rest={},
+        )
+        _cookie_jar.set_cookie(_cookie)
+
+
+async def request_to_params(
+    request: Request,
+    settings: Optional[SETTINGS_T] = None,
+    is_start_request: bool = False,
+    cookies: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Convert a Scrapy request to a Zyte API parameters dictionary."""
+    start_request = request if is_start_request else Request(url="data:,")
+
+    class TestSpider(Spider):
+        name = "test_spider"
+        custom_settings = {
+            "DOWNLOAD_HANDLERS": {
+                "https": "tests.test_api_requests.ParamsDownloadHandler",
+            },
+        }
+
+        async def start(self):
+            inject_cookies(cookies, request, self.crawler)
+            yield start_request
+
+        def start_requests(self):
+            yield start_request
+
+        async def parse(self, response):
+            if not is_start_request:
+                yield request
+
+    param_sets: List[Dict[str, Any]] = []
+
+    def track_params(params):
+        param_sets.append(params)
+
+    crawler = await get_crawler(
+        settings, spider_cls=TestSpider, setup_engine=False, use_addon=_ADDON_SUPPORT
+    )
+    crawler.signals.connect(track_params, signal=params_signal)
+    await crawler.crawl()
+
+    return param_sets[0]
 
 
 @pytest.mark.parametrize(
@@ -660,43 +746,12 @@ async def _test_param_processing(
     request = Request(url="https://example.com", **request_kwargs)
     request.meta[meta_key] = meta
     settings = {**settings, "ZYTE_API_TRANSPARENT_MODE": True}
-    crawler = await get_crawler(settings)
-    await _process_request(crawler, request, is_start_request=True)
-    if "cookies" in request_kwargs:
-        try:
-            cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
-        except ValueError:
-            pass
-        else:
-            if cookie_jar:
-                _cookie_jar = _get_cookie_jar(request, cookie_middleware.jars)
-                for cookie in cookie_jar:
-                    _cookie = Cookie(
-                        version=1,
-                        name=cookie["name"],
-                        value=cookie["value"],
-                        port=None,
-                        port_specified=False,
-                        domain=cookie.get("domain"),
-                        domain_specified="domain" in cookie,
-                        domain_initial_dot=cookie.get("domain", "").startswith("."),
-                        path=cookie.get("path", "/"),
-                        path_specified="path" in cookie,
-                        secure=cookie.get("secure", False),
-                        expires=cookie.get("expires", None),
-                        discard=False,
-                        comment=None,
-                        comment_url=None,
-                        rest={},
-                    )
-                    _cookie_jar.set_cookie(_cookie)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
     with caplog.at_level("WARNING"):
-        api_params = param_parser.parse(request)
-    api_params.pop("url")
-    assert api_params == expected
+        params = await request_to_params(
+            request, settings, is_start_request=True, cookies=cookie_jar
+        )
+    params.pop("url")
+    assert params == expected
     if warnings:
         for warning in warnings:
             assert warning in caplog.text
@@ -3412,67 +3467,33 @@ async def test_default_params_false(default_params):
 
 
 @ensureDeferred
-async def _process_request(crawler, request, is_start_request=False):
-    spider = crawler.spider
-
-    await crawler.engine.scraper.open_spider(spider)
-    await crawler.engine.signals.send_catch_log_deferred(
-        signals.spider_opened, spider=spider
-    )
-
-    spider_middlewares = crawler.engine.scraper.spidermw
-    if is_start_request:
-        result = await spider_middlewares.process_start_requests([request], spider)
-        request = next(result)
-    else:
-        response = Response(request.url, request=request)
-        _, request, _ = await spider_middlewares.scrape_response(
-            lambda *args: args, response, request, spider
-        )
-
-    downloader_middlewares = crawler.engine.downloader.middleware
-    for process_request in downloader_middlewares.methods["process_request"]:
-        result = process_request(request=request, spider=spider)
-        if asyncio.isfuture(result) or inspect.isawaitable(result):
-            await result
-
-
-@ensureDeferred
 async def test_middleware_headers_start_requests():
     """By default, automap should not generate a customHttpRequestHeaders
     parameter."""
-    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
     request = Request(url="https://example.com")
-    await _process_request(crawler, request, is_start_request=True)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert "customHttpRequestHeaders" not in api_params
+    settings = {"ZYTE_API_TRANSPARENT_MODE": True}
+    params = await request_to_params(request, settings, is_start_request=True)
+    assert "customHttpRequestHeaders" not in params
 
 
 @ensureDeferred
 async def test_middleware_headers_cb_requests_disable():
     """Callback requests will not include the Referer parameter if the Referer
     middleware is disabled."""
+    request = Request(url="https://example.com")
     settings = {
         "REFERER_ENABLED": False,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = await get_crawler(settings)
-    request = Request(url="https://example.com")
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert "customHttpRequestHeaders" not in api_params
+    params = await request_to_params(request, settings)
+    assert "customHttpRequestHeaders" not in params
 
 
 @ensureDeferred
 async def test_middleware_headers_cb_requests_skip():
     """Callback requests will not include the Referer parameter if the Referer
     header is configured to be skipped."""
+    request = Request(url="https://example.com")
     settings = {
         "ZYTE_API_SKIP_HEADERS": list(
             set(header.decode() for header in SKIP_HEADERS)
@@ -3482,14 +3503,8 @@ async def test_middleware_headers_cb_requests_skip():
         ),
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = await get_crawler(settings)
-    request = Request(url="https://example.com")
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert "customHttpRequestHeaders" not in api_params
+    params = await request_to_params(request, settings)
+    assert "customHttpRequestHeaders" not in params
 
 
 @ensureDeferred
@@ -3498,6 +3513,7 @@ async def test_middleware_headers_default():
     the global default, and values matching defaults from middlewares that are
     ignored otherwise, its headers should be translated into the
     customHttpRequestHeaders parameter."""
+    request = Request(url="https://example.com")
     settings = {
         "DEFAULT_REQUEST_HEADERS": {
             **DEFAULT_REQUEST_HEADERS,
@@ -3506,14 +3522,8 @@ async def test_middleware_headers_default():
         },
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = await get_crawler(settings)
-    request = Request(url="https://example.com")
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert api_params["customHttpRequestHeaders"] == [
+    params = await request_to_params(request, settings)
+    assert params["customHttpRequestHeaders"] == [
         {
             "name": "Accept",
             "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -3534,6 +3544,7 @@ async def test_middleware_headers_default():
 async def test_middleware_headers_default_custom():
     """Non-default values set for headers with a default value also work as
     expected."""
+    request = Request(url="https://example.com")
     settings = {
         "DEFAULT_REQUEST_HEADERS": {
             "Accept": "text/html",
@@ -3545,14 +3556,8 @@ async def test_middleware_headers_default_custom():
         "REFERER_ENABLED": False,  # https://github.com/scrapy/scrapy/issues/6184
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = await get_crawler(settings)
-    request = Request(url="https://example.com")
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert api_params["customHttpRequestHeaders"] == [
+    params = await request_to_params(request, settings)
+    assert params["customHttpRequestHeaders"] == [
         {
             "name": "Accept",
             "value": "text/html",
@@ -3571,6 +3576,7 @@ async def test_middleware_headers_default_custom():
 async def test_middleware_headers_default_skip():
     """Headers set through DEFAULT_REQUEST_HEADERS will not be translated into
     the customHttpRequestHeaders parameter if configured to be skipped."""
+    request = Request(url="https://example.com")
     settings = {
         "DEFAULT_REQUEST_HEADERS": {
             **DEFAULT_REQUEST_HEADERS,
@@ -3583,24 +3589,14 @@ async def test_middleware_headers_default_skip():
         ),
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = await get_crawler(settings)
-    request = Request(url="https://example.com")
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert "customHttpRequestHeaders" not in api_params
+    params = await request_to_params(request, settings)
+    assert "customHttpRequestHeaders" not in params
 
 
 @ensureDeferred
 async def test_middleware_headers_request_headers():
     """If request headers match the global default value of
     DEFAULT_REQUEST_HEADERS, they should be translated nonetheless."""
-    settings = {
-        "ZYTE_API_TRANSPARENT_MODE": True,
-    }
-    crawler = await get_crawler(settings)
     request = Request(
         url="https://example.com",
         headers={
@@ -3609,12 +3605,11 @@ async def test_middleware_headers_request_headers():
             "User-Agent": DEFAULT_USER_AGENT,
         },
     )
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert api_params["customHttpRequestHeaders"] == [
+    settings = {
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    params = await request_to_params(request, settings)
+    assert params["customHttpRequestHeaders"] == [
         {
             "name": "Accept",
             "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -3632,7 +3627,6 @@ async def test_middleware_headers_request_headers():
 async def test_middleware_headers_request_headers_custom():
     """Non-default values set for headers with a default value also work as
     expected."""
-    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
     request = Request(
         url="https://example.com",
         headers={
@@ -3643,12 +3637,8 @@ async def test_middleware_headers_request_headers_custom():
             "User-Agent": "foo/1.2.3",
         },
     )
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert api_params["customHttpRequestHeaders"] == [
+    params = await request_to_params(request, {"ZYTE_API_TRANSPARENT_MODE": True})
+    assert params["customHttpRequestHeaders"] == [
         {
             "name": "Accept",
             "value": "text/html",
@@ -3667,14 +3657,6 @@ async def test_middleware_headers_request_headers_custom():
 async def test_middleware_headers_request_headers_skip():
     """Headers set on the request will not be translated into the
     customHttpRequestHeaders parameter if configured to be skipped."""
-    settings = {
-        "ZYTE_API_SKIP_HEADERS": list(
-            set(header.decode() for header in SKIP_HEADERS)
-            | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer", "User-Agent"}
-        ),
-        "ZYTE_API_TRANSPARENT_MODE": True,
-    }
-    crawler = await get_crawler(settings)
     request = Request(
         url="https://example.com",
         headers={
@@ -3683,12 +3665,15 @@ async def test_middleware_headers_request_headers_skip():
             "User-Agent": DEFAULT_USER_AGENT,
         },
     )
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert "customHttpRequestHeaders" not in api_params
+    settings = {
+        "ZYTE_API_SKIP_HEADERS": list(
+            set(header.decode() for header in SKIP_HEADERS)
+            | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer", "User-Agent"}
+        ),
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    params = await request_to_params(request, settings)
+    assert "customHttpRequestHeaders" not in params
 
 
 class DefaultValuesDownloaderMiddleware:
@@ -3707,6 +3692,7 @@ async def test_middleware_headers_custom_middleware_before():
     the scrapy-zyte-api downloader middleware match the global default value of
     DEFAULT_REQUEST_HEADERS, they will *not* be translated."""
 
+    request = Request("https://example.com")
     settings: SETTINGS_T = {
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -3716,14 +3702,8 @@ async def test_middleware_headers_custom_middleware_before():
         **SETTINGS["DOWNLOADER_MIDDLEWARES"],
         mw1: SETTINGS["DOWNLOADER_MIDDLEWARES"][mw2] - 1,
     }
-    crawler = await get_crawler(settings)
-    request = Request("https://example.com")
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert "customHttpRequestHeaders" not in api_params
+    params = await request_to_params(request, settings)
+    assert "customHttpRequestHeaders" not in params
 
 
 class CustomValuesDownloaderMiddleware:
@@ -3743,6 +3723,7 @@ async def test_middleware_headers_custom_middleware_before_custom():
     """If request headers defined from a custom middleware configured before
     the scrapy-zyte-api downloader middleware have non-default values, they
     will be translated."""
+    request = Request("https://example.com")
     settings: SETTINGS_T = {
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -3752,14 +3733,8 @@ async def test_middleware_headers_custom_middleware_before_custom():
         **SETTINGS["DOWNLOADER_MIDDLEWARES"],
         mw1: SETTINGS["DOWNLOADER_MIDDLEWARES"][mw2] - 1,
     }
-    crawler = await get_crawler(settings)
-    request = Request("https://example.com")
-    await _process_request(crawler, request)
-
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert api_params["customHttpRequestHeaders"] == [
+    params = await request_to_params(request, settings)
+    assert params["customHttpRequestHeaders"] == [
         {
             "name": "Accept",
             "value": "text/html",
@@ -3780,6 +3755,7 @@ async def test_middleware_headers_custom_middleware_before_skip():
     the scrapy-zyte-api downloader middleware will not be translated into the
     customHttpRequestHeaders parameter if configured to be skipped."""
 
+    request = Request("https://example.com")
     settings = {
         "ZYTE_API_SKIP_HEADERS": list(
             set(header.decode() for header in SKIP_HEADERS)
@@ -3793,14 +3769,20 @@ async def test_middleware_headers_custom_middleware_before_skip():
         **SETTINGS["DOWNLOADER_MIDDLEWARES"],
         mw1: SETTINGS["DOWNLOADER_MIDDLEWARES"][mw2] - 1,
     }
-    crawler = await get_crawler(settings)
-    request = Request("https://example.com")
-    await _process_request(crawler, request)
+    params = await request_to_params(request, settings)
+    assert "customHttpRequestHeaders" not in params
 
-    handler = get_download_handler(crawler, "https")
-    param_parser = handler._param_parser
-    api_params = param_parser.parse(request)
-    assert "customHttpRequestHeaders" not in api_params
+
+@ensureDeferred
+async def test_middleware_headers_request_copy():
+    """A copy of a request (e.g. due to request retrying or redirect following)
+    should not get default headers mapped to customHttpRequestHeaders."""
+    request = Request(url="https://example.com")
+    settings = {"ZYTE_API_TRANSPARENT_MODE": True}
+    params = await request_to_params(request, settings)
+    assert "customHttpRequestHeaders" not in params
+    params = await request_to_params(request.copy(), settings)
+    assert "customHttpRequestHeaders" not in params
 
 
 @pytest.mark.parametrize(

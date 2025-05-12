@@ -16,7 +16,9 @@ _SCRAPY_2_1_0 = Version("2.1.0")
 _SCRAPY_2_4_0 = Version("2.4.0")
 _SCRAPY_2_5_0 = Version("2.5.0")
 _SCRAPY_2_6_0 = Version("2.6.0")
+_SCRAPY_2_10_0 = Version("2.10.0")
 _SCRAPY_2_12_0 = Version("2.12.0")
+_SCRAPY_2_13_0 = Version("2.13.0")
 
 # Need to install an asyncio reactor before download handler imports to work
 # around:
@@ -25,6 +27,8 @@ _SCRAPY_2_12_0 = Version("2.12.0")
 # https://github.com/scrapy/scrapy/commit/e4bdd1cb958b7d89b86ea66f0af1cec2d91a6d44
 _NEEDS_EARLY_REACTOR = _SCRAPY_2_4_0 <= _SCRAPY_VERSION < _SCRAPY_2_6_0
 
+_ADDON_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_10_0
+_ASYNC_START_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_13_0
 _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_12_0
 _DOWNLOAD_NEEDS_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_6_0
 _RAW_CLASS_SETTING_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_4_0

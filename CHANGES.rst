@@ -1,6 +1,27 @@
 Changes
 =======
 
+Unreleased
+----------
+
+-   Extended :doc:`Scrapy <scrapy:index>` support to :ref:`2.13.0+
+    <scrapy:release-2.13.0>`.
+
+-   Switched the minimum required version of :doc:`python-zyte-api
+    <python-zyte-api:index>` from ``0.5.1`` to ``0.6.0``.
+
+-   Fixed the removal of default request headers (``Accept``,
+    ``Accept-Encoding``, ``Accept-Language``, and ``User-Agent``) not working
+    for request copies (e.g. redirects or retries).
+
+-   The default value of the :setting:`ZYTE_API_FALLBACK_HTTP_HANDLER` and
+    :setting:`ZYTE_API_FALLBACK_HTTPS_HANDLER` settings is as expected even
+    when not using the add-on.
+
+-   The scrapy-zyte-api download handlers now support fallback download
+    handlers that do not define a ``close()`` method.
+
+
 0.29.0 (2025-03-20)
 -------------------
 
