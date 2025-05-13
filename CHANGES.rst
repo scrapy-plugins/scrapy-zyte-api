@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.30.0 (unreleased)
+0.30.0 (2025-05-13)
 -------------------
 
 -   Extended :doc:`Scrapy <scrapy:index>` support to :ref:`2.13.0+
