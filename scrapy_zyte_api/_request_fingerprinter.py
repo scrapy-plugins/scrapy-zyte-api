@@ -32,32 +32,44 @@ else:
         def from_crawler(cls, crawler):
             return cls(crawler)
 
+        @staticmethod
+        def _poet_is_configured(settings):
+            try:
+                from scrapy_poet import InjectionMiddleware
+            except ImportError:
+                return False
+            for k, v in settings.get("DOWNLOADER_MIDDLEWARES", {}).items():
+                if issubclass(load_object(k), InjectionMiddleware):
+                    return v is not None
+            return False
+
         def __init__(self, crawler):
             settings = crawler.settings
-            try:
-                from scrapy_poet import ScrapyPoetRequestFingerprinter
-            except ImportError:
-                self._has_poet = False
-                RequestFingerprinter = ScrapyRequestFingerprinter
+            self._fallback_fingerprinter_is_poets = poet_is_configured = (
+                self._poet_is_configured(settings)
+            )
+            if poet_is_configured:
+                from scrapy_poet import (
+                    ScrapyPoetRequestFingerprinter as DefaultFallbackRequestFingerprinter,
+                )
             else:
-                self._has_poet = True
-                RequestFingerprinter = ScrapyPoetRequestFingerprinter
+                DefaultFallbackRequestFingerprinter = ScrapyRequestFingerprinter
             self._fallback_request_fingerprinter = _build_from_crawler(
                 load_object(
                     settings.get(
                         "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS",
-                        RequestFingerprinter,
+                        DefaultFallbackRequestFingerprinter,
                     )
                 ),
                 crawler,
             )
-            if self._has_poet and not isinstance(
-                self._fallback_request_fingerprinter, cast(type, RequestFingerprinter)
+            if poet_is_configured and not isinstance(
+                self._fallback_request_fingerprinter,
+                cast(type, DefaultFallbackRequestFingerprinter),
             ):
                 logger.warning(
-                    f"You have scrapy-poet installed, but your custom value "
-                    f"for the ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS "
-                    f"setting "
+                    f"scrapy-poet is enabled, but your custom value for the "
+                    f"ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS setting "
                     f"({settings['ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS']!r})"
                     f" does not point to a subclass of "
                     f"scrapy_poet.ScrapyPoetRequestFingerprinter. For request "
@@ -69,7 +81,7 @@ else:
                     f"to the SCRAPY_POET_REQUEST_FINGERPRINTER_BASE_CLASS "
                     f"setting instead."
                 )
-                self._has_poet = False
+                self._fallback_fingerprinter_is_poets = False
             self._cache: "WeakKeyDictionary[Request, bytes]" = WeakKeyDictionary()
             self._param_parser = _ParamParser(crawler, cookies_enabled=False)
             self._crawler = crawler
@@ -124,7 +136,7 @@ else:
                     api_params.setdefault("sessionContext", session_pool)
                 self._normalize_params(api_params)
                 fingerprint = json.dumps(api_params, sort_keys=True).encode()
-                if self._has_poet:
+                if self._fallback_fingerprinter_is_poets:
                     deps_key = self._fallback_request_fingerprinter.get_deps_key(
                         request
                     )

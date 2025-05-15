@@ -57,15 +57,40 @@ async def test_fallback_custom(caplog):
     assert fingerprinter.fingerprint(request) == b"foo"
     request = Request("https://example.com", meta={"zyte_api": True})
     assert fingerprinter.fingerprint(request) != b"foo"
-    try:
-        import scrapy_poet  # noqa: F401
-    except ImportError:
-        pass
-    else:
+    if scrapy_poet is not None:
         assert (
             "does not point to a subclass of scrapy_poet.ScrapyPoetRequestFingerprinter"
             in caplog.text
         )
+
+
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@ensureDeferred
+async def test_poet_installed_but_disabled(caplog):
+    """If the scrapy-poet package is installed but its main middleware,
+    InjectionMiddleware, is not set in DOWNLOADER_MIDDLEWARES, do not try to
+    use its API for request fingerprinting."""
+    from web_poet import WebPage
+
+    no_deps_request = Request("https://example.com")
+
+    class DepsSpider(Spider):
+        name = "deps"
+
+        def __init__(self, *args, **kwargs):
+            self.deps_request = Request("https://example.com", callback=self.parse_deps)
+
+        def parse_deps(self, response, a: WebPage):
+            pass
+
+    crawler = await get_crawler(
+        spider_cls=DepsSpider, settings={"ZYTE_API_TRANSPARENT_MODE": True}, poet=False
+    )
+    fingerprinter = crawler.request_fingerprinter
+
+    no_deps_fp = fingerprinter.fingerprint(no_deps_request)
+    deps_fp = fingerprinter.fingerprint(crawler.spider.deps_request)
+    assert no_deps_fp == deps_fp
 
 
 @ensureDeferred
