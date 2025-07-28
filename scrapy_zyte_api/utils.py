@@ -9,16 +9,11 @@ from .__version__ import __version__
 USER_AGENT = f"scrapy-zyte-api/{__version__} {PYTHON_ZYTE_API_USER_AGENT}"
 
 _PYTHON_ZYTE_API_VERSION = Version(version("zyte_api"))
-_PYTHON_ZYTE_API_0_5_2 = Version("0.5.2")
 
 _SCRAPY_VERSION = Version(scrapy.__version__)
-_SCRAPY_2_1_0 = Version("2.1.0")
 _SCRAPY_2_4_0 = Version("2.4.0")
-_SCRAPY_2_5_0 = Version("2.5.0")
 _SCRAPY_2_6_0 = Version("2.6.0")
-_SCRAPY_2_10_0 = Version("2.10.0")
 _SCRAPY_2_12_0 = Version("2.12.0")
-_SCRAPY_2_13_0 = Version("2.13.0")
 
 # Need to install an asyncio reactor before download handler imports to work
 # around:
@@ -27,15 +22,15 @@ _SCRAPY_2_13_0 = Version("2.13.0")
 # https://github.com/scrapy/scrapy/commit/e4bdd1cb958b7d89b86ea66f0af1cec2d91a6d44
 _NEEDS_EARLY_REACTOR = _SCRAPY_2_4_0 <= _SCRAPY_VERSION < _SCRAPY_2_6_0
 
-_ADDON_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_10_0
-_ASYNC_START_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_13_0
+_ADDON_SUPPORT = _SCRAPY_VERSION >= Version("2.10.0")
+_ASYNC_START_SUPPORT = _SCRAPY_VERSION >= Version("2.13.0")
 _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_12_0
 _DOWNLOAD_NEEDS_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_6_0
 _RAW_CLASS_SETTING_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_4_0
-_REQUEST_ERROR_HAS_QUERY = _PYTHON_ZYTE_API_VERSION >= _PYTHON_ZYTE_API_0_5_2
+_REQUEST_ERROR_HAS_QUERY = _PYTHON_ZYTE_API_VERSION >= Version("0.5.2")
 _RESPONSE_HAS_ATTRIBUTES = _SCRAPY_VERSION >= _SCRAPY_2_6_0
-_RESPONSE_HAS_IP_ADDRESS = _SCRAPY_VERSION >= _SCRAPY_2_1_0
-_RESPONSE_HAS_PROTOCOL = _SCRAPY_VERSION >= _SCRAPY_2_5_0
+_RESPONSE_HAS_IP_ADDRESS = _SCRAPY_VERSION >= Version("2.1.0")
+_RESPONSE_HAS_PROTOCOL = _SCRAPY_VERSION >= Version("2.5.0")
 _START_REQUESTS_CAN_YIELD_ITEMS = _SCRAPY_VERSION >= _SCRAPY_2_12_0
 
 try:
@@ -62,3 +57,10 @@ else:
     _SCRAPY_POET_VERSION = Version(version("scrapy-poet"))
     _SCRAPY_POET_0_26_0 = Version("0.26.0")
     _POET_ADDON_SUPPORT = _SCRAPY_POET_VERSION >= _SCRAPY_POET_0_26_0
+
+try:
+    from zyte_api import AuthInfo  # noqa: F401
+except ImportError:
+    _X402_SUPPORT = False
+else:
+    _X402_SUPPORT = True

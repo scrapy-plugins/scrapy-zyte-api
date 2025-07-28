@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import re
 from copy import deepcopy
@@ -25,6 +26,7 @@ from scrapy_zyte_api.responses import ZyteAPITextResponse
 from scrapy_zyte_api.utils import (
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
     _POET_ADDON_SUPPORT,
+    _X402_SUPPORT,
     USER_AGENT,
 )
 
@@ -54,78 +56,98 @@ async def test_concurrency_configuration(concurrency):
     assert handler._session._session.connector.limit == concurrency
 
 
+ETH_KEY = "c85ef7d79691fe79573b1a7064c5232332f53bb1b44a08f1a737f57a68a4706e"
+ETH_KEY_2 = ETH_KEY[-1] + ETH_KEY[:-1]
+assert ETH_KEY_2 != ETH_KEY
+HAS_X402 = importlib.util.find_spec("x402") is not None and _X402_SUPPORT
+
+
 @pytest.mark.parametrize(
-    "env_var,setting,expected",
+    ("scenario", "expected"),
     (
         (
-            UNSET,
-            UNSET,
+            {},
             NotConfigured,
         ),
         (
-            "",
-            UNSET,
-            "",
-        ),
-        (
-            "a",
-            UNSET,
-            "a",
-        ),
-        (
-            UNSET,
-            None,
+            {"env": {"ZYTE_API_KEY": ""}},
             NotConfigured,
         ),
         (
-            "",
-            None,
-            "",
+            {"env": {"ZYTE_API_KEY": "a"}},
+            {"key_type": "zyte", "key": "a"},
         ),
         (
-            "a",
-            None,
-            "a",
-        ),
-        (
-            UNSET,
-            "",
+            {"settings": {"ZYTE_API_KEY": None}},
             NotConfigured,
         ),
         (
-            "",
-            "",
-            "",
+            {"env": {"ZYTE_API_KEY": ""}, "settings": {"ZYTE_API_KEY": None}},
+            NotConfigured,
         ),
         (
-            "a",
-            "",
-            "a",
+            {"env": {"ZYTE_API_KEY": "a"}, "settings": {"ZYTE_API_KEY": None}},
+            {"key_type": "zyte", "key": "a"},
         ),
         (
-            UNSET,
-            "b",
-            "b",
+            {"settings": {"ZYTE_API_KEY": ""}},
+            NotConfigured,
         ),
         (
-            "",
-            "b",
-            "b",
+            {"env": {"ZYTE_API_KEY": ""}, "settings": {"ZYTE_API_KEY": ""}},
+            NotConfigured,
         ),
         (
-            "a",
-            "b",
-            "b",
+            {"env": {"ZYTE_API_KEY": "a"}, "settings": {"ZYTE_API_KEY": ""}},
+            {"key_type": "zyte", "key": "a"},
+        ),
+        (
+            {"settings": {"ZYTE_API_KEY": "b"}},
+            {"key_type": "zyte", "key": "b"},
+        ),
+        (
+            {"env": {"ZYTE_API_KEY": ""}, "settings": {"ZYTE_API_KEY": "b"}},
+            {"key_type": "zyte", "key": "b"},
+        ),
+        (
+            {"env": {"ZYTE_API_KEY": "a"}, "settings": {"ZYTE_API_KEY": "b"}},
+            {"key_type": "zyte", "key": "b"},
+        ),
+        (
+            {
+                "env": {"ZYTE_API_KEY": "a", "ZYTE_API_ETH_KEY": ETH_KEY},
+                "settings": {"ZYTE_API_KEY": "b", "ZYTE_API_ETH_KEY": ETH_KEY_2},
+            },
+            {"key_type": "zyte", "key": "b"},
+        ),
+        (
+            {
+                "env": {"ZYTE_API_KEY": "a", "ZYTE_API_ETH_KEY": ETH_KEY},
+                "settings": {"ZYTE_API_ETH_KEY": ETH_KEY_2},
+            },
+            {"key_type": "eth", "key": ETH_KEY_2}
+            if HAS_X402
+            else ModuleNotFoundError
+            if _X402_SUPPORT
+            else {"key_type": "zyte", "key": "a"},
+        ),
+        (
+            {"env": {"ZYTE_API_KEY": "a", "ZYTE_API_ETH_KEY": ETH_KEY}},
+            {"key_type": "zyte", "key": "a"},
+        ),
+        (
+            {"env": {"ZYTE_API_ETH_KEY": ETH_KEY}},
+            {"key_type": "eth", "key": ETH_KEY}
+            if HAS_X402
+            else ModuleNotFoundError
+            if _X402_SUPPORT
+            else NotConfigured,
         ),
     ),
 )
-def test_api_key(env_var, setting, expected):
-    env = {}
-    if env_var is not UNSET:
-        env["ZYTE_API_KEY"] = env_var
-    settings: SETTINGS_T = {}
-    if setting is not UNSET:
-        settings["ZYTE_API_KEY"] = setting
+def test_auth(scenario: dict[str, Any], expected: type[Exception] | dict[str, str]):
+    env = scenario.get("env", {})
+    settings: SETTINGS_T = scenario.get("settings", {})
     with set_env(**env):
         crawler = get_crawler(settings_dict=settings)
 
@@ -139,9 +161,20 @@ def test_api_key(env_var, setting, expected):
         if isclass(expected) and issubclass(expected, Exception):
             with pytest.raises(expected):
                 handler = build_hander()
+            return
+
+        handler = build_hander()
+
+    assert isinstance(expected, dict)
+    if expected["key_type"] == "zyte":
+        if _X402_SUPPORT:
+            assert handler._client.auth.key == expected["key"]
         else:
-            handler = build_hander()
-            assert handler._client.api_key == expected
+            assert handler._client.api_key == expected["key"]
+    else:
+        assert expected["key_type"] == "eth"
+        assert HAS_X402
+        assert handler._client.auth.key == expected["key"]
 
 
 @pytest.mark.parametrize(

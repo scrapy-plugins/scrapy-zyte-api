@@ -27,7 +27,8 @@ requires-python = ">=3.9"
 dependencies = [
     "packaging>=20.0",
     "scrapy>=2.0.1",
-    "zyte-api>=0.6.0",
+    # TODO: Restore: "zyte-api>=0.6.0",
+    "zyte-api @ git+https://github.com/Gallaecio/python-zyte-api.git@5b0072505627cededd5bded6d4dd64fe4ed13565",  # x402 branch
 ]
 
 [project.optional-dependencies]
@@ -38,6 +39,13 @@ provider = [
     "web-poet>=0.17.0",
     "zyte-common-items>=0.27.0",
 ]
+x402 = [
+    # TODO: "zyte-api[x402]>=0.8.0",
+    "zyte-api[x402] @ git+https://github.com/Gallaecio/python-zyte-api.git@5b0072505627cededd5bded6d4dd64fe4ed13565",  # x402 branch
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true  # TODO: Remove
 
 [project.urls]
 source = "https://github.com/scrapy-plugins/scrapy-zyte-api"

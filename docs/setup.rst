@@ -22,9 +22,9 @@ You need at least:
 
 -   Scrapy 2.0.1+
 
-:doc:`scrapy-poet <scrapy-poet:index>` integration requires higher versions:
+:doc:`scrapy-poet <scrapy-poet:index>` integration requires Scrapy 2.6+.
 
--   Scrapy 2.6+
+:ref:`x402 support <x402>` requires Python 3.10+.
 
 
 Installation
@@ -42,6 +42,20 @@ For :ref:`scrapy-poet integration <scrapy-poet>`:
 
     pip install scrapy-zyte-api[provider]
 
+For :ref:`x402 support <x402>`:
+
+.. code-block:: shell
+
+    pip install scrapy-zyte-api[x402]
+
+Note that you can install multiple extras_:
+
+.. _extras: https://setuptools.pypa.io/en/latest/userguide/dependency_management.html#optional-dependencies
+
+.. code-block:: shell
+
+    pip install scrapy-zyte-api[provider,x402]
+
 
 Configuration
 =============
@@ -52,21 +66,36 @@ either :ref:`enable the add-on <config-addon>` (Scrapy ≥ 2.10) or
 
 .. warning:: :ref:`reactor-change`.
 
+.. _auth:
 .. _config-api-key:
 
-Setting your API key
---------------------
+Authentication
+--------------
 
-Add your `Zyte API key`_, and add it to your project ``settings.py``:
+After you `sign up for a Zyte API account
+<https://app.zyte.com/account/signup/zyteapi>`_, copy `your API key
+<https://app.zyte.com/o/zyte-api/api-access>`_, and do either of the following:
 
-.. _Zyte API key: https://app.zyte.com/o/zyte-api/api-access
+-   Define an environment variable named ``ZYTE_API_KEY`` with your API key.
 
-.. code-block:: python
+-   Add your API key to your setting module:
 
-    ZYTE_API_KEY = "YOUR_API_KEY"
+    .. code-block:: python
+        :caption: settings.py
 
-Alternatively, you can set your API key in the ``ZYTE_API_KEY`` environment
-variable instead.
+        ZYTE_API_KEY = "YOUR_API_KEY"
+
+To use :ref:`x402` instead, do either of the following:
+
+-   Define an environment variable named ``ZYTE_API_ETH_KEY`` with your
+    Ethereum private key.
+
+-   Add your Ethereum private key to your setting module:
+
+    .. code-block:: python
+        :caption: settings.py
+
+        ZYTE_API_ETH_KEY = "YOUR_ETH_PRIVATE_KEY"
 
 
 .. _config-addon:
