@@ -407,6 +407,24 @@ object, for example to read settings:
     ZYTE_API_SESSION_CHECKER = MySessionChecker
 
 
+.. setting:: ZYTE_API_SESSION_DELAY
+
+ZYTE_API_SESSION_DELAY
+======================
+
+Default: ``1.0``
+
+Minimum number of seconds to wait before reusing a :ref:`scrapy-zyte-api 
+session <session>`.
+
+To override this value for specific pools, use
+:setting:`ZYTE_API_SESSION_POOLS`.
+
+Increasing this number can reduce the number of ban-related session
+expirations, hence increasing the lifetime of each session. See
+:ref:`optimize-sessions`.
+
+
 .. setting:: ZYTE_API_SESSION_ENABLED
 
 ZYTE_API_SESSION_ENABLED
@@ -535,22 +553,30 @@ The maximum number of active :ref:`scrapy-zyte-api sessions <session>` to keep
 per :ref:`pool <session-pools>`.
 
 To override this value for specific pools, use
-:setting:`ZYTE_API_SESSION_POOL_SIZES`.
+:setting:`ZYTE_API_SESSION_POOLS`.
 
 Increase this number to lower the frequency with which requests are sent
 through each session, which on some websites may increase the lifetime of each
 session. See :ref:`optimize-sessions`.
 
 
-.. setting:: ZYTE_API_SESSION_POOL_SIZES
+.. setting:: ZYTE_API_SESSION_POOLS
 
-ZYTE_API_SESSION_POOL_SIZES
-===========================
+ZYTE_API_SESSION_POOLS
+======================
 
 Default: ``{}``
 
 :class:`dict` where keys are :ref:`pool <session-pools>` IDs and values are
-overrides of :setting:`ZYTE_API_SESSION_POOL_SIZE` for those pools.
+dicts with any combination of the following keys that override the
+corresponding setting for that pool:
+
+-   ``"delay"`` overrides :setting:`ZYTE_API_SESSION_DELAY`.
+
+-   ``"size"`` overrides :setting:`ZYTE_API_SESSION_POOL_SIZE`.
+
+These override take precedence over :attr:`SessionConfig.pool
+<scrapy_zyte_api.SessionConfig.pool>`.
 
 
 .. setting:: ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS

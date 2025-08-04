@@ -247,7 +247,7 @@ overrides <session-configs>`.
 
 The :setting:`ZYTE_API_SESSION_POOL_SIZE` setting determines the desired number
 of concurrent, active, working sessions per pool. The
-:setting:`ZYTE_API_SESSION_POOL_SIZES` setting allows defining different values
+:setting:`ZYTE_API_SESSION_POOLS` setting allows defining different values
 for specific pools.
 
 .. _pool-size:
