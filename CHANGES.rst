@@ -1,6 +1,25 @@
 Changes
 =======
 
+0.31.0 (unreleased)
+-------------------
+
+-   Added a minimum delay between reuses of any given :ref:`managed session 
+    <session>`.
+
+    It is 1 second by default. Use :setting:`ZYTE_API_SESSION_DELAY` to change
+    that, :setting:`ZYTE_API_SESSION_POOLS` to override it for specific
+    :setting:`session pools <session-pools>`.
+
+-   :attr:`SessionConfig.pool <scrapy_zyte_api.SessionConfig.pool>` can now
+    return a dictionary instead of a string, allowing session configs to
+    override :setting:`ZYTE_API_SESSION_POOLS` and
+    :setting:`ZYTE_API_SESSION_DELAY` for the corresponding pool.
+
+-   Deprecated the ``ZYTE_API_SESSION_POOL_SIZES`` setting in favor of the new
+    :setting:`ZYTE_API_SESSION_POOLS` setting, where you can set ``"size"``.
+
+
 0.30.0 (2025-05-13)
 -------------------
 
