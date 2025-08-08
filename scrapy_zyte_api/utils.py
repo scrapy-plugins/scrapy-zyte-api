@@ -62,3 +62,10 @@ else:
     _SCRAPY_POET_VERSION = Version(version("scrapy-poet"))
     _SCRAPY_POET_0_26_0 = Version("0.26.0")
     _POET_ADDON_SUPPORT = _SCRAPY_POET_VERSION >= _SCRAPY_POET_0_26_0
+
+try:
+    from zyte_api import AuthInfo  # noqa: F401
+except ImportError:
+    _X402_SUPPORT = False
+else:
+    _X402_SUPPORT = True

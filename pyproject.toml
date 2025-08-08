@@ -38,6 +38,9 @@ provider = [
     "web-poet>=0.17.0",
     "zyte-common-items>=0.27.0",
 ]
+x402 = [
+    "zyte-api[x402]>=0.8.0",
+]
 
 [project.urls]
 source = "https://github.com/scrapy-plugins/scrapy-zyte-api"

@@ -18,34 +18,35 @@ jobs:
       matrix:
         include:
         - python-version: '3.9'
-          toxenv: pinned-scrapy-2x0
+          toxenv: min-scrapy-2x0
         - python-version: '3.9'
-          toxenv: pinned-scrapy-2x1
+          toxenv: min-scrapy-2x1
         - python-version: '3.9'
-          toxenv: pinned-scrapy-2x3
+          toxenv: min-scrapy-2x3
         - python-version: '3.9'
-          toxenv: pinned-scrapy-2x4
+          toxenv: min-scrapy-2x4
         - python-version: '3.9'
-          toxenv: pinned-scrapy-2x5
+          toxenv: min-scrapy-2x5
         - python-version: '3.9'
-          toxenv: pinned-scrapy-2x6
+          toxenv: min-scrapy-2x6
         - python-version: '3.9'
-          toxenv: pinned-scrapy-2x7
+          toxenv: min-scrapy-2x7
+        - python-version: '3.9'
+          toxenv: min-extra
+        - python-version: '3.9'
+          toxenv: min-provider
+        - python-version: '3.10'
+          toxenv: min-x402
         - python-version: '3.10'
         - python-version: '3.11'
         - python-version: '3.12'
         - python-version: '3.13'
-
-        - python-version: '3.9'
-          toxenv: pinned-provider
-        - python-version: '3.13'
-          toxenv: provider
-
-        - python-version: '3.9'
-          toxenv: pinned-extra
         - python-version: '3.13'
           toxenv: extra
-
+        - python-version: '3.13'
+          toxenv: provider
+        - python-version: '3.13'
+          toxenv: x402
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
@@ -70,7 +71,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12"]  # Keep in sync with .readthedocs.yml
-        tox-job: ["mypy", "pre-commit", "twine-check", "docs"]
+        tox-job: ["pre-commit", "mypy", "twine", "docs"]
 
     steps:
     - uses: actions/checkout@v4

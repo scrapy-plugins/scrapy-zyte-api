@@ -4,6 +4,7 @@ import time
 from copy import deepcopy
 from typing import Any, Generator, Optional, Union
 
+
 from scrapy import Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
@@ -15,12 +16,12 @@ from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
-from zyte_api.constants import API_URL
 
 from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 from .utils import (
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _X402_SUPPORT,
     USER_AGENT,
     _build_from_crawler,
 )
@@ -95,7 +96,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             # https://github.com/scrapy-plugins/scrapy-zyte-api/issues/58
             crawler.zyte_api_client = client  # type: ignore[attr-defined]
         self._client: AsyncZyteAPI = crawler.zyte_api_client  # type: ignore[attr-defined]
-        logger.info("Using a Zyte API key starting with %r", self._client.api_key[:7])
+        self._log_auth()
         verify_installed_reactor(
             "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
         )
@@ -133,6 +134,21 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     def from_crawler(cls, crawler):
         return cls(crawler.settings, crawler)
 
+    def _log_auth(self):
+        if _X402_SUPPORT:
+            auth_type = (
+                "a Zyte API key"
+                if self._client.auth.type == "zyte"
+                else "an Ethereum private key"
+            )
+            logger.info(
+                f"Using {auth_type} starting with {self._client.auth.key[:7]!r}"
+            )
+        else:
+            logger.info(
+                f"Using a Zyte API key starting with {self._client.api_key[:7]!r}"
+            )
+
     async def engine_started(self):
         self._session = self._client.session(trust_env=self._trust_env)
         if not self._cookies_enabled:
@@ -153,27 +169,26 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     @staticmethod
     def _build_client(settings):
+        kwargs = {}
+        if api_key := settings.get("ZYTE_API_KEY"):
+            kwargs["api_key"] = api_key
+        if _X402_SUPPORT and (eth_key := settings.get("ZYTE_API_ETH_KEY")):
+            kwargs["eth_key"] = eth_key
+        if api_url := settings.get("ZYTE_API_URL"):
+            kwargs["api_url"] = api_url
         try:
             return AsyncZyteAPI(
-                # To allow users to have a key defined in Scrapy settings and
-                # in a environment variable, and be able to cause the
-                # environment variable to be used instead of the setting by
-                # overriding the setting on the command-line to be an empty
-                # string, we do not support setting empty string keys through
-                # settings.
-                api_key=settings.get("ZYTE_API_KEY") or None,
-                api_url=settings.get("ZYTE_API_URL") or API_URL,
                 n_conn=settings.getint("CONCURRENT_REQUESTS"),
-                user_agent=settings.get("_ZYTE_API_USER_AGENT", default=USER_AGENT),
+                user_agent=settings.get("_ZYTE_API_USER_AGENT", USER_AGENT),
+                **kwargs,
             )
         except NoApiKey:
-            logger.warning(
-                "'ZYTE_API_KEY' must be set in the spider settings or env var "
-                "in order for ScrapyZyteAPIDownloadHandler to work."
+            message = (
+                "No authentication data provided. See "
+                "https://scrapy-zyte-api.readthedocs.io/en/latest/setup.html#auth"
             )
-            raise NotConfigured(
-                "Your Zyte API key is not set. Set ZYTE_API_KEY to your API key."
-            )
+            logger.warning(message)
+            raise NotConfigured(message)
 
     def _create_handler(self, path: Any) -> Any:
         dhcls = load_object(path)
