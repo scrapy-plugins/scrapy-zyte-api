@@ -27,6 +27,8 @@ You need at least:
 :ref:`x402 support <x402>` requires Python 3.10+.
 
 
+.. _install:
+
 Installation
 ============
 
@@ -85,17 +87,27 @@ After you `sign up for a Zyte API account
 
         ZYTE_API_KEY = "YOUR_API_KEY"
 
-To use :ref:`x402` instead, do either of the following:
+To use :ref:`x402` instead:
 
--   Define an environment variable named ``ZYTE_API_ETH_KEY`` with your
-    Ethereum private key.
+#.  Read the `Zyte Terms of Service`_. By using Zyte API, you are accepting
+    them.
 
--   Add your Ethereum private key to your setting module:
+    .. _Zyte Terms of Service: https://www.zyte.com/terms-policies/terms-of-service/
 
-    .. code-block:: python
-        :caption: settings.py
+#.  During :ref:`installation <install>`, make sure to install the ``x402``
+    extra.
 
-        ZYTE_API_ETH_KEY = "YOUR_ETH_PRIVATE_KEY"
+#.  Do either of the following:
+
+    -   Define an environment variable named ``ZYTE_API_ETH_KEY`` with your
+        Ethereum private key.
+
+    -   Add your Ethereum private key to your setting module:
+
+        .. code-block:: python
+            :caption: settings.py
+
+            ZYTE_API_ETH_KEY = "YOUR_ETH_PRIVATE_KEY"
 
 
 .. _config-addon:
