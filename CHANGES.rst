@@ -6,6 +6,9 @@ Changes
 
 -   Added :ref:`x402 support <x402>`.
 
+-   Request fingerprinting no longer tries to take scrapy-poet into account if
+    scrapy-poet is installed but is not enabled.
+
 
 0.30.0 (2025-05-13)
 -------------------
