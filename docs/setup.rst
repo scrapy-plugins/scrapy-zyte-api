@@ -253,7 +253,7 @@ variable, so that it also works when you use :doc:`python-zyte-api
 
         $ export ZYTE_API_ETH_KEY=YOUR_ETH_PRIVATE_KEY
 
-Alternatively, you can add your Ethereum private key to setting module:
+Alternatively, you can add your Ethereum private key to the settings module:
 
 .. code-block:: python
     :caption: settings.py
