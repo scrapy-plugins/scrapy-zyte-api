@@ -16,7 +16,6 @@ from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
-from zyte_api.constants import API_URL
 
 from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
@@ -147,7 +146,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
         else:
             logger.info(
-                f"Using a Zyte API key starting with {self._client.auth.key[:7]!r}"
+                f"Using a Zyte API key starting with {self._client.api_key[:7]!r}"
             )
 
     async def engine_started(self):
@@ -170,17 +169,18 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     @staticmethod
     def _build_client(settings):
-        auth_kwargs = {}
+        kwargs = {}
         if api_key := settings.get("ZYTE_API_KEY"):
-            auth_kwargs["api_key"] = api_key
+            kwargs["api_key"] = api_key
         if _X402_SUPPORT and (eth_key := settings.get("ZYTE_API_ETH_KEY")):
-            auth_kwargs["eth_key"] = eth_key
+            kwargs["eth_key"] = eth_key
+        if api_url := settings.get("ZYTE_API_URL"):
+            kwargs["api_url"] = api_url
         try:
             return AsyncZyteAPI(
-                api_url=settings.get("ZYTE_API_URL") or API_URL,
                 n_conn=settings.getint("CONCURRENT_REQUESTS"),
-                user_agent=settings.get("_ZYTE_API_USER_AGENT", default=USER_AGENT),
-                **auth_kwargs,
+                user_agent=settings.get("_ZYTE_API_USER_AGENT", USER_AGENT),
+                **kwargs,
             )
         except NoApiKey:
             message = (

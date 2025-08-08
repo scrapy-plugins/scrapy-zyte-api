@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib.util
 import json
 import re
@@ -71,7 +73,7 @@ HAS_X402 = importlib.util.find_spec("x402") is not None and _X402_SUPPORT
         ),
         (
             {"env": {"ZYTE_API_KEY": ""}},
-            NotConfigured,
+            NotConfigured if _X402_SUPPORT else {"key_type": "zyte", "key": ""},
         ),
         (
             {"env": {"ZYTE_API_KEY": "a"}},
@@ -83,7 +85,7 @@ HAS_X402 = importlib.util.find_spec("x402") is not None and _X402_SUPPORT
         ),
         (
             {"env": {"ZYTE_API_KEY": ""}, "settings": {"ZYTE_API_KEY": None}},
-            NotConfigured,
+            NotConfigured if _X402_SUPPORT else {"key_type": "zyte", "key": ""},
         ),
         (
             {"env": {"ZYTE_API_KEY": "a"}, "settings": {"ZYTE_API_KEY": None}},
@@ -95,7 +97,7 @@ HAS_X402 = importlib.util.find_spec("x402") is not None and _X402_SUPPORT
         ),
         (
             {"env": {"ZYTE_API_KEY": ""}, "settings": {"ZYTE_API_KEY": ""}},
-            NotConfigured,
+            NotConfigured if _X402_SUPPORT else {"key_type": "zyte", "key": ""},
         ),
         (
             {"env": {"ZYTE_API_KEY": "a"}, "settings": {"ZYTE_API_KEY": ""}},
@@ -169,12 +171,14 @@ def test_auth(scenario: dict[str, Any], expected: type[Exception] | dict[str, st
     if expected["key_type"] == "zyte":
         if _X402_SUPPORT:
             assert handler._client.auth.key == expected["key"]
+            assert handler._client.api_url == "https://api.zyte.com/v1/"
         else:
             assert handler._client.api_key == expected["key"]
     else:
         assert expected["key_type"] == "eth"
         assert HAS_X402
         assert handler._client.auth.key == expected["key"]
+        assert handler._client.api_url == "https://api-x402.zyte.com/v1/"
 
 
 @pytest.mark.parametrize(

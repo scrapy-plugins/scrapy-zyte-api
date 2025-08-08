@@ -44,7 +44,8 @@ For :ref:`scrapy-poet integration <scrapy-poet>`:
 
     pip install scrapy-zyte-api[provider]
 
-For :ref:`x402 support <x402>`:
+For :ref:`x402 support <x402>`, make sure you have Python 3.10+ and install
+the ``x402`` extra:
 
 .. code-block:: shell
 
@@ -62,9 +63,9 @@ Note that you can install multiple extras_:
 Configuration
 =============
 
-To configure scrapy-zyte-api, :ref:`set your API key <config-api-key>` and
-either :ref:`enable the add-on <config-addon>` (Scrapy ≥ 2.10) or
-:ref:`configure all components separately <config-components>`.
+To configure scrapy-zyte-api, :ref:`set up authentication <auth>` and either
+:ref:`enable the add-on <config-addon>` (Scrapy ≥ 2.10) or :ref:`configure all
+components separately <config-components>`.
 
 .. warning:: :ref:`reactor-change`.
 
@@ -74,9 +75,9 @@ either :ref:`enable the add-on <config-addon>` (Scrapy ≥ 2.10) or
 Authentication
 --------------
 
-After you `sign up for a Zyte API account
+If you `sign up for a Zyte API account
 <https://app.zyte.com/account/signup/zyteapi>`_, copy `your API key
-<https://app.zyte.com/o/zyte-api/api-access>`_, and do either of the following:
+<https://app.zyte.com/o/zyte-api/api-access>`_ and do either of the following:
 
 -   Define an environment variable named ``ZYTE_API_KEY`` with your API key.
 
@@ -87,7 +88,9 @@ After you `sign up for a Zyte API account
 
         ZYTE_API_KEY = "YOUR_API_KEY"
 
-To use :ref:`x402` instead:
+.. _x402:
+
+To use :ref:`python-zyte-api:x402` instead:
 
 #.  Read the `Zyte Terms of Service`_. By using Zyte API, you are accepting
     them.
@@ -97,7 +100,10 @@ To use :ref:`x402` instead:
 #.  During :ref:`installation <install>`, make sure to install the ``x402``
     extra.
 
-#.  Do either of the following:
+#.  Configure the *private* key of your Ethereum_ account to authorize by doing
+    either of the following:
+
+    .. _Ethereum: https://ethereum.org/
 
     -   Define an environment variable named ``ZYTE_API_ETH_KEY`` with your
         Ethereum private key.
