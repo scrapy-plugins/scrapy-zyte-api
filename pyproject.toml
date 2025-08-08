@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scrapy-zyte-api"
-version = "0.30.0"
+version = "0.31.0"
 description = "Client library to process URLs through Zyte API"
 authors = [{name = "Zyte Group Ltd", email = "info@zyte.com"}]
 license = "BSD-3-Clause"
@@ -47,7 +47,7 @@ source = "https://github.com/scrapy-plugins/scrapy-zyte-api"
 docs = "https://scrapy-zyte-api.readthedocs.io/en/latest/"
 
 [tool.bumpversion]
-current_version = "0.30.0"
+current_version = "0.31.0"
 commit = true
 tag = true
 tag_name = "{new_version}"
