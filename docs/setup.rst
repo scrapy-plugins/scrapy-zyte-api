@@ -75,11 +75,23 @@ components separately <config-components>`.
 Authentication
 --------------
 
-If you `sign up for a Zyte API account
+`Sign up for a Zyte API account
 <https://app.zyte.com/account/signup/zyteapi>`_, copy `your API key
 <https://app.zyte.com/o/zyte-api/api-access>`_ and do either of the following:
 
--   Define an environment variable named ``ZYTE_API_KEY`` with your API key.
+-   Define an environment variable named ``ZYTE_API_KEY`` with your API key:
+
+    -   On Windows’ CMD:
+
+        .. code-block:: shell
+
+                > set ZYTE_API_KEY=YOUR_API_KEY
+
+    -   On macOS and Linux:
+
+        .. code-block:: shell
+
+                $ export ZYTE_API_KEY=YOUR_API_KEY
 
 -   Add your API key to your setting module:
 
@@ -88,32 +100,7 @@ If you `sign up for a Zyte API account
 
         ZYTE_API_KEY = "YOUR_API_KEY"
 
-.. _x402:
-
-To use :ref:`python-zyte-api:x402` instead:
-
-#.  Read the `Zyte Terms of Service`_. By using Zyte API, you are accepting
-    them.
-
-    .. _Zyte Terms of Service: https://www.zyte.com/terms-policies/terms-of-service/
-
-#.  During :ref:`installation <install>`, make sure to install the ``x402``
-    extra.
-
-#.  Configure the *private* key of your Ethereum_ account to authorize by doing
-    either of the following:
-
-    .. _Ethereum: https://ethereum.org/
-
-    -   Define an environment variable named ``ZYTE_API_ETH_KEY`` with your
-        Ethereum private key.
-
-    -   Add your Ethereum private key to your setting module:
-
-        .. code-block:: python
-            :caption: settings.py
-
-            ZYTE_API_ETH_KEY = "YOUR_ETH_PRIVATE_KEY"
+To use `x402 <https://www.x402.org/>`__ instead, see :ref:`x402`.
 
 
 .. _config-addon:
@@ -222,3 +209,53 @@ your existing code may need changes, such as:
     some Scrapy functions and methods. For example, when you yield the
     return value of ``self.crawler.engine.download()`` from a spider
     callback, you are yielding a Deferred.
+
+
+.. _x402:
+
+x402
+====
+
+It is possible to use :ref:`Zyte API <zyte-api>` without a Zyte API account by 
+using the `x402 <https://www.x402.org/>`__ protocol to handle payments:
+
+#.  Read the `Zyte Terms of Service`_. By using Zyte API, you are accepting
+    them.
+
+    .. _Zyte Terms of Service: https://www.zyte.com/terms-policies/terms-of-service/
+
+#.  During :ref:`installation <install>`, make sure to install the ``x402``
+    extra.
+
+#.  :ref:`Configure <eth-key>` the *private* key of your Ethereum_ account to
+    authorize payments.
+
+    .. _Ethereum: https://ethereum.org/
+
+.. _eth-key:
+
+Configuring your Ethereum private key
+-------------------------------------
+
+It is recommended to configure your Ethereum private key through an environment
+variable, so that it also works when you use :doc:`python-zyte-api
+<python-zyte-api:index>`:
+
+-  On Windows’ CMD:
+
+   .. code-block:: shell
+
+        > set ZYTE_API_ETH_KEY=YOUR_ETH_PRIVATE_KEY
+
+-  On macOS and Linux:
+
+   .. code-block:: shell
+
+        $ export ZYTE_API_ETH_KEY=YOUR_ETH_PRIVATE_KEY
+
+Alternatively, you can add your Ethereum private key to setting module:
+
+.. code-block:: python
+    :caption: settings.py
+
+    ZYTE_API_ETH_KEY = "YOUR_ETH_PRIVATE_KEY"
