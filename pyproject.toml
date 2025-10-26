@@ -75,12 +75,24 @@ include = [
 
 [tool.mypy]
 check_untyped_defs = true
-ignore_missing_imports = true
 warn_no_return = false
 files = [
     "scrapy_zyte_api",
     "tests"
 ]
+
+[[tool.mypy.overrides]]
+module = [
+    "pytest_twisted",
+    "scrapy_crawlera",
+    "scrapy_zyte_smartproxy",
+]
+ignore_missing_imports = true
+
+# to be fixed
+[[tool.mypy.overrides]]
+module = "scrapy_poet.*"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 junit_family = "xunit2"
