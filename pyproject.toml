@@ -82,7 +82,11 @@ disable_warnings = [
 
 [tool.hatch.build.targets.sdist]
 include = [
-  "scrapy_zyte_api/*.py",
+    "/docs",
+    "/scrapy_zyte_api",
+    "/tests",
+    "/CHANGES.rst",
+    "/tox.ini",
 ]
 
 [tool.mypy]
