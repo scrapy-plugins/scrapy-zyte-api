@@ -68,6 +68,18 @@ parse = "version\\s*=\\s*['\"](?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+
 [[tool.bumpversion.files]]
 filename = "scrapy_zyte_api/__version__.py"
 
+[tool.coverage.run]
+branch = true
+include = [
+    "scrapy_zyte_api/*",
+]
+omit = [
+    "tests/*",
+]
+disable_warnings = [
+    "include-ignored",
+]
+
 [tool.hatch.build.targets.sdist]
 include = [
   "scrapy_zyte_api/*.py",
