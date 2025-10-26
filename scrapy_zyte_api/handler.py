@@ -82,7 +82,10 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     lazy = False
 
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+        self,
+        settings: Settings,
+        crawler: Crawler,
+        client: Optional[AsyncZyteAPI] = None,
     ):
         if not settings.getbool("ZYTE_API_ENABLED", True):
             raise NotConfigured(
@@ -348,7 +351,10 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
 class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+        self,
+        settings: Settings,
+        crawler: Crawler,
+        client: Optional[AsyncZyteAPI] = None,
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
@@ -358,7 +364,10 @@ class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
 
 class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+        self,
+        settings: Settings,
+        crawler: Crawler,
+        client: Optional[AsyncZyteAPI] = None,
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
@@ -371,7 +380,10 @@ class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
 
 class ScrapyZyteAPIHTTPSDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+        self,
+        settings: Settings,
+        crawler: Crawler,
+        client: Optional[AsyncZyteAPI] = None,
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
