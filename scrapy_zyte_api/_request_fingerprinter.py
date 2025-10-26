@@ -25,7 +25,7 @@ else:
     from w3lib.url import canonicalize_url
 
     from ._params import _REQUEST_PARAMS, _may_use_browser, _ParamParser
-    from .utils import _build_from_crawler
+    from .utils import _build_from_crawler  # type: ignore[attr-defined]
 
     class ScrapyZyteAPIRequestFingerprinter:
         @classmethod

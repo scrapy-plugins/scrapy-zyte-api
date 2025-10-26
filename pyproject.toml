@@ -75,7 +75,9 @@ include = [
 
 [tool.mypy]
 check_untyped_defs = true
+implicit_reexport = false
 warn_no_return = false
+warn_unused_ignores = true
 files = [
     "scrapy_zyte_api",
     "tests"

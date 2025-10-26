@@ -19,7 +19,7 @@ from zyte_api.apikey import NoApiKey
 
 from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
-from .utils import (
+from .utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
     _X402_SUPPORT,
     USER_AGENT,
