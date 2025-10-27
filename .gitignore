@@ -9,3 +9,5 @@ docs/_build
 __pycache__/
 /test-results/
 build/
+.idea/
+.vscode/

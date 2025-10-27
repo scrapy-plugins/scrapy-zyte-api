@@ -16,8 +16,8 @@ from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
 from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
+from zyte_api import RetryFactory
 from zyte_api.aio.client import AsyncClient
-from zyte_api.aio.retry import RetryFactory
 from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import (

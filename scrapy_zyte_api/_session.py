@@ -18,7 +18,7 @@ from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
 from zyte_api import RequestError, RetryFactory
 
-from .utils import _DOWNLOAD_NEEDS_SPIDER, _build_from_crawler
+from .utils import _DOWNLOAD_NEEDS_SPIDER, _build_from_crawler  # type: ignore[attr-defined]
 
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import argparse
 import json
 import socket
@@ -18,7 +19,7 @@ from twisted.internet.task import deferLater
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET, Site
 
-from scrapy_zyte_api._annotations import _ActionResult
+from scrapy_zyte_api._annotations import _ActionResult, ExtractFrom
 from scrapy_zyte_api.responses import _API_RESPONSE
 
 from . import SETTINGS, make_handler
@@ -242,8 +243,6 @@ class DefaultResource(Resource):
             assert isinstance(response_data["product"]["name"], str)
             extract_from = request_data.get("productOptions", {}).get("extractFrom")
             if extract_from:
-                from scrapy_zyte_api.providers import ExtractFrom
-
                 if extract_from == ExtractFrom.httpResponseBody:
                     response_data["product"]["name"] += " (from httpResponseBody)"
 

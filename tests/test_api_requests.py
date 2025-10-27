@@ -21,11 +21,11 @@ from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from scrapy.utils.defer import deferred_f_from_coro_f
 from twisted.internet.defer import Deferred
-from zyte_api.aio.errors import RequestError
+from zyte_api import RequestError
 
 from scrapy_zyte_api._cookies import _get_cookie_jar
-from scrapy_zyte_api._params import ANY_VALUE
-from scrapy_zyte_api.handler import _ParamParser, _ScrapyZyteAPIBaseDownloadHandler
+from scrapy_zyte_api._params import ANY_VALUE, _ParamParser
+from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.responses import _process_response
 from scrapy_zyte_api.utils import _ADDON_SUPPORT
 

@@ -368,7 +368,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             if not kw:
                 continue
             assert issubclass(cls_stripped, Item)
-            result = cls_stripped.from_dict(api_response.raw_api_response[kw])  # type: ignore[attr-defined]
+            result = cls_stripped.from_dict(api_response.raw_api_response[kw])
             if is_typing_annotated(cls):
                 result = AnnotatedInstance(result, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(result)
