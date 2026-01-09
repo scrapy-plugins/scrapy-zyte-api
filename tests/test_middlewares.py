@@ -7,14 +7,16 @@ from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.http.response import Response
 from scrapy.item import Item
-from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
-from scrapy_zyte_api.utils import _START_REQUESTS_CAN_YIELD_ITEMS
+from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _START_REQUESTS_CAN_YIELD_ITEMS,
+    _build_from_crawler,
+)
 
 from . import SETTINGS
 from .mockserver import DelayedResource, MockServer
@@ -65,7 +67,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     assert crawler.spider
     spider = crawler.spider
 
-    middleware = create_instance(mw_cls, settings=crawler.settings, crawler=crawler)
+    middleware = _build_from_crawler(mw_cls, crawler)
 
     # AutoThrottle does this.
     spider.download_delay = 5  # type: ignore[attr-defined]
@@ -116,9 +118,7 @@ async def test_cookies():
     crawler = get_crawler(settings_dict=settings)
     await crawler.crawl("a")
     spider = crawler.spider
-    middleware = create_instance(
-        ScrapyZyteAPIDownloaderMiddleware, settings=crawler.settings, crawler=crawler
-    )
+    middleware = _build_from_crawler(ScrapyZyteAPIDownloaderMiddleware, crawler)
     request = Request(
         "https://example.com", cookies={"a": "b"}, meta={"zyte_api_automap": True}
     )

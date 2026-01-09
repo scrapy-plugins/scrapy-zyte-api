@@ -9,9 +9,9 @@ if Version(SCRAPY_VERSION) < Version("2.7"):
     pytest.skip("Skipping tests for Scrapy ≥ 2.7", allow_module_level=True)
 
 from scrapy import Request, Spider
-from scrapy.utils.misc import create_instance
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
+from scrapy_zyte_api.utils import _build_from_crawler  # type: ignore[attr-defined]
 
 from . import SETTINGS, get_crawler
 
@@ -24,9 +24,7 @@ except ImportError:
 @ensureDeferred
 async def test_cache():
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request = Request("https://example.com", meta={"zyte_api": True})
     fingerprint = fingerprinter.fingerprint(request)
 
@@ -48,11 +46,7 @@ async def test_fallback_custom(caplog):
     }
     crawler = await get_crawler(settings)
     with caplog.at_level("WARNING"):
-        fingerprinter = create_instance(
-            ScrapyZyteAPIRequestFingerprinter,
-            settings=crawler.settings,
-            crawler=crawler,
-        )
+        fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request = Request("https://example.com")
     assert fingerprinter.fingerprint(request) == b"foo"
     request = Request("https://example.com", meta={"zyte_api": True})
@@ -115,9 +109,7 @@ async def test_fallback_default():
 @ensureDeferred
 async def test_headers():
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request(
         "https://example.com",
         meta={
@@ -223,9 +215,7 @@ async def test_known_fingerprints(url, params, fingerprint):
     """Test that known fingerprints remain the same, i.e. make sure that we do
     not accidentally modify fingerprints with future implementation changes."""
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request = Request(url, meta={"zyte_api": params})
     actual_fingerprint = fingerprinter.fingerprint(request)
     assert actual_fingerprint == fingerprint
@@ -235,13 +225,11 @@ async def test_known_fingerprints(url, params, fingerprint):
 async def test_metadata():
     settings = {"JOB": "1/2/3"}
     crawler = await get_crawler(settings)
-    job_fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    job_fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
 
     crawler = await get_crawler()
-    no_job_fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
+    no_job_fingerprinter = _build_from_crawler(
+        ScrapyZyteAPIRequestFingerprinter, crawler
     )
 
     request1 = Request("https://example.com", meta={"zyte_api": {"echoData": "foo"}})
@@ -358,9 +346,7 @@ async def test_only_end_parameters_matter():
 @ensureDeferred
 async def test_url(url1, url2, match):
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request(url1, meta={"zyte_api_automap": True})
     fingerprint1 = fingerprinter.fingerprint(request1)
     request2 = Request(url2, meta={"zyte_api_automap": True})
@@ -494,9 +480,7 @@ def merge_dicts(*dicts):
 @ensureDeferred
 async def test_url_fragments(params, match):
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request("https://toscrape.com#1", meta={"zyte_api": params})
     fingerprint1 = fingerprinter.fingerprint(request1)
     request2 = Request("https://toscrape.com#2", meta={"zyte_api": params})
@@ -510,9 +494,7 @@ async def test_url_fragments(params, match):
 @ensureDeferred
 async def test_extract_types():
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request("https://toscrape.com", meta={"zyte_api": {"product": True}})
     fingerprint1 = fingerprinter.fingerprint(request1)
     request2 = Request(
@@ -525,9 +507,7 @@ async def test_extract_types():
 @ensureDeferred
 async def test_request_body():
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request(
         "https://toscrape.com", meta={"zyte_api": {"httpRequestBody": "Zm9v"}}
     )
