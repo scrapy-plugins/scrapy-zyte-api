@@ -14,7 +14,6 @@ from scrapy import Request, Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
-from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
 from zyte_api import RetryFactory
 from zyte_api.aio.client import AsyncClient
@@ -25,10 +24,11 @@ from scrapy_zyte_api.handler import (
     _body_max_size_exceeded,
 )
 from scrapy_zyte_api.responses import ZyteAPITextResponse
-from scrapy_zyte_api.utils import (
+from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
     _POET_ADDON_SUPPORT,
     _X402_SUPPORT,
+    _build_from_crawler,
     USER_AGENT,
 )
 
@@ -154,11 +154,7 @@ def test_auth(scenario: dict[str, Any], expected: type[Exception] | dict[str, st
         crawler = get_crawler(settings_dict=settings)
 
         def build_hander():
-            return create_instance(
-                ScrapyZyteAPIDownloadHandler,
-                settings=None,
-                crawler=crawler,
-            )
+            return _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
 
         if isclass(expected) and issubclass(expected, Exception):
             with pytest.raises(expected):
@@ -211,11 +207,7 @@ def test_api_url(setting, expected):
     if setting is not UNSET:
         settings["ZYTE_API_URL"] = setting
     crawler = get_crawler(settings_dict=settings)
-    handler = create_instance(
-        ScrapyZyteAPIDownloadHandler,
-        settings=None,
-        crawler=crawler,
-    )
+    handler = _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
     assert handler._client.api_url == expected
 
 
@@ -552,11 +544,7 @@ def test_log_request_truncate_negative(enabled):
     }
     crawler = get_crawler(settings_dict=settings)
     with pytest.raises(ValueError):
-        create_instance(
-            ScrapyZyteAPIDownloadHandler,
-            settings=None,
-            crawler=crawler,
-        )
+        _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
 
 
 @pytest.mark.parametrize("enabled", [True, False, None])
