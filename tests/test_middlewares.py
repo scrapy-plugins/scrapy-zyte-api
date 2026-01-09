@@ -3,7 +3,7 @@ from unittest import SkipTest
 
 import pytest
 from packaging.version import Version
-from pytest_twisted import ensureDeferred
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
 from scrapy.http.response import Response
 from scrapy.item import Item
@@ -59,7 +59,7 @@ def spider_output_processor(middleware, request, spider):
         ({"AUTOTHROTTLE_ENABLED": True, "ZYTE_API_PRESERVE_DELAY": True}, True),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_preserve_delay(mw_cls, processor, settings, preserve):
     crawler = get_crawler(settings_dict=settings)
     await crawler.crawl("a")
@@ -110,7 +110,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     await crawler.stop()
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_cookies():
     """Make sure that the downloader middleware does not crash on Zyte API
     requests with cookies."""
@@ -125,7 +125,7 @@ async def test_cookies():
     assert middleware.process_request(request, spider) is None
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_max_requests(caplog):
     spider_requests = 13
     zapi_max_requests = 5
@@ -182,7 +182,7 @@ async def test_max_requests(caplog):
     )
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_max_requests_race_condition(caplog):
     spider_requests = 8
     zapi_max_requests = 1
@@ -230,7 +230,7 @@ async def test_max_requests_race_condition(caplog):
     )
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_forbidden_domain_start_url():
     class TestSpider(Spider):
         name = "test"
@@ -253,7 +253,7 @@ async def test_forbidden_domain_start_url():
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_forbidden_domain_start_urls():
     class TestSpider(Spider):
         name = "test"
@@ -280,7 +280,7 @@ async def test_forbidden_domain_start_urls():
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_some_forbidden_domain_start_url():
     class TestSpider(Spider):
         name = "test"
@@ -306,7 +306,7 @@ async def test_some_forbidden_domain_start_url():
     assert crawler.stats.get_value("finish_reason") == "finished"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_follow_up_forbidden_domain_url():
     class TestSpider(Spider):
         name = "test"
@@ -331,7 +331,7 @@ async def test_follow_up_forbidden_domain_url():
     assert crawler.stats.get_value("finish_reason") == "finished"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_forbidden_domain_with_partial_start_request_consumption():
     """With concurrency lower than the number of start requests + 1, the code
     path followed changes, because ``_total_start_request_count`` is not set
@@ -376,7 +376,7 @@ async def test_forbidden_domain_with_partial_start_request_consumption():
         (True, True, True),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_spm_conflict_smartproxy(setting, attribute, conflict):
     try:
         import scrapy_zyte_smartproxy  # noqa: F401
@@ -433,7 +433,7 @@ else:
         (True, True, True),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_spm_conflict_crawlera(setting, attribute, conflict):
     if scrapy_crawlera is None:
         raise SkipTest("scrapy-crawlera missing")
@@ -469,7 +469,7 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
 
 
 @pytest.mark.skipif(not _START_REQUESTS_CAN_YIELD_ITEMS, reason="Scrapy < 2.12")
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_start_requests_items():
     class TestSpider(Spider):
         name = "test"

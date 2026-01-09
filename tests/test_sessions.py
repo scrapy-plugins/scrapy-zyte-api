@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from aiohttp.client_exceptions import ServerConnectionError
-from pytest_twisted import ensureDeferred
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider, signals
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response
@@ -45,7 +45,7 @@ UNSET = object()
         (False, False, False),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_enabled(setting, meta, outcome, mockserver):
     settings = {"ZYTE_API_URL": mockserver.urljoin("/")}
     if setting is not UNSET:
@@ -195,7 +195,7 @@ async def test_enabled(setting, meta, outcome, mockserver):
         (True, True, True, True, True),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_params_precedence(
     params_setting, params_meta, location_setting, location_meta, outcome, mockserver
 ):
@@ -303,7 +303,7 @@ async def test_params_precedence(
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_url_override(params, close_reason, stats, mockserver):
     """If session params define a URL, that URL is used for session
     initialization. Otherwise, the URL from the request getting the session
@@ -513,7 +513,7 @@ CHECKER_TESTS: Tuple[Tuple[str, str, Dict[str, int]], ...] = (
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_checker(checker, close_reason, stats, mockserver):
     settings = {
         "RETRY_TIMES": 0,
@@ -582,7 +582,7 @@ async def test_checker(checker, close_reason, stats, mockserver):
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_checker_location(postal_code, url, close_reason, stats, mockserver):
     """The default checker looks into the outcome of the ``setLocation`` action
     if a location meta/setting was used."""
@@ -637,7 +637,7 @@ class CloseSpiderURLChecker:
         return True
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_checker_close_spider_use(mockserver):
     """A checker can raise CloseSpider not only during session initialization,
     but also during session use."""
@@ -682,7 +682,7 @@ async def test_checker_close_spider_use(mockserver):
         (None, 8),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_max_bad_inits(setting, value, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
@@ -721,7 +721,7 @@ async def test_max_bad_inits(setting, value, mockserver):
         (3, None, 3),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
@@ -767,7 +767,7 @@ async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mocks
         (2, 2),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_max_check_failures(setting, value, mockserver):
     retry_times = 2
     settings = {
@@ -815,7 +815,7 @@ async def test_max_check_failures(setting, value, mockserver):
         (2, 2),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_max_errors(setting, value, mockserver):
     retry_times = 2
     settings = {
@@ -860,7 +860,7 @@ class DomainChecker:
         return "fail" not in domain
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_check_overrides_error(mockserver):
     """Max errors are ignored if a session does not pass its session check."""
     retry_times = 2
@@ -943,7 +943,7 @@ async def test_check_overrides_error(mockserver):
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_pool(meta, pool, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
@@ -973,7 +973,7 @@ async def test_pool(meta, pool, mockserver):
     }
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_pool_params(mockserver, caplog):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
@@ -1042,7 +1042,7 @@ async def test_pool_params(mockserver, caplog):
         (None, 8),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_pool_size(setting, value, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
@@ -1080,7 +1080,7 @@ async def test_pool_size(setting, value, mockserver):
         (3, None, 3),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
@@ -1168,7 +1168,7 @@ class fast_forward:
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 @patch("time.monotonic")
 async def test_retry_stop(monotonic_mock, retrying, outcomes, exhausted):
     monotonic_mock.return_value = 0
@@ -1246,7 +1246,7 @@ else:
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.skipif(
     not ADDON_SUPPORT, reason="No add-on support in this version of Scrapy"
 )
@@ -1267,7 +1267,7 @@ async def test_addon(manual_settings, addon_settings):
     )
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config(mockserver):
     pytest.importorskip("web_poet")
 
@@ -1370,7 +1370,7 @@ async def test_session_config(mockserver):
     }
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_check_meta(mockserver):
     """When initializing a session, known zyte_api_session-prefixed params
     should be included in the session initialization request, so that they can
@@ -1517,7 +1517,7 @@ async def test_session_config_enabled(mockserver):
         ({}, {"zyte_api_session_location": {"postalCode": "10002"}}, False),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_location(settings, meta, used, mockserver):
     """Overriding location in SessionConfig, if done according to the docs,
     only has an effect when neither spider-level nor request-level variables
@@ -1622,7 +1622,7 @@ async def test_session_config_location(settings, meta, used, mockserver):
         ({}, {"zyte_api_session_location": {"postalCode": "10002"}}, True),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_location_bad(settings, meta, used, mockserver):
     """Overriding location in SessionConfig, if it does not return
     super().location() when truthy, breaks params precedence for location meta
@@ -1697,7 +1697,7 @@ async def test_session_config_location_bad(settings, meta, used, mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_params_location(mockserver):
     """A custom session config can be used to customize the params for
     location, e.g. to include extra actions, while still relying on the default
@@ -1768,7 +1768,7 @@ async def test_session_config_params_location(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_params_location_no_set_location(mockserver):
     """A custom session config can be used to customize the params for
     location to the point where they do not use a ``setLocation`` action. In
@@ -1886,7 +1886,7 @@ async def test_session_config_params_location_no_set_location(mockserver):
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_params_precedence(
     meta, settings, pool, outcome, mockserver
 ):
@@ -1962,7 +1962,7 @@ async def test_session_config_params_precedence(
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_params_error(mockserver):
     pytest.importorskip("web_poet")
 
@@ -2002,7 +2002,7 @@ async def test_session_config_params_error(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_pool_caching(mockserver):
     pytest.importorskip("web_poet")
 
@@ -2053,7 +2053,7 @@ async def test_session_config_pool_caching(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_pool_error(mockserver):
     # NOTE: This error should only happen during the initial process_request
     # call. By the time the code reaches process_response, the cached pool
@@ -2100,7 +2100,7 @@ async def test_session_config_pool_error(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_no_web_poet(mockserver):
     """If web-poet is not installed, @session_config raises a RuntimeError."""
     try:
@@ -2117,7 +2117,7 @@ async def test_session_config_no_web_poet(mockserver):
             pass
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_process_request_change_request(mockserver):
     pytest.importorskip("web_poet")
 
@@ -2174,7 +2174,7 @@ async def test_session_config_process_request_change_request(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_config_process_request_new_request(mockserver):
     pytest.importorskip("web_poet")
 
@@ -2232,7 +2232,7 @@ async def test_session_config_process_request_new_request(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_location_session_config(mockserver):
     pytest.importorskip("web_poet")
 
@@ -2344,7 +2344,7 @@ async def test_location_session_config(mockserver):
     }
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_location_session_config_no_methods(mockserver):
     """If no location_* methods are defined, LocationSessionConfig works the
     same as SessionConfig."""
@@ -2416,7 +2416,7 @@ async def test_location_session_config_no_methods(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_location_session_config_no_location(mockserver):
     """If no location is configured, the methods are never called."""
     pytest.importorskip("web_poet")
@@ -2483,7 +2483,7 @@ async def test_location_session_config_no_location(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_refresh(mockserver):
     """If a response does not pass a session validity check, the session is
     discarded, and the request is retried with a different session."""
@@ -2537,7 +2537,7 @@ async def test_session_refresh(mockserver):
     assert tracker.sessions[2] != tracker.sessions[4]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_refresh_concurrent(mockserver):
     """When more than 1 request is using the same session concurrently, it can
     happen that more than 1 response triggers a session refresh. In those
@@ -2575,7 +2575,7 @@ async def test_session_refresh_concurrent(mockserver):
     }
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_cookies(mockserver):
     class Tracker:
         def __init__(self):
@@ -2660,7 +2660,7 @@ async def test_cookies(mockserver):
     ]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_empty_queue(mockserver):
     """After a pool is full, there might be a situation when the middleware
     tries to assign a session to a request but all sessions of the pool are
@@ -2696,7 +2696,7 @@ async def test_empty_queue(mockserver):
     }
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_empty_queue_limit(mockserver):
     settings = {
         "ZYTE_API_SESSION_ENABLED": True,
@@ -2741,7 +2741,7 @@ class SessionIDRemovingDownloaderMiddleware:
         return None
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_missing_session_id(mockserver, caplog):
     """If a session ID is missing from a request that should have had it
     assigned, a warning is logged about it."""
@@ -2830,7 +2830,7 @@ async def test_missing_session_id(mockserver, caplog):
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_assign_meta_key(settings, meta, meta_key, mockserver):
     """Session ID is set in the zyte_api_provider meta key always, and in
     either zyte_api or zyte_api_automap depending on some settings and meta
@@ -2885,7 +2885,7 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
     assert tracker.meta.get(other_meta_key, False) is False
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider(mockserver):
     pytest.importorskip("scrapy_poet")
 
@@ -2975,7 +2975,7 @@ class ExceptionRaisingDownloaderMiddleware:
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_exceptions(exception, stat, reason, mockserver, caplog):
     settings = {
         "DOWNLOADER_MIDDLEWARES": {

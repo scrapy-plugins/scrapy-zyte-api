@@ -7,7 +7,7 @@ import pytest
 pytest.importorskip("scrapy_poet")
 
 import attrs
-from pytest_twisted import ensureDeferred
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
 from scrapy_poet import DummyResponse
 from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
@@ -97,7 +97,7 @@ class ZyteAPIProviderMetaSpider(Spider):
         }
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider(mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -129,7 +129,7 @@ class MyPage(ItemPage[MyItem]):
         return str(self.response.url)
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):
         def parse_(  # type: ignore[override]
@@ -161,7 +161,7 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     assert "product" in item
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, product: Product, my_item: MyItem):  # type: ignore[override]
@@ -188,7 +188,7 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     assert "product" in item
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):
         def parse_(  # type: ignore[override]
@@ -223,7 +223,7 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
     assert "browser_response" in item
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_params_setting(mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -234,7 +234,7 @@ async def test_provider_params_setting(mockserver):
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/geolocation") == 1
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_params_meta(mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -246,7 +246,7 @@ async def test_provider_params_meta(mockserver):
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/geolocation") == 1
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_params_remove_unused_options(mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
@@ -264,7 +264,7 @@ async def test_provider_params_remove_unused_options(mockserver):
     )
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_extractfrom(mockserver):
     @attrs.define
     class AnnotatedProductPage(BasePage):
@@ -295,7 +295,7 @@ async def test_provider_extractfrom(mockserver):
     )
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_extractfrom_double(mockserver, caplog):
     @attrs.define
     class AnnotatedProductPage(BasePage):
@@ -317,7 +317,7 @@ async def test_provider_extractfrom_double(mockserver, caplog):
     assert "Multiple different extractFrom specified for product" in caplog.text
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_extractfrom_override(mockserver):
     @attrs.define
     class AnnotatedProductPage(BasePage):
@@ -349,7 +349,7 @@ async def test_provider_extractfrom_override(mockserver):
     )
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_geolocation(mockserver):
     @attrs.define
     class GeoProductPage(BasePage):
@@ -370,7 +370,7 @@ async def test_provider_geolocation(mockserver):
     assert item["product"].name == "Product name (country DE)"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_geolocation_unannotated(mockserver, caplog):
     @attrs.define
     class GeoProductPage(BasePage):
@@ -405,7 +405,7 @@ custom_attrs_input = {
         custom_attrs(custom_attrs_input, {"foo": "bar"}),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_custom_attrs(mockserver, annotation):
     @attrs.define
     class CustomAttrsPage(BasePage):
@@ -445,7 +445,7 @@ async def test_provider_custom_attrs(mockserver, annotation):
     )
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_custom_attrs_values(mockserver):
     @attrs.define
     class CustomAttrsPage(BasePage):
@@ -505,7 +505,7 @@ def provider_settings(server):
     return settings
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_only(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -534,7 +534,7 @@ async def test_provider_any_response_only(mockserver):
     assert type(item["page"].response.response) is HttpResponse
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_http_response_param(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -564,7 +564,7 @@ async def test_provider_any_response_http_response_param(mockserver):
     assert type(item["page"].response.response) is HttpResponse
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_browser_html_param(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -593,7 +593,7 @@ async def test_provider_any_response_browser_html_param(mockserver):
     assert type(item["page"].response.response) is BrowserResponse
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_product(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -624,7 +624,7 @@ async def test_provider_any_response_product(mockserver):
     assert type(item["page"].product) is Product
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_product_extract_from_browser_html(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -659,7 +659,7 @@ async def test_provider_any_response_product_extract_from_browser_html(mockserve
     assert type(item["page"].product) is Product
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_product_item_extract_from_browser_html(mockserver):
     @attrs.define
     class SomePage(ItemPage[Product]):
@@ -693,7 +693,7 @@ async def test_provider_any_response_product_item_extract_from_browser_html(mock
     assert type(item["product"]) is Product
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_product_extract_from_browser_html_2(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -732,7 +732,7 @@ async def test_provider_any_response_product_extract_from_browser_html_2(mockser
     assert id(item["page"].browser_response) == id(item["page"].response.response)
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_product_extract_from_http_response(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -768,7 +768,7 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
     assert type(item["page"].product) is Product
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_product_options_empty(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -805,7 +805,7 @@ async def test_provider_any_response_product_options_empty(mockserver):
 # HttpResponseProvider doesn't know that it should not run since ScrapyZyteAPI
 # could provide HttpResponse in anycase.
 @pytest.mark.xfail(reason="Not supported yet", raises=AssertionError, strict=True)
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_product_extract_from_http_response_2(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -843,7 +843,7 @@ async def test_provider_any_response_product_extract_from_http_response_2(mockse
     assert type(item["page"].http_response) is HttpResponse
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_browser_html(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -871,7 +871,7 @@ async def test_provider_any_response_browser_html(mockserver):
     assert type(item["page"].html) is BrowserHtml
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_browser_response(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -899,7 +899,7 @@ async def test_provider_any_response_browser_response(mockserver):
     assert type(item["page"].browser_response) is BrowserResponse
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_browser_html_response(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -929,7 +929,7 @@ async def test_provider_any_response_browser_html_response(mockserver):
     assert type(item["page"].html) is BrowserHtml
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_http_response(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -961,7 +961,7 @@ async def test_provider_any_response_http_response(mockserver):
     assert type(item["page"].http_response) is HttpResponse
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_browser_http_response(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -998,7 +998,7 @@ async def test_provider_any_response_browser_http_response(mockserver):
     assert id(item["page"].browser_response) == id(item["page"].response.response)
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_http_response_multiple_pages(mockserver):
     @attrs.define
     class FirstPage(BasePage):
@@ -1034,7 +1034,7 @@ async def test_provider_any_response_http_response_multiple_pages(mockserver):
     assert type(item["page2"].response.response) is HttpResponse
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_any_response_http_browser_response_multiple_pages(mockserver):
     @attrs.define
     class FirstPage(BasePage):
@@ -1072,7 +1072,7 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
     assert type(item["page2"].response.response) is BrowserResponse
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_screenshot(mockserver):
     class ZyteAPISpider(Spider):
         url: str
@@ -1094,7 +1094,7 @@ async def test_screenshot(mockserver):
     assert item["screenshot"].body == b"screenshot-body-contents"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_provider_actions(mockserver, caplog):
     @attrs.define
     class ActionProductPage(BasePage):
@@ -1149,7 +1149,7 @@ def test_auto_pages_set():
     assert set(_ITEM_KEYWORDS) == {get_item_cls(cls) for cls in _AUTO_PAGES}  # type: ignore[call-overload]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_not_enabled(mockserver):
     class TestSpider(Spider):
         name = "test_spider"
@@ -1174,7 +1174,7 @@ async def test_auto_field_stats_not_enabled(mockserver):
     assert auto_field_stats == {}
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_no_override(mockserver):
     """When requesting an item directly from Zyte API, without an override to
     change fields, stats reflect the entire list of item fields."""
@@ -1235,7 +1235,7 @@ async def test_auto_field_stats_no_override(mockserver):
     assert all(value == 0 for value in duplicate_stat_calls.values())
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_partial_override(mockserver):
     """When requesting an item and having an Auto…Page subclass to change
     fields, stats reflect the list of item fields not defined in the
@@ -1289,7 +1289,7 @@ async def test_auto_field_stats_partial_override(mockserver):
     default_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_full_override(mockserver):
     """When requesting an item and having an Auto…Page subclass to change
     all fields, stats reflect the list of non-overriden item fields as an empty
@@ -1435,7 +1435,7 @@ async def test_auto_field_stats_full_override(mockserver):
     default_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_callback_override(mockserver):
     """Fields overridden in callbacks, instead of using a page object, are not
     taken into account."""
@@ -1474,7 +1474,7 @@ async def test_auto_field_stats_callback_override(mockserver):
     default_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_item_page_override(mockserver):
     """The stat accounts for the configured page for a given item, so if you
     request that page directly, things work the same as if you request the item
@@ -1527,7 +1527,7 @@ async def test_auto_field_stats_item_page_override(mockserver):
     default_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_alt_page_override(mockserver):
     """The stat does not account for alternatives pages, so if you request a
     page that provides an item, the page that counts for stats is the
@@ -1591,7 +1591,7 @@ async def test_auto_field_stats_alt_page_override(mockserver):
     default_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_non_auto_override(mockserver):
     """If instead of using an Auto…Page class you use a custom class, all
     fields are assumed to be overridden."""
@@ -1637,7 +1637,7 @@ async def test_auto_field_stats_non_auto_override(mockserver):
     default_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_auto_field_decorator(mockserver):
     """Using @auto_field forces a field to not be considered overridden."""
 
@@ -1682,7 +1682,7 @@ async def test_auto_field_stats_auto_field_decorator(mockserver):
     default_registry.__init__()  # type: ignore[misc]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_auto_field_stats_auto_field_meta(mockserver):
     """Using @field(meta={"auto_field": True}) has the same effect as using
     @auto_field."""
@@ -1748,7 +1748,7 @@ class ZyteAPIMultipleSpider(Spider):
         }
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_multiple_types(mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")

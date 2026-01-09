@@ -9,7 +9,6 @@ from unittest import mock
 
 import pytest
 from _pytest.logging import LogCaptureFixture  # NOQA
-from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
@@ -163,7 +162,7 @@ async def request_to_params(
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_response_binary(meta: Dict[str, Dict[str, Any]], mockserver):
     """Test that binary (i.e. non-text) responses from Zyte API are
     successfully mapped to a subclass of Response that is not also a subclass
@@ -182,7 +181,7 @@ async def test_response_binary(meta: Dict[str, Dict[str, Any]], mockserver):
     assert resp.body == b"\x00"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     "meta",
     [
@@ -224,7 +223,7 @@ async def test_response_html(meta: Dict[str, Dict[str, Any]], mockserver):
 UNSET = object()
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     "setting,enabled",
     [
@@ -245,7 +244,7 @@ async def test_enabled(setting, enabled, mockserver):
 
 
 @pytest.mark.parametrize("zyte_api", [True, False])
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_coro_handling(zyte_api: bool, mockserver):
     """ScrapyZyteAPIDownloadHandler.download_request must return a deferred
     both when using Zyte API and when using the regular downloader logic."""
@@ -263,7 +262,7 @@ async def test_coro_handling(zyte_api: bool, mockserver):
         await dfd
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     "meta, exception_type, exception_text",
     [
@@ -303,7 +302,7 @@ async def test_exceptions(
         assert exception_text in caplog.text
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_higher_concurrency():
     """Make sure that CONCURRENT_REQUESTS and CONCURRENT_REQUESTS_PER_DOMAIN
     have an effect on Zyte API requests."""
@@ -380,7 +379,7 @@ GET_API_PARAMS_KWARGS = {
 }
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_params_parser_input_default(mockserver):
     async with mockserver.make_handler() as handler:
         for key in GET_API_PARAMS_KWARGS:
@@ -389,7 +388,7 @@ async def test_params_parser_input_default(mockserver):
             assert actual == expected, key
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_param_parser_input_custom(mockserver):
     settings = {
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
@@ -413,7 +412,7 @@ async def test_param_parser_input_custom(mockserver):
         assert parser._transparent_mode is True
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     "output,uses_zyte_api",
     [
@@ -515,7 +514,7 @@ DEFAULT_AUTOMAP_PARAMS: Dict[str, Any] = {
         (True, {"zyte_api": {"a": "b"}, "zyte_api_automap": {"a": "b"}}, ValueError),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_transparent_mode_toggling(setting, meta, expected):
     """Test how the value of the ``ZYTE_API_TRANSPARENT_MODE`` setting
     (*setting*) in combination with request metadata (*meta*) determines what
@@ -544,7 +543,7 @@ async def test_transparent_mode_toggling(setting, meta, expected):
 
 
 @pytest.mark.parametrize("meta", [None, 0, "", b"", [], ()])
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_api_disabling_deprecated(meta):
     """Test how undocumented falsy values of the ``zyte_api`` request metadata
     key (*meta*) can be used to disable the use of Zyte API, but trigger a
@@ -560,7 +559,7 @@ async def test_api_disabling_deprecated(meta):
 
 @pytest.mark.parametrize("key", ["zyte_api", "zyte_api_automap"])
 @pytest.mark.parametrize("value", [1, ["a", "b"]])
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_bad_meta_type(key, value):
     """Test how undocumented truthy values (*value*) for the ``zyte_api`` and
     ``zyte_api_automap`` request metadata keys (*key*) trigger a
@@ -573,7 +572,7 @@ async def test_bad_meta_type(key, value):
 
 
 @pytest.mark.parametrize("meta", ["zyte_api", "zyte_api_automap"])
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_job_id(meta, mockserver):
     """Test how the value of the ``SHUB_JOBKEY`` environment variable is
     included as ``jobId`` among the parameters sent to Zyte API, both with
@@ -592,7 +591,7 @@ async def test_job_id(meta, mockserver):
     assert api_params["jobId"] == "1/2/3"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_default_params_none(mockserver, caplog):
     """Test how setting a value to ``None`` in the dictionary of the
     ZYTE_API_DEFAULT_PARAMS and ZYTE_API_AUTOMAP_PARAMS settings causes a
@@ -653,7 +652,7 @@ async def test_default_params_none(mockserver, caplog):
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_default_params_merging(
     setting_key, meta_key, ignore_keys, setting, meta, expected, warnings, caplog
 ):
@@ -718,7 +717,7 @@ async def test_default_params_merging(
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_default_params_immutability(setting_key, meta_key, setting, meta):
     """Make sure that the merging of Zyte API parameters from the *arg_key*
     _get_api_params parameter with those from the *meta_key* request metadata
@@ -842,7 +841,7 @@ async def _test_param_processing(
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_main_outputs(meta, expected, warnings, caplog):
     await _test_param_processing({}, {}, meta, expected, warnings, caplog)
 
@@ -980,7 +979,7 @@ async def test_automap_main_outputs(meta, expected, warnings, caplog):
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_header_output(meta, expected, warnings, caplog):
     await _test_param_processing({}, {}, meta, expected, warnings, caplog)
 
@@ -1105,7 +1104,7 @@ async def test_automap_header_output(meta, expected, warnings, caplog):
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_method(method, meta, expected, warnings, caplog):
     await _test_param_processing(
         {}, {"method": method}, meta, expected, warnings, caplog
@@ -2282,7 +2281,7 @@ UNSAFE_HEADER_HANDLING_SCENARIOS: list[dict[str, Any]] = [
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_headers(headers, meta, expected, warnings, caplog):
     await _test_param_processing(
         {}, {"headers": headers}, meta, expected, warnings, caplog
@@ -2332,7 +2331,7 @@ async def test_automap_headers(headers, meta, expected, warnings, caplog):
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_header_settings(
     settings, headers, meta, expected, warnings, caplog
 ):
@@ -2371,7 +2370,7 @@ async def test_automap_header_settings(
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_manual_custom_http_request_headers_processing(
     meta, expected, warnings, caplog
 ):
@@ -2886,7 +2885,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_cookies(
     settings, cookies, meta, params, expected, warnings, cookie_jar, caplog
 ):
@@ -2908,7 +2907,7 @@ async def test_automap_cookies(
         {"zyte_api_automap": {"browserHtml": True}},
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_all_cookies(meta):
     """Because of scenarios like cross-domain redirects and browser rendering,
     Zyte API requests should include all cookie jar cookies, regardless of
@@ -3010,7 +3009,7 @@ async def test_automap_all_cookies(meta):
         {"zyte_api_automap": {"browserHtml": True}},
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_cookie_jar(meta):
     """Test that cookies from the right jar are used."""
     request1 = Request(
@@ -3071,7 +3070,7 @@ async def test_automap_cookie_jar(meta):
         {"zyte_api_automap": {"browserHtml": True}},
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_cookie_limit(meta, caplog):
     settings: Dict[str, Any] = {
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
@@ -3201,7 +3200,7 @@ class CustomCookieMiddleware(CookiesMiddleware):
         self.jars = defaultdict(CustomCookieJar)
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_custom_cookie_middleware():
     mw_cls = CustomCookieMiddleware
     settings = {
@@ -3297,7 +3296,7 @@ async def test_automap_custom_cookie_middleware():
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_body(body, meta, expected, warnings, caplog):
     await _test_param_processing({}, {"body": body}, meta, expected, warnings, caplog)
 
@@ -3371,7 +3370,7 @@ async def test_automap_body(body, meta, expected, warnings, caplog):
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_automap_default_parameter_cleanup(meta, expected, warnings, caplog):
     await _test_param_processing({}, {}, meta, expected, warnings, caplog)
 
@@ -3418,7 +3417,7 @@ async def test_automap_default_parameter_cleanup(meta, expected, warnings, caplo
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_default_params_automap(default_params, meta, expected, warnings, caplog):
     """Warnings about unneeded parameters should not apply if those parameters
     are needed to extend or override parameters set in the
@@ -3451,7 +3450,7 @@ async def test_default_params_automap(default_params, meta, expected, warnings, 
         {},
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_default_params_false(default_params):
     """If zyte_api_default_params=False is passed, ZYTE_API_DEFAULT_PARAMS is ignored."""
     request = Request(url="https://example.com")
@@ -3466,7 +3465,7 @@ async def test_default_params_false(default_params):
     assert api_params is None
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_start_requests():
     """By default, automap should not generate a customHttpRequestHeaders
     parameter."""
@@ -3476,7 +3475,7 @@ async def test_middleware_headers_start_requests():
     assert "customHttpRequestHeaders" not in params
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_cb_requests_disable():
     """Callback requests will not include the Referer parameter if the Referer
     middleware is disabled."""
@@ -3489,7 +3488,7 @@ async def test_middleware_headers_cb_requests_disable():
     assert "customHttpRequestHeaders" not in params
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_cb_requests_skip():
     """Callback requests will not include the Referer parameter if the Referer
     header is configured to be skipped."""
@@ -3507,7 +3506,7 @@ async def test_middleware_headers_cb_requests_skip():
     assert "customHttpRequestHeaders" not in params
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_default():
     """If DEFAULT_REQUEST_HEADERS is user-defined, even with the same value as
     the global default, and values matching defaults from middlewares that are
@@ -3540,7 +3539,7 @@ async def test_middleware_headers_default():
     ]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_default_custom():
     """Non-default values set for headers with a default value also work as
     expected."""
@@ -3572,7 +3571,7 @@ async def test_middleware_headers_default_custom():
     ]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_default_skip():
     """Headers set through DEFAULT_REQUEST_HEADERS will not be translated into
     the customHttpRequestHeaders parameter if configured to be skipped."""
@@ -3593,7 +3592,7 @@ async def test_middleware_headers_default_skip():
     assert "customHttpRequestHeaders" not in params
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_request_headers():
     """If request headers match the global default value of
     DEFAULT_REQUEST_HEADERS, they should be translated nonetheless."""
@@ -3623,7 +3622,7 @@ async def test_middleware_headers_request_headers():
     ]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_request_headers_custom():
     """Non-default values set for headers with a default value also work as
     expected."""
@@ -3653,7 +3652,7 @@ async def test_middleware_headers_request_headers_custom():
     ]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_request_headers_skip():
     """Headers set on the request will not be translated into the
     customHttpRequestHeaders parameter if configured to be skipped."""
@@ -3686,7 +3685,7 @@ class DefaultValuesDownloaderMiddleware:
             request.headers[k] = v
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_custom_middleware_before():
     """If request headers defined from a custom middleware configured before
     the scrapy-zyte-api downloader middleware match the global default value of
@@ -3718,7 +3717,7 @@ class CustomValuesDownloaderMiddleware:
             request.headers[k] = v
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_custom_middleware_before_custom():
     """If request headers defined from a custom middleware configured before
     the scrapy-zyte-api downloader middleware have non-default values, they
@@ -3749,7 +3748,7 @@ async def test_middleware_headers_custom_middleware_before_custom():
     ]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_custom_middleware_before_skip():
     """Headers set on the request from a custom middleware configured before
     the scrapy-zyte-api downloader middleware will not be translated into the
@@ -3773,7 +3772,7 @@ async def test_middleware_headers_custom_middleware_before_skip():
     assert "customHttpRequestHeaders" not in params
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_middleware_headers_request_copy():
     """A copy of a request (e.g. due to request retrying or redirect following)
     should not get default headers mapped to customHttpRequestHeaders."""
@@ -3831,7 +3830,7 @@ async def test_middleware_headers_request_copy():
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_serp_header_mapping(extract_from, headers, warnings, caplog):
     """serp does not support headers."""
     meta: Dict[str, Any] = {"serp": True}
@@ -3883,7 +3882,7 @@ async def test_serp_header_mapping(extract_from, headers, warnings, caplog):
         ),
     ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_unneeded_params(meta, expected, warnings, caplog):
     """When a Zyte API parameter is set to its default value with
     zyte_api_automap, the parameter is removed with a warning."""

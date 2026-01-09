@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 import pytest
-from pytest_twisted import ensureDeferred
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Spider, signals
 from scrapy.utils.test import get_crawler
 
@@ -263,7 +263,7 @@ else:
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_main(settings, meta, headers, expected, mockserver):
     items = []
     settings = deepcopy(settings)

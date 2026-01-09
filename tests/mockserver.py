@@ -11,7 +11,7 @@ from subprocess import PIPE, Popen
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
-from pytest_twisted import ensureDeferred
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
@@ -41,7 +41,7 @@ def get_ephemeral_port():
     return s.getsockname()[1]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def produce_request_response(mockserver, meta, settings=None):
     settings = settings if settings is not None else {**SETTINGS}
     async with mockserver.make_handler(settings) as handler:

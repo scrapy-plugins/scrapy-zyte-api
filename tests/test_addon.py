@@ -1,8 +1,9 @@
 from typing import Optional, Type
 
 import pytest
-from pytest_twisted import ensureDeferred
+
 from scrapy import Request
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.http.response import Response
 from scrapy.settings.default_settings import TWISTED_REACTOR
@@ -36,7 +37,7 @@ _crawler = get_crawler()
 BASELINE_SETTINGS = _crawler.settings.copy_to_dict()
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon(mockserver):
     async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
         request = Request("https://example.com")
@@ -44,7 +45,7 @@ async def test_addon(mockserver):
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_disable_transparent(mockserver):
     async with make_handler(
         {"ZYTE_API_TRANSPARENT_MODE": False}, mockserver.urljoin("/"), use_addon=True
@@ -59,7 +60,7 @@ async def test_addon_disable_transparent(mockserver):
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_fallback():
     crawler = await get_crawler_zyte_api(use_addon=True)
     handler = get_download_handler(crawler, "http")
@@ -77,7 +78,7 @@ class DummyDownloadHandler:
         pass
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_fallback_custom():
     settings = {
         "DOWNLOAD_HANDLERS": {"http": "tests.test_addon.DummyDownloadHandler"},
@@ -88,7 +89,7 @@ async def test_addon_fallback_custom():
     assert isinstance(handler._fallback_handler, DummyDownloadHandler)
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_fallback_explicit():
     settings = {
         "ZYTE_API_FALLBACK_HTTP_HANDLER": "tests.test_addon.DummyDownloadHandler",
@@ -99,7 +100,7 @@ async def test_addon_fallback_explicit():
     assert isinstance(handler._fallback_handler, DummyDownloadHandler)
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_matching_settings():
     crawler = await get_crawler_zyte_api(
         {"ZYTE_API_TRANSPARENT_MODE": True}, poet=False
@@ -110,7 +111,7 @@ async def test_addon_matching_settings():
     )
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_custom_fingerprint():
     class CustomRequestFingerprinter:
         pass

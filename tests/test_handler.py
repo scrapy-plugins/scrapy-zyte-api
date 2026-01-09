@@ -9,7 +9,7 @@ from typing import Any
 from unittest import mock
 
 import pytest
-from pytest_twisted import ensureDeferred
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
 from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
 from scrapy.exceptions import NotConfigured
@@ -46,7 +46,7 @@ from .mockserver import MockServer
         DEFAULT_CLIENT_CONCURRENCY + 1,
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_concurrency_configuration(concurrency):
     settings: SETTINGS_T = {
         **SETTINGS,
@@ -224,7 +224,7 @@ RETRY_POLICY_B = RetryFactory().build()
 assert RETRY_POLICY_A != RETRY_POLICY_B
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     "settings,meta,expected",
     [
@@ -325,7 +325,7 @@ async def test_retry_policy(
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_download_latency(settings, meta, is_set, mockserver):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
 
@@ -351,7 +351,7 @@ async def test_download_latency(settings, meta, is_set, mockserver):
         assert "download_latency" not in request.meta
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_stats(mockserver):
     async with make_handler({}, mockserver.urljoin("/")) as handler:
         scrapy_stats = handler._stats
@@ -424,7 +424,7 @@ def test_single_client():
     assert handler1._client is handler2._client
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     "settings,enabled",
     [
@@ -449,7 +449,7 @@ async def test_log_request_toggle(
             logger.debug.assert_not_called()
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     "settings,short_str,long_str,truncated_str",
     [
@@ -548,7 +548,7 @@ def test_log_request_truncate_negative(enabled):
 
 
 @pytest.mark.parametrize("enabled", [True, False, None])
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_trust_env(enabled):
     settings: SETTINGS_T = {
         **SETTINGS,
@@ -587,7 +587,7 @@ def test_user_agent_for_build_client(user_agent, expected):
     assert client.user_agent == expected
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_bad_key():
     class TestSpider(Spider):
         name = "test"
@@ -615,7 +615,7 @@ async def test_bad_key():
 # case of follow-up responses suddenly giving such an error.
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_suspended_account_start_urls():
     class TestSpider(Spider):
         name = "test"
@@ -638,7 +638,7 @@ async def test_suspended_account_start_urls():
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_suspended_account_callback():
     class TestSpider(Spider):
         name = "test"
@@ -663,7 +663,7 @@ async def test_suspended_account_callback():
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_fallback_setting():
     crawler = await get_crawler_zyte_api(settings=SETTINGS)
     handler = get_download_handler(crawler, "https")
@@ -721,7 +721,7 @@ def test_body_max_size_exceeded(
         logger.warning.assert_not_called()
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     "body_size, warnsize, maxsize, expect_null",
     [

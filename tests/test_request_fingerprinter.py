@@ -2,7 +2,7 @@ from copy import copy
 
 import pytest
 from packaging.version import Version
-from pytest_twisted import ensureDeferred
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import __version__ as SCRAPY_VERSION
 
 if Version(SCRAPY_VERSION) < Version("2.7"):
@@ -21,7 +21,7 @@ except ImportError:
     scrapy_poet = None
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_cache():
     crawler = await get_crawler()
     fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
@@ -36,7 +36,7 @@ async def test_cache():
     assert fingerprint == fingerprinter._cache[request]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_fallback_custom(caplog):
     class CustomFingerprinter:
         def fingerprint(self, request):
@@ -60,7 +60,7 @@ async def test_fallback_custom(caplog):
 
 
 @pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_poet_installed_but_disabled(caplog):
     """If the scrapy-poet package is installed but its main middleware,
     InjectionMiddleware, is not set in DOWNLOADER_MIDDLEWARES, do not try to
@@ -88,7 +88,7 @@ async def test_poet_installed_but_disabled(caplog):
     assert no_deps_fp == deps_fp
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_fallback_default():
     crawler = await get_crawler()
     fingerprinter = crawler.request_fingerprinter
@@ -107,7 +107,7 @@ async def test_fallback_default():
     assert new_fingerprint != old_fingerprint
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_headers():
     crawler = await get_crawler()
     fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
@@ -211,7 +211,7 @@ async def test_headers():
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_known_fingerprints(url, params, fingerprint):
     """Test that known fingerprints remain the same, i.e. make sure that we do
     not accidentally modify fingerprints with future implementation changes."""
@@ -222,7 +222,7 @@ async def test_known_fingerprints(url, params, fingerprint):
     assert actual_fingerprint == fingerprint
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_metadata():
     settings = {"JOB": "1/2/3"}
     crawler = await get_crawler(settings)
@@ -252,7 +252,7 @@ async def test_metadata():
     scrapy_poet is not None,
     reason=("scrapy-poet is installed, and test_deps already covers these scenarios"),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_only_end_parameters_matter():
     """Test that it does not matter how a request comes to use some Zyte API
     parameters, that the fingerprint is the same if the parameters actually
@@ -344,7 +344,7 @@ async def test_only_end_parameters_matter():
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_url(url1, url2, match):
     crawler = await get_crawler()
     fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
@@ -478,7 +478,7 @@ def merge_dicts(*dicts):
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_url_fragments(params, match):
     crawler = await get_crawler()
     fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
@@ -492,7 +492,7 @@ async def test_url_fragments(params, match):
         assert fingerprint1 != fingerprint2
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_extract_types():
     crawler = await get_crawler()
     fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
@@ -505,7 +505,7 @@ async def test_extract_types():
     assert fingerprint1 != fingerprint2
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_request_body():
     crawler = await get_crawler()
     fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
@@ -521,7 +521,7 @@ async def test_request_body():
 
 
 @pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_deps():
     """Test that some injected dependencies do not affect fingerprinting at
     all (e.g. HttpClient) while others do (e.g. WebPage)."""
@@ -692,7 +692,7 @@ async def test_deps():
     assert page_request_transparent_fp == page_auto_request_transparent_fp
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_page_params():
     no_params_request = Request("https://example.com")
     empty_params_request = Request("https://example.com", meta={"page_params": {}})
@@ -857,7 +857,7 @@ del NO_SESSION_DOWNLOADER_MIDDLEWARES[
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_pool_ids(settings, meta1, meta2, fingerprint_matches):
     request1 = Request("https://example.com", meta=meta1)
     request2 = Request("https://example.com", meta=meta2)
