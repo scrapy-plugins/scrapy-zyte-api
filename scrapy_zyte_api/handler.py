@@ -2,18 +2,17 @@ import json
 import logging
 import time
 from copy import deepcopy
-from typing import Any, Generator, Optional, Union
+from typing import Any, Optional, Union
 
 
 from scrapy import Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
 from scrapy.http import Request
+from scrapy.http.response import Response
 from scrapy.settings import Settings
-from scrapy.utils.defer import deferred_from_coro
 from scrapy.utils.misc import load_object
 from scrapy.utils.reactor import verify_installed_reactor
-from twisted.internet.defer import Deferred, inlineCallbacks
 from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
 
@@ -21,6 +20,7 @@ from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 from .utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _DOWNLOAD_REQUEST_NEEDS_SPIDER,
     _X402_SUPPORT,
     USER_AGENT,
     _build_from_crawler,
@@ -197,14 +197,15 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         dhcls = load_object(path)
         return _build_from_crawler(dhcls, self._crawler)
 
-    def download_request(self, request: Request, spider: Spider) -> Deferred:
+    async def download_request(
+        self, request: Request, spider: Spider | None = None
+    ) -> Response:
         api_params = self._param_parser.parse(request)
         if api_params is not None:
-            return deferred_from_coro(
-                self._download_request(api_params, request, spider)
-            )
+            return await self._download_request(api_params, request)
         assert self._fallback_handler
-        return self._fallback_handler.download_request(request, spider)
+        args = (spider,) if _DOWNLOAD_REQUEST_NEEDS_SPIDER else tuple()
+        return await self._fallback_handler.download_request(request, *args)
 
     def _update_stats(self, api_params):
         prefix = "scrapy-zyte-api"
@@ -258,7 +259,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 self._stats.set_value(f"{prefix}/{counter}/{key}", value)
 
     async def _download_request(
-        self, api_params: dict, request: Request, spider: Spider
+        self, api_params: dict, request: Request
     ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
         # Define url by default
         retrying = request.meta.get("zyte_api_retry_policy")
@@ -339,11 +340,10 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         _truncate(params, self._truncate_limit)
         return params
 
-    @inlineCallbacks
-    def close(self) -> Generator:
+    async def close(self) -> None:
         if self._fallback_handler and hasattr(self._fallback_handler, "close"):
-            yield self._fallback_handler.close()
-        yield deferred_from_coro(self._close())
+            await self._fallback_handler.close()
+        await self._close()
 
     async def _close(self) -> None:  # NOQA
         await self._session.close()

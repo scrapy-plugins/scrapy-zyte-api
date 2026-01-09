@@ -8,7 +8,7 @@ from typing import Any, DefaultDict, Deque, Dict, List, Optional, Set, Type, Uni
 from uuid import uuid4
 from weakref import WeakKeyDictionary
 
-from scrapy import Request, Spider
+from scrapy import Request, Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.exceptions import CloseSpider, IgnoreRequest
 from scrapy.http import Response
@@ -592,6 +592,9 @@ session_config = session_config_registry.session_config
 class _SessionManager:
     def __init__(self, crawler: Crawler):
         self._crawler = crawler
+        crawler.signals.connect(
+            self._handle_engine_start, signal=signals.engine_started
+        )
 
         settings = crawler.settings
 
@@ -677,6 +680,10 @@ class _SessionManager:
 
         self._fatal_error_handler = FatalErrorHandler(crawler)
 
+    async def _handle_engine_start(self):
+        self._download_async = getattr(self._crawler.engine, "download_async", None)
+        self._download = None if self._download_async else self._crawler.engine.download
+
     def _get_session_config(self, request: Request) -> SessionConfig:
         try:
             return self._session_config_cache[request]
@@ -724,7 +731,6 @@ class _SessionManager:
                 return False
         session_params = deepcopy(session_params)
         session_init_url = session_params.pop("url", request.url)
-        spider = self._crawler.spider
         session_init_request = Request(
             session_init_url,
             meta={
@@ -739,14 +745,18 @@ class _SessionManager:
             },
             callback=NO_CALLBACK,
         )
-        if _DOWNLOAD_NEEDS_SPIDER:
-            deferred = self._crawler.engine.download(  # type: ignore[call-arg]
-                session_init_request, spider=spider
-            )
+        if self._download_async is not None:  # Scrapy >= 2.14
+            download = self._download_async(session_init_request)
+        elif not _DOWNLOAD_NEEDS_SPIDER:
+            deferred = self._download(session_init_request)
+            download = deferred_to_future(deferred)
         else:
-            deferred = self._crawler.engine.download(session_init_request)
+            deferred = self._download(  # type: ignore[call-arg]
+                session_init_request, spider=self._crawler.spider
+            )
+            download = deferred_to_future(deferred)
         try:
-            response = await deferred_to_future(deferred)
+            response = await download
         except Exception:
             self._crawler.stats.inc_value(
                 f"scrapy-zyte-api/sessions/pools/{pool}/init/failed"
@@ -997,12 +1007,12 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         self._sessions = _SessionManager(crawler)
 
     async def process_request(
-        self, request: Request, spider: Spider
+        self, request: Request, spider: Spider | None = None
     ) -> Optional[Request]:
         return await self._sessions.assign(request)
 
     async def process_response(
-        self, request: Request, response: Response, spider: Spider
+        self, request: Request, response: Response, spider: Spider | None = None
     ) -> Union[Request, Response, None]:
         if isinstance(response, DummyResponse):
             return response
@@ -1013,7 +1023,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         if not passed:
             new_request_or_none = get_retry_request(
                 request,
-                spider=spider,
+                spider=self._crawler.spider,
                 reason="session_expired",
             )
             if not new_request_or_none:
@@ -1022,7 +1032,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         return response
 
     async def process_exception(
-        self, request: Request, exception: Exception, spider: Spider
+        self, request: Request, exception: Exception, spider: Spider | None = None
     ) -> Union[Request, None]:
         if (
             not isinstance(exception, RequestError)
@@ -1044,7 +1054,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
 
         return get_retry_request(
             request,
-            spider=spider,
+            spider=self._crawler.spider,
             reason=reason,
         )
 

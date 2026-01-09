@@ -9,7 +9,11 @@ from scrapy import __version__ as SCRAPY_VERSION
 from scrapy.crawler import Crawler
 from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler as _get_crawler
-from zyte_api.aio.client import AsyncClient
+
+try:
+    from zyte_api import AsyncZyteAPI
+except ImportError:
+    from zyte_api.aio.client import AsyncClient as AsyncZyteAPI
 
 from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
@@ -17,7 +21,7 @@ from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT
 
 _API_KEY = "a"
 
-DEFAULT_CLIENT_CONCURRENCY = AsyncClient(api_key=_API_KEY).n_conn
+DEFAULT_CLIENT_CONCURRENCY = AsyncZyteAPI(api_key=_API_KEY).n_conn
 SETTINGS_T = Dict[str, Any]
 SETTINGS: SETTINGS_T = {
     "DOWNLOAD_HANDLERS": {

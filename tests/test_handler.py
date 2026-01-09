@@ -761,7 +761,7 @@ async def test_download_request_limits(
                 return_value=mock_api_response,
             ):
                 request = Request("https://example.com")
-                result = await handler._download_request({}, request, None)
+                result = await handler._download_request({}, request)
 
                 if expect_null:
                     assert result is None

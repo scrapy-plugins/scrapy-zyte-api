@@ -3,7 +3,8 @@ from typing import Optional, Type
 import pytest
 from pytest_twisted import ensureDeferred
 from scrapy import Request
-from scrapy.core.downloader.handlers.http import HTTP10DownloadHandler
+from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
+from scrapy.http.response import Response
 from scrapy.settings.default_settings import TWISTED_REACTOR
 from scrapy.utils.test import get_crawler
 
@@ -60,26 +61,42 @@ async def test_addon_disable_transparent(mockserver):
 
 @ensureDeferred
 async def test_addon_fallback():
+    crawler = await get_crawler_zyte_api(use_addon=True)
+    handler = get_download_handler(crawler, "http")
+    assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
+    assert isinstance(handler._fallback_handler, HTTP11DownloadHandler)
+
+
+class DummyDownloadHandler:
+    lazy: bool = False
+
+    async def download_request(self, request: Request) -> Response:
+        pass
+
+    async def close(self) -> None:
+        pass
+
+
+@ensureDeferred
+async def test_addon_fallback_custom():
     settings = {
-        "DOWNLOAD_HANDLERS": {
-            "http": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler"
-        },
+        "DOWNLOAD_HANDLERS": {"http": "tests.test_addon.DummyDownloadHandler"},
     }
     crawler = await get_crawler_zyte_api(settings, use_addon=True)
     handler = get_download_handler(crawler, "http")
     assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
-    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
+    assert isinstance(handler._fallback_handler, DummyDownloadHandler)
 
 
 @ensureDeferred
 async def test_addon_fallback_explicit():
     settings = {
-        "ZYTE_API_FALLBACK_HTTP_HANDLER": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler",
+        "ZYTE_API_FALLBACK_HTTP_HANDLER": "tests.test_addon.DummyDownloadHandler",
     }
     crawler = await get_crawler_zyte_api(settings, use_addon=True)
     handler = get_download_handler(crawler, "http")
     assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
-    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
+    assert isinstance(handler._fallback_handler, DummyDownloadHandler)
 
 
 @ensureDeferred
