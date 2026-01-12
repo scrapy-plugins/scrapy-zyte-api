@@ -358,7 +358,7 @@ class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
-            "scrapy.core.downloader.handlers.http.HTTPDownloadHandler"
+            "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
         )
 
 

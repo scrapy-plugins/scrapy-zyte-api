@@ -324,28 +324,33 @@ async def test_higher_concurrency():
     fast_seconds = 0.001
     slow_seconds = 0.2
 
+    def _build_request(index: int) -> Request:
+        return Request(
+            "https://example.com",
+            meta={
+                "index": index,
+                "zyte_api": {
+                    "browserHtml": True,
+                    "delay": (
+                        fast_seconds if index == expected_first_index else slow_seconds
+                    ),
+                },
+            },
+            dont_filter=True,
+        )
+
     with MockServer(DelayedResource) as server:
 
         class TestSpider(Spider):
             name = "test_spider"
 
+            async def start(self):
+                for index in range(concurrency):
+                    yield _build_request(index)
+
             def start_requests(self):
                 for index in range(concurrency):
-                    yield Request(
-                        "https://example.com",
-                        meta={
-                            "index": index,
-                            "zyte_api": {
-                                "browserHtml": True,
-                                "delay": (
-                                    fast_seconds
-                                    if index == expected_first_index
-                                    else slow_seconds
-                                ),
-                            },
-                        },
-                        dont_filter=True,
-                    )
+                    yield _build_request(index)
 
             async def parse(self, response):
                 response_indexes.append(response.meta["index"])

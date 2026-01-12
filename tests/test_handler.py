@@ -11,7 +11,7 @@ from unittest import mock
 import pytest
 from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
-from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
+from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
 from scrapy.utils.test import get_crawler
@@ -668,7 +668,7 @@ async def test_fallback_setting():
     crawler = await get_crawler_zyte_api(settings=SETTINGS)
     handler = get_download_handler(crawler, "https")
     assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
-    assert isinstance(handler._fallback_handler, HTTPDownloadHandler)
+    assert isinstance(handler._fallback_handler, HTTP11DownloadHandler)
 
 
 @pytest.mark.parametrize(
