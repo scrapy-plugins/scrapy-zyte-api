@@ -193,7 +193,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
             if isinstance(item_or_request, Request):
                 count += 1
                 item_or_request.meta["is_start_request"] = True
-                self._process_output_request(item_or_request, None)
+                self._process_output_request(item_or_request)
             yield item_or_request
         self._send_signal(_start_requests_processed, count=count)
 
@@ -203,7 +203,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
             if isinstance(item_or_request, Request):
                 count += 1
                 item_or_request.meta["is_start_request"] = True
-                self._process_output_request(item_or_request, spider)
+                self._process_output_request(item_or_request)
             yield item_or_request
         self._send_signal(_start_requests_processed, count=count)
 

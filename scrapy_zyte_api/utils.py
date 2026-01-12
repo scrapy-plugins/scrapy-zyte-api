@@ -1,4 +1,5 @@
 from importlib.metadata import version
+from warnings import catch_warnings, filterwarnings
 
 import scrapy
 from packaging.version import Version
@@ -74,3 +75,37 @@ except ImportError:
     _X402_SUPPORT = False
 else:
     _X402_SUPPORT = True
+
+try:
+    from scrapy.utils.defer import maybe_deferred_to_future  # noqa: F401
+except ImportError:  # Scrapy < 2.14
+    from asyncio import get_event_loop, new_event_loop, set_event_loop
+
+    from scrapy.utils.misc import load_object
+    from scrapy.utils.reactor import is_asyncio_reactor_installed
+
+    def set_asyncio_event_loop(event_loop_path):
+        if event_loop_path is not None:
+            event_loop_class = load_object(event_loop_path)
+            event_loop = set_asyncio_event_loop(None)
+            if not isinstance(event_loop, event_loop_class):
+                event_loop = event_loop_class()
+                set_event_loop(event_loop)
+        else:
+            try:
+                with catch_warnings():
+                    filterwarnings(
+                        "ignore",
+                        message="There is no current event loop",
+                        category=DeprecationWarning,
+                    )
+                    event_loop = get_event_loop()
+            except RuntimeError:
+                event_loop = new_event_loop()
+                set_event_loop(event_loop)
+        return event_loop
+
+    def maybe_deferred_to_future(d):
+        if not is_asyncio_reactor_installed():
+            return d
+        return d.asFuture(set_asyncio_event_loop(None))

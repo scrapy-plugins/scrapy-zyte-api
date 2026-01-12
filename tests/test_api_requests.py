@@ -29,6 +29,7 @@ from scrapy_zyte_api.responses import _process_response
 from scrapy_zyte_api.utils import (
     _ADDON_SUPPORT,
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
+    maybe_deferred_to_future,
 )
 
 from . import (
@@ -365,7 +366,7 @@ async def test_higher_concurrency():
             TestSpider,
             setup_engine=False,
         )
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert response_indexes[0] == expected_first_index
 
