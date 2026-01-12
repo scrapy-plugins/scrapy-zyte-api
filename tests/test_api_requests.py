@@ -60,11 +60,21 @@ def sort_dict_list(dict_list):
 
 
 class ParamsDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
-    @deferred_f_from_coro_f
-    async def download_request(self, request: Request, spider: Spider) -> Response:
-        params = self._param_parser.parse(request)
-        self._crawler.signals.send_catch_log(params_signal, params=params)
-        return Response(request.url)
+    if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+
+        def download_request(self, request: Request, spider: Spider) -> Deferred:
+            params = self._param_parser.parse(request)
+            self._crawler.signals.send_catch_log(params_signal, params=params)
+            from twisted.internet.defer import succeed
+
+            return succeed(Response(request.url))
+
+    else:
+
+        async def download_request(self, request: Request) -> Response:
+            params = self._param_parser.parse(request)
+            self._crawler.signals.send_catch_log(params_signal, params=params)
+            return Response(request.url)
 
 
 def inject_cookies(
@@ -137,7 +147,7 @@ async def request_to_params(
         settings, spider_cls=TestSpider, setup_engine=False, use_addon=_ADDON_SUPPORT
     )
     crawler.signals.connect(track_params, signal=params_signal)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     return param_sets[0]
 

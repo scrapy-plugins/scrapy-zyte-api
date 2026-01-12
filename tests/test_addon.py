@@ -2,12 +2,13 @@ from typing import Optional, Type
 
 import pytest
 
-from scrapy import Request
+from scrapy import Request, Spider
 from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.http.response import Response
 from scrapy.settings.default_settings import TWISTED_REACTOR
 from scrapy.utils.test import get_crawler
+from twisted.internet.defer import Deferred, succeed
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
@@ -16,7 +17,11 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
-from scrapy_zyte_api.utils import _HTTP10_SUPPORT, _POET_ADDON_SUPPORT
+from scrapy_zyte_api.utils import (
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
+    _HTTP10_SUPPORT,
+    _POET_ADDON_SUPPORT,
+)
 
 from . import get_crawler as get_crawler_zyte_api
 from . import get_download_handler, make_handler, serialize_settings
@@ -71,8 +76,15 @@ async def test_addon_fallback():
 class DummyDownloadHandler:
     lazy: bool = False
 
-    async def download_request(self, request: Request) -> Response:
-        pass
+    if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+
+        def download_request(self, request: Request, spider: Spider) -> Deferred:
+            return succeed(None)
+
+    else:
+
+        async def download_request(self, request: Request) -> Response:
+            pass
 
     async def close(self) -> None:
         pass

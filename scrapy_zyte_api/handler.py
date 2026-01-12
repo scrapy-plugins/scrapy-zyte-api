@@ -20,7 +20,6 @@ from ._params import _ParamParser
 from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
 from .utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
-    _DOWNLOAD_REQUEST_NEEDS_SPIDER,
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _X402_SUPPORT,
     USER_AGENT,
@@ -212,15 +211,12 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             return self._fallback_handler.download_request(request, spider)
     else:
 
-        async def download_request(
-            self, request: Request, spider: Spider | None = None
-        ) -> Response:
+        async def download_request(self, request: Request) -> Response:
             api_params = self._param_parser.parse(request)
             if api_params is not None:
                 return await self._download_request(api_params, request)
             assert self._fallback_handler
-            args = (spider,) if _DOWNLOAD_REQUEST_NEEDS_SPIDER else tuple()
-            return await self._fallback_handler.download_request(request, *args)
+            return await self._fallback_handler.download_request(request)
 
     def _update_stats(self, api_params):
         prefix = "scrapy-zyte-api"
