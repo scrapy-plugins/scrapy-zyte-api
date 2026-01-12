@@ -40,6 +40,7 @@ from . import (
     get_download_handler,
     get_downloader_middleware,
     set_env,
+    download_request,
 )
 from .mockserver import DelayedResource, MockServer, produce_request_response
 
@@ -71,7 +72,7 @@ class ParamsDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
 
     else:
 
-        async def download_request(self, request: Request) -> Response:
+        async def download_request(self, request: Request) -> Response:  # type: ignore[misc]
             params = self._param_parser.parse(request)
             self._crawler.signals.send_catch_log(params_signal, params=params)
             return Response(request.url)
@@ -271,15 +272,16 @@ async def test_coro_handling(zyte_api: bool, mockserver):
             mockserver.urljoin("/"),
             meta={"zyte_api": zyte_api},
         )
-        args = (Spider("test"),) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
-        result = handler.download_request(req, *args)
-        if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
-            assert not iscoroutine(result)
-            assert isinstance(result, Deferred)
-        else:
+
+        if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+            result = handler.download_request(req)
             assert iscoroutine(result)
             assert not isinstance(result, Deferred)
-        await maybe_deferred_to_future(result)
+        else:
+            result = handler.download_request(req, None)
+            assert iscoroutine(result)
+            assert not isinstance(result, Deferred)
+        await result
 
 
 @deferred_f_from_coro_f
@@ -317,9 +319,8 @@ async def test_exceptions(
     caplog.set_level("DEBUG")
     async with mockserver.make_handler() as handler:
         req = Request("http://example.com", method="POST", meta=meta)
-        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with pytest.raises(exception_type):
-            await maybe_deferred_to_future(handler.download_request(req, *args))
+            await download_request(handler, req)
         assert exception_text in caplog.text
 
 
@@ -459,9 +460,8 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
         handler._fallback_handler.download_request = mock.AsyncMock(
             side_effect=RuntimeError
         )
-        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with pytest.raises(RuntimeError):
-            await maybe_deferred_to_future(handler.download_request(request, *args))
+            await download_request(handler, request)
     if uses_zyte_api:
         handler._download_request.assert_called()
     else:

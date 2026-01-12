@@ -641,6 +641,7 @@ class _SessionManager:
         self._fatal_error_handler = FatalErrorHandler(crawler)
 
     async def _handle_engine_start(self):
+        assert self._crawler.engine
         self._download_async = getattr(self._crawler.engine, "download_async", None)
         self._download = None if self._download_async else self._crawler.engine.download
 
@@ -706,11 +707,14 @@ class _SessionManager:
             callback=NO_CALLBACK,
         )
         if self._download_async is not None:  # Scrapy >= 2.14
+            assert self._download_async
             download = self._download_async(session_init_request)
         elif not _DOWNLOAD_NEEDS_SPIDER:
+            assert self._download
             deferred = self._download(session_init_request)
             download = deferred_to_future(deferred)
         else:
+            assert self._download
             deferred = self._download(  # type: ignore[call-arg]
                 session_init_request, spider=self._crawler.spider
             )
@@ -981,6 +985,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
 
         passed = await self._sessions.check(response, request)
         if not passed:
+            assert self._crawler.spider
             new_request_or_none = get_retry_request(
                 request,
                 spider=self._crawler.spider,
@@ -1012,6 +1017,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         else:
             return None
 
+        assert self._crawler.spider
         return get_retry_request(
             request,
             spider=self._crawler.spider,

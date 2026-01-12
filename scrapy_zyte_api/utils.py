@@ -34,6 +34,7 @@ _ASYNC_START_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_13_0
 _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_12_0
 _DOWNLOAD_NEEDS_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_6_0
 _DOWNLOAD_REQUEST_RETURNS_DEFERRED = _SCRAPY_VERSION < _SCRAPY_2_14_0
+_ENGINE_HAS_DOWNLOAD_ASYNC = _SCRAPY_VERSION >= _SCRAPY_2_14_0
 _GET_SLOT_NEEDS_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _HTTP10_SUPPORT = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _RAW_CLASS_SETTING_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_4_0
@@ -82,9 +83,13 @@ except ImportError:  # pragma: no cover
     # Scrapy < 2.14
 
     import asyncio
+    from typing import TYPE_CHECKING, TypeVar, Union
     from warnings import catch_warnings, filterwarnings
 
     from scrapy.utils.reactor import is_asyncio_reactor_installed
+
+    if TYPE_CHECKING:
+        from twisted.internet.defer import Deferred
 
     def set_asyncio_event_loop():
         try:
@@ -103,10 +108,21 @@ except ImportError:  # pragma: no cover
     def _get_asyncio_event_loop():
         return set_asyncio_event_loop()
 
-    def deferred_to_future(d):  # type: ignore[misc]
+    _T = TypeVar("_T")
+
+    def deferred_to_future(d: "Deferred[_T]") -> "asyncio.Future[_T]":
         return d.asFuture(_get_asyncio_event_loop())
 
-    def maybe_deferred_to_future(d):
+    def maybe_deferred_to_future(
+        d: "Deferred[_T]",
+    ) -> Union["Deferred[_T]", "asyncio.Future[_T]"]:
         if not is_asyncio_reactor_installed():
             return d
         return deferred_to_future(d)
+
+
+__all__ = [
+    "USER_AGENT",
+    "deferred_to_future",
+    "maybe_deferred_to_future",
+]

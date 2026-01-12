@@ -21,11 +21,10 @@ from scrapy_zyte_api.utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _HTTP10_SUPPORT,
     _POET_ADDON_SUPPORT,
-    maybe_deferred_to_future,
 )
 
 from . import get_crawler as get_crawler_zyte_api
-from . import get_download_handler, make_handler, serialize_settings
+from . import get_download_handler, make_handler, serialize_settings, download_request
 
 pytest.importorskip("scrapy.addons")
 
@@ -47,8 +46,7 @@ BASELINE_SETTINGS = _crawler.settings.copy_to_dict()
 async def test_addon(mockserver):
     async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
         request = Request("https://example.com")
-        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
-        await maybe_deferred_to_future(handler.download_request(request, *args))
+        await download_request(handler, request)
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
@@ -58,13 +56,12 @@ async def test_addon_disable_transparent(mockserver):
         {"ZYTE_API_TRANSPARENT_MODE": False}, mockserver.urljoin("/"), use_addon=True
     ) as handler:
         request = Request("https://toscrape.com")
-        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
-        await maybe_deferred_to_future(handler.download_request(request, *args))
+        await download_request(handler, request)
         assert handler._stats.get_value("scrapy-zyte-api/success") is None
 
         meta = {"zyte_api": {"foo": "bar"}}
         request = Request("https://toscrape.com", meta=meta)
-        await maybe_deferred_to_future(handler.download_request(request, *args))
+        await download_request(handler, request)
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
@@ -86,8 +83,8 @@ class DummyDownloadHandler:
 
     else:
 
-        async def download_request(self, request: Request) -> Response:
-            pass
+        async def download_request(self, request: Request) -> Response:  # type: ignore[misc]
+            return None  # type: ignore[return-value]
 
     async def close(self) -> None:
         pass

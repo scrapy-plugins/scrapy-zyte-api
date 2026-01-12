@@ -7,6 +7,7 @@ from packaging.version import Version
 from scrapy import Spider
 from scrapy import __version__ as SCRAPY_VERSION
 from scrapy.crawler import Crawler
+from scrapy.http import Response
 from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler as _get_crawler
 
@@ -17,7 +18,11 @@ except ImportError:
 
 from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
-from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT
+from scrapy_zyte_api.utils import (
+    _POET_ADDON_SUPPORT,
+    maybe_deferred_to_future,
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
+)
 
 _API_KEY = "a"
 
@@ -165,3 +170,11 @@ async def setup_crawler_engine(crawler: Crawler):
     handler = get_download_handler(crawler, "https")
     if hasattr(handler, "engine_started"):
         await handler.engine_started()
+
+
+async def download_request(handler, request) -> Response:
+    if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+        future = handler.download_request(request)
+    else:
+        future = maybe_deferred_to_future(handler.download_request(request, None))
+    return await future

@@ -203,7 +203,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:  # Scrapy < 2.14
 
-        def download_request(self, request: Request, spider: Spider) -> Deferred:
+        def download_request(
+            self, request: Request, spider: Spider
+        ) -> Deferred[Response | None]:
             api_params = self._param_parser.parse(request)
             if api_params is not None:
                 return deferred_from_coro(self._download_request(api_params, request))
@@ -213,7 +215,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
     else:
 
-        async def download_request(self, request: Request) -> Response:
+        async def download_request(self, request: Request) -> Response | None:  # type: ignore[misc]
             api_params = self._param_parser.parse(request)
             if api_params is not None:
                 return await self._download_request(api_params, request)
