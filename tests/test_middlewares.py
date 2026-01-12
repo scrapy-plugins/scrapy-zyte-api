@@ -63,7 +63,7 @@ def spider_output_processor(middleware, request, spider):
 @deferred_f_from_coro_f
 async def test_preserve_delay(mw_cls, processor, settings, preserve):
     crawler = get_crawler(settings_dict=settings)
-    await crawler.crawl("a")
+    await maybe_deferred_to_future(crawler.crawl("a"))
     assert crawler.engine
     assert crawler.spider
     spider = crawler.spider
@@ -117,7 +117,7 @@ async def test_cookies():
     requests with cookies."""
     settings = {"ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True}
     crawler = get_crawler(settings_dict=settings)
-    await crawler.crawl("a")
+    await maybe_deferred_to_future(crawler.crawl("a"))
     spider = crawler.spider
     middleware = _build_from_crawler(ScrapyZyteAPIDownloaderMiddleware, crawler)
     request = Request(

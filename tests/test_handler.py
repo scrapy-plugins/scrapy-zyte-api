@@ -344,7 +344,7 @@ async def test_download_latency(settings, meta, is_set, mockserver):
             requests.append(response.request)
 
     crawler = await get_crawler_zyte_api(settings, TestSpider, setup_engine=False)
-    await crawler.crawl(spidercls=TestSpider)
+    await maybe_deferred_to_future(crawler.crawl(spidercls=TestSpider))
     assert requests
     request = requests[0]
     if is_set:
