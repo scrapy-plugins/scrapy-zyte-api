@@ -108,7 +108,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == (10 if preserve else 0)
 
-    await crawler.stop()
+    await maybe_deferred_to_future(crawler.stop())
 
 
 @deferred_f_from_coro_f
