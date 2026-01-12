@@ -46,7 +46,7 @@ BASELINE_SETTINGS = _crawler.settings.copy_to_dict()
 async def test_addon(mockserver):
     async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
         request = Request("https://example.com")
-        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         await handler.download_request(request, *args)
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
@@ -57,7 +57,7 @@ async def test_addon_disable_transparent(mockserver):
         {"ZYTE_API_TRANSPARENT_MODE": False}, mockserver.urljoin("/"), use_addon=True
     ) as handler:
         request = Request("https://toscrape.com")
-        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         await handler.download_request(request, *args)
         assert handler._stats.get_value("scrapy-zyte-api/success") is None
 

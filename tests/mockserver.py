@@ -45,7 +45,7 @@ async def produce_request_response(mockserver, meta, settings=None):
     settings = settings if settings is not None else {**SETTINGS}
     async with mockserver.make_handler(settings) as handler:
         req = Request(mockserver.urljoin("/"), meta=meta)
-        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         resp = await handler.download_request(req, *args)
         return req, resp
 

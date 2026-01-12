@@ -268,7 +268,7 @@ async def test_retry_policy(
             "browserHtml": "",
             "url": "",
         }
-        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         await handler.download_request(req, *args)
 
         # What we're interested in is the Request call in the API
@@ -364,7 +364,7 @@ async def test_stats(mockserver):
             "zyte_api": {"a": "...", "b": {"b0": "..."}, "experimental": {"c0": "..."}}
         }
         request = Request("https://example.com", meta=meta)
-        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         await handler.download_request(request, *args)
 
         assert set(scrapy_stats.get_stats()) == {
@@ -445,7 +445,7 @@ async def test_log_request_toggle(
     async with make_handler(settings, mockserver.urljoin("/")) as handler:
         meta = {"zyte_api": {"foo": "bar"}}
         request = Request("https://example.com", meta=meta)
-        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with mock.patch("scrapy_zyte_api.handler.logger") as logger:
             await handler.download_request(request, *args)
         if enabled:
@@ -522,7 +522,7 @@ async def test_log_request_truncate(
             "browserHtml": "",
             "url": "",
         }
-        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with mock.patch("scrapy_zyte_api.handler.logger") as logger:
             await handler.download_request(request, *args)
 
