@@ -24,6 +24,7 @@ from .utils import (  # type: ignore[attr-defined]
     _X402_SUPPORT,
     USER_AGENT,
     _build_from_crawler,
+    _close_spider,
 )
 
 if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
@@ -339,7 +340,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             (403, "/auth/account-suspended", "zyte_api_suspended_account"),
         ):
             if error.status == status and error.parsed.type == error_type:
-                self._crawler.engine.close_spider(self._crawler.spider, close_reason)
+                _close_spider(self._crawler, close_reason)
                 return
 
     def _log_request(self, params):

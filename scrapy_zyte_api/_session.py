@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from functools import partial
 from logging import getLogger
-from typing import Any, DefaultDict, Deque, Dict, List, Optional, Set, Type, Union, cast
+from typing import Any, DefaultDict, Deque, Dict, List, Optional, Set, Type, Union
 from uuid import uuid4
 from weakref import WeakKeyDictionary
 
@@ -18,7 +18,12 @@ from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
 from zyte_api import RequestError, RetryFactory
 
-from .utils import _DOWNLOAD_NEEDS_SPIDER, _build_from_crawler, deferred_to_future  # type: ignore[attr-defined]
+from .utils import (
+    _DOWNLOAD_NEEDS_SPIDER,
+    _build_from_crawler,
+    deferred_to_future,
+    _close_spider,
+)  # type: ignore[attr-defined]
 
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
@@ -524,25 +529,19 @@ class FatalErrorHandler:
     def __init__(self, crawler):
         self.crawler = crawler
 
-    def __enter__(self):
+    async def __aenter__(self):
         return None
 
-    def __exit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, tb):
         if exc_type is None:
             return
-        from twisted.internet import reactor
-        from twisted.internet.interfaces import IReactorCore
-
-        reactor = cast(IReactorCore, reactor)
-        close = partial(
-            reactor.callLater, 0, self.crawler.engine.close_spider, self.crawler.spider
-        )
+        close = partial(_close_spider, self.crawler)
         if issubclass(exc_type, TooManyBadSessionInits):
-            close("bad_session_inits")
+            await close("bad_session_inits")
         elif issubclass(exc_type, PoolError):
-            close("pool_error")
+            await close("pool_error")
         elif issubclass(exc_type, CloseSpider):
-            close(exc.reason)
+            await close(exc.reason)
 
 
 session_config_registry = SessionConfigRulesRegistry()
@@ -747,7 +746,7 @@ class _SessionManager:
         return result
 
     async def _create_session(self, request: Request, pool: str) -> str:
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             while True:
                 session_id = str(uuid4())
                 session_init_succeeded = await self._init_session(
@@ -852,7 +851,7 @@ class _SessionManager:
         internal session pool accordingly, and return ``False`` if the session
         has expired or ``True`` if the session passed validation."""
         assert self._crawler.stats
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             if self.is_init_request(request):
                 return True
             session_config = self._get_session_config(request)
@@ -894,7 +893,7 @@ class _SessionManager:
         request.
         """
         assert self._crawler.stats
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             if self.is_init_request(request) or request.meta.get(
                 "_zyte_api_session_assigned", False
             ):
@@ -937,9 +936,9 @@ class _SessionManager:
         session_config = self._get_session_config(request)
         return session_config.enabled(request)
 
-    def handle_error(self, request: Request):
+    async def handle_error(self, request: Request):
         assert self._crawler.stats
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             pool = self.get_pool(request)
             self._crawler.stats.inc_value(
                 f"scrapy-zyte-api/sessions/pools/{pool}/use/failed"
@@ -951,9 +950,9 @@ class _SessionManager:
                     return
             self._start_request_session_refresh(request, pool)
 
-    def handle_expiration(self, request: Request):
+    async def handle_expiration(self, request: Request):
         assert self._crawler.stats
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             pool = self.get_pool(request)
             self._crawler.stats.inc_value(
                 f"scrapy-zyte-api/sessions/pools/{pool}/use/expired"
@@ -1009,10 +1008,10 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         self._sessions.allow_new_session_assignments(request)
 
         if exception.parsed.type == "/problem/session-expired":
-            self._sessions.handle_expiration(request)
+            await self._sessions.handle_expiration(request)
             reason = "session_expired"
         elif exception.status in {520, 521}:
-            self._sessions.handle_error(request)
+            await self._sessions.handle_error(request)
             reason = "download_error"
         else:
             return None

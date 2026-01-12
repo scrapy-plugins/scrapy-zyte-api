@@ -14,12 +14,15 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT,
     _START_REQUESTS_CAN_YIELD_ITEMS,
     _build_from_crawler,
     maybe_deferred_to_future,
+    _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER,
+    _PROCESS_START_REQUIRES_SPIDER,
 )
 
-from . import SETTINGS
+from . import SETTINGS, process_request
 from .mockserver import DelayedResource, MockServer
 
 
@@ -27,19 +30,34 @@ class NamedSpider(Spider):
     name = "named"
 
 
-def request_processor(middleware, request, spider):
-    assert middleware.process_request(request, spider) is None
+async def request_processor(middleware, request: Request):
+    assert process_request(middleware, request) is None
 
 
-def start_request_processor(middleware, request, spider):
-    assert list(middleware.process_start_requests([request], spider)) == [request]
+async def start_request_processor(middleware, request: Request):
+    if hasattr(middleware, "process_start"):
+        args = (None,) if _PROCESS_START_REQUIRES_SPIDER else ()
+        result = [
+            request async for request in middleware.process_start([request], *args)
+        ]
+    else:
+        result = list(middleware.process_start_requests([request], None))
+    assert result == [request]
 
 
-def spider_output_processor(middleware, request, spider):
+async def spider_output_processor(middleware, request: Request):
     response = Response("https://example.com")
-    assert list(middleware.process_spider_output(response, [request], spider)) == [
-        request
-    ]
+    args = (None,) if _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER else ()
+    if _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT:
+        result = [
+            request
+            async for request in middleware.process_spider_output(
+                response, [request], *args
+            )
+        ]
+    else:
+        result = list(middleware.process_spider_output(response, [request], *args))
+    assert result == [request]
 
 
 @pytest.mark.parametrize(
@@ -75,7 +93,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
 
     # No effect on non-Zyte-API requests
     request = Request("https://example.com")
-    processor(middleware, request, spider)
+    await processor(middleware, request, spider)
     assert "download_slot" not in request.meta
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == spider.download_delay  # type: ignore[attr-defined]
@@ -83,7 +101,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     # On Zyte API requests, the download slot is changed, and its delay may be
     # set to 0 depending on settings.
     request = Request("https://example.com", meta={"zyte_api": {}})
-    processor(middleware, request, spider)
+    await processor(middleware, request, spider)
     assert request.meta["download_slot"] == "zyte-api@example.com"
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == (5 if preserve else 0)
@@ -92,7 +110,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     # work the same.
     meta = {"download_slot": "zyte-api@example.com", "zyte_api": True}
     request = Request("https://example.com", meta=meta)
-    processor(middleware, request, spider)
+    await processor(middleware, request, spider)
     assert request.meta["download_slot"] == "zyte-api@example.com"
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == (5 if preserve else 0)
@@ -103,7 +121,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     # depending on settings.
     slot.delay = 10
     request = Request("https://example.com", meta={"zyte_api": {}})
-    processor(middleware, request, spider)
+    await processor(middleware, request, spider)
     assert request.meta["download_slot"] == "zyte-api@example.com"
     _, slot = crawler.engine.downloader._get_slot(request, spider)
     assert slot.delay == (10 if preserve else 0)
@@ -118,12 +136,11 @@ async def test_cookies():
     settings = {"ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True}
     crawler = get_crawler(settings_dict=settings)
     await maybe_deferred_to_future(crawler.crawl("a"))
-    spider = crawler.spider
     middleware = _build_from_crawler(ScrapyZyteAPIDownloaderMiddleware, crawler)
     request = Request(
         "https://example.com", cookies={"a": "b"}, meta={"zyte_api_automap": True}
     )
-    assert middleware.process_request(request, spider) is None
+    assert process_request(middleware, request) is None
 
 
 @deferred_f_from_coro_f
@@ -135,6 +152,10 @@ async def test_max_requests(caplog):
 
         class TestSpider(Spider):
             name = "test_spider"
+
+            async def start(self):
+                for request in self.start_requests():
+                    yield request
 
             def start_requests(self):
                 for i in range(spider_requests):
@@ -192,6 +213,10 @@ async def test_max_requests_race_condition(caplog):
 
         class TestSpider(Spider):
             name = "test_spider"
+
+            async def start(self):
+                for request in self.start_requests():
+                    yield request
 
             def start_requests(self):
                 for i in range(spider_requests):
@@ -474,6 +499,9 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
 async def test_start_requests_items():
     class TestSpider(Spider):
         name = "test"
+
+        async def start(self):
+            yield {"foo": "bar"}
 
         def start_requests(self):
             yield {"foo": "bar"}

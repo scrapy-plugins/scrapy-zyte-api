@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager, contextmanager
 from copy import deepcopy
 from os import environ
 from typing import Any, Dict, Optional
+from urllib.request import Request
 
 from packaging.version import Version
 from scrapy import Spider
@@ -178,3 +179,17 @@ async def download_request(handler, request) -> Response:
     else:
         future = maybe_deferred_to_future(handler.download_request(request, None))
     return await future
+
+
+def process_request(middleware, request) -> Request | None:
+    if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+        return middleware.process_request(request)
+    else:
+        return middleware.process_request(request, spider=None)
+
+
+def process_response(middleware, request, response) -> Request | None:
+    if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+        return middleware.process_response(request, response)
+    else:
+        return middleware.process_response(request, response, spider=None)

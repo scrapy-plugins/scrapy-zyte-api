@@ -1,12 +1,15 @@
 from logging import getLogger
-from typing import cast
 
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest
 from zyte_api import RequestError
 
 from ._params import _ParamParser
-from .utils import _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT, _GET_SLOT_NEEDS_SPIDER
+from .utils import (
+    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _GET_SLOT_NEEDS_SPIDER,
+    _close_spider,
+)
 
 logger = getLogger(__name__)
 _start_requests_processed = object()
@@ -91,7 +94,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
                 return middleware
         return None
 
-    def _check_spm_conflict(self):
+    async def _check_spm_conflict(self):
         checked = getattr(self, "_checked_spm_conflict", False)
         if checked:
             return
@@ -116,32 +119,21 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             "request.meta to set dont_proxy to True and zyte_api_automap "
             "either to True or to a dictionary of extra request fields."
         )
-        from twisted.internet import reactor
-        from twisted.internet.interfaces import IReactorCore
+        await _close_spider(self._crawler, "plugin_conflict")
 
-        reactor = cast(IReactorCore, reactor)
-        reactor.callLater(
-            0,
-            self._crawler.engine.close_spider,
-            self._crawler.spider,
-            "plugin_conflict",
-        )
-
-    def _start_requests_processed(self, count):
+    async def _start_requests_processed(self, count):
         self._total_start_request_count = count
-        self._maybe_close()
+        await self._maybe_close()
 
-    def process_request(self, request: Request, spider: Spider | None = None):
-        self._check_spm_conflict()
+    async def process_request(self, request: Request, spider: Spider | None = None):
+        await self._check_spm_conflict()
 
         if self._param_parser.parse(request) is None:
             return
 
         self._request_count += 1
         if self._max_requests and self._request_count > self._max_requests:
-            self._crawler.engine.close_spider(
-                self._crawler.spider, "closespider_max_zapi_requests"
-            )
+            await _close_spider(self._crawler, "closespider_max_zapi_requests")
             raise IgnoreRequest(
                 f"The request {request} is skipped as {self._max_requests} max "
                 f"Zyte API requests have been reached."
@@ -149,7 +141,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
 
         self.slot_request(request, force=True)
 
-    def process_exception(
+    async def process_exception(
         self, request: Request, exception: Exception, spider: Spider | None = None
     ):
         if (
@@ -160,9 +152,9 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             return
 
         self._forbidden_domain_start_request_count += 1
-        self._maybe_close()
+        await self._maybe_close()
 
-    def _maybe_close(self):
+    async def _maybe_close(self):
         if not self._total_start_request_count:
             return
         if self._forbidden_domain_start_request_count < self._total_start_request_count:
@@ -171,15 +163,13 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             "Stopping the spider, all start requests failed because they "
             "were pointing to a domain forbidden by Zyte API."
         )
-        self._crawler.engine.close_spider(
-            self._crawler.spider, "failed_forbidden_domain"
-        )
+        await _close_spider(self._crawler, "failed_forbidden_domain")
 
 
 class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
     def __init__(self, crawler):
         super().__init__(crawler)
-        self._send_signal = crawler.signals.send_catch_log
+        self._send_signal = crawler.signals.send_catch_log_deferred
 
     @staticmethod
     def _get_header_set(request):

@@ -2936,10 +2936,19 @@ async def test_provider(mockserver):
 
 
 class ExceptionRaisingDownloaderMiddleware:
-    async def process_request(self, request: Request, spider: Spider) -> None:
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        self.crawler = crawler
+
+    async def process_request(
+        self, request: Request, spider: Spider | None = None
+    ) -> None:
         if request.meta.get("_is_session_init_request", False):
             return
-        raise spider.exception  # type: ignore[attr-defined]
+        raise self.crawler.exception  # type: ignore[attr-defined]
 
 
 @pytest.mark.parametrize(
@@ -2999,7 +3008,6 @@ async def test_exceptions(exception, stat, reason, mockserver, caplog):
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.exception = exception
 
         def parse(self, response):
             pass
@@ -3007,6 +3015,7 @@ async def test_exceptions(exception, stat, reason, mockserver, caplog):
     caplog.clear()
     caplog.set_level("ERROR")
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    crawler.exception = exception
     await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {

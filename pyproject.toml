@@ -119,5 +119,6 @@ testpaths = [
 ]
 minversion = "6.0"
 filterwarnings = [
-    "ignore::DeprecationWarning:twisted.web.http",
+    "ignore::DeprecationWarning:twisted\\.web\\.http",
+    "ignore::DeprecationWarning:scrapy\\.core\\.downloader\\.contextfactory",  # https://github.com/scrapy/scrapy/issues/3288
 ]

@@ -17,6 +17,7 @@ _SCRAPY_2_1_0 = Version("2.1.0")
 _SCRAPY_2_4_0 = Version("2.4.0")
 _SCRAPY_2_5_0 = Version("2.5.0")
 _SCRAPY_2_6_0 = Version("2.6.0")
+_SCRAPY_2_7_0 = Version("2.7.0")
 _SCRAPY_2_10_0 = Version("2.10.0")
 _SCRAPY_2_12_0 = Version("2.12.0")
 _SCRAPY_2_13_0 = Version("2.13.0")
@@ -37,6 +38,9 @@ _DOWNLOAD_REQUEST_RETURNS_DEFERRED = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _ENGINE_HAS_DOWNLOAD_ASYNC = _SCRAPY_VERSION >= _SCRAPY_2_14_0
 _GET_SLOT_NEEDS_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _HTTP10_SUPPORT = _SCRAPY_VERSION < _SCRAPY_2_14_0
+_PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_7_0
+_PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_14_0
+_PROCESS_START_REQUIRES_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _RAW_CLASS_SETTING_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_4_0
 _REQUEST_ERROR_HAS_QUERY = _PYTHON_ZYTE_API_VERSION >= _PYTHON_ZYTE_API_0_5_2
 _RESPONSE_HAS_ATTRIBUTES = _SCRAPY_VERSION >= _SCRAPY_2_6_0
@@ -119,6 +123,36 @@ except ImportError:  # pragma: no cover
         if not is_asyncio_reactor_installed():
             return d
         return deferred_to_future(d)
+
+# TODO: Remove these commented lines once confirmed that none of the
+# _close_spider calls need to be delayed.
+#
+# def _call_later(func, *args):
+#     try:
+#         from scrapy.utils.asyncio import call_later
+#     except ImportError:  # Scrapy < 2.14
+#         from twisted.internet import reactor
+#         from twisted.internet.interfaces import IReactorCore
+
+#         reactor = cast(IReactorCore, reactor)
+#         reactor.callLater(0, func, *args)
+#     else:
+#         call_later(0, func, *args)
+
+# def _close_spider(crawler, reason):
+#     if hasattr(crawler.engine, "close_spider_async"):
+#         _call_later(partial(crawler.engine.close_spider_async, reason=reason))
+#     else:  # Scrapy < 2.14
+#         _call_later(crawler.engine.close_spider, crawler.spider, reason)
+
+
+async def _close_spider(crawler, reason):
+    if hasattr(crawler.engine, "close_spider_async"):
+        await crawler.engine.close_spider_async(reason=reason)
+    else:  # Scrapy < 2.14
+        await maybe_deferred_to_future(
+            crawler.engine.close_spider(crawler.spider, reason)
+        )
 
 
 __all__ = [

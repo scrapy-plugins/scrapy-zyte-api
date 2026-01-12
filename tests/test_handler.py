@@ -16,7 +16,6 @@ from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
 from scrapy.utils.test import get_crawler
 from zyte_api import RetryFactory
-from zyte_api.aio.client import AsyncClient
 from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import (
@@ -37,6 +36,11 @@ from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_T, UNSET
 from . import get_crawler as get_crawler_zyte_api
 from . import get_download_handler, make_handler, set_env, download_request
 from .mockserver import MockServer
+
+try:
+    from zyte_api import AsyncZyteAPI
+except ImportError:
+    from zyte_api.aio.client import AsyncClient as AsyncZyteAPI
 
 
 @pytest.mark.parametrize(
@@ -213,11 +217,11 @@ def test_api_url(setting, expected):
 
 
 def test_custom_client():
-    client = AsyncClient(api_key="a", api_url="b")
+    client = AsyncZyteAPI(api_key="a", api_url="b")
     crawler = get_crawler()
     handler = ScrapyZyteAPIDownloadHandler(crawler.settings, crawler, client)
     assert handler._client == client
-    assert handler._client != AsyncClient(api_key="a", api_url="b")
+    assert handler._client != AsyncZyteAPI(api_key="a", api_url="b")
 
 
 RETRY_POLICY_A = RetryFactory().build()
@@ -334,6 +338,9 @@ async def test_download_latency(settings, meta, is_set, mockserver):
 
     class TestSpider(Spider):
         name = "test"
+
+        async def start(self):
+            yield Request(mockserver.urljoin("/"), meta=meta)
 
         def start_requests(self):
             yield Request(mockserver.urljoin("/"), meta=meta)

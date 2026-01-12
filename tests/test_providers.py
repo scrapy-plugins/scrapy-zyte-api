@@ -46,11 +46,22 @@ from scrapy_zyte_api import (
 from scrapy_zyte_api._params import _EXTRACT_KEYS
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import _AUTO_PAGES, _ITEM_KEYWORDS, ZyteApiProvider
+from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SETTINGS
 from .mockserver import get_ephemeral_port
 
 PROVIDER_PARAMS = {"geolocation": "IE"}
+
+
+def _crawl_single_item(
+    spider_cls, resource_cls, settings, spider_kwargs=None, port=None
+):
+    return maybe_deferred_to_future(
+        crawl_single_item(
+            spider_cls, resource_cls, settings, spider_kwargs=spider_kwargs, port=port
+        )
+    )
 
 
 @attrs.define
@@ -70,8 +81,14 @@ class ProductNavigationPage(BasePage):
 class ZyteAPISpider(Spider):
     url: str
 
+    def get_start_request(self):
+        return Request(self.url, callback=self.parse_)
+
+    async def start(self):
+        yield self.get_start_request()
+
     def start_requests(self):
-        yield Request(self.url, callback=self.parse_)
+        yield self.get_start_request()
 
     def parse_(self, response: DummyResponse, page: ProductPage):
         yield {
@@ -84,8 +101,8 @@ class ZyteAPISpider(Spider):
 class ZyteAPIProviderMetaSpider(Spider):
     url: str
 
-    def start_requests(self):
-        yield Request(
+    def get_start_request(self):
+        return Request(
             self.url, callback=self.parse_, meta={"zyte_api_provider": PROVIDER_PARAMS}
         )
 
@@ -102,7 +119,7 @@ async def test_provider(mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    item, url, _ = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, _ = await _crawl_single_item(ZyteAPISpider, HtmlResource, settings)
     assert item["html"] == "<html><body>Hello<h1>World!</h1></body></html>"
     assert item["response_html"] == "<html><body>Hello<h1>World!</h1></body></html>"
     assert item["product"] == Product.from_dict(
@@ -149,7 +166,7 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
-    item, url, _ = await crawl_single_item(
+    item, url, _ = await _crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
     count_resp = await Agent(reactor).request(
@@ -176,7 +193,7 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
-    item, url, _ = await crawl_single_item(
+    item, url, _ = await _crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
     count_resp = await Agent(reactor).request(
@@ -210,7 +227,7 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1}
-    item, url, _ = await crawl_single_item(
+    item, url, _ = await _crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
     count_resp = await Agent(reactor).request(
@@ -229,7 +246,7 @@ async def test_provider_params_setting(mockserver):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_PROVIDER_PARAMS"] = PROVIDER_PARAMS
-    _, _, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    _, _, crawler = await _crawl_single_item(ZyteAPISpider, HtmlResource, settings)
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/browserHtml") == 1
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/geolocation") == 1
 
@@ -239,7 +256,7 @@ async def test_provider_params_meta(mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    _, _, crawler = await crawl_single_item(
+    _, _, crawler = await _crawl_single_item(
         ZyteAPIProviderMetaSpider, HtmlResource, settings
     )
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/browserHtml") == 1
@@ -255,7 +272,7 @@ async def test_provider_params_remove_unused_options(mockserver):
         "productOptions": {"extractFrom": "httpResponseBody"},
         "productNavigationOptions": {"extractFrom": "httpResponseBody"},
     }
-    _, _, crawler = await crawl_single_item(ZyteAPISpider, Product, settings)
+    _, _, crawler = await _crawl_single_item(ZyteAPISpider, Product, settings)
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/product") == 1
     assert crawler.stats.get_value("scrapy-zyte-api/request_args/productOptions") == 1
     assert (
@@ -282,7 +299,7 @@ async def test_provider_extractfrom(mockserver):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, url, _ = await crawl_single_item(
+    item, url, _ = await _crawl_single_item(
         AnnotatedZyteAPISpider, HtmlResource, settings
     )
     assert item["product"] == Product.from_dict(
@@ -312,7 +329,9 @@ async def test_provider_extractfrom_double(mockserver, caplog):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, _, _ = await crawl_single_item(AnnotatedZyteAPISpider, HtmlResource, settings)
+    item, _, _ = await _crawl_single_item(
+        AnnotatedZyteAPISpider, HtmlResource, settings
+    )
     assert item is None
     assert "Multiple different extractFrom specified for product" in caplog.text
 
@@ -336,7 +355,7 @@ async def test_provider_extractfrom_override(mockserver):
         "productOptions": {"extractFrom": "browserHtml"}
     }
 
-    item, url, _ = await crawl_single_item(
+    item, url, _ = await _crawl_single_item(
         AnnotatedZyteAPISpider, HtmlResource, settings
     )
     assert item["product"] == Product.from_dict(
@@ -366,7 +385,7 @@ async def test_provider_geolocation(mockserver):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, url, _ = await crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
+    item, url, _ = await _crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
     assert item["product"].name == "Product name (country DE)"
 
 
@@ -385,7 +404,7 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, url, _ = await crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
+    item, url, _ = await _crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
     assert item is None
     assert "Geolocation dependencies must be annotated" in caplog.text
 
@@ -423,7 +442,7 @@ async def test_provider_custom_attrs(mockserver, annotation):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, url, _ = await crawl_single_item(
+    item, url, _ = await _crawl_single_item(
         CustomAttrsZyteAPISpider, HtmlResource, settings
     )
     assert item["product"] == Product.from_dict(
@@ -466,7 +485,7 @@ async def test_provider_custom_attrs_values(mockserver):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, url, _ = await crawl_single_item(
+    item, url, _ = await _crawl_single_item(
         CustomAttrsZyteAPISpider, HtmlResource, settings
     )
     assert item["product"] == Product.from_dict(
@@ -511,17 +530,12 @@ async def test_provider_any_response_only(mockserver):
     class SomePage(BasePage):
         response: AnyResponse
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -540,18 +554,13 @@ async def test_provider_any_response_http_response_param(mockserver):
     class SomePage(BasePage):
         response: AnyResponse
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
     settings["ZYTE_API_PROVIDER_PARAMS"] = {"httpResponseBody": True}
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -570,18 +579,13 @@ async def test_provider_any_response_browser_html_param(mockserver):
     class SomePage(BasePage):
         response: AnyResponse
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
     settings["ZYTE_API_PROVIDER_PARAMS"] = {"browserHtml": True}
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -600,17 +604,12 @@ async def test_provider_any_response_product(mockserver):
         response: AnyResponse
         product: Product
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -631,19 +630,14 @@ async def test_provider_any_response_product_extract_from_browser_html(mockserve
         response: AnyResponse
         product: Product
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     product_options = {"extractFrom": "browserHtml"}
     settings = provider_settings(mockserver)
     settings["ZYTE_API_PROVIDER_PARAMS"] = {"productOptions": product_options}
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -665,19 +659,14 @@ async def test_provider_any_response_product_item_extract_from_browser_html(mock
     class SomePage(ItemPage[Product]):
         response: AnyResponse
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage, product: Product):
             yield {"page": page, "product": product}
 
     product_options = {"extractFrom": "browserHtml"}
     settings = provider_settings(mockserver)
     settings["ZYTE_API_PROVIDER_PARAMS"] = {"productOptions": product_options}
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -701,19 +690,14 @@ async def test_provider_any_response_product_extract_from_browser_html_2(mockser
         browser_response: BrowserResponse
         product: Product
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     product_options = {"extractFrom": "browserHtml"}
     settings = provider_settings(mockserver)
     settings["ZYTE_API_PROVIDER_PARAMS"] = {"productOptions": product_options}
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -739,19 +723,14 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
         response: AnyResponse
         product: Product
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     product_options = {"extractFrom": "httpResponseBody"}
     settings = provider_settings(mockserver)
     settings["ZYTE_API_PROVIDER_PARAMS"] = {"productOptions": product_options}
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -775,18 +754,13 @@ async def test_provider_any_response_product_options_empty(mockserver):
         response: AnyResponse
         product: Product
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
     settings["ZYTE_API_PROVIDER_PARAMS"] = {"productOptions": {}}
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -813,19 +787,14 @@ async def test_provider_any_response_product_extract_from_http_response_2(mockse
         http_response: HttpResponse
         product: Product
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     product_options = {"extractFrom": "httpResponseBody"}
     settings = provider_settings(mockserver)
     settings["ZYTE_API_PROVIDER_PARAMS"] = {"productOptions": product_options}
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -850,17 +819,12 @@ async def test_provider_any_response_browser_html(mockserver):
         response: AnyResponse
         html: BrowserHtml
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -878,17 +842,12 @@ async def test_provider_any_response_browser_response(mockserver):
         response: AnyResponse
         browser_response: BrowserResponse
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -907,17 +866,12 @@ async def test_provider_any_response_browser_html_response(mockserver):
         browser_response: BrowserResponse
         html: BrowserHtml
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -936,17 +890,12 @@ async def test_provider_any_response_http_response(mockserver):
         response: AnyResponse
         http_response: HttpResponse
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -969,17 +918,12 @@ async def test_provider_any_response_browser_http_response(mockserver):
         browser_response: BrowserResponse
         http_response: HttpResponse
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):
             yield {"page": page}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 2
@@ -1009,17 +953,12 @@ async def test_provider_any_response_http_response_multiple_pages(mockserver):
         http_response: HttpResponse
         response: AnyResponse
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page1: FirstPage, page2: SecondPage):
             yield {"page1": page1, "page2": page2}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -1045,17 +984,12 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
         http_response: HttpResponse
         response: AnyResponse
 
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page1: FirstPage, page2: SecondPage):
             yield {"page1": page1, "page2": page2}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 2
@@ -1074,17 +1008,12 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
 
 @deferred_f_from_coro_f
 async def test_screenshot(mockserver):
-    class ZyteAPISpider(Spider):
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse_)
-
+    class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, screenshot: Screenshot):
             yield {"screenshot": screenshot}
 
     settings = provider_settings(mockserver)
-    item, url, crawler = await crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
     params = crawler.engine.downloader.handlers._handlers["http"].params
 
     assert len(params) == 1
@@ -1123,7 +1052,7 @@ async def test_provider_actions(mockserver, caplog):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, url, _ = await crawl_single_item(ActionZyteAPISpider, HtmlResource, settings)
+    item, url, _ = await _crawl_single_item(ActionZyteAPISpider, HtmlResource, settings)
     assert isinstance(item["product"], Product)
     assert item["action_results"] == Actions(
         [
@@ -1164,7 +1093,7 @@ async def test_auto_field_stats_not_enabled(mockserver):
     settings = deepcopy(SETTINGS)
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(TestSpider, HtmlResource, settings)
+    _, _, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
 
     auto_field_stats = {
         k: v
@@ -1220,7 +1149,7 @@ async def test_auto_field_stats_no_override(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(TestSpider, HtmlResource, settings)
+    _, _, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
 
     auto_field_stats = {
         k: v
@@ -1267,7 +1196,7 @@ async def test_auto_field_stats_partial_override(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(
+    _, _, crawler = await _crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
 
@@ -1418,7 +1347,7 @@ async def test_auto_field_stats_full_override(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(
+    _, _, crawler = await _crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
 
@@ -1455,7 +1384,7 @@ async def test_auto_field_stats_callback_override(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(
+    _, _, crawler = await _crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
 
@@ -1505,7 +1434,7 @@ async def test_auto_field_stats_item_page_override(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(
+    _, _, crawler = await _crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
 
@@ -1569,7 +1498,7 @@ async def test_auto_field_stats_alt_page_override(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(
+    _, _, crawler = await _crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
 
@@ -1620,7 +1549,7 @@ async def test_auto_field_stats_non_auto_override(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(
+    _, _, crawler = await _crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
 
@@ -1665,7 +1594,7 @@ async def test_auto_field_stats_auto_field_decorator(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(
+    _, _, crawler = await _crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
 
@@ -1711,7 +1640,7 @@ async def test_auto_field_stats_auto_field_meta(mockserver):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
     settings["ZYTE_API_AUTO_FIELD_STATS"] = True
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
-    _, _, crawler = await crawl_single_item(
+    _, _, crawler = await _crawl_single_item(
         TestSpider, HtmlResource, settings, port=mockserver.port
     )
 
@@ -1731,8 +1660,8 @@ async def test_auto_field_stats_auto_field_meta(mockserver):
 class ZyteAPIMultipleSpider(Spider):
     url: str
 
-    def start_requests(self):
-        yield Request(self.url, callback=self.parse_)
+    def get_start_request(self):
+        return Request(self.url, callback=self.parse_)
 
     def parse_(
         self,
@@ -1753,7 +1682,7 @@ async def test_multiple_types(mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
-    item, url, _ = await crawl_single_item(
+    item, url, _ = await _crawl_single_item(
         ZyteAPIMultipleSpider, HtmlResource, settings
     )
     assert item["html"] == "<html><body>Hello<h1>World!</h1></body></html>"
