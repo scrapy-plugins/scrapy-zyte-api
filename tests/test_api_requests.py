@@ -26,7 +26,10 @@ from scrapy_zyte_api._cookies import _get_cookie_jar
 from scrapy_zyte_api._params import ANY_VALUE, _ParamParser
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.responses import _process_response
-from scrapy_zyte_api.utils import _ADDON_SUPPORT
+from scrapy_zyte_api.utils import (
+    _ADDON_SUPPORT,
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
+)
 
 from . import (
     DEFAULT_CLIENT_CONCURRENCY,
@@ -246,8 +249,9 @@ async def test_enabled(setting, enabled, mockserver):
 @pytest.mark.parametrize("zyte_api", [True, False])
 @deferred_f_from_coro_f
 async def test_coro_handling(zyte_api: bool, mockserver):
-    """ScrapyZyteAPIDownloadHandler.download_request must return a deferred
-    both when using Zyte API and when using the regular downloader logic."""
+    """ScrapyZyteAPIDownloadHandler.download_request must return a coroutine on
+    Scrapy 2.14+ or a deferred in lower Scrapy versions both when using Zyte
+    API and when using the regular downloader logic."""
     settings = {"ZYTE_API_DEFAULT_PARAMS": {"browserHtml": True}}
     async with mockserver.make_handler(settings) as handler:
         req = Request(
@@ -256,10 +260,14 @@ async def test_coro_handling(zyte_api: bool, mockserver):
             mockserver.urljoin("/"),
             meta={"zyte_api": zyte_api},
         )
-        dfd = handler.download_request(req, Spider("test"))
-        assert not iscoroutine(dfd)
-        assert isinstance(dfd, Deferred)
-        await dfd
+        result = handler.download_request(req, Spider("test"))
+        if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+            assert not iscoroutine(result)
+            assert isinstance(result, Deferred)
+        else:
+            assert iscoroutine(result)
+            assert not isinstance(result, Deferred)
+        await result
 
 
 @deferred_f_from_coro_f
