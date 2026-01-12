@@ -271,7 +271,8 @@ async def test_coro_handling(zyte_api: bool, mockserver):
             mockserver.urljoin("/"),
             meta={"zyte_api": zyte_api},
         )
-        result = handler.download_request(req, Spider("test"))
+        args = (Spider("test"),) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        result = handler.download_request(req, *args)
         if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
             assert not iscoroutine(result)
             assert isinstance(result, Deferred)
@@ -316,8 +317,9 @@ async def test_exceptions(
     caplog.set_level("DEBUG")
     async with mockserver.make_handler() as handler:
         req = Request("http://example.com", method="POST", meta=meta)
+        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with pytest.raises(exception_type):
-            await handler.download_request(req, None)
+            await handler.download_request(req, *args)
         assert exception_text in caplog.text
 
 
@@ -457,8 +459,9 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
         handler._fallback_handler.download_request = mock.AsyncMock(
             side_effect=RuntimeError
         )
+        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with pytest.raises(RuntimeError):
-            await handler.download_request(request, None)
+            await handler.download_request(request, *args)
     if uses_zyte_api:
         handler._download_request.assert_called()
     else:

@@ -21,11 +21,14 @@ from scrapy_zyte_api import (
     SessionConfig,
     get_request_session_id,
     is_session_init_request,
-    maybe_deferred_to_future,
     session_config,
 )
 from scrapy_zyte_api._session import SESSION_INIT_META_KEY, session_config_registry
-from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT, _REQUEST_ERROR_HAS_QUERY
+from scrapy_zyte_api.utils import (
+    _RAW_CLASS_SETTING_SUPPORT,
+    _REQUEST_ERROR_HAS_QUERY,
+    maybe_deferred_to_future,
+)
 
 from . import get_crawler, serialize_settings
 

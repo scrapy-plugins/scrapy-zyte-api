@@ -26,6 +26,7 @@ from scrapy_zyte_api.handler import (
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _POET_ADDON_SUPPORT,
     _X402_SUPPORT,
     _build_from_crawler,
@@ -267,7 +268,8 @@ async def test_retry_policy(
             "browserHtml": "",
             "url": "",
         }
-        await handler.download_request(req, None)
+        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        await handler.download_request(req, *args)
 
         # What we're interested in is the Request call in the API
         request_call = [c for c in handler._session.mock_calls if "get(" in str(c)]
@@ -362,7 +364,8 @@ async def test_stats(mockserver):
             "zyte_api": {"a": "...", "b": {"b0": "..."}, "experimental": {"c0": "..."}}
         }
         request = Request("https://example.com", meta=meta)
-        await handler.download_request(request, None)
+        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        await handler.download_request(request, *args)
 
         assert set(scrapy_stats.get_stats()) == {
             f"scrapy-zyte-api/{stat}"
@@ -442,8 +445,9 @@ async def test_log_request_toggle(
     async with make_handler(settings, mockserver.urljoin("/")) as handler:
         meta = {"zyte_api": {"foo": "bar"}}
         request = Request("https://example.com", meta=meta)
+        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with mock.patch("scrapy_zyte_api.handler.logger") as logger:
-            await handler.download_request(request, None)
+            await handler.download_request(request, *args)
         if enabled:
             logger.debug.assert_called()
         else:
@@ -518,8 +522,9 @@ async def test_log_request_truncate(
             "browserHtml": "",
             "url": "",
         }
+        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with mock.patch("scrapy_zyte_api.handler.logger") as logger:
-            await handler.download_request(request, None)
+            await handler.download_request(request, *args)
 
         # Check that the logged params are truncated.
         logged_message = logger.debug.call_args[0][0]

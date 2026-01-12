@@ -20,6 +20,7 @@ from twisted.web.server import NOT_DONE_YET, Site
 
 from scrapy_zyte_api._annotations import _ActionResult, ExtractFrom
 from scrapy_zyte_api.responses import _API_RESPONSE
+from scrapy_zyte_api.utils import _DOWNLOAD_REQUEST_RETURNS_DEFERRED
 
 from . import SETTINGS, make_handler
 
@@ -44,7 +45,8 @@ async def produce_request_response(mockserver, meta, settings=None):
     settings = settings if settings is not None else {**SETTINGS}
     async with mockserver.make_handler(settings) as handler:
         req = Request(mockserver.urljoin("/"), meta=meta)
-        resp = await handler.download_request(req, None)
+        args = (None,) if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
+        resp = await handler.download_request(req, *args)
         return req, resp
 
 
