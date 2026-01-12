@@ -269,7 +269,7 @@ async def test_retry_policy(
             "url": "",
         }
         args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
-        await handler.download_request(req, *args)
+        await maybe_deferred_to_future(handler.download_request(req, *args))
 
         # What we're interested in is the Request call in the API
         request_call = [c for c in handler._session.mock_calls if "get(" in str(c)]
@@ -365,7 +365,7 @@ async def test_stats(mockserver):
         }
         request = Request("https://example.com", meta=meta)
         args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
-        await handler.download_request(request, *args)
+        await maybe_deferred_to_future(handler.download_request(request, *args))
 
         assert set(scrapy_stats.get_stats()) == {
             f"scrapy-zyte-api/{stat}"
@@ -447,7 +447,7 @@ async def test_log_request_toggle(
         request = Request("https://example.com", meta=meta)
         args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with mock.patch("scrapy_zyte_api.handler.logger") as logger:
-            await handler.download_request(request, *args)
+            await maybe_deferred_to_future(handler.download_request(request, *args))
         if enabled:
             logger.debug.assert_called()
         else:
@@ -524,7 +524,7 @@ async def test_log_request_truncate(
         }
         args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with mock.patch("scrapy_zyte_api.handler.logger") as logger:
-            await handler.download_request(request, *args)
+            await maybe_deferred_to_future(handler.download_request(request, *args))
 
         # Check that the logged params are truncated.
         logged_message = logger.debug.call_args[0][0]

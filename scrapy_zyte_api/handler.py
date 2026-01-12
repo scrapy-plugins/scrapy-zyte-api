@@ -208,7 +208,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             if api_params is not None:
                 return deferred_from_coro(self._download_request(api_params, request))
             assert self._fallback_handler
-            return self._fallback_handler.download_request(request, spider)
+            return deferred_from_coro(
+                self._fallback_handler.download_request(request, spider)
+            )
     else:
 
         async def download_request(self, request: Request) -> Response:

@@ -279,7 +279,7 @@ async def test_coro_handling(zyte_api: bool, mockserver):
         else:
             assert iscoroutine(result)
             assert not isinstance(result, Deferred)
-        await result
+        await maybe_deferred_to_future(result)
 
 
 @deferred_f_from_coro_f
@@ -319,7 +319,7 @@ async def test_exceptions(
         req = Request("http://example.com", method="POST", meta=meta)
         args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with pytest.raises(exception_type):
-            await handler.download_request(req, *args)
+            await maybe_deferred_to_future(handler.download_request(req, *args))
         assert exception_text in caplog.text
 
 
@@ -461,7 +461,7 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
         )
         args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
         with pytest.raises(RuntimeError):
-            await handler.download_request(request, *args)
+            await maybe_deferred_to_future(handler.download_request(request, *args))
     if uses_zyte_api:
         handler._download_request.assert_called()
     else:

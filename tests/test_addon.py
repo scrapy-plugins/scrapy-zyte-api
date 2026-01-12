@@ -21,6 +21,7 @@ from scrapy_zyte_api.utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _HTTP10_SUPPORT,
     _POET_ADDON_SUPPORT,
+    maybe_deferred_to_future,
 )
 
 from . import get_crawler as get_crawler_zyte_api
@@ -47,7 +48,7 @@ async def test_addon(mockserver):
     async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
         request = Request("https://example.com")
         args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
-        await handler.download_request(request, *args)
+        await maybe_deferred_to_future(handler.download_request(request, *args))
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
@@ -58,12 +59,12 @@ async def test_addon_disable_transparent(mockserver):
     ) as handler:
         request = Request("https://toscrape.com")
         args = (None,) if _DOWNLOAD_REQUEST_RETURNS_DEFERRED else ()
-        await handler.download_request(request, *args)
+        await maybe_deferred_to_future(handler.download_request(request, *args))
         assert handler._stats.get_value("scrapy-zyte-api/success") is None
 
         meta = {"zyte_api": {"foo": "bar"}}
         request = Request("https://toscrape.com", meta=meta)
-        await handler.download_request(request, *args)
+        await maybe_deferred_to_future(handler.download_request(request, *args))
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
