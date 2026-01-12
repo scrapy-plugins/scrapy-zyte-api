@@ -18,7 +18,7 @@ from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
 from zyte_api import RequestError, RetryFactory
 
-from .utils import _DOWNLOAD_NEEDS_SPIDER, _build_from_crawler  # type: ignore[attr-defined]
+from .utils import _DOWNLOAD_NEEDS_SPIDER, _build_from_crawler, deferred_to_future  # type: ignore[attr-defined]
 
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
@@ -134,46 +134,6 @@ except ImportError:
 
     def NO_CALLBACK(response):  # type: ignore[misc]
         pass  # pragma: no cover
-
-
-try:
-    from scrapy.utils.defer import deferred_to_future
-except ImportError:  # pragma: no cover
-    import asyncio
-    from warnings import catch_warnings, filterwarnings
-
-    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/reactor.py#L119-L147
-    def set_asyncio_event_loop():
-        try:
-            with catch_warnings():
-                # In Python 3.10.9, 3.11.1, 3.12 and 3.13, a DeprecationWarning
-                # is emitted about the lack of a current event loop, because in
-                # Python 3.14 and later `get_event_loop` will raise a
-                # RuntimeError in that event. Because our code is already
-                # prepared for that future behavior, we ignore the deprecation
-                # warning.
-                filterwarnings(
-                    "ignore",
-                    message="There is no current event loop",
-                    category=DeprecationWarning,
-                )
-                event_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # `get_event_loop` raises RuntimeError when called with no asyncio
-            # event loop yet installed in the following scenarios:
-            # - Previsibly on Python 3.14 and later.
-            #   https://github.com/python/cpython/issues/100160#issuecomment-1345581902
-            event_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(event_loop)
-        return event_loop
-
-    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/reactor.py#L115-L116
-    def _get_asyncio_event_loop():
-        return set_asyncio_event_loop()
-
-    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/defer.py#L360-L379
-    def deferred_to_future(d):  # type: ignore[misc]
-        return d.asFuture(_get_asyncio_event_loop())
 
 
 class PoolError(ValueError):

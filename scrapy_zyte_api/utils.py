@@ -75,36 +75,38 @@ except ImportError:
 else:
     _X402_SUPPORT = True
 
-try:
-    from scrapy.utils.defer import maybe_deferred_to_future  # noqa: F401
-except ImportError:  # Scrapy < 2.14
-    from asyncio import get_event_loop, new_event_loop, set_event_loop
 
-    from scrapy.utils.misc import load_object
+try:
+    from scrapy.utils.defer import deferred_to_future, maybe_deferred_to_future
+except ImportError:  # pragma: no cover
+    # Scrapy < 2.14
+
+    import asyncio
+    from warnings import catch_warnings, filterwarnings
+
     from scrapy.utils.reactor import is_asyncio_reactor_installed
 
-    def set_asyncio_event_loop(event_loop_path):
-        if event_loop_path is not None:
-            event_loop_class = load_object(event_loop_path)
-            event_loop = set_asyncio_event_loop(None)
-            if not isinstance(event_loop, event_loop_class):
-                event_loop = event_loop_class()
-                set_event_loop(event_loop)
-        else:
-            try:
-                with catch_warnings():
-                    filterwarnings(
-                        "ignore",
-                        message="There is no current event loop",
-                        category=DeprecationWarning,
-                    )
-                    event_loop = get_event_loop()
-            except RuntimeError:
-                event_loop = new_event_loop()
-                set_event_loop(event_loop)
+    def set_asyncio_event_loop():
+        try:
+            with catch_warnings():
+                filterwarnings(
+                    "ignore",
+                    message="There is no current event loop",
+                    category=DeprecationWarning,
+                )
+                event_loop = asyncio.get_event_loop()
+        except RuntimeError:
+            event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(event_loop)
         return event_loop
+
+    def _get_asyncio_event_loop():
+        return set_asyncio_event_loop()
+
+    def deferred_to_future(d):  # type: ignore[misc]
+        return d.asFuture(_get_asyncio_event_loop())
 
     def maybe_deferred_to_future(d):
         if not is_asyncio_reactor_installed():
             return d
-        return d.asFuture(set_asyncio_event_loop(None))
+        return deferred_to_future(d)
