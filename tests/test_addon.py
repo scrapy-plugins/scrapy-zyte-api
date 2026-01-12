@@ -16,7 +16,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
-from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT
+from scrapy_zyte_api.utils import _HTTP10_SUPPORT, _POET_ADDON_SUPPORT
 
 from . import get_crawler as get_crawler_zyte_api
 from . import get_download_handler, make_handler, serialize_settings
@@ -159,6 +159,11 @@ def _test_setting_changes(initial_settings, expected_settings):
     assert actual_settings == expected_settings
 
 
+FALLBACK_HANDLER = (
+    "scrapy.core.downloader.handlers.http.HTTPDownloadHandler"
+    if _HTTP10_SUPPORT
+    else "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
+)
 BASE_EXPECTED = {
     "DOWNLOADER_MIDDLEWARES": {
         ScrapyZyteAPIDownloaderMiddleware: 633,
@@ -173,8 +178,8 @@ BASE_EXPECTED = {
         ScrapyZyteAPISpiderMiddleware: 100,
         ScrapyZyteAPIRefererSpiderMiddleware: 1000,
     },
-    "ZYTE_API_FALLBACK_HTTPS_HANDLER": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
-    "ZYTE_API_FALLBACK_HTTP_HANDLER": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
+    "ZYTE_API_FALLBACK_HTTPS_HANDLER": FALLBACK_HANDLER,
+    "ZYTE_API_FALLBACK_HTTP_HANDLER": FALLBACK_HANDLER,
     "ZYTE_API_TRANSPARENT_MODE": True,
 }
 if TWISTED_REACTOR != "twisted.internet.asyncioreactor.AsyncioSelectorReactor":
