@@ -41,12 +41,11 @@ jobs:
         - python-version: '3.11'
         - python-version: '3.12'
         - python-version: '3.13'
-        - python-version: '3.14'
-        - python-version: '3.14'
+        - python-version: '3.13'
           toxenv: extra
-        - python-version: '3.14'
+        - python-version: '3.13'
           toxenv: provider
-        - python-version: '3.14'
+        - python-version: '3.13'
           toxenv: x402
     steps:
     - uses: actions/checkout@v4
