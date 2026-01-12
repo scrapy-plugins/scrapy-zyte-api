@@ -30,6 +30,7 @@ from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _X402_SUPPORT,
     _build_from_crawler,
     USER_AGENT,
+    maybe_deferred_to_future,
 )
 
 from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_T, UNSET
@@ -604,7 +605,7 @@ async def test_bad_key():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "zyte_api_bad_key"
@@ -632,7 +633,7 @@ async def test_suspended_account_start_urls():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
@@ -657,7 +658,7 @@ async def test_suspended_account_callback():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"

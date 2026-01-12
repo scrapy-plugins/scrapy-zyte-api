@@ -16,6 +16,7 @@ from scrapy_zyte_api import (
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _START_REQUESTS_CAN_YIELD_ITEMS,
     _build_from_crawler,
+    maybe_deferred_to_future,
 )
 
 from . import SETTINGS
@@ -163,7 +164,7 @@ async def test_max_requests(caplog):
 
         crawler = get_crawler(TestSpider, settings_dict=settings)
         with caplog.at_level("INFO"):
-            await crawler.crawl()
+            await maybe_deferred_to_future(crawler.crawl())
 
     assert (
         f"Maximum Zyte API requests for this crawl is set at {zapi_max_requests}"
@@ -211,7 +212,7 @@ async def test_max_requests_race_condition(caplog):
 
         crawler = get_crawler(TestSpider, settings_dict=settings)
         with caplog.at_level("INFO"):
-            await crawler.crawl()
+            await maybe_deferred_to_future(crawler.crawl())
 
     assert (
         f"Maximum Zyte API requests for this crawl is set at {zapi_max_requests}"
@@ -247,7 +248,7 @@ async def test_forbidden_domain_start_url():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
@@ -274,7 +275,7 @@ async def test_forbidden_domain_start_urls():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
@@ -300,7 +301,7 @@ async def test_some_forbidden_domain_start_url():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "finished"
@@ -325,7 +326,7 @@ async def test_follow_up_forbidden_domain_url():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "finished"
@@ -356,7 +357,7 @@ async def test_forbidden_domain_with_partial_start_request_consumption():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "failed_forbidden_domain"
@@ -403,7 +404,7 @@ async def test_spm_conflict_smartproxy(setting, attribute, conflict):
         settings["ZYTE_SMARTPROXY_ENABLED"] = setting
 
     crawler = get_crawler(SPMSpider, settings_dict=settings)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
     expected = "plugin_conflict" if conflict else "finished"
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == expected
@@ -458,7 +459,7 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
         settings["CRAWLERA_ENABLED"] = setting
 
     crawler = get_crawler(CrawleraSpider, settings_dict=settings)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
     expected = "plugin_conflict" if conflict else "finished"
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == expected, (
@@ -478,7 +479,7 @@ async def test_start_requests_items():
             yield {"foo": "bar"}
 
     crawler = get_crawler(TestSpider, settings_dict=SETTINGS)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats is not None
     assert crawler.stats.get_value("finish_reason") == "finished"

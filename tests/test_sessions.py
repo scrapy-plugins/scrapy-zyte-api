@@ -21,6 +21,7 @@ from scrapy_zyte_api import (
     SessionConfig,
     get_request_session_id,
     is_session_init_request,
+    maybe_deferred_to_future,
     session_config,
 )
 from scrapy_zyte_api._session import SESSION_INIT_META_KEY, session_config_registry
@@ -64,7 +65,7 @@ async def test_enabled(setting, meta, outcome, mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -266,7 +267,7 @@ async def test_params_precedence(
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -327,7 +328,7 @@ async def test_url_override(params, close_reason, stats, mockserver):
             self.close_reason = reason
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -534,7 +535,7 @@ async def test_checker(checker, close_reason, stats, mockserver):
             self.close_reason = reason
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -619,7 +620,7 @@ async def test_checker_location(postal_code, url, close_reason, stats, mockserve
             self.close_reason = reason
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -660,7 +661,7 @@ async def test_checker_close_spider_use(mockserver):
             self.close_reason = reason
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -700,7 +701,7 @@ async def test_max_bad_inits(setting, value, mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -743,7 +744,7 @@ async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mocks
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -790,7 +791,7 @@ async def test_max_check_failures(setting, value, mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -837,7 +838,7 @@ async def test_max_errors(setting, value, mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -882,7 +883,7 @@ async def test_check_overrides_error(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -960,7 +961,7 @@ async def test_pool(meta, pool, mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1004,7 +1005,7 @@ async def test_pool_params(mockserver, caplog):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     caplog.clear()
     caplog.set_level("INFO")
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1059,7 +1060,7 @@ async def test_pool_size(setting, value, mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1099,7 +1100,7 @@ async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1335,7 +1336,7 @@ async def test_session_config(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1355,7 +1356,7 @@ async def test_session_config(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1432,7 +1433,7 @@ async def test_session_config_check_meta(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1470,7 +1471,7 @@ async def test_session_config_enabled(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1562,7 +1563,7 @@ async def test_session_config_location(settings, meta, used, mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1667,7 +1668,7 @@ async def test_session_config_location_bad(settings, meta, used, mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1752,7 +1753,7 @@ async def test_session_config_params_location(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1822,7 +1823,7 @@ async def test_session_config_params_location_no_set_location(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1941,7 +1942,7 @@ async def test_session_config_params_precedence(
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -1987,7 +1988,7 @@ async def test_session_config_params_error(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2036,7 +2037,7 @@ async def test_session_config_pool_caching(mockserver):
             self.close_reason = reason
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2086,7 +2087,7 @@ async def test_session_config_pool_error(mockserver):
             self.close_reason = reason
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2154,7 +2155,7 @@ async def test_session_config_process_request_change_request(mockserver):
             request_headers.append(response.request.headers["foo"])
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     assert request_headers == [b"bar"]
 
@@ -2212,7 +2213,7 @@ async def test_session_config_process_request_new_request(mockserver):
             output_urls.append(response.url)
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     assert output_urls == ["https://example.com/bar"]
 
@@ -2311,7 +2312,7 @@ async def test_location_session_config(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2330,7 +2331,7 @@ async def test_location_session_config(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2398,7 +2399,7 @@ async def test_location_session_config_no_methods(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2464,7 +2465,7 @@ async def test_location_session_config_no_location(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2518,7 +2519,7 @@ async def test_session_refresh(mockserver):
     crawler.signals.connect(
         tracker.track_session, signal=signals.request_reached_downloader
     )
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2560,7 +2561,7 @@ async def test_session_refresh_concurrent(mockserver):
                 yield Request(f"https://example.com/{n}?temporary-download-error")
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2628,7 +2629,7 @@ async def test_cookies(mockserver):
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2683,7 +2684,7 @@ async def test_empty_queue(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2714,7 +2715,7 @@ async def test_empty_queue_limit(mockserver):
             pass
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2771,7 +2772,7 @@ async def test_missing_session_id(mockserver, caplog):
     caplog.clear()
     caplog.set_level("WARNING")
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2865,7 +2866,7 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -2917,7 +2918,7 @@ async def test_provider(mockserver):
 
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
@@ -3003,7 +3004,7 @@ async def test_exceptions(exception, stat, reason, mockserver, caplog):
     caplog.clear()
     caplog.set_level("ERROR")
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
