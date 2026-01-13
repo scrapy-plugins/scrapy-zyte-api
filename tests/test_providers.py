@@ -169,8 +169,8 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     item, url, _ = await _crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
-    count_resp = await Agent(reactor).request(
-        b"GET", fresh_mockserver.urljoin("/count").encode()
+    count_resp = await maybe_deferred_to_future(
+        Agent(reactor).request(b"GET", fresh_mockserver.urljoin("/count").encode())
     )
     call_count = int((await readBody(count_resp)).decode())
     assert call_count == 1
@@ -196,8 +196,8 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     item, url, _ = await _crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
-    count_resp = await Agent(reactor).request(
-        b"GET", fresh_mockserver.urljoin("/count").encode()
+    count_resp = await maybe_deferred_to_future(
+        Agent(reactor).request(b"GET", fresh_mockserver.urljoin("/count").encode())
     )
     call_count = int((await readBody(count_resp)).decode())
     assert call_count == 1
@@ -230,8 +230,8 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
     item, url, _ = await _crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
-    count_resp = await Agent(reactor).request(
-        b"GET", fresh_mockserver.urljoin("/count").encode()
+    count_resp = await maybe_deferred_to_future(
+        Agent(reactor).request(b"GET", fresh_mockserver.urljoin("/count").encode())
     )
     call_count = int((await readBody(count_resp)).decode())
     assert call_count == 1
