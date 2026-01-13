@@ -1,3 +1,4 @@
+import asyncio
 from importlib.metadata import version
 from typing import Any, Coroutine, cast
 from warnings import catch_warnings, filterwarnings
