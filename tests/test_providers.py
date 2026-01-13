@@ -79,6 +79,7 @@ class ProductNavigationPage(BasePage):
 
 
 class ZyteAPISpider(Spider):
+    name: str = "test_spider"
     url: str
 
     def get_start_request(self):
@@ -1080,14 +1081,8 @@ def test_auto_pages_set():
 
 @deferred_f_from_coro_f
 async def test_auto_field_stats_not_enabled(mockserver):
-    class TestSpider(Spider):
-        name = "test_spider"
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse)
-
-        def parse(self, response: DummyResponse, product: Product):
+    class TestSpider(ZyteAPISpider):
+        def _parse(self, response: DummyResponse, product: Product):
             pass
 
     settings = deepcopy(SETTINGS)
@@ -1134,14 +1129,15 @@ async def test_auto_field_stats_no_override(mockserver):
             super().min_value(key, value, spider)
 
     class TestSpider(Spider):
-        name = "test_spider"
-        url: str
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
         def start_requests(self):
             for url in ("data:,a", "data:,b"):
-                yield Request(url, callback=self.parse)
+                yield Request(url, callback=self._parse)
 
-        def parse(self, response: DummyResponse, product: Product):
+        def _parse(self, response: DummyResponse, product: Product):
             pass
 
     settings = deepcopy(SETTINGS)
@@ -1182,14 +1178,8 @@ async def test_auto_field_stats_partial_override(mockserver):
 
     handle_urls(f"{mockserver.host}:{mockserver.port}")(MyProductPage)
 
-    class TestSpider(Spider):
-        name = "test_spider"
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse)
-
-        def parse(self, response: DummyResponse, product: Product):
+    class TestSpider(ZyteAPISpider):
+        def _parse(self, response: DummyResponse, product: Product):
             pass
 
     settings = deepcopy(SETTINGS)
@@ -1333,14 +1323,8 @@ async def test_auto_field_stats_full_override(mockserver):
 
     handle_urls(f"{mockserver.host}:{mockserver.port}")(MyProductPage)
 
-    class TestSpider(Spider):
-        name = "test_spider"
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse)
-
-        def parse(self, response: DummyResponse, product: Product):
+    class TestSpider(ZyteAPISpider):
+        def _parse(self, response: DummyResponse, product: Product):
             pass
 
     settings = deepcopy(SETTINGS)
@@ -1369,14 +1353,8 @@ async def test_auto_field_stats_callback_override(mockserver):
     """Fields overridden in callbacks, instead of using a page object, are not
     taken into account."""
 
-    class TestSpider(Spider):
-        name = "test_spider"
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse)
-
-        def parse(self, response: DummyResponse, product: Product):
+    class TestSpider(ZyteAPISpider):
+        def _parse(self, response: DummyResponse, product: Product):
             product.name = "foo"
             yield product
 
@@ -1420,14 +1398,8 @@ async def test_auto_field_stats_item_page_override(mockserver):
 
     handle_urls(f"{mockserver.host}:{mockserver.port}")(MyProductPage)
 
-    class TestSpider(Spider):
-        name = "test_spider"
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse)
-
-        def parse(self, response: DummyResponse, page: MyProductPage):
+    class TestSpider(ZyteAPISpider):
+        def _parse(self, response: DummyResponse, page: MyProductPage):
             pass
 
     settings = deepcopy(SETTINGS)
@@ -1484,14 +1456,8 @@ async def test_auto_field_stats_alt_page_override(mockserver):
 
     handle_urls(f"{mockserver.host}:{mockserver.port}", priority=0)(AltProductPage)
 
-    class TestSpider(Spider):
-        name = "test_spider"
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse)
-
-        def parse(self, response: DummyResponse, page: AltProductPage):
+    class TestSpider(ZyteAPISpider):
+        def _parse(self, response: DummyResponse, page: AltProductPage):
             pass
 
     settings = deepcopy(SETTINGS)
@@ -1535,14 +1501,8 @@ async def test_auto_field_stats_non_auto_override(mockserver):
 
     handle_urls(f"{mockserver.host}:{mockserver.port}")(MyProductPage)
 
-    class TestSpider(Spider):
-        name = "test_spider"
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse)
-
-        def parse(self, response: DummyResponse, product: Product):
+    class TestSpider(ZyteAPISpider):
+        def _parse(self, response: DummyResponse, product: Product):
             pass
 
     settings = deepcopy(SETTINGS)
@@ -1580,14 +1540,8 @@ async def test_auto_field_stats_auto_field_decorator(mockserver):
 
     handle_urls(f"{mockserver.host}:{mockserver.port}")(MyProductPage)
 
-    class TestSpider(Spider):
-        name = "test_spider"
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse)
-
-        def parse(self, response: DummyResponse, product: Product):
+    class TestSpider(ZyteAPISpider):
+        def _parse(self, response: DummyResponse, product: Product):
             pass
 
     settings = deepcopy(SETTINGS)
@@ -1626,14 +1580,8 @@ async def test_auto_field_stats_auto_field_meta(mockserver):
 
     handle_urls(f"{mockserver.host}:{mockserver.port}")(MyProductPage)
 
-    class TestSpider(Spider):
-        name = "test_spider"
-        url: str
-
-        def start_requests(self):
-            yield Request(self.url, callback=self.parse)
-
-        def parse(self, response: DummyResponse, product: Product):
+    class TestSpider(ZyteAPISpider):
+        def _parse(self, response: DummyResponse, product: Product):
             pass
 
     settings = deepcopy(SETTINGS)
@@ -1657,7 +1605,7 @@ async def test_auto_field_stats_auto_field_meta(mockserver):
     default_registry.__init__()  # type: ignore[misc]
 
 
-class ZyteAPIMultipleSpider(Spider):
+class ZyteAPIMultipleSpider(ZyteAPISpider):
     url: str
 
     def get_start_request(self):
