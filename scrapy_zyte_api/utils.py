@@ -210,7 +210,7 @@ except ImportError:  # pragma: no cover
         if inspect.isawaitable(o):
             return o
 
-        async def coro() -> _T:
+        async def coro():
             return o
 
         return coro()
