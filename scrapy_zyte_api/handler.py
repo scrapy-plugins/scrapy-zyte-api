@@ -340,7 +340,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             (403, "/auth/account-suspended", "zyte_api_suspended_account"),
         ):
             if error.status == status and error.parsed.type == error_type:
-                await _close_spider(self._crawler, close_reason)
+                _close_spider(self._crawler, close_reason)
                 return
 
     def _log_request(self, params):

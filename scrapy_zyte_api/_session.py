@@ -537,11 +537,11 @@ class FatalErrorHandler:
             return
         close = partial(_close_spider, self.crawler)
         if issubclass(exc_type, TooManyBadSessionInits):
-            await close("bad_session_inits")
+            close("bad_session_inits")
         elif issubclass(exc_type, PoolError):
-            await close("pool_error")
+            close("pool_error")
         elif issubclass(exc_type, CloseSpider):
-            await close(exc.reason)
+            close(exc.reason)
 
 
 session_config_registry = SessionConfigRulesRegistry()

@@ -281,9 +281,9 @@ async def test_coro_handling(zyte_api: bool, mockserver):
             assert not isinstance(result, Deferred)
         else:
             result = handler.download_request(req, None)
-            assert iscoroutine(result)
-            assert not isinstance(result, Deferred)
-        await result
+            assert not iscoroutine(result)
+            assert isinstance(result, Deferred)
+        await maybe_deferred_to_future(result)
 
 
 @deferred_f_from_coro_f
@@ -2956,7 +2956,7 @@ async def test_automap_all_cookies(meta):
         meta=meta,
         cookies={"a": "b"},
     )
-    process_request(cookie_middleware, pre_request)
+    await process_request(cookie_middleware, pre_request)
 
     # Send a request to c.example, with a cookie for b.example, and ensure that
     # it includes the cookies for a.example and b.example.
@@ -2971,7 +2971,7 @@ async def test_automap_all_cookies(meta):
             },
         ],
     )
-    process_request(cookie_middleware, request1)
+    await process_request(cookie_middleware, request1)
     api_params = param_parser.parse(request1)
     assert api_params["experimental"]["requestCookies"] == [
         {"name": "a", "value": "b", "domain": "a.example"},
@@ -3006,7 +3006,7 @@ async def test_automap_all_cookies(meta):
     }
     assert handler._cookie_jars is not None  # typing
     response = _process_response(api_response, request1, handler._cookie_jars)
-    process_response(cookie_middleware, request1, response)
+    await process_response(cookie_middleware, request1, response)
 
     # Send a second request to e.example, and ensure that cookies
     # for all other domains are included.
@@ -3014,7 +3014,7 @@ async def test_automap_all_cookies(meta):
         url="https://e.example",
         meta=meta,
     )
-    process_request(cookie_middleware, request2)
+    await process_request(cookie_middleware, request2)
     api_params = param_parser.parse(request2)
 
     assert sort_dict_list(
@@ -3058,17 +3058,17 @@ async def test_automap_cookie_jar(meta):
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
 
-    process_request(cookie_middleware, request1)
+    await process_request(cookie_middleware, request1)
     api_params = param_parser.parse(request1)
     assert api_params["experimental"]["requestCookies"] == [
         {"name": "z", "value": "y", "domain": "example.com"}
     ]
 
-    process_request(cookie_middleware, request2)
+    await process_request(cookie_middleware, request2)
     api_params = param_parser.parse(request2)
     assert "requestCookies" not in api_params["experimental"]
 
-    process_request(cookie_middleware, request3)
+    await process_request(cookie_middleware, request3)
 
     api_params = param_parser.parse(request3)
     assert sort_dict_list(
@@ -3080,7 +3080,7 @@ async def test_automap_cookie_jar(meta):
         ]
     )
 
-    process_request(cookie_middleware, request4)
+    await process_request(cookie_middleware, request4)
     api_params = param_parser.parse(request4)
     assert sort_dict_list(
         api_params["experimental"]["requestCookies"]
@@ -3119,7 +3119,7 @@ async def test_automap_cookie_limit(meta, caplog):
         cookies={"z": "y"},
     )
     cookiejar += 1
-    process_request(cookie_middleware, request)
+    await process_request(cookie_middleware, request)
     caplog.clear()
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
@@ -3137,7 +3137,7 @@ async def test_automap_cookie_limit(meta, caplog):
         cookies={"z": "y", "x": "w"},
     )
     cookiejar += 1
-    process_request(cookie_middleware, request)
+    await process_request(cookie_middleware, request)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     assert api_params["experimental"]["requestCookies"] in [
@@ -3155,14 +3155,14 @@ async def test_automap_cookie_limit(meta, caplog):
         meta={**meta, "cookiejar": cookiejar},
         cookies={"z": "y"},
     )
-    process_request(cookie_middleware, pre_request)
+    await process_request(cookie_middleware, pre_request)
     request = Request(
         url="https://example.com/1",
         meta={**meta, "cookiejar": cookiejar},
         cookies={"x": "w"},
     )
     cookiejar += 1
-    process_request(cookie_middleware, request)
+    await process_request(cookie_middleware, request)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     assert api_params["experimental"]["requestCookies"] in [
@@ -3179,14 +3179,14 @@ async def test_automap_cookie_limit(meta, caplog):
         meta={**meta, "cookiejar": cookiejar},
         cookies={"z": "y"},
     )
-    process_request(cookie_middleware, pre_request)
+    await process_request(cookie_middleware, pre_request)
     request = Request(
         url="https://example.com/1",
         meta={**meta, "cookiejar": cookiejar},
         cookies={"x": "w"},
     )
     cookiejar += 1
-    process_request(cookie_middleware, request)
+    await process_request(cookie_middleware, request)
     with caplog.at_level("WARNING"):
         api_params = param_parser.parse(request)
     assert api_params["experimental"]["requestCookies"] in [
@@ -3247,7 +3247,7 @@ async def test_automap_custom_cookie_middleware():
     param_parser = handler._param_parser
 
     request = Request(url="https://example.com/1")
-    process_request(cookie_middleware, request)
+    await process_request(cookie_middleware, request)
     api_params = param_parser.parse(request)
     assert api_params["experimental"]["requestCookies"] == [
         {"name": "z", "value": "y", "domain": "example.com"}
@@ -3705,7 +3705,7 @@ async def test_middleware_headers_request_headers_skip():
 
 
 class DefaultValuesDownloaderMiddleware:
-    def process_request(self, request: Request, spider: Spider | None = None):
+    async def process_request(self, request: Request, spider: Spider | None = None):
         for k, v in {
             **DEFAULT_REQUEST_HEADERS,
             "Accept-Encoding": DEFAULT_ACCEPT_ENCODING,
@@ -3735,7 +3735,7 @@ async def test_middleware_headers_custom_middleware_before():
 
 
 class CustomValuesDownloaderMiddleware:
-    def process_request(self, request: Request, spider: Spider | None = None):
+    async def process_request(self, request: Request, spider: Spider | None = None):
         for k, v in {
             "Accept": "text/html",
             "Accept-Language": "fa",

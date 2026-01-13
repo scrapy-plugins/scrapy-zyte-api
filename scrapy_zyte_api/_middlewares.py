@@ -10,6 +10,7 @@ from .utils import (
     _GET_SLOT_NEEDS_SPIDER,
     _LOG_DEFERRED_IS_DEPRECATED,
     _close_spider,
+    _schedule_coro,
 )
 
 logger = getLogger(__name__)
@@ -120,7 +121,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             "request.meta to set dont_proxy to True and zyte_api_automap "
             "either to True or to a dictionary of extra request fields."
         )
-        await _close_spider(self._crawler, "plugin_conflict")
+        _close_spider(self._crawler, "plugin_conflict")
 
     async def _start_requests_processed(self, count):
         self._total_start_request_count = count
@@ -134,7 +135,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
 
         self._request_count += 1
         if self._max_requests and self._request_count > self._max_requests:
-            await _close_spider(self._crawler, "closespider_max_zapi_requests")
+            _close_spider(self._crawler, "closespider_max_zapi_requests")
             raise IgnoreRequest(
                 f"The request {request} is skipped as {self._max_requests} max "
                 f"Zyte API requests have been reached."
@@ -164,7 +165,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             "Stopping the spider, all start requests failed because they "
             "were pointing to a domain forbidden by Zyte API."
         )
-        await _close_spider(self._crawler, "failed_forbidden_domain")
+        _close_spider(self._crawler, "failed_forbidden_domain")
 
 
 class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
@@ -179,7 +180,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
     def _get_header_set(request):
         return {header.strip().lower() for header in request.headers}
 
-    async def process_start(self, start):
+    async def process_start(self, start, spider: Spider | None = None):
         # Mark start requests and reports to the downloader middleware the
         # number of them once all have been processed.
         count = 0
@@ -189,9 +190,9 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
                 item_or_request.meta["is_start_request"] = True
                 self._process_output_request(item_or_request)
             yield item_or_request
-        self._send_signal(_start_requests_processed, count=count)
+        await self._send_signal(_start_requests_processed, count=count)
 
-    def process_start_requests(self, start_requests, spider):
+    def process_start_requests(self, start_requests, spider: Spider):
         count = 0
         for item_or_request in start_requests:
             if isinstance(item_or_request, Request):
@@ -199,7 +200,10 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
                 item_or_request.meta["is_start_request"] = True
                 self._process_output_request(item_or_request)
             yield item_or_request
-        self._send_signal(_start_requests_processed, count=count)
+        if _LOG_DEFERRED_IS_DEPRECATED:
+            _schedule_coro(self._send_signal(_start_requests_processed, count=count))
+        else:
+            self._send_signal(_start_requests_processed, count=count)
 
     def _process_output_request(self, request: Request):
         if "_pre_mw_headers" not in request.meta:

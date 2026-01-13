@@ -21,6 +21,7 @@ from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.utils import (
     _POET_ADDON_SUPPORT,
+    _ensure_awaitable,
     maybe_deferred_to_future,
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
 )
@@ -181,15 +182,17 @@ async def download_request(handler, request) -> Response:
     return await future
 
 
-def process_request(middleware, request) -> Request | None:
+async def process_request(middleware, request) -> Request | None:
     if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
-        return middleware.process_request(request)
+        maybe_awaitable = middleware.process_request(request)
     else:
-        return middleware.process_request(request, spider=None)
+        maybe_awaitable = middleware.process_request(request, spider=None)
+    await _ensure_awaitable(maybe_awaitable)
 
 
-def process_response(middleware, request, response) -> Request | None:
+async def process_response(middleware, request, response) -> Request | None:
     if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
-        return middleware.process_response(request, response)
+        maybe_awaitable = middleware.process_response(request, response)
     else:
-        return middleware.process_response(request, response, spider=None)
+        maybe_awaitable = middleware.process_response(request, response, spider=None)
+    await _ensure_awaitable(maybe_awaitable)

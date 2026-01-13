@@ -1,10 +1,12 @@
 import asyncio
+import sys
 from importlib.metadata import version
 from typing import Any, Coroutine, cast
 from warnings import catch_warnings, filterwarnings
 
 import scrapy
 from packaging.version import Version
+from twisted.internet import asyncioreactor
 from zyte_api.utils import USER_AGENT as PYTHON_ZYTE_API_USER_AGENT
 
 from .__version__ import __version__
@@ -85,6 +87,18 @@ else:
 
 
 try:
+    from scrapy.utils.reactor import (
+        is_asyncio_reactor_installed as _is_asyncio_reactor_installed,
+    )
+except ImportError:  # Scrapy < 2.14
+
+    def _is_asyncio_reactor_installed():
+        from twisted.internet import reactor
+
+        return isinstance(reactor, asyncioreactor.AsyncioSelectorReactor)
+
+
+try:
     from scrapy.utils.defer import deferred_to_future, maybe_deferred_to_future
 except ImportError:  # pragma: no cover
     # Scrapy < 2.14
@@ -92,8 +106,6 @@ except ImportError:  # pragma: no cover
     import asyncio
     from typing import TYPE_CHECKING, TypeVar, Union
     from warnings import catch_warnings, filterwarnings
-
-    from scrapy.utils.reactor import is_asyncio_reactor_installed
 
     if TYPE_CHECKING:
         from twisted.internet.defer import Deferred
@@ -123,12 +135,9 @@ except ImportError:  # pragma: no cover
     def maybe_deferred_to_future(
         d: "Deferred[_T]",
     ) -> Union["Deferred[_T]", "asyncio.Future[_T]"]:
-        if not is_asyncio_reactor_installed():
+        if not _is_asyncio_reactor_installed():
             return d
         return deferred_to_future(d)
-
-# TODO: Remove these commented lines once confirmed that none of the
-# _close_spider calls need to be delayed.
 
 
 def _call_later(func, *args):
@@ -147,22 +156,64 @@ def _call_later(func, *args):
         loop.call_soon(func, *args)
 
 
+try:
+    from scrapy.utils.reactor import is_reactor_installed as _is_reactor_installed
+except ImportError:  # Scrapy < 2.14
+
+    def _is_reactor_installed() -> bool:
+        return "twisted.internet.reactor" in sys.modules
+
+
+try:
+    from scrapy.utils.asyncio import is_asyncio_available as _is_asyncio_available
+except ImportError:  # Scrapy < 2.14
+
+    def _is_asyncio_available() -> bool:
+        if not _is_reactor_installed():
+            raise RuntimeError(
+                "is_asyncio_available() called without an installed reactor."
+            )
+
+        return _is_asyncio_reactor_installed()
+
+
 # https://github.com/scrapy/scrapy/blob/0b9d8da09dd2cb1b74ddf025107e6f584839fbff/scrapy/utils/defer.py#L525
 def _schedule_coro(coro: Coroutine[Any, Any, Any]) -> None:
-    from scrapy.utils.asyncio import is_asyncio_available
+    if not _is_asyncio_available():
+        from twisted.internet.defer import Deferred
 
-    if not is_asyncio_available():
         Deferred.fromCoroutine(coro)
         return
     loop = asyncio.get_event_loop()
     loop.create_task(coro)  # noqa: RUF006
 
 
-async def _close_spider(crawler, reason):
+def _close_spider(crawler, reason):
     if hasattr(crawler.engine, "close_spider_async"):
         _schedule_coro(crawler.engine.close_spider_async(reason=reason))
-    else:  # Scrapy < 2.14
-        _call_later(crawler.engine.close_spider, crawler.spider, reason)
+    else:
+        crawler.engine.close_spider(crawler.spider, reason)
+
+
+try:
+    from scrapy.utils.defer import ensure_awaitable as _ensure_awaitable
+except ImportError:  # pragma: no cover
+    # Scrapy < 2.14
+
+    import inspect
+
+    from twisted.internet.defer import Deferred
+
+    def _ensure_awaitable(o):
+        if isinstance(o, Deferred):
+            return maybe_deferred_to_future(o)
+        if inspect.isawaitable(o):
+            return o
+
+        async def coro() -> _T:
+            return o
+
+        return coro()
 
 
 __all__ = [
