@@ -110,7 +110,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
                 return middleware
         return None
 
-    async def _check_spm_conflict(self):
+    def _check_spm_conflict(self):
         checked = getattr(self, "_checked_spm_conflict", False)
         if checked:
             return
@@ -137,12 +137,12 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         )
         _close_spider(self._crawler, "plugin_conflict")
 
-    async def _start_requests_processed(self, count):
+    def _start_requests_processed(self, count):
         self._total_start_request_count = count
-        await self._maybe_close()
+        self._maybe_close()
 
-    async def process_request(self, request: Request, spider: Spider | None = None):
-        await self._check_spm_conflict()
+    def process_request(self, request: Request, spider: Spider | None = None):
+        self._check_spm_conflict()
 
         if self._param_parser.parse(request) is None:
             return
@@ -157,7 +157,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
 
         self.slot_request(request, force=True)
 
-    async def process_exception(
+    def process_exception(
         self, request: Request, exception: Exception, spider: Spider | None = None
     ):
         if (
@@ -168,9 +168,9 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             return
 
         self._forbidden_domain_start_request_count += 1
-        await self._maybe_close()
+        self._maybe_close()
 
-    async def _maybe_close(self):
+    def _maybe_close(self):
         if not self._total_start_request_count:
             return
         if self._forbidden_domain_start_request_count < self._total_start_request_count:
@@ -265,7 +265,7 @@ class ScrapyZyteAPIRefererSpiderMiddleware:
             self._process_output_item_or_request(item_or_request)
             yield item_or_request
 
-    def _process_output_item_or_request(self, item_or_request: Request):
+    def _process_output_item_or_request(self, item_or_request):
         if not isinstance(item_or_request, Request):
             return
         self._process_output_request(item_or_request)
