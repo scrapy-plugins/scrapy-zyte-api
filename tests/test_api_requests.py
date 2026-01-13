@@ -276,14 +276,15 @@ async def test_coro_handling(zyte_api: bool, mockserver):
         )
 
         if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
-            result = handler.download_request(req)
-            assert iscoroutine(result)
-            assert not isinstance(result, Deferred)
+            future = handler.download_request(req)
+            assert iscoroutine(future)
+            assert not isinstance(future, Deferred)
         else:
-            result = handler.download_request(req, None)
-            assert not iscoroutine(result)
-            assert isinstance(result, Deferred)
-        await maybe_deferred_to_future(result)
+            deferred = handler.download_request(req, None)
+            assert not iscoroutine(deferred)
+            assert isinstance(deferred, Deferred)
+            future = maybe_deferred_to_future(deferred)
+        await future
 
 
 @deferred_f_from_coro_f
