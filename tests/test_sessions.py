@@ -1480,6 +1480,7 @@ async def test_session_config_check_meta(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
+@deferred_f_from_coro_f
 async def test_session_config_enabled(mockserver):
     pytest.importorskip("web_poet")
 
