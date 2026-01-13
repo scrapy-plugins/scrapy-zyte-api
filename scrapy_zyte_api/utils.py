@@ -1,4 +1,5 @@
 from importlib.metadata import version
+from typing import Any, Coroutine, cast
 from warnings import catch_warnings, filterwarnings
 
 import scrapy
@@ -38,6 +39,7 @@ _DOWNLOAD_REQUEST_RETURNS_DEFERRED = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _ENGINE_HAS_DOWNLOAD_ASYNC = _SCRAPY_VERSION >= _SCRAPY_2_14_0
 _GET_SLOT_NEEDS_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _HTTP10_SUPPORT = _SCRAPY_VERSION < _SCRAPY_2_14_0
+_LOG_DEFERRED_IS_DEPRECATED = _SCRAPY_VERSION >= _SCRAPY_2_14_0
 _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_7_0
 _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _PROCESS_START_REQUIRES_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_14_0
@@ -126,33 +128,40 @@ except ImportError:  # pragma: no cover
 
 # TODO: Remove these commented lines once confirmed that none of the
 # _close_spider calls need to be delayed.
-#
-# def _call_later(func, *args):
-#     try:
-#         from scrapy.utils.asyncio import call_later
-#     except ImportError:  # Scrapy < 2.14
-#         from twisted.internet import reactor
-#         from twisted.internet.interfaces import IReactorCore
 
-#         reactor = cast(IReactorCore, reactor)
-#         reactor.callLater(0, func, *args)
-#     else:
-#         call_later(0, func, *args)
 
-# def _close_spider(crawler, reason):
-#     if hasattr(crawler.engine, "close_spider_async"):
-#         _call_later(partial(crawler.engine.close_spider_async, reason=reason))
-#     else:  # Scrapy < 2.14
-#         _call_later(crawler.engine.close_spider, crawler.spider, reason)
+def _call_later(func, *args):
+    try:
+        from scrapy.utils.asyncio import call_later  # noqa: F401
+    except ImportError:  # Scrapy < 2.14
+        from twisted.internet import reactor
+        from twisted.internet.interfaces import IReactorCore
+
+        reactor = cast(IReactorCore, reactor)
+        reactor.callLater(0, func, *args)
+    else:
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        loop.call_soon(func, *args)
+
+
+# https://github.com/scrapy/scrapy/blob/0b9d8da09dd2cb1b74ddf025107e6f584839fbff/scrapy/utils/defer.py#L525
+def _schedule_coro(coro: Coroutine[Any, Any, Any]) -> None:
+    from scrapy.utils.asyncio import is_asyncio_available
+
+    if not is_asyncio_available():
+        Deferred.fromCoroutine(coro)
+        return
+    loop = asyncio.get_event_loop()
+    loop.create_task(coro)  # noqa: RUF006
 
 
 async def _close_spider(crawler, reason):
     if hasattr(crawler.engine, "close_spider_async"):
-        await crawler.engine.close_spider_async(reason=reason)
+        _schedule_coro(crawler.engine.close_spider_async(reason=reason))
     else:  # Scrapy < 2.14
-        await maybe_deferred_to_future(
-            crawler.engine.close_spider(crawler.spider, reason)
-        )
+        _call_later(crawler.engine.close_spider, crawler.spider, reason)
 
 
 __all__ = [

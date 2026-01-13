@@ -291,7 +291,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         try:
             api_response = await self._session.get(api_params, retrying=retrying)
         except RequestError as error:
-            self._process_request_error(request, error)
+            await self._process_request_error(request, error)
             raise
         except Exception as er:
             logger.debug(
@@ -325,7 +325,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
         return response
 
-    def _process_request_error(self, request, error):
+    async def _process_request_error(self, request, error):
         detail = (error.parsed.data or {}).get("detail", error.message)
         logger.debug(
             f"Got Zyte API error (status={error.status}, "
@@ -340,7 +340,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             (403, "/auth/account-suspended", "zyte_api_suspended_account"),
         ):
             if error.status == status and error.parsed.type == error_type:
-                _close_spider(self._crawler, close_reason)
+                await _close_spider(self._crawler, close_reason)
                 return
 
     def _log_request(self, params):

@@ -8,6 +8,7 @@ from ._params import _ParamParser
 from .utils import (
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
     _GET_SLOT_NEEDS_SPIDER,
+    _LOG_DEFERRED_IS_DEPRECATED,
     _close_spider,
 )
 
@@ -169,7 +170,10 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
 class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
     def __init__(self, crawler):
         super().__init__(crawler)
-        self._send_signal = crawler.signals.send_catch_log_deferred
+        if _LOG_DEFERRED_IS_DEPRECATED:
+            self._send_signal = crawler.signals.send_catch_log_async
+        else:
+            self._send_signal = crawler.signals.send_catch_log_deferred
 
     @staticmethod
     def _get_header_set(request):
