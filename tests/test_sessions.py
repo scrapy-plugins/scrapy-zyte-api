@@ -61,6 +61,10 @@ async def test_enabled(setting, meta, outcome, mockserver):
     class TestSpider(Spider):
         name = "test"
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             yield Request("https://example.com", meta=meta_dict)
 
@@ -249,6 +253,10 @@ async def test_params_precedence(
 
     class TestSpider(Spider):
         name = "test"
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
         def start_requests(self):
             yield Request(
@@ -600,6 +608,10 @@ async def test_checker_location(postal_code, url, close_reason, stats, mockserve
 
     class TestSpider(Spider):
         name = "test"
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
         def start_requests(self):
             yield Request(
@@ -957,6 +969,10 @@ async def test_pool(meta, pool, mockserver):
     class TestSpider(Spider):
         name = "test"
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             yield Request("https://example.com", meta=meta)
 
@@ -987,6 +1003,10 @@ async def test_pool_params(mockserver, caplog):
 
     class TestSpider(Spider):
         name = "test"
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
         def start_requests(self):
             yield Request(
@@ -1319,6 +1339,10 @@ async def test_session_config(mockserver):
             "https://postal-code-10001-b.example",
         ]
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             for url in self.start_urls:
                 yield Request(
@@ -1419,6 +1443,10 @@ async def test_session_config_check_meta(mockserver):
     class TestSpider(Spider):
         name = "test"
         start_urls = ["https://example.com"]
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
         def start_requests(self):
             for url in self.start_urls:
@@ -1545,6 +1573,10 @@ async def test_session_config_location(settings, meta, used, mockserver):
         name = "test"
         start_urls = ["https://postal-code-10001.example"]
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             for url in self.start_urls:
                 yield Request(
@@ -1650,6 +1682,10 @@ async def test_session_config_location_bad(settings, meta, used, mockserver):
         name = "test"
         start_urls = ["https://postal-code-10001.example"]
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             for url in self.start_urls:
                 yield Request(
@@ -1736,6 +1772,10 @@ async def test_session_config_params_location(mockserver):
         name = "test"
         start_urls = ["https://postal-code-10001.example"]
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             for url in self.start_urls:
                 yield Request(
@@ -1805,6 +1845,10 @@ async def test_session_config_params_location_no_set_location(mockserver):
     class TestSpider(Spider):
         name = "test"
         start_urls = ["https://example.com"]
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
         def start_requests(self):
             for url in self.start_urls:
@@ -1923,6 +1967,10 @@ async def test_session_config_params_precedence(
     class TestSpider(Spider):
         name = "test"
         start_urls = ["https://postal-code-10001.example"]
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
         def start_requests(self):
             for url in self.start_urls:
@@ -2295,6 +2343,10 @@ async def test_location_session_config(mockserver):
             "https://postal-code-10001-fail.example",
         ]
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             for url in self.start_urls:
                 yield Request(
@@ -2382,6 +2434,10 @@ async def test_location_session_config_no_methods(mockserver):
             "https://postal-code-10001-alternative.example",
         ]
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             for url in self.start_urls:
                 yield Request(
@@ -2447,6 +2503,10 @@ async def test_location_session_config_no_location(mockserver):
     class TestSpider(Spider):
         name = "test"
         start_urls = ["https://postal-code-10001.example", "https://a.example"]
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
         def start_requests(self):
             for url in self.start_urls:
@@ -2600,6 +2660,10 @@ async def test_cookies(mockserver):
     class TestSpider(Spider):
         name = "test"
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             yield Request(
                 "https://example.com",
@@ -2733,7 +2797,7 @@ async def test_empty_queue_limit(mockserver):
 
 class SessionIDRemovingDownloaderMiddleware:
     def process_exception(
-        self, request: Request, exception: Exception, spider: Spider
+        self, request: Request, exception: Exception, spider: Spider | None = None
     ) -> Union[Request, None]:
         if not isinstance(exception, RequestError) or request.meta.get(
             "_is_session_init_request", False
@@ -2858,6 +2922,10 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
     class TestSpider(Spider):
         name = "test"
 
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
         def start_requests(self):
             yield Request(
                 "https://example.com",
@@ -2912,6 +2980,10 @@ async def test_provider(mockserver):
 
     class TestSpider(Spider):
         name = "test"
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
         def start_requests(self):
             yield Request("https://example.com", callback=self.parse)
