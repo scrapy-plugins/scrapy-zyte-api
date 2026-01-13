@@ -92,7 +92,7 @@ try:
     )
 except ImportError:  # Scrapy < 2.14
 
-    def _is_asyncio_reactor_installed():
+    def _is_asyncio_reactor_installed() -> bool:
         from twisted.internet import reactor
 
         return isinstance(reactor, asyncioreactor.AsyncioSelectorReactor)
@@ -204,7 +204,7 @@ except ImportError:  # pragma: no cover
 
     from twisted.internet.defer import Deferred
 
-    def _ensure_awaitable(o):
+    def _ensure_awaitable(o):  # type: ignore[no-redef]
         if isinstance(o, Deferred):
             return maybe_deferred_to_future(o)
         if inspect.isawaitable(o):

@@ -531,7 +531,7 @@ async def test_provider_any_response_only(mockserver):
         response: AnyResponse
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -555,7 +555,7 @@ async def test_provider_any_response_http_response_param(mockserver):
         response: AnyResponse
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -580,7 +580,7 @@ async def test_provider_any_response_browser_html_param(mockserver):
         response: AnyResponse
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -605,7 +605,7 @@ async def test_provider_any_response_product(mockserver):
         product: Product
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -631,7 +631,7 @@ async def test_provider_any_response_product_extract_from_browser_html(mockserve
         product: Product
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     product_options = {"extractFrom": "browserHtml"}
@@ -660,7 +660,7 @@ async def test_provider_any_response_product_item_extract_from_browser_html(mock
         response: AnyResponse
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage, product: Product):
+        def parse_(self, response: DummyResponse, page: SomePage, product: Product):  # type: ignore[override]
             yield {"page": page, "product": product}
 
     product_options = {"extractFrom": "browserHtml"}
@@ -691,7 +691,7 @@ async def test_provider_any_response_product_extract_from_browser_html_2(mockser
         product: Product
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     product_options = {"extractFrom": "browserHtml"}
@@ -724,7 +724,7 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
         product: Product
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     product_options = {"extractFrom": "httpResponseBody"}
@@ -755,7 +755,7 @@ async def test_provider_any_response_product_options_empty(mockserver):
         product: Product
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -788,7 +788,7 @@ async def test_provider_any_response_product_extract_from_http_response_2(mockse
         product: Product
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     product_options = {"extractFrom": "httpResponseBody"}
@@ -820,7 +820,7 @@ async def test_provider_any_response_browser_html(mockserver):
         html: BrowserHtml
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -843,7 +843,7 @@ async def test_provider_any_response_browser_response(mockserver):
         browser_response: BrowserResponse
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -867,7 +867,7 @@ async def test_provider_any_response_browser_html_response(mockserver):
         html: BrowserHtml
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -891,7 +891,7 @@ async def test_provider_any_response_http_response(mockserver):
         http_response: HttpResponse
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -919,7 +919,7 @@ async def test_provider_any_response_browser_http_response(mockserver):
         http_response: HttpResponse
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page: SomePage):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
             yield {"page": page}
 
     settings = provider_settings(mockserver)
@@ -954,7 +954,7 @@ async def test_provider_any_response_http_response_multiple_pages(mockserver):
         response: AnyResponse
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page1: FirstPage, page2: SecondPage):
+        def parse_(self, response: DummyResponse, page1: FirstPage, page2: SecondPage):  # type: ignore[override]
             yield {"page1": page1, "page2": page2}
 
     settings = provider_settings(mockserver)
@@ -985,7 +985,7 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
         response: AnyResponse
 
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, page1: FirstPage, page2: SecondPage):
+        def parse_(self, response: DummyResponse, page1: FirstPage, page2: SecondPage):  # type: ignore[override]
             yield {"page1": page1, "page2": page2}
 
     settings = provider_settings(mockserver)
@@ -1009,7 +1009,7 @@ async def test_provider_any_response_http_browser_response_multiple_pages(mockse
 @deferred_f_from_coro_f
 async def test_screenshot(mockserver):
     class TestSpider(ZyteAPISpider):
-        def parse_(self, response: DummyResponse, screenshot: Screenshot):
+        def parse_(self, response: DummyResponse, screenshot: Screenshot):  # type: ignore[override]
             yield {"screenshot": screenshot}
 
     settings = provider_settings(mockserver)

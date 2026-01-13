@@ -19,7 +19,7 @@ except ImportError:
 
 from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
-from scrapy_zyte_api.utils import (
+from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _POET_ADDON_SUPPORT,
     _ensure_awaitable,
     maybe_deferred_to_future,

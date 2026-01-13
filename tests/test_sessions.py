@@ -2948,7 +2948,7 @@ class ExceptionRaisingDownloaderMiddleware:
     ) -> None:
         if request.meta.get("_is_session_init_request", False):
             return
-        raise self.crawler.exception  # type: ignore[attr-defined]
+        raise self.crawler.exception
 
 
 @pytest.mark.parametrize(
