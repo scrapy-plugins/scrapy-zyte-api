@@ -98,7 +98,7 @@ class ZyteAPISpider(Spider):
         }
 
 
-class ZyteAPIProviderMetaSpider(Spider):
+class ZyteAPIProviderMetaSpider(ZyteAPISpider):
     url: str
 
     def get_start_request(self):
