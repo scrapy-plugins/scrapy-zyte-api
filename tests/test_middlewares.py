@@ -14,6 +14,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _GET_SLOT_NEEDS_SPIDER,
     _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT,
     _START_REQUESTS_CAN_YIELD_ITEMS,
     _build_from_crawler,
@@ -101,7 +102,8 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     request = Request("https://example.com")
     await processor(middleware, request)
     assert "download_slot" not in request.meta
-    _, slot = crawler.engine.downloader._get_slot(request, spider)
+    args = (crawler.spider,) if _GET_SLOT_NEEDS_SPIDER else ()
+    _, slot = crawler.engine.downloader._get_slot(request, *args)
     assert slot.delay == spider.download_delay  # type: ignore[attr-defined]
 
     # On Zyte API requests, the download slot is changed, and its delay may be
@@ -109,7 +111,8 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     request = Request("https://example.com", meta={"zyte_api": {}})
     await processor(middleware, request)
     assert request.meta["download_slot"] == "zyte-api@example.com"
-    _, slot = crawler.engine.downloader._get_slot(request, spider)
+    args = (crawler.spider,) if _GET_SLOT_NEEDS_SPIDER else ()
+    _, slot = crawler.engine.downloader._get_slot(request, *args)
     assert slot.delay == (5 if preserve else 0)
 
     # Requests that happen to already have the right download slot assigned
@@ -118,7 +121,8 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     request = Request("https://example.com", meta=meta)
     await processor(middleware, request)
     assert request.meta["download_slot"] == "zyte-api@example.com"
-    _, slot = crawler.engine.downloader._get_slot(request, spider)
+    args = (crawler.spider,) if _GET_SLOT_NEEDS_SPIDER else ()
+    _, slot = crawler.engine.downloader._get_slot(request, *args)
     assert slot.delay == (5 if preserve else 0)
 
     # The slot delay is taken into account every time a request for the slot is
@@ -129,10 +133,14 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     request = Request("https://example.com", meta={"zyte_api": {}})
     await processor(middleware, request)
     assert request.meta["download_slot"] == "zyte-api@example.com"
-    _, slot = crawler.engine.downloader._get_slot(request, spider)
+    args = (crawler.spider,) if _GET_SLOT_NEEDS_SPIDER else ()
+    _, slot = crawler.engine.downloader._get_slot(request, *args)
     assert slot.delay == (10 if preserve else 0)
 
-    await maybe_deferred_to_future(crawler.stop())
+    if hasattr(crawler, "stop_async"):
+        await crawler.stop_async()
+    else:
+        await maybe_deferred_to_future(crawler.stop())
 
 
 @deferred_f_from_coro_f
