@@ -1,7 +1,9 @@
 from logging import getLogger
+from warnings import warn
 
 from scrapy import Request, Spider
-from scrapy.exceptions import IgnoreRequest
+from scrapy.exceptions import IgnoreRequest, ScrapyDeprecationWarning
+from scrapy.utils.python import global_object_name
 from zyte_api import RequestError
 
 from ._params import _ParamParser
@@ -32,7 +34,19 @@ class _BaseMiddleware:
             not crawler.settings.getbool("AUTOTHROTTLE_ENABLED"),
         )
 
-    def slot_request(self, request, force=False):
+    def slot_request(
+        self, request: Request, spider: Spider | None = None, force: bool = False
+    ):
+        if spider is not None:
+            warn(
+                f"Passing a 'spider' argument to "
+                f"{global_object_name(self.__class__)}.slot_request() is "
+                f"deprecated and the argument will be removed in a future "
+                f"scrapy-zyte-api version.",
+                category=ScrapyDeprecationWarning,
+                stacklevel=1,
+            )
+
         if not force and self._param_parser.parse(request) is None:
             return
 
