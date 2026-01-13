@@ -121,4 +121,11 @@ minversion = "6.0"
 filterwarnings = [
     "ignore::DeprecationWarning:twisted\\.web\\.http",
     "ignore::DeprecationWarning:scrapy\\.core\\.downloader\\.contextfactory",  # https://github.com/scrapy/scrapy/issues/3288
+
+    # scrapy-poet warnings for Scrapy 2.14:
+    "ignore:CollectorPipeline\\.:scrapy.exceptions.ScrapyDeprecationWarning",
+    "ignore:DownloaderStatsMiddleware\\.:scrapy.exceptions.ScrapyDeprecationWarning",
+    "ignore:.*?InjectionMiddleware\\.:scrapy.exceptions.ScrapyDeprecationWarning",
+    "ignore:RetryMiddleware\\.process_spider_exception\\(\\):scrapy.exceptions.ScrapyDeprecationWarning",
+    "ignore::scrapy.exceptions.ScrapyDeprecationWarning:scrapy_poet",
 ]
