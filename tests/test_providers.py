@@ -12,7 +12,9 @@ from scrapy import Request, Spider
 from scrapy_poet import DummyResponse
 from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
 from twisted.internet import reactor
-from twisted.web.client import Agent, readBody
+from twisted.web.client import Agent
+from twisted.internet.defer import Deferred
+from twisted.internet.protocol import Protocol
 from web_poet import (
     AnyResponse,
     BrowserHtml,
@@ -62,6 +64,27 @@ def _crawl_single_item(
             spider_cls, resource_cls, settings, spider_kwargs=spider_kwargs, port=port
         )
     )
+
+
+def read_body_without_abort(response):
+    """Read response body using deliverBody to avoid deprecated readBody warning.
+
+    Returns a Twisted Deferred that fires with the body bytes.
+    """
+    d = Deferred()
+
+    class BodyCollector(Protocol):
+        def __init__(self):
+            self._buf = []
+
+        def dataReceived(self, data):
+            self._buf.append(data)
+
+        def connectionLost(self, reason):
+            d.callback(b"".join(self._buf))
+
+    response.deliverBody(BodyCollector())
+    return maybe_deferred_to_future(d)
 
 
 @attrs.define
@@ -173,7 +196,7 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     count_resp = await maybe_deferred_to_future(
         Agent(reactor).request(b"GET", fresh_mockserver.urljoin("/count").encode())
     )
-    call_count = int((await readBody(count_resp)).decode())
+    call_count = int((await read_body_without_abort(count_resp)).decode())
     assert call_count == 1
     assert "browser_response" in item
     assert "product" in item
@@ -200,7 +223,7 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     count_resp = await maybe_deferred_to_future(
         Agent(reactor).request(b"GET", fresh_mockserver.urljoin("/count").encode())
     )
-    call_count = int((await readBody(count_resp)).decode())
+    call_count = int((await read_body_without_abort(count_resp)).decode())
     assert call_count == 1
     assert "my_item" in item
     assert "product" in item
@@ -234,7 +257,7 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
     count_resp = await maybe_deferred_to_future(
         Agent(reactor).request(b"GET", fresh_mockserver.urljoin("/count").encode())
     )
-    call_count = int((await readBody(count_resp)).decode())
+    call_count = int((await read_body_without_abort(count_resp)).decode())
     assert call_count == 1
     assert "my_item" in item
     assert "product" in item
