@@ -44,8 +44,9 @@ SETTINGS: SETTINGS_T = {
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
         "scrapy_zyte_api.ScrapyZyteAPIRefererSpiderMiddleware": 1000,
     },
-    "ZYTE_API_KEY": _API_KEY,
+    "TELNETCONSOLE_ENABLED": False,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+    "ZYTE_API_KEY": _API_KEY,
 }
 if Version(SCRAPY_VERSION) < Version("2.12"):
     SETTINGS["REQUEST_FINGERPRINTER_IMPLEMENTATION"] = (
@@ -70,6 +71,7 @@ SETTINGS_ADDON: SETTINGS_T = {
     "ADDONS": {
         Addon: 500,
     },
+    "TELNETCONSOLE_ENABLED": False,
     "ZYTE_API_KEY": _API_KEY,
 }
 UNSET = object()
