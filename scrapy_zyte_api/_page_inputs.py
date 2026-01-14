@@ -18,6 +18,7 @@ class Actions:
     results: Optional[List[_ActionResult]]
 
 
+@attrs.define
 class Geolocation:
     """A page input that forces a given geolocation for all other page inputs.
 
