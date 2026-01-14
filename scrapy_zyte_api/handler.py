@@ -291,7 +291,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         try:
             api_response = await self._session.get(api_params, retrying=retrying)
         except RequestError as error:
-            await self._process_request_error(request, error)
+            self._process_request_error(request, error)
             raise
         except Exception as er:
             logger.debug(
@@ -325,7 +325,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
         return response
 
-    async def _process_request_error(self, request, error):
+    def _process_request_error(self, request, error):
         detail = (error.parsed.data or {}).get("detail", error.message)
         logger.debug(
             f"Got Zyte API error (status={error.status}, "

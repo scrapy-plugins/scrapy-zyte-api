@@ -1,7 +1,7 @@
 import asyncio
 import sys
 from importlib.metadata import version
-from typing import Any, Coroutine, cast
+from typing import Any, Coroutine
 from warnings import catch_warnings, filterwarnings
 
 import scrapy
@@ -138,22 +138,6 @@ except ImportError:  # pragma: no cover
         if not _is_asyncio_reactor_installed():
             return d
         return deferred_to_future(d)
-
-
-def _call_later(func, *args):
-    try:
-        from scrapy.utils.asyncio import call_later  # noqa: F401
-    except ImportError:  # Scrapy < 2.14
-        from twisted.internet import reactor
-        from twisted.internet.interfaces import IReactorCore
-
-        reactor = cast(IReactorCore, reactor)
-        reactor.callLater(0, func, *args)
-    else:
-        import asyncio
-
-        loop = asyncio.get_event_loop()
-        loop.call_soon(func, *args)
 
 
 try:

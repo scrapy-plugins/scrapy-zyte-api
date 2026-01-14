@@ -44,7 +44,7 @@ class _BaseMiddleware:
                 f"deprecated and the argument will be removed in a future "
                 f"scrapy-zyte-api version.",
                 category=ScrapyDeprecationWarning,
-                stacklevel=1,
+                stacklevel=2,
             )
 
         if not force and self._param_parser.parse(request) is None:
