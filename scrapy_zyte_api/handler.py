@@ -356,10 +356,24 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         _truncate(params, self._truncate_limit)
         return params
 
-    async def close(self) -> None:
-        if self._fallback_handler and hasattr(self._fallback_handler, "close"):
-            await self._fallback_handler.close()
-        await self._close()
+    if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+
+        def close(self) -> Deferred:
+            from twisted.internet.defer import ensureDeferred
+
+            async def _close():
+                if self._fallback_handler and hasattr(self._fallback_handler, "close"):
+                    await self._fallback_handler.close()
+                await self._close()
+
+            return ensureDeferred(_close())
+
+    else:
+
+        async def close(self) -> None:
+            if self._fallback_handler and hasattr(self._fallback_handler, "close"):
+                await self._fallback_handler.close()
+            await self._close()
 
     async def _close(self) -> None:  # NOQA
         await self._session.close()
