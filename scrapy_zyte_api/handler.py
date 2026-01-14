@@ -370,7 +370,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     else:
 
-        async def close(self) -> None:
+        async def close(self) -> None:  # type: ignore[misc]
             if self._fallback_handler and hasattr(self._fallback_handler, "close"):
                 await self._fallback_handler.close()
             await self._close()
