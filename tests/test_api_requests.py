@@ -772,6 +772,7 @@ async def _test_param_processing(
     cookie_jar=None,
     meta_key="zyte_api_automap",
 ):
+    caplog.clear()
     request = Request(url="https://example.com", **request_kwargs)
     request.meta[meta_key] = meta
     settings = {**settings, "ZYTE_API_TRANSPARENT_MODE": True}
