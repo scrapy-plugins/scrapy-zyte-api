@@ -339,7 +339,7 @@ async def test_higher_concurrency():
     response_indexes = []
     expected_first_index = concurrency - 1
     fast_seconds = 0.001
-    slow_seconds = 0.2
+    slow_seconds = 0.4
 
     def _build_request(index: int) -> Request:
         return Request(

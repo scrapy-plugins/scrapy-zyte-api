@@ -13,6 +13,7 @@ from .utils import (
     _LOG_DEFERRED_IS_DEPRECATED,
     _close_spider,
     _schedule_coro,
+    maybe_deferred_to_future,
 )
 
 logger = getLogger(__name__)
@@ -188,7 +189,13 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
         if _LOG_DEFERRED_IS_DEPRECATED:
             self._send_signal = crawler.signals.send_catch_log_async
         else:
-            self._send_signal = crawler.signals.send_catch_log_deferred
+
+            async def _send_signal(signal, **kwargs):
+                await maybe_deferred_to_future(
+                    crawler.signals.send_catch_log_deferred(signal, **kwargs)
+                )
+
+            self._send_signal = _send_signal
 
     @staticmethod
     def _get_header_set(request):
