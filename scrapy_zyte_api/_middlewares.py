@@ -221,10 +221,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
                 item_or_request.meta["is_start_request"] = True
                 self._process_output_request(item_or_request)
             yield item_or_request
-        if _LOG_DEFERRED_IS_DEPRECATED:
-            _schedule_coro(self._send_signal(_start_requests_processed, count=count))
-        else:
-            self._send_signal(_start_requests_processed, count=count)
+        _schedule_coro(self._send_signal(_start_requests_processed, count=count))
 
     def _process_output_request(self, request: Request):
         if "_pre_mw_headers" not in request.meta:
