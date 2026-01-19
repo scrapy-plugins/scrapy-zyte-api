@@ -19,7 +19,6 @@ from scrapy_zyte_api import (
 from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
 from scrapy_zyte_api.utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
-    _HTTP10_SUPPORT,
     _POET_ADDON_SUPPORT,
 )
 
@@ -171,11 +170,7 @@ def _test_setting_changes(initial_settings, expected_settings):
     assert actual_settings == expected_settings
 
 
-FALLBACK_HANDLER = (
-    "scrapy.core.downloader.handlers.http.HTTPDownloadHandler"
-    if _HTTP10_SUPPORT
-    else "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
-)
+FALLBACK_HANDLER = "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
 BASE_EXPECTED = {
     "DOWNLOADER_MIDDLEWARES": {
         ScrapyZyteAPIDownloaderMiddleware: 633,

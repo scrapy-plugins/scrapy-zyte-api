@@ -11,11 +11,7 @@ from scrapy.crawler import Crawler
 from scrapy.http import Response
 from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler as _get_crawler
-
-try:
-    from zyte_api import AsyncZyteAPI
-except ImportError:
-    from zyte_api.aio.client import AsyncClient as AsyncZyteAPI
+from zyte_api import AsyncZyteAPI
 
 from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
