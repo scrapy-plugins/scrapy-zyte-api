@@ -3,10 +3,10 @@ from unittest import SkipTest
 
 import pytest
 from packaging.version import Version
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
 from scrapy.http.response import Response
 from scrapy.item import Item
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api import (
