@@ -1,9 +1,9 @@
+from collections.abc import Coroutine
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type, cast
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
-from scrapy.utils.defer import maybe_deferred_to_future
 from scrapy_poet import PageObjectInputProvider
 from twisted.internet.defer import Deferred
 from web_poet import (
@@ -47,6 +47,7 @@ from zyte_common_items.fields import is_auto_field
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
 from scrapy_zyte_api.responses import ZyteAPITextResponse
+from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
 
 try:
     # requires Scrapy >= 2.8
@@ -268,9 +269,20 @@ class ZyteApiProvider(PageObjectInputProvider):
             callback=NO_CALLBACK,
         )
         assert crawler.engine
-        api_response: ZyteAPITextResponse = await maybe_deferred_to_future(
-            cast("Deferred[ZyteAPITextResponse]", crawler.engine.download(api_request))
-        )
+        if _ENGINE_HAS_DOWNLOAD_ASYNC:
+            future = cast(
+                "Coroutine[None, None, ZyteAPITextResponse]",
+                crawler.engine.download_async(api_request),
+            )
+        else:  # Scrapy < 2.14
+            deferred = cast(
+                "Deferred[ZyteAPITextResponse]", crawler.engine.download(api_request)
+            )
+            future = cast(
+                "Coroutine[None, None, ZyteAPITextResponse]",
+                maybe_deferred_to_future(deferred),
+            )
+        api_response: ZyteAPITextResponse = await future
 
         assert api_response.raw_api_response
         if html_requested:

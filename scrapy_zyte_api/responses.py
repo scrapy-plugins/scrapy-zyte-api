@@ -1,6 +1,6 @@
+import datetime as dt
 from base64 import b64decode
 from copy import copy
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 from scrapy import Request
@@ -72,7 +72,7 @@ class ZyteAPIMixin:
             result += f"; Path={path}"
         expires = cookie.get("expires")
         if expires is not None:
-            expires_date = datetime.utcfromtimestamp(expires)
+            expires_date = dt.datetime.fromtimestamp(expires, dt.timezone.utc)
             expires_date_string = expires_date.strftime("%a, %d %b %Y %H:%M:%S GMT")
             result += f"; Expires={expires_date_string}"
         if cookie.get("httpOnly"):

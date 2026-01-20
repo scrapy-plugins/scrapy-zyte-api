@@ -1,11 +1,14 @@
 from typing import Optional, Type
 
 import pytest
-from pytest_twisted import ensureDeferred
-from scrapy import Request
-from scrapy.core.downloader.handlers.http import HTTP10DownloadHandler
+
+from scrapy import Request, Spider
+from scrapy.utils.defer import deferred_f_from_coro_f
+from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
+from scrapy.http.response import Response
 from scrapy.settings.default_settings import TWISTED_REACTOR
 from scrapy.utils.test import get_crawler
+from twisted.internet.defer import Deferred, succeed
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
@@ -14,10 +17,13 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
-from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT
+from scrapy_zyte_api.utils import (
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
+    _POET_ADDON_SUPPORT,
+)
 
 from . import get_crawler as get_crawler_zyte_api
-from . import get_download_handler, make_handler, serialize_settings
+from . import get_download_handler, make_handler, serialize_settings, download_request
 
 pytest.importorskip("scrapy.addons")
 
@@ -35,54 +41,77 @@ _crawler = get_crawler()
 BASELINE_SETTINGS = _crawler.settings.copy_to_dict()
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon(mockserver):
     async with make_handler({}, mockserver.urljoin("/"), use_addon=True) as handler:
         request = Request("https://example.com")
-        await handler.download_request(request, None)
+        await download_request(handler, request)
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_disable_transparent(mockserver):
     async with make_handler(
         {"ZYTE_API_TRANSPARENT_MODE": False}, mockserver.urljoin("/"), use_addon=True
     ) as handler:
         request = Request("https://toscrape.com")
-        await handler.download_request(request, None)
+        await download_request(handler, request)
         assert handler._stats.get_value("scrapy-zyte-api/success") is None
 
         meta = {"zyte_api": {"foo": "bar"}}
         request = Request("https://toscrape.com", meta=meta)
-        await handler.download_request(request, None)
+        await download_request(handler, request)
         assert handler._stats.get_value("scrapy-zyte-api/success") == 1
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_fallback():
+    crawler = await get_crawler_zyte_api(use_addon=True)
+    handler = get_download_handler(crawler, "http")
+    assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
+    assert isinstance(handler._fallback_handler, HTTP11DownloadHandler)
+
+
+class DummyDownloadHandler:
+    lazy: bool = False
+
+    if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+
+        def download_request(self, request: Request, spider: Spider) -> Deferred:
+            return succeed(None)
+
+    else:
+
+        async def download_request(self, request: Request) -> Response:  # type: ignore[misc]
+            return None  # type: ignore[return-value]
+
+    async def close(self) -> None:
+        pass
+
+
+@deferred_f_from_coro_f
+async def test_addon_fallback_custom():
     settings = {
-        "DOWNLOAD_HANDLERS": {
-            "http": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler"
-        },
+        "DOWNLOAD_HANDLERS": {"http": "tests.test_addon.DummyDownloadHandler"},
     }
     crawler = await get_crawler_zyte_api(settings, use_addon=True)
     handler = get_download_handler(crawler, "http")
     assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
-    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
+    assert isinstance(handler._fallback_handler, DummyDownloadHandler)
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_fallback_explicit():
     settings = {
-        "ZYTE_API_FALLBACK_HTTP_HANDLER": "scrapy.core.downloader.handlers.http.HTTP10DownloadHandler",
+        "ZYTE_API_FALLBACK_HTTP_HANDLER": "tests.test_addon.DummyDownloadHandler",
     }
     crawler = await get_crawler_zyte_api(settings, use_addon=True)
     handler = get_download_handler(crawler, "http")
     assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
-    assert isinstance(handler._fallback_handler, HTTP10DownloadHandler)
+    assert isinstance(handler._fallback_handler, DummyDownloadHandler)
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_matching_settings():
     crawler = await get_crawler_zyte_api(
         {"ZYTE_API_TRANSPARENT_MODE": True}, poet=False
@@ -93,7 +122,7 @@ async def test_addon_matching_settings():
     )
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_addon_custom_fingerprint():
     class CustomRequestFingerprinter:
         pass
@@ -141,6 +170,7 @@ def _test_setting_changes(initial_settings, expected_settings):
     assert actual_settings == expected_settings
 
 
+FALLBACK_HANDLER = "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
 BASE_EXPECTED = {
     "DOWNLOADER_MIDDLEWARES": {
         ScrapyZyteAPIDownloaderMiddleware: 633,
@@ -155,8 +185,8 @@ BASE_EXPECTED = {
         ScrapyZyteAPISpiderMiddleware: 100,
         ScrapyZyteAPIRefererSpiderMiddleware: 1000,
     },
-    "ZYTE_API_FALLBACK_HTTPS_HANDLER": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
-    "ZYTE_API_FALLBACK_HTTP_HANDLER": "scrapy.core.downloader.handlers.http.HTTPDownloadHandler",
+    "ZYTE_API_FALLBACK_HTTPS_HANDLER": FALLBACK_HANDLER,
+    "ZYTE_API_FALLBACK_HTTP_HANDLER": FALLBACK_HANDLER,
     "ZYTE_API_TRANSPARENT_MODE": True,
 }
 if TWISTED_REACTOR != "twisted.internet.asyncioreactor.AsyncioSelectorReactor":

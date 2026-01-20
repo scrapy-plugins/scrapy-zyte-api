@@ -4,11 +4,11 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from functools import partial
 from logging import getLogger
-from typing import Any, DefaultDict, Deque, Dict, List, Optional, Set, Type, Union, cast
+from typing import Any, DefaultDict, Deque, Dict, List, Optional, Set, Type, Union
 from uuid import uuid4
 from weakref import WeakKeyDictionary
 
-from scrapy import Request, Spider
+from scrapy import Request, Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.exceptions import CloseSpider, IgnoreRequest
 from scrapy.http import Response
@@ -18,7 +18,12 @@ from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
 from zyte_api import RequestError, RetryFactory
 
-from .utils import _DOWNLOAD_NEEDS_SPIDER, _build_from_crawler  # type: ignore[attr-defined]
+from .utils import (  # type: ignore[attr-defined]
+    _DOWNLOAD_NEEDS_SPIDER,
+    _build_from_crawler,
+    deferred_to_future,
+    _close_spider,
+)
 
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
@@ -134,46 +139,6 @@ except ImportError:
 
     def NO_CALLBACK(response):  # type: ignore[misc]
         pass  # pragma: no cover
-
-
-try:
-    from scrapy.utils.defer import deferred_to_future
-except ImportError:  # pragma: no cover
-    import asyncio
-    from warnings import catch_warnings, filterwarnings
-
-    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/reactor.py#L119-L147
-    def set_asyncio_event_loop():
-        try:
-            with catch_warnings():
-                # In Python 3.10.9, 3.11.1, 3.12 and 3.13, a DeprecationWarning
-                # is emitted about the lack of a current event loop, because in
-                # Python 3.14 and later `get_event_loop` will raise a
-                # RuntimeError in that event. Because our code is already
-                # prepared for that future behavior, we ignore the deprecation
-                # warning.
-                filterwarnings(
-                    "ignore",
-                    message="There is no current event loop",
-                    category=DeprecationWarning,
-                )
-                event_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # `get_event_loop` raises RuntimeError when called with no asyncio
-            # event loop yet installed in the following scenarios:
-            # - Previsibly on Python 3.14 and later.
-            #   https://github.com/python/cpython/issues/100160#issuecomment-1345581902
-            event_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(event_loop)
-        return event_loop
-
-    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/reactor.py#L115-L116
-    def _get_asyncio_event_loop():
-        return set_asyncio_event_loop()
-
-    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/utils/defer.py#L360-L379
-    def deferred_to_future(d):  # type: ignore[misc]
-        return d.asFuture(_get_asyncio_event_loop())
 
 
 class PoolError(ValueError):
@@ -564,19 +529,13 @@ class FatalErrorHandler:
     def __init__(self, crawler):
         self.crawler = crawler
 
-    def __enter__(self):
+    async def __aenter__(self):
         return None
 
-    def __exit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, tb):
         if exc_type is None:
             return
-        from twisted.internet import reactor
-        from twisted.internet.interfaces import IReactorCore
-
-        reactor = cast(IReactorCore, reactor)
-        close = partial(
-            reactor.callLater, 0, self.crawler.engine.close_spider, self.crawler.spider
-        )
+        close = partial(_close_spider, self.crawler)
         if issubclass(exc_type, TooManyBadSessionInits):
             close("bad_session_inits")
         elif issubclass(exc_type, PoolError):
@@ -592,6 +551,9 @@ session_config = session_config_registry.session_config
 class _SessionManager:
     def __init__(self, crawler: Crawler):
         self._crawler = crawler
+        crawler.signals.connect(
+            self._handle_engine_start, signal=signals.engine_started
+        )
 
         settings = crawler.settings
 
@@ -677,6 +639,11 @@ class _SessionManager:
 
         self._fatal_error_handler = FatalErrorHandler(crawler)
 
+    async def _handle_engine_start(self):
+        assert self._crawler.engine
+        self._download_async = getattr(self._crawler.engine, "download_async", None)
+        self._download = None if self._download_async else self._crawler.engine.download
+
     def _get_session_config(self, request: Request) -> SessionConfig:
         try:
             return self._session_config_cache[request]
@@ -724,7 +691,6 @@ class _SessionManager:
                 return False
         session_params = deepcopy(session_params)
         session_init_url = session_params.pop("url", request.url)
-        spider = self._crawler.spider
         session_init_request = Request(
             session_init_url,
             meta={
@@ -739,14 +705,21 @@ class _SessionManager:
             },
             callback=NO_CALLBACK,
         )
-        if _DOWNLOAD_NEEDS_SPIDER:
-            deferred = self._crawler.engine.download(  # type: ignore[call-arg]
-                session_init_request, spider=spider
-            )
+        if self._download_async is not None:  # Scrapy >= 2.14
+            assert self._download_async
+            download = self._download_async(session_init_request)
+        elif not _DOWNLOAD_NEEDS_SPIDER:
+            assert self._download
+            deferred = self._download(session_init_request)
+            download = deferred_to_future(deferred)
         else:
-            deferred = self._crawler.engine.download(session_init_request)
+            assert self._download
+            deferred = self._download(  # type: ignore[call-arg]
+                session_init_request, spider=self._crawler.spider
+            )
+            download = deferred_to_future(deferred)
         try:
-            response = await deferred_to_future(deferred)
+            response = await download
         except Exception:
             self._crawler.stats.inc_value(
                 f"scrapy-zyte-api/sessions/pools/{pool}/init/failed"
@@ -773,7 +746,7 @@ class _SessionManager:
         return result
 
     async def _create_session(self, request: Request, pool: str) -> str:
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             while True:
                 session_id = str(uuid4())
                 session_init_succeeded = await self._init_session(
@@ -878,7 +851,7 @@ class _SessionManager:
         internal session pool accordingly, and return ``False`` if the session
         has expired or ``True`` if the session passed validation."""
         assert self._crawler.stats
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             if self.is_init_request(request):
                 return True
             session_config = self._get_session_config(request)
@@ -920,7 +893,7 @@ class _SessionManager:
         request.
         """
         assert self._crawler.stats
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             if self.is_init_request(request) or request.meta.get(
                 "_zyte_api_session_assigned", False
             ):
@@ -963,9 +936,9 @@ class _SessionManager:
         session_config = self._get_session_config(request)
         return session_config.enabled(request)
 
-    def handle_error(self, request: Request):
+    async def handle_error(self, request: Request):
         assert self._crawler.stats
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             pool = self.get_pool(request)
             self._crawler.stats.inc_value(
                 f"scrapy-zyte-api/sessions/pools/{pool}/use/failed"
@@ -977,9 +950,9 @@ class _SessionManager:
                     return
             self._start_request_session_refresh(request, pool)
 
-    def handle_expiration(self, request: Request):
+    async def handle_expiration(self, request: Request):
         assert self._crawler.stats
-        with self._fatal_error_handler:
+        async with self._fatal_error_handler:
             pool = self.get_pool(request)
             self._crawler.stats.inc_value(
                 f"scrapy-zyte-api/sessions/pools/{pool}/use/expired"
@@ -997,12 +970,12 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         self._sessions = _SessionManager(crawler)
 
     async def process_request(
-        self, request: Request, spider: Spider
+        self, request: Request, spider: Spider | None = None
     ) -> Optional[Request]:
         return await self._sessions.assign(request)
 
     async def process_response(
-        self, request: Request, response: Response, spider: Spider
+        self, request: Request, response: Response, spider: Spider | None = None
     ) -> Union[Request, Response, None]:
         if isinstance(response, DummyResponse):
             return response
@@ -1011,9 +984,10 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
 
         passed = await self._sessions.check(response, request)
         if not passed:
+            assert self._crawler.spider
             new_request_or_none = get_retry_request(
                 request,
-                spider=spider,
+                spider=self._crawler.spider,
                 reason="session_expired",
             )
             if not new_request_or_none:
@@ -1022,7 +996,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         return response
 
     async def process_exception(
-        self, request: Request, exception: Exception, spider: Spider
+        self, request: Request, exception: Exception, spider: Spider | None = None
     ) -> Union[Request, None]:
         if (
             not isinstance(exception, RequestError)
@@ -1034,17 +1008,18 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         self._sessions.allow_new_session_assignments(request)
 
         if exception.parsed.type == "/problem/session-expired":
-            self._sessions.handle_expiration(request)
+            await self._sessions.handle_expiration(request)
             reason = "session_expired"
         elif exception.status in {520, 521}:
-            self._sessions.handle_error(request)
+            await self._sessions.handle_error(request)
             reason = "download_error"
         else:
             return None
 
+        assert self._crawler.spider
         return get_retry_request(
             request,
-            spider=spider,
+            spider=self._crawler.spider,
             reason=reason,
         )
 

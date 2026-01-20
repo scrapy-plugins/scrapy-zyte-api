@@ -2,16 +2,16 @@ from copy import copy
 
 import pytest
 from packaging.version import Version
-from pytest_twisted import ensureDeferred
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import __version__ as SCRAPY_VERSION
 
 if Version(SCRAPY_VERSION) < Version("2.7"):
     pytest.skip("Skipping tests for Scrapy ≥ 2.7", allow_module_level=True)
 
 from scrapy import Request, Spider
-from scrapy.utils.misc import create_instance
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
+from scrapy_zyte_api.utils import _build_from_crawler  # type: ignore[attr-defined]
 
 from . import SETTINGS, get_crawler
 
@@ -21,23 +21,22 @@ except ImportError:
     scrapy_poet = None
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_cache():
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request = Request("https://example.com", meta={"zyte_api": True})
     fingerprint = fingerprinter.fingerprint(request)
 
-    fingerprinter._param_parser = None  # Prevent later calls from working
+    # Prevent later calls from working:
+    fingerprinter._param_parser = None  # type: ignore[assignment]
     cached_fingerprint = fingerprinter.fingerprint(request)
 
     assert fingerprint == cached_fingerprint
     assert fingerprint == fingerprinter._cache[request]
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_fallback_custom(caplog):
     class CustomFingerprinter:
         def fingerprint(self, request):
@@ -48,11 +47,7 @@ async def test_fallback_custom(caplog):
     }
     crawler = await get_crawler(settings)
     with caplog.at_level("WARNING"):
-        fingerprinter = create_instance(
-            ScrapyZyteAPIRequestFingerprinter,
-            settings=crawler.settings,
-            crawler=crawler,
-        )
+        fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request = Request("https://example.com")
     assert fingerprinter.fingerprint(request) == b"foo"
     request = Request("https://example.com", meta={"zyte_api": True})
@@ -65,7 +60,7 @@ async def test_fallback_custom(caplog):
 
 
 @pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_poet_installed_but_disabled(caplog):
     """If the scrapy-poet package is installed but its main middleware,
     InjectionMiddleware, is not set in DOWNLOADER_MIDDLEWARES, do not try to
@@ -93,7 +88,7 @@ async def test_poet_installed_but_disabled(caplog):
     assert no_deps_fp == deps_fp
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_fallback_default():
     crawler = await get_crawler()
     fingerprinter = crawler.request_fingerprinter
@@ -112,12 +107,10 @@ async def test_fallback_default():
     assert new_fingerprint != old_fingerprint
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_headers():
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request(
         "https://example.com",
         meta={
@@ -218,30 +211,26 @@ async def test_headers():
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_known_fingerprints(url, params, fingerprint):
     """Test that known fingerprints remain the same, i.e. make sure that we do
     not accidentally modify fingerprints with future implementation changes."""
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request = Request(url, meta={"zyte_api": params})
     actual_fingerprint = fingerprinter.fingerprint(request)
     assert actual_fingerprint == fingerprint
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_metadata():
     settings = {"JOB": "1/2/3"}
     crawler = await get_crawler(settings)
-    job_fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    job_fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
 
     crawler = await get_crawler()
-    no_job_fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
+    no_job_fingerprinter = _build_from_crawler(
+        ScrapyZyteAPIRequestFingerprinter, crawler
     )
 
     request1 = Request("https://example.com", meta={"zyte_api": {"echoData": "foo"}})
@@ -263,7 +252,7 @@ async def test_metadata():
     scrapy_poet is not None,
     reason=("scrapy-poet is installed, and test_deps already covers these scenarios"),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_only_end_parameters_matter():
     """Test that it does not matter how a request comes to use some Zyte API
     parameters, that the fingerprint is the same if the parameters actually
@@ -355,12 +344,10 @@ async def test_only_end_parameters_matter():
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_url(url1, url2, match):
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request(url1, meta={"zyte_api_automap": True})
     fingerprint1 = fingerprinter.fingerprint(request1)
     request2 = Request(url2, meta={"zyte_api_automap": True})
@@ -491,12 +478,10 @@ def merge_dicts(*dicts):
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_url_fragments(params, match):
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request("https://toscrape.com#1", meta={"zyte_api": params})
     fingerprint1 = fingerprinter.fingerprint(request1)
     request2 = Request("https://toscrape.com#2", meta={"zyte_api": params})
@@ -507,12 +492,10 @@ async def test_url_fragments(params, match):
         assert fingerprint1 != fingerprint2
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_extract_types():
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request("https://toscrape.com", meta={"zyte_api": {"product": True}})
     fingerprint1 = fingerprinter.fingerprint(request1)
     request2 = Request(
@@ -522,12 +505,10 @@ async def test_extract_types():
     assert fingerprint1 != fingerprint2
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_request_body():
     crawler = await get_crawler()
-    fingerprinter = create_instance(
-        ScrapyZyteAPIRequestFingerprinter, settings=crawler.settings, crawler=crawler
-    )
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     request1 = Request(
         "https://toscrape.com", meta={"zyte_api": {"httpRequestBody": "Zm9v"}}
     )
@@ -540,7 +521,7 @@ async def test_request_body():
 
 
 @pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_deps():
     """Test that some injected dependencies do not affect fingerprinting at
     all (e.g. HttpClient) while others do (e.g. WebPage)."""
@@ -711,7 +692,7 @@ async def test_deps():
     assert page_request_transparent_fp == page_auto_request_transparent_fp
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_page_params():
     no_params_request = Request("https://example.com")
     empty_params_request = Request("https://example.com", meta={"page_params": {}})
@@ -876,7 +857,7 @@ del NO_SESSION_DOWNLOADER_MIDDLEWARES[
         ),
     ),
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_session_pool_ids(settings, meta1, meta2, fingerprint_matches):
     request1 = Request("https://example.com", meta=meta1)
     request2 = Request("https://example.com", meta=meta2)

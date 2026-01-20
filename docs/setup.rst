@@ -18,13 +18,11 @@ You need at least:
 -   A :ref:`Zyte API <zyte-api>` subscription (there’s a :ref:`free trial
     <zapi-trial>`).
 
--   Python 3.9+
+-   Python 3.10+
 
 -   Scrapy 2.0.1+
 
 :doc:`scrapy-poet <scrapy-poet:index>` integration requires Scrapy 2.6+.
-
-:ref:`x402 support <x402>` requires Python 3.10+.
 
 
 .. _install:
@@ -38,14 +36,13 @@ For a basic installation:
 
     pip install scrapy-zyte-api
 
-For :ref:`scrapy-poet integration <scrapy-poet>`:
+For :ref:`scrapy-poet integration <scrapy-poet>`,  install the ``provider`` extra:
 
 .. code-block:: shell
 
     pip install scrapy-zyte-api[provider]
 
-For :ref:`x402 support <x402>`, make sure you have Python 3.10+ and install
-the ``x402`` extra:
+For :ref:`x402 support <x402>`,  install the ``x402`` extra:
 
 .. code-block:: shell
 
