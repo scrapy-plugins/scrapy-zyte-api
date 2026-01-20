@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.32.0 (unreleased)
+0.32.0 (2026-01-20)
 -------------------
 
 -   Dropped support for Python 3.9.
