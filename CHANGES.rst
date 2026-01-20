@@ -1,6 +1,19 @@
 Changes
 =======
 
+0.32.0 (unreleased)
+-------------------
+
+-   Dropped support for Python 3.9.
+
+-   Added support for Scrapy 2.14+.
+
+-   Added web-poet test fixture support for :class:`~scrapy_zyte_api.Actions`,
+    :class:`~scrapy_zyte_api.Screenshot`, and
+    :class:`~scrapy_zyte_api.Geolocation`.
+
+-   Improved typing and added ``py.typed`` to indicate typing support.
+
 0.31.0 (2025-08-08)
 -------------------
 
