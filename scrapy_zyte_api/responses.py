@@ -198,7 +198,7 @@ def _process_response(
             headers=scrapy_headers,
             url=cast("str", api_response["url"]),
             # FIXME: update this when python-zyte-api supports base64 decoding
-            body=b64decode(api_response["httpResponseBody"]),  # type: ignore
+            body=b64decode(api_response["httpResponseBody"]),  # type: ignore[arg-type]
         )
         if issubclass(response_cls, TextResponse):
             return ZyteAPITextResponse.from_api_response(api_response, request=request)

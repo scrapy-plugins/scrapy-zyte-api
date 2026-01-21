@@ -29,11 +29,11 @@ if TYPE_CHECKING:
 
 
 # https://github.com/scrapy/scrapy/blob/02b97f98e74a994ad3e4d74e7ed55207e508a576/tests/mockserver.py#L27C1-L33C19
-def getarg(request, name, default=None, type=None):
+def getarg(request, name, default=None, type_=None):
     if name in request.args:
         value = request.args[name][0]
-        if type is not None:
-            value = type(value)
+        if type_ is not None:
+            value = type_(value)
         return value
     return default
 
@@ -200,10 +200,7 @@ class DefaultResource(Resource):
                     break
             else:
                 headers = request_data.get("requestHeaders", {})
-                if "referer" in headers:
-                    referer = headers["referer"]
-                else:
-                    referer = None
+                referer = headers.get("referer")
             if referer is not None:
                 assert isinstance(response_data["httpResponseHeaders"], list)
                 response_data["httpResponseHeaders"].append(
@@ -244,9 +241,8 @@ class DefaultResource(Resource):
             assert isinstance(response_data["product"], dict)
             assert isinstance(response_data["product"]["name"], str)
             extract_from = request_data.get("productOptions", {}).get("extractFrom")
-            if extract_from:
-                if extract_from == ExtractFrom.httpResponseBody:
-                    response_data["product"]["name"] += " (from httpResponseBody)"
+            if extract_from == ExtractFrom.httpResponseBody:
+                response_data["product"]["name"] += " (from httpResponseBody)"
 
             if "geolocation" in request_data:
                 response_data["product"]["name"] += (

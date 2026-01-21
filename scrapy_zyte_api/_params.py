@@ -286,9 +286,9 @@ def _may_use_browser(api_params: dict[str, Any]) -> bool:
         return True
     if "httpResponseBody" in extract_froms:
         return False
-    if api_params.get("httpResponseBody", _DEFAULT_API_PARAMS["httpResponseBody"]):
-        return False
-    return True
+    return not api_params.get(
+        "httpResponseBody", _DEFAULT_API_PARAMS["httpResponseBody"]
+    )
 
 
 def session_id_to_session(session_id):
@@ -526,15 +526,16 @@ def _process_manual_custom_http_request_headers(
     api_params: dict[str, Any],
     request: Request,
 ) -> None:
-    headers = []
-    for header_dict in api_params.pop("customHttpRequestHeaders"):
+    headers = [
+        header_dict
+        for header_dict in api_params.pop("customHttpRequestHeaders")
         if _is_safe_header(
             header_dict["name"],
             header_dict["value"],
             api_params=api_params,
             request=request,
-        ):
-            headers.append(header_dict)
+        )
+    ]
     if headers:
         api_params["customHttpRequestHeaders"] = headers
 

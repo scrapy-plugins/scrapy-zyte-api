@@ -86,7 +86,8 @@ def actions(value: Iterable[Action]) -> tuple[Any, ...]:
 
 
 def custom_attrs(
-    input: dict[str, Any], options: dict[str, Any] | None = None
+    input: dict[str, Any],  # noqa: A002
+    options: dict[str, Any] | None = None,
 ) -> tuple[frozenset[Any], frozenset[Any] | None]:
     input_wrapped = make_hashable(input)
     options_wrapped = make_hashable(options) if options else None

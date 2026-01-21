@@ -9,7 +9,7 @@ from scrapy_zyte_api._annotations import (
 
 
 @pytest.mark.parametrize(
-    ("input", "expected"),
+    ("input_", "expected"),
     [
         ([], ()),
         ({}, frozenset()),
@@ -38,12 +38,12 @@ from scrapy_zyte_api._annotations import (
         ),
     ],
 )
-def test_make_hashable(input, expected):
-    assert make_hashable(input) == expected
+def test_make_hashable(input_, expected):
+    assert make_hashable(input_) == expected
 
 
 @pytest.mark.parametrize(
-    ("input", "expected"),
+    ("input_", "expected"),
     [
         ((), []),
         (frozenset(), {}),
@@ -72,12 +72,12 @@ def test_make_hashable(input, expected):
         ),
     ],
 )
-def test_from_hashable(input, expected):
-    assert _from_hashable(input) == expected
+def test_from_hashable(input_, expected):
+    assert _from_hashable(input_) == expected
 
 
 @pytest.mark.parametrize(
-    ("input", "expected"),
+    ("input_", "expected"),
     [
         ([], ()),
         ([{}], (frozenset(),)),
@@ -90,12 +90,12 @@ def test_from_hashable(input, expected):
         ),
     ],
 )
-def test_actions(input, expected):
-    assert actions(input) == expected
+def test_actions(input_, expected):
+    assert actions(input_) == expected
 
 
 @pytest.mark.parametrize(
-    ("input", "options", "expected"),
+    ("input_", "options", "expected"),
     [
         ({}, None, (frozenset(), None)),
         ({"foo": "bar"}, None, (frozenset({("foo", "bar")}), None)),
@@ -106,5 +106,5 @@ def test_actions(input, expected):
         ),
     ],
 )
-def test_custom_attrs(input, options, expected):
-    assert custom_attrs(input, options) == expected
+def test_custom_attrs(input_, options, expected):
+    assert custom_attrs(input_, options) == expected

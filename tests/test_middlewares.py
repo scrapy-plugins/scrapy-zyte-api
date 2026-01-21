@@ -35,7 +35,7 @@ async def request_processor(middleware, request: Request):
     assert await process_request(middleware, request) is None
 
 
-async def aiter(list_):
+async def aiter_(list_):
     for item in list_:
         yield item
 
@@ -45,7 +45,7 @@ async def start_request_processor(middleware, request: Request):
         args = (None,) if _PROCESS_START_REQUIRES_SPIDER else ()
         result = [
             request
-            async for request in middleware.process_start(aiter([request]), *args)
+            async for request in middleware.process_start(aiter_([request]), *args)
         ]
     else:
         result = list(middleware.process_start_requests([request], None))
@@ -59,7 +59,7 @@ async def spider_output_processor(middleware, request: Request):
         result = [
             request
             async for request in middleware.process_spider_output_async(
-                response, aiter([request]), *args
+                response, aiter_([request]), *args
             )
         ]
     else:
@@ -233,7 +233,7 @@ async def test_max_requests_race_condition(caplog):
                     yield request
 
             def start_requests(self):
-                for i in range(spider_requests):
+                for _ in range(spider_requests):
                     meta = {"zyte_api": {"browserHtml": True}}
                     yield Request("https://example.com", meta=meta, dont_filter=True)
 

@@ -2839,7 +2839,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 {
                     "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
                 },
-                input,
+                input_,
                 {},
                 {},
                 {
@@ -2853,7 +2853,7 @@ REQUEST_OUTPUT_COOKIES_MAXIMAL = [
                 [],
                 [],
             )
-            for input, output in (
+            for input_, output in (
                 (
                     REQUEST_INPUT_COOKIES_MINIMAL_DICT,
                     REQUEST_OUTPUT_COOKIES_MINIMAL,
@@ -3525,7 +3525,7 @@ async def test_middleware_headers_cb_requests_skip():
     request = Request(url="https://example.com")
     settings = {
         "ZYTE_API_SKIP_HEADERS": list(
-            set(header.decode() for header in SKIP_HEADERS)
+            {header.decode() for header in SKIP_HEADERS}
             | {
                 "Referer",
             }
@@ -3613,7 +3613,7 @@ async def test_middleware_headers_default_skip():
             "User-Agent": DEFAULT_USER_AGENT,
         },
         "ZYTE_API_SKIP_HEADERS": list(
-            set(header.decode() for header in SKIP_HEADERS)
+            {header.decode() for header in SKIP_HEADERS}
             | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer", "User-Agent"}
         ),
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -3696,7 +3696,7 @@ async def test_middleware_headers_request_headers_skip():
     )
     settings = {
         "ZYTE_API_SKIP_HEADERS": list(
-            set(header.decode() for header in SKIP_HEADERS)
+            {header.decode() for header in SKIP_HEADERS}
             | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer", "User-Agent"}
         ),
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -3787,7 +3787,7 @@ async def test_middleware_headers_custom_middleware_before_skip():
     request = Request("https://example.com")
     settings = {
         "ZYTE_API_SKIP_HEADERS": list(
-            set(header.decode() for header in SKIP_HEADERS)
+            {header.decode() for header in SKIP_HEADERS}
             | {*DEFAULT_REQUEST_HEADERS, "Accept-Encoding", "Referer", "User-Agent"}
         ),
         "ZYTE_API_TRANSPARENT_MODE": True,
