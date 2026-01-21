@@ -7,14 +7,14 @@ import pytest
 pytest.importorskip("scrapy_poet")
 
 import attrs
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy_poet import DummyResponse
 from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
 from twisted.internet import reactor
-from twisted.web.client import Agent
 from twisted.internet.defer import Deferred
 from twisted.internet.protocol import Protocol
+from twisted.web.client import Agent
 from web_poet import (
     AnyResponse,
     BrowserHtml,

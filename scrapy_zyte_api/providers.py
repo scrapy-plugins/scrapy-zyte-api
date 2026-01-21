@@ -1,11 +1,10 @@
-from collections.abc import Coroutine
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type, cast
+from collections.abc import Callable, Coroutine, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
 from scrapy_poet import PageObjectInputProvider
-from twisted.internet.defer import Deferred
 from web_poet import (
     AnyResponse,
     BrowserHtml,
@@ -46,8 +45,12 @@ from zyte_common_items.fields import is_auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
-from scrapy_zyte_api.responses import ZyteAPITextResponse
 from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
+
+if TYPE_CHECKING:
+    from twisted.internet.defer import Deferred
+
+    from scrapy_zyte_api.responses import ZyteAPITextResponse
 
 try:
     # requires Scrapy >= 2.8
@@ -56,7 +59,7 @@ except ImportError:
     NO_CALLBACK = None  # type: ignore[assignment]
 
 
-_ITEM_KEYWORDS: Dict[type, str] = {
+_ITEM_KEYWORDS: dict[type, str] = {
     Product: "product",
     ProductList: "productList",
     ProductNavigation: "productNavigation",
@@ -68,7 +71,7 @@ _ITEM_KEYWORDS: Dict[type, str] = {
     JobPostingNavigation: "jobPostingNavigation",
     Serp: "serp",
 }
-_AUTO_PAGES: Set[type] = {
+_AUTO_PAGES: set[type] = {
     AutoArticlePage,
     AutoArticleListPage,
     AutoArticleNavigationPage,
@@ -113,7 +116,7 @@ class ZyteApiProvider(PageObjectInputProvider):
     def is_provided(self, type_: Callable) -> bool:
         return super().is_provided(strip_annotated(type_))
 
-    def _track_auto_fields(self, crawler: Crawler, request: Request, cls: Type):
+    def _track_auto_fields(self, crawler: Crawler, request: Request, cls: type):
         assert crawler.stats
         if cls not in _ITEM_KEYWORDS:
             return
@@ -138,16 +141,16 @@ class ZyteApiProvider(PageObjectInputProvider):
         cls_fqn = get_fq_class_name(cls)
         crawler.stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)
 
-    async def __call__(  # noqa: C901
-        self, to_provide: Set[Callable], request: Request, crawler: Crawler
+    async def __call__(
+        self, to_provide: set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
-        results: List[Any] = []
+        results: list[Any] = []
 
         http_response = None
         screenshot_requested = Screenshot in to_provide
         for cls in list(to_provide):
-            self._track_auto_fields(crawler, request, cast(type, cls))
+            self._track_auto_fields(crawler, request, cast("type", cls))
             item = self.injector.weak_cache.get(request, {}).get(cls)
             if item:
                 results.append(item)
@@ -177,8 +180,8 @@ class ZyteApiProvider(PageObjectInputProvider):
             **request.meta.get("zyte_api_provider", {}),
         }
 
-        to_provide_stripped: Set[type] = set()
-        extract_from_seen: Dict[str, str] = {}
+        to_provide_stripped: set[type] = set()
+        extract_from_seen: dict[str, str] = {}
         item_requested: bool = False
 
         for cls in to_provide:
@@ -344,7 +347,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                 results.append(result)
                 continue
             if cls_stripped is Actions and is_typing_annotated(cls):
-                actions_result: Optional[List[_ActionResult]]
+                actions_result: list[_ActionResult] | None
                 if "actions" in api_response.raw_api_response:
                     actions_result = [
                         _ActionResult(**action_result)

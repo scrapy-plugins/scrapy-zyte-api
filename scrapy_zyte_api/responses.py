@@ -1,7 +1,7 @@
 import datetime as dt
 from base64 import b64decode
 from copy import copy
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Union, cast
 
 from scrapy import Request
 from scrapy.http import Headers, HtmlResponse, Response, TextResponse
@@ -26,11 +26,11 @@ class ZyteAPIMixin:
         "content-encoding",
     }
 
-    def __init__(self, *args, raw_api_response: Optional[Dict] = None, **kwargs):
+    def __init__(self, *args, raw_api_response: dict | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._raw_api_response = raw_api_response
         if not _RESPONSE_HAS_ATTRIBUTES:
-            self.attributes: Tuple[str, ...] = (
+            self.attributes: tuple[str, ...] = (
                 "url",
                 "status",
                 "headers",
@@ -54,7 +54,7 @@ class ZyteAPIMixin:
         return cls(*args, **kwargs)
 
     @property
-    def raw_api_response(self) -> Optional[Dict]:
+    def raw_api_response(self) -> dict | None:
         """Contains the raw API response from Zyte API.
 
         For the full list of parameters, see :ref:`zapi-reference`.
@@ -85,12 +85,12 @@ class ZyteAPIMixin:
         return result
 
     @classmethod
-    def _prepare_headers(cls, api_response: Dict[str, Any]):
-        result: Dict[str, List[str]] = {}
-        input_headers: Optional[List[Dict[str, str]]] = api_response.get(
+    def _prepare_headers(cls, api_response: dict[str, Any]):
+        result: dict[str, list[str]] = {}
+        input_headers: list[dict[str, str]] | None = api_response.get(
             "httpResponseHeaders"
         )
-        response_cookies: Optional[List[Dict[str, str]]] = api_response.get(
+        response_cookies: list[dict[str, str]] | None = api_response.get(
             "experimental", {}
         ).get("responseCookies")
         if input_headers:
@@ -113,9 +113,7 @@ class ZyteAPIMixin:
 
 class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
     @classmethod
-    def from_api_response(
-        cls, api_response: Dict, *, request: Optional[Request] = None
-    ):
+    def from_api_response(cls, api_response: dict, *, request: Request | None = None):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
@@ -146,9 +144,7 @@ class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
 
 class ZyteAPIResponse(ZyteAPIMixin, Response):
     @classmethod
-    def from_api_response(
-        cls, api_response: Dict, *, request: Optional[Request] = None
-    ):
+    def from_api_response(cls, api_response: dict, *, request: Request | None = None):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
@@ -165,16 +161,16 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
 
 _IMMUTABLE_JSON = Union[None, str, int, float, bool]
 _JSON = Union[
-    None, str, int, float, bool, List["_JSON"], Dict[_IMMUTABLE_JSON, "_JSON"]
+    None, str, int, float, bool, list["_JSON"], dict[_IMMUTABLE_JSON, "_JSON"]
 ]
-_API_RESPONSE = Dict[str, _JSON]
+_API_RESPONSE = dict[str, _JSON]
 
 
 def _process_response(
     api_response: _API_RESPONSE,
     request: Request,
-    cookie_jars: Optional[Dict[Any, CookieJar]],
-) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
+    cookie_jars: dict[Any, CookieJar] | None,
+) -> ZyteAPITextResponse | ZyteAPIResponse | None:
     """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
     this returns either a ``ZyteAPITextResponse`` or ``ZyteAPIResponse`` depending
     on which if it can properly decode the HTTP Body or have access to browserHtml.
@@ -196,11 +192,11 @@ def _process_response(
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
         # a plain dict here doesn't work correctly on Scrapy < 2.1
         scrapy_headers = Headers()
-        for header in cast(List[Dict[str, str]], api_response["httpResponseHeaders"]):
+        for header in cast("list[dict[str, str]]", api_response["httpResponseHeaders"]):
             scrapy_headers[header["name"].encode()] = header["value"].encode()
         response_cls = responsetypes.from_args(
             headers=scrapy_headers,
-            url=cast(str, api_response["url"]),
+            url=cast("str", api_response["url"]),
             # FIXME: update this when python-zyte-api supports base64 decoding
             body=b64decode(api_response["httpResponseBody"]),  # type: ignore
         )

@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from functools import partial
 from logging import getLogger
-from typing import Any, DefaultDict, Deque, Dict, List, Optional, Set, Type, Union
+from typing import Any
 from uuid import uuid4
 from weakref import WeakKeyDictionary
 
@@ -21,8 +21,8 @@ from zyte_api import RequestError, RetryFactory
 from .utils import (  # type: ignore[attr-defined]
     _DOWNLOAD_NEEDS_SPIDER,
     _build_from_crawler,
-    deferred_to_future,
     _close_spider,
+    deferred_to_future,
 )
 
 logger = getLogger(__name__)
@@ -30,7 +30,7 @@ SESSION_INIT_META_KEY = "_is_session_init_request"
 ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
 
 
-def get_request_session_id(request: Request) -> Optional[str]:
+def get_request_session_id(request: Request) -> str | None:
     """Return the session ID of *request*, or ``None`` if it does not have a
     session ID assigned."""
     for meta_key in ZYTE_API_META_KEYS:
@@ -157,7 +157,7 @@ class SessionConfig:
     #: :ref:`creating a pool ID for a request <session-pools>` based on the
     #: content of the :reqmeta:`zyte_api_session_location` metadata key. See
     #: :meth:`pool`.
-    ADDRESS_FIELDS: List[str] = [
+    ADDRESS_FIELDS: list[str] = [
         "addressCountry",
         "addressRegion",
         "postalCode",
@@ -182,7 +182,7 @@ class SessionConfig:
             self._checker = None
         self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
         self._pool_counters = defaultdict(int)
-        self._param_pools: DefaultDict[str, Dict[str, int]] = defaultdict(dict)
+        self._param_pools: defaultdict[str, dict[str, int]] = defaultdict(dict)
 
     def enabled(self, request: Request) -> bool:
         """Return ``True`` if the request should use sessions from
@@ -193,7 +193,7 @@ class SessionConfig:
         """
         return request.meta.get("zyte_api_session_enabled", self._enabled)
 
-    def process_request(self, request: Request) -> Optional[Request]:
+    def process_request(self, request: Request) -> Request | None:
         """Process *request* after it has been assigned a session.
 
         Return ``None`` to send the request as is, or return a new request
@@ -290,7 +290,7 @@ class SessionConfig:
             return f"{netloc}@{location_id}"
         return netloc
 
-    def location(self, request: Request) -> Dict[str, str]:
+    def location(self, request: Request) -> dict[str, str]:
         """Return the address :class:`dict` to use for location-based session
         initialization for *request*.
 
@@ -335,7 +335,7 @@ class SessionConfig:
         """
         return request.meta.get("zyte_api_session_location", self._setting_location)
 
-    def params(self, request: Request) -> Dict[str, Any]:
+    def params(self, request: Request) -> dict[str, Any]:
         """Return the Zyte API request parameters to use to initialize a
         session for *request*.
 
@@ -417,14 +417,14 @@ try:
 except ImportError:
 
     class SessionConfigRulesRegistry:
-        def session_config_cls(self, request: Request) -> Type[SessionConfig]:
+        def session_config_cls(self, request: Request) -> type[SessionConfig]:
             return SessionConfig
 
         def session_config(
             self,
             include,
             *,
-            instead_of: Optional[Type] = SessionConfig,
+            instead_of: type | None = SessionConfig,
             exclude=None,
             priority: int = 500,
             **kwargs,
@@ -498,9 +498,9 @@ else:
             rules = [ApplyRule(for_patterns=Patterns(include=[""]), use=SessionConfig)]  # type: ignore[arg-type]
             super().__init__(rules=rules)
 
-        def session_config_cls(self, request: Request) -> Type[SessionConfig]:
+        def session_config_cls(self, request: Request) -> type[SessionConfig]:
             cls = SessionConfig
-            overrides: Dict[Type[SessionConfig], Type[SessionConfig]] = (
+            overrides: dict[type[SessionConfig], type[SessionConfig]] = (
                 self.overrides_for(request.url)  # type: ignore[assignment]
             )
             while cls in overrides:
@@ -511,8 +511,8 @@ else:
             self,
             include: Strings,
             *,
-            instead_of: Optional[Type[SessionConfig]] = SessionConfig,
-            exclude: Optional[Strings] = None,
+            instead_of: type[SessionConfig] | None = SessionConfig,
+            exclude: Strings | None = None,
             priority: int = 500,
             **kwargs,
         ):
@@ -558,7 +558,7 @@ class _SessionManager:
         settings = crawler.settings
 
         pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
-        self._pending_initial_sessions: Dict[str, int] = defaultdict(lambda: pool_size)
+        self._pending_initial_sessions: dict[str, int] = defaultdict(lambda: pool_size)
         pool_sizes = settings.getdict("ZYTE_API_SESSION_POOL_SIZES", {})
         for pool, size in pool_sizes.items():
             self._pending_initial_sessions[pool] = size
@@ -566,19 +566,19 @@ class _SessionManager:
         self._max_check_failures = settings.getint(
             "ZYTE_API_SESSION_MAX_CHECK_FAILURES", 1
         )
-        self._check_failures: Dict[str, int] = defaultdict(int)
+        self._check_failures: dict[str, int] = defaultdict(int)
 
         self._max_errors = settings.getint("ZYTE_API_SESSION_MAX_ERRORS", 1)
-        self._errors: Dict[str, int] = defaultdict(int)
+        self._errors: dict[str, int] = defaultdict(int)
 
         max_bad_inits = settings.getint("ZYTE_API_SESSION_MAX_BAD_INITS", 8)
-        self._max_bad_inits: Dict[str, int] = defaultdict(lambda: max_bad_inits)
+        self._max_bad_inits: dict[str, int] = defaultdict(lambda: max_bad_inits)
         max_bad_inits_per_pool = settings.getdict(
             "ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL", {}
         )
         for pool, pool_max_bad_inits in max_bad_inits_per_pool.items():
             self._max_bad_inits[pool] = pool_max_bad_inits
-        self._bad_inits: Dict[str, int] = defaultdict(int)
+        self._bad_inits: dict[str, int] = defaultdict(int)
 
         # Transparent mode, needed to determine whether to set the session
         # using ``zyte_api`` or ``zyte_api_automap``.
@@ -597,7 +597,7 @@ class _SessionManager:
         #
         # As soon as a session expires, it is removed from its pool, and a task
         # to initialize that new session is started.
-        self._pools: Dict[str, Set[str]] = defaultdict(set)
+        self._pools: dict[str, set[str]] = defaultdict(set)
         self._pool_cache: WeakKeyDictionary[Request, str] = WeakKeyDictionary()
 
         # The queue is a rotating list of session IDs to use.
@@ -616,7 +616,7 @@ class _SessionManager:
         # If the queue is empty, sleep and try again. Sessions from the pool
         # will be appended to the queue as they are initialized and ready to
         # use.
-        self._queues: Dict[str, Deque[str]] = defaultdict(deque)
+        self._queues: dict[str, deque[str]] = defaultdict(deque)
         self._queue_max_attempts = settings.getint(
             "ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS", 60
         )
@@ -628,12 +628,12 @@ class _SessionManager:
         #
         # Keeping a reference to those tasks until they are done is necessary
         # to prevent garbage collection to remove the tasks.
-        self._init_tasks: Set[Task] = set()
+        self._init_tasks: set[Task] = set()
 
         self._session_config_cache: WeakKeyDictionary[Request, SessionConfig] = (
             WeakKeyDictionary()
         )
-        self._session_config_map: Dict[Type[SessionConfig], SessionConfig] = {}
+        self._session_config_map: dict[type[SessionConfig], SessionConfig] = {}
 
         self._setting_params = settings.getdict("ZYTE_API_SESSION_PARAMS")
 
@@ -885,7 +885,7 @@ class _SessionManager:
             self._start_request_session_refresh(request, pool)
         return False
 
-    async def assign(self, request: Request) -> Optional[Request]:
+    async def assign(self, request: Request) -> Request | None:
         """Assign a working session to *request*.
 
         If the session config creates a new request instead of modifying the
@@ -971,12 +971,12 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
 
     async def process_request(
         self, request: Request, spider: Spider | None = None
-    ) -> Optional[Request]:
+    ) -> Request | None:
         return await self._sessions.assign(request)
 
     async def process_response(
         self, request: Request, response: Response, spider: Spider | None = None
-    ) -> Union[Request, Response, None]:
+    ) -> Request | Response | None:
         if isinstance(response, DummyResponse):
             return response
 
@@ -997,7 +997,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
 
     async def process_exception(
         self, request: Request, exception: Exception, spider: Spider | None = None
-    ) -> Union[Request, None]:
+    ) -> Request | None:
         if (
             not isinstance(exception, RequestError)
             or self._sessions.is_init_request(request)
@@ -1041,7 +1041,7 @@ class LocationSessionConfig(SessionConfig):
     as a parameter.
     """
 
-    def params(self, request: Request) -> Dict[str, Any]:
+    def params(self, request: Request) -> dict[str, Any]:
         if not (location := self.location(request)):
             return super().params(request)
         return self.location_params(request, location)
@@ -1052,15 +1052,15 @@ class LocationSessionConfig(SessionConfig):
         return self.location_check(response, request, location)
 
     def location_params(
-        self, request: Request, location: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, request: Request, location: dict[str, Any]
+    ) -> dict[str, Any]:
         """Like :class:`SessionConfig.params
         <scrapy_zyte_api.SessionConfig.params>`, but it is only called when a
         location is set, and gets that *location* as a parameter."""
         return super().params(request)
 
     def location_check(
-        self, response: Response, request: Request, location: Dict[str, Any]
+        self, response: Response, request: Request, location: dict[str, Any]
     ) -> bool:
         """Like :class:`SessionConfig.check
         <scrapy_zyte_api.SessionConfig.check>`, but it is only called when a

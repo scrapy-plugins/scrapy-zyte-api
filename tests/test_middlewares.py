@@ -1,4 +1,4 @@
-from typing import Any, Dict, cast
+from typing import Any, cast
 from unittest import SkipTest
 
 import pytest
@@ -16,11 +16,11 @@ from scrapy_zyte_api import (
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _GET_SLOT_NEEDS_SPIDER,
     _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT,
+    _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER,
+    _PROCESS_START_REQUIRES_SPIDER,
     _START_REQUESTS_CAN_YIELD_ITEMS,
     _build_from_crawler,
     maybe_deferred_to_future,
-    _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER,
-    _PROCESS_START_REQUIRES_SPIDER,
 )
 
 from . import SETTINGS, process_request
@@ -68,7 +68,7 @@ async def spider_output_processor(middleware, request: Request):
 
 
 @pytest.mark.parametrize(
-    ["mw_cls", "processor"],
+    ("mw_cls", "processor"),
     [
         (ScrapyZyteAPIDownloaderMiddleware, request_processor),
         (ScrapyZyteAPISpiderMiddleware, start_request_processor),
@@ -76,7 +76,7 @@ async def spider_output_processor(middleware, request: Request):
     ],
 )
 @pytest.mark.parametrize(
-    ["settings", "preserve"],
+    ("settings", "preserve"),
     [
         ({}, True),
         ({"ZYTE_API_PRESERVE_DELAY": False}, False),
@@ -403,7 +403,7 @@ async def test_forbidden_domain_with_partial_start_request_consumption():
 
 
 @pytest.mark.parametrize(
-    "setting,attribute,conflict",
+    ("setting", "attribute", "conflict"),
     [
         (None, None, False),
         (None, False, False),
@@ -435,7 +435,7 @@ async def test_spm_conflict_smartproxy(setting, attribute, conflict):
         "ZYTE_SMARTPROXY_APIKEY": "foo",
         **SETTINGS,
     }
-    mws = dict(cast(Dict[Any, int], settings["DOWNLOADER_MIDDLEWARES"]))
+    mws = dict(cast("dict[Any, int]", settings["DOWNLOADER_MIDDLEWARES"]))
     mws["scrapy_zyte_smartproxy.ZyteSmartProxyMiddleware"] = 610
     settings["DOWNLOADER_MIDDLEWARES"] = mws
 
@@ -450,7 +450,7 @@ async def test_spm_conflict_smartproxy(setting, attribute, conflict):
 
 
 try:
-    import scrapy_crawlera  # noqa: F401
+    import scrapy_crawlera
 except ImportError:
     scrapy_crawlera = None
     SCRAPY_CRAWLERA_VERSION = Version("1.2.3")
@@ -459,7 +459,7 @@ else:
 
 
 @pytest.mark.parametrize(
-    "setting,attribute,conflict",
+    ("setting", "attribute", "conflict"),
     [
         (None, None, False),
         (None, False, False),
@@ -469,7 +469,7 @@ else:
         (False, True, True),
         (True, None, True),
         # https://github.com/scrapy-plugins/scrapy-zyte-smartproxy/commit/49ebedd8b1d48cf2667db73f18da3e2c2c7fbfa7
-        (True, False, SCRAPY_CRAWLERA_VERSION < Version("1.7")),
+        (True, False, SCRAPY_CRAWLERA_VERSION < Version("1.7")),  # noqa: SIM300
         (True, True, True),
     ],
 )
@@ -490,7 +490,7 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
         "CRAWLERA_APIKEY": "foo",
         **SETTINGS,
     }
-    mws = dict(cast(Dict[Any, int], settings["DOWNLOADER_MIDDLEWARES"]))
+    mws = dict(cast("dict[Any, int]", settings["DOWNLOADER_MIDDLEWARES"]))
     mws["scrapy_crawlera.CrawleraMiddleware"] = 610
     settings["DOWNLOADER_MIDDLEWARES"] = mws
 

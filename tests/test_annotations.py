@@ -9,7 +9,7 @@ from scrapy_zyte_api._annotations import (
 
 
 @pytest.mark.parametrize(
-    "input,expected",
+    ("input", "expected"),
     [
         ([], ()),
         ({}, frozenset()),
@@ -43,7 +43,7 @@ def test_make_hashable(input, expected):
 
 
 @pytest.mark.parametrize(
-    "input,expected",
+    ("input", "expected"),
     [
         ((), []),
         (frozenset(), {}),
@@ -77,7 +77,7 @@ def test_from_hashable(input, expected):
 
 
 @pytest.mark.parametrize(
-    "input,expected",
+    ("input", "expected"),
     [
         ([], ()),
         ([{}], (frozenset(),)),
@@ -95,7 +95,7 @@ def test_actions(input, expected):
 
 
 @pytest.mark.parametrize(
-    "input,options,expected",
+    ("input", "options", "expected"),
     [
         ({}, None, (frozenset(), None)),
         ({"foo": "bar"}, None, (frozenset({("foo", "bar")}), None)),

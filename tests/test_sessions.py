@@ -1,15 +1,15 @@
 from collections import deque
 from copy import copy, deepcopy
 from math import floor
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 from aiohttp.client_exceptions import ServerConnectionError
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider, signals
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import load_object
 from zyte_api import RequestError
@@ -37,7 +37,7 @@ UNSET = object()
 
 @pytest.mark.parametrize(
     ("setting", "meta", "outcome"),
-    (
+    [
         (UNSET, UNSET, False),
         (UNSET, True, True),
         (UNSET, False, False),
@@ -47,7 +47,7 @@ UNSET = object()
         (False, UNSET, False),
         (False, True, True),
         (False, False, False),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_enabled(setting, meta, outcome, mockserver):
@@ -92,7 +92,7 @@ async def test_enabled(setting, meta, outcome, mockserver):
 
 @pytest.mark.parametrize(
     ("params_setting", "params_meta", "location_setting", "location_meta", "outcome"),
-    (
+    [
         (UNSET, UNSET, UNSET, UNSET, False),
         (UNSET, UNSET, UNSET, None, False),
         (UNSET, UNSET, UNSET, False, False),
@@ -201,7 +201,7 @@ async def test_enabled(setting, meta, outcome, mockserver):
         (True, True, True, None, True),
         (True, True, True, False, True),
         (True, True, True, True, True),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_params_precedence(
@@ -222,7 +222,7 @@ async def test_params_precedence(
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
-    meta: Dict[str, Any] = {}
+    meta: dict[str, Any] = {}
 
     if params_setting is not UNSET:
         settings["ZYTE_API_SESSION_PARAMS"] = {
@@ -298,7 +298,7 @@ async def test_params_precedence(
 
 @pytest.mark.parametrize(
     ("params", "close_reason", "stats"),
-    (
+    [
         (
             {"browserHtml": True},
             "bad_session_inits",
@@ -313,7 +313,7 @@ async def test_params_precedence(
                 "scrapy-zyte-api/sessions/pools/forbidden.example/init/check-passed": 1,
             },
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_url_override(params, close_reason, stats, mockserver):
@@ -436,7 +436,7 @@ class OnlyPassFirstInitChecker:
 # subclasses for the crawler classes because the init use is enough to verify
 # that using the crawler works.
 
-CHECKER_TESTS: Tuple[Tuple[str, str, Dict[str, int]], ...] = (
+CHECKER_TESTS: tuple[tuple[str, str, dict[str, int]], ...] = (
     (
         "tests.test_sessions.TrueChecker",
         "finished",
@@ -506,7 +506,7 @@ CHECKER_TESTS: Tuple[Tuple[str, str, Dict[str, int]], ...] = (
 
 @pytest.mark.parametrize(
     ("checker", "close_reason", "stats"),
-    (
+    [
         *CHECKER_TESTS,
         *(
             pytest.param(
@@ -523,7 +523,7 @@ CHECKER_TESTS: Tuple[Tuple[str, str, Dict[str, int]], ...] = (
             )
             for checker, close_reason, stats in CHECKER_TESTS
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_checker(checker, close_reason, stats, mockserver):
@@ -559,7 +559,7 @@ async def test_checker(checker, close_reason, stats, mockserver):
 
 @pytest.mark.parametrize(
     ("postal_code", "url", "close_reason", "stats"),
-    (
+    [
         (
             None,
             "https://postal-code-10001-soft.example",
@@ -592,7 +592,7 @@ async def test_checker(checker, close_reason, stats, mockserver):
             "unsupported_set_location",
             {},
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_checker_location(postal_code, url, close_reason, stats, mockserver):
@@ -691,12 +691,12 @@ async def test_checker_close_spider_use(mockserver):
 
 @pytest.mark.parametrize(
     ("setting", "value"),
-    (
+    [
         (0, 1),
         (1, 1),
         (2, 2),
         (None, 8),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_max_bad_inits(setting, value, mockserver):
@@ -730,12 +730,12 @@ async def test_max_bad_inits(setting, value, mockserver):
 
 @pytest.mark.parametrize(
     ("global_setting", "pool_setting", "value"),
-    (
+    [
         (None, 0, 1),
         (None, 1, 1),
         (None, 2, 2),
         (3, None, 3),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mockserver):
@@ -776,12 +776,12 @@ async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mocks
 
 @pytest.mark.parametrize(
     ("setting", "value"),
-    (
+    [
         (None, 1),
         (0, 1),
         (1, 1),
         (2, 2),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_max_check_failures(setting, value, mockserver):
@@ -824,12 +824,12 @@ async def test_max_check_failures(setting, value, mockserver):
 
 @pytest.mark.parametrize(
     ("setting", "value"),
-    (
+    [
         (None, 1),
         (0, 1),
         (1, 1),
         (2, 2),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_max_errors(setting, value, mockserver):
@@ -915,7 +915,7 @@ async def test_check_overrides_error(mockserver):
 
 @pytest.mark.parametrize(
     ("meta", "pool"),
-    (
+    [
         ({}, "example.com"),
         ({"zyte_api_session_location": {"postalCode": "10001"}}, "example.com@10001"),
         (
@@ -957,7 +957,7 @@ async def test_check_overrides_error(mockserver):
             },
             "foo",
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_pool(meta, pool, mockserver):
@@ -1060,11 +1060,11 @@ async def test_pool_params(mockserver, caplog):
 
 @pytest.mark.parametrize(
     ("setting", "value"),
-    (
+    [
         (1, 1),
         (2, 2),
         (None, 8),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_pool_size(setting, value, mockserver):
@@ -1098,11 +1098,11 @@ async def test_pool_size(setting, value, mockserver):
 
 @pytest.mark.parametrize(
     ("global_setting", "pool_setting", "value"),
-    (
+    [
         (None, 1, 1),
         (None, 2, 2),
         (3, None, 3),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
@@ -1141,7 +1141,7 @@ async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
 
 
 def mock_request_error(*, status=200, response_content=None):
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     if _REQUEST_ERROR_HAS_QUERY:
         kwargs["query"] = {}
     return RequestError(
@@ -1164,7 +1164,7 @@ class fast_forward:
 
 @pytest.mark.parametrize(
     ("retrying", "outcomes", "exhausted"),
-    (
+    [
         *(
             (retry_policy, outcomes, exhausted)
             for retry_policy in (
@@ -1190,7 +1190,7 @@ class fast_forward:
                 ),
             )
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 @patch("time.monotonic")
@@ -1237,7 +1237,7 @@ else:
 
 @pytest.mark.parametrize(
     ("manual_settings", "addon_settings"),
-    (
+    [
         (
             {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
             {},
@@ -1268,7 +1268,7 @@ else:
             {"ZYTE_API_RETRY_POLICY": "tests.test_sessions.UNSET"},
             {"ZYTE_API_RETRY_POLICY": "tests.test_sessions.UNSET"},
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 @pytest.mark.skipif(
@@ -1522,7 +1522,7 @@ async def test_session_config_enabled(mockserver):
 
 @pytest.mark.parametrize(
     ("settings", "meta", "used"),
-    (
+    [
         ({}, {}, True),
         (
             {
@@ -1548,7 +1548,7 @@ async def test_session_config_enabled(mockserver):
             False,
         ),
         ({}, {"zyte_api_session_location": {"postalCode": "10002"}}, False),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_session_config_location(settings, meta, used, mockserver):
@@ -1631,7 +1631,7 @@ async def test_session_config_location(settings, meta, used, mockserver):
 
 @pytest.mark.parametrize(
     ("settings", "meta", "used"),
-    (
+    [
         ({}, {}, True),
         (
             {
@@ -1657,7 +1657,7 @@ async def test_session_config_location(settings, meta, used, mockserver):
             False,
         ),
         ({}, {"zyte_api_session_location": {"postalCode": "10002"}}, True),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_session_config_location_bad(settings, meta, used, mockserver):
@@ -1889,7 +1889,7 @@ async def test_session_config_params_location_no_set_location(mockserver):
 
 @pytest.mark.parametrize(
     ("meta", "settings", "pool", "outcome"),
-    (
+    [
         ({}, {}, "postal-code-10001.example", False),
         (
             {
@@ -1933,7 +1933,7 @@ async def test_session_config_params_location_no_set_location(mockserver):
             "postal-code-10001.example",
             False,
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_session_config_params_precedence(
@@ -2186,7 +2186,7 @@ async def test_session_config_process_request_change_request(mockserver):
                 self.session_data[session_id] = {"foo": "bar"}
             return super().check(response, request)
 
-        def process_request(self, request: Request) -> Optional[Request]:
+        def process_request(self, request: Request) -> Request | None:
             session_id = get_request_session_id(request)
             foo = self.session_data[session_id]["foo"]
             request.headers["foo"] = foo
@@ -2243,7 +2243,7 @@ async def test_session_config_process_request_new_request(mockserver):
                 self.session_data[session_id] = {"foo": "bar"}
             return super().check(response, request)
 
-        def process_request(self, request: Request) -> Optional[Request]:
+        def process_request(self, request: Request) -> Request | None:
             session_id = get_request_session_id(request)
             foo = self.session_data[session_id]["foo"]
             new_url = request.url.rstrip("/") + f"/{foo}"
@@ -2298,8 +2298,8 @@ async def test_location_session_config(mockserver):
     )
     class CustomSessionConfig(LocationSessionConfig):
         def location_params(
-            self, request: Request, location: Dict[str, Any]
-        ) -> Dict[str, Any]:
+            self, request: Request, location: dict[str, Any]
+        ) -> dict[str, Any]:
             assert location == {"postalCode": "10002"}
             return {
                 "actions": [
@@ -2311,7 +2311,7 @@ async def test_location_session_config(mockserver):
             }
 
         def location_check(
-            self, response: Response, request: Request, location: Dict[str, Any]
+            self, response: Response, request: Request, location: dict[str, Any]
         ) -> bool:
             assert location == {"postalCode": "10002"}
             domain = urlparse_cached(request).netloc
@@ -2485,12 +2485,12 @@ async def test_location_session_config_no_location(mockserver):
     @session_config(["postal-code-10001.example", "a.example"])
     class CustomSessionConfig(LocationSessionConfig):
         def location_params(
-            self, request: Request, location: Dict[str, Any]
-        ) -> Dict[str, Any]:
+            self, request: Request, location: dict[str, Any]
+        ) -> dict[str, Any]:
             assert False
 
         def location_check(
-            self, response: Response, request: Request, location: Dict[str, Any]
+            self, response: Response, request: Request, location: dict[str, Any]
         ) -> bool:
             assert False
 
@@ -2799,7 +2799,7 @@ async def test_empty_queue_limit(mockserver):
 class SessionIDRemovingDownloaderMiddleware:
     def process_exception(
         self, request: Request, exception: Exception, spider: Spider | None = None
-    ) -> Union[Request, None]:
+    ) -> Request | None:
         if not isinstance(exception, RequestError) or request.meta.get(
             "_is_session_init_request", False
         ):
@@ -2856,7 +2856,7 @@ async def test_missing_session_id(mockserver, caplog):
 
 @pytest.mark.parametrize(
     ("settings", "meta", "meta_key"),
-    (
+    [
         (
             {},
             {},
@@ -2897,7 +2897,7 @@ async def test_missing_session_id(mockserver, caplog):
             {"zyte_api_automap": True},
             "zyte_api_automap",
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_assign_meta_key(settings, meta, meta_key, mockserver):
@@ -2907,7 +2907,7 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
 
     class Tracker:
         def __init__(self):
-            self.meta: Dict[str, Any] = {}
+            self.meta: dict[str, Any] = {}
 
         def track(self, request: Request, spider: Spider):
             self.meta = deepcopy(request.meta)
@@ -2967,7 +2967,7 @@ async def test_provider(mockserver):
 
     class Tracker:
         def __init__(self):
-            self.query: Dict[str, Any] = {}
+            self.query: dict[str, Any] = {}
 
         def track(self, request: Request, spider: Spider):
             self.query = request.meta["zyte_api"]
@@ -3026,7 +3026,7 @@ class ExceptionRaisingDownloaderMiddleware:
 
 @pytest.mark.parametrize(
     ("exception", "stat", "reason"),
-    (
+    [
         (
             mock_request_error(
                 status=422, response_content=b'{"type": "/problem/session-expired"}'
@@ -3059,7 +3059,7 @@ class ExceptionRaisingDownloaderMiddleware:
             None,
             None,
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_exceptions(exception, stat, reason, mockserver, caplog):
@@ -3111,11 +3111,11 @@ async def test_exceptions(exception, stat, reason, mockserver, caplog):
 
 @pytest.mark.parametrize(
     ("meta", "expected"),
-    (
+    [
         ({}, False),
         ({SESSION_INIT_META_KEY: False}, False),
         ({SESSION_INIT_META_KEY: True}, True),
-    ),
+    ],
 )
 def test_is_session_init_request(meta, expected):
     actual = is_session_init_request(Request("https://example.com", meta=meta))

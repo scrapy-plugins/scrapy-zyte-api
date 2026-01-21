@@ -1,7 +1,8 @@
 import asyncio
 import sys
+from collections.abc import Coroutine
 from importlib.metadata import version
-from typing import Any, Coroutine
+from typing import Any
 from warnings import catch_warnings, filterwarnings
 
 import scrapy

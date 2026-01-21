@@ -6,7 +6,7 @@ from ._session import ScrapyZyteAPISessionDownloaderMiddleware
 
 logger = getLogger(__name__)
 
-try:  # noqa: C901
+try:
     from scrapy.utils.request import RequestFingerprinter as _  # noqa: F401
 except ImportError:
     if not TYPE_CHECKING:
@@ -65,7 +65,7 @@ else:
             )
             if poet_is_configured and not isinstance(
                 self._fallback_request_fingerprinter,
-                cast(type, DefaultFallbackRequestFingerprinter),
+                cast("type", DefaultFallbackRequestFingerprinter),
             ):
                 logger.warning(
                     f"scrapy-poet is enabled, but your custom value for the "
@@ -82,7 +82,7 @@ else:
                     f"setting instead."
                 )
                 self._fallback_fingerprinter_is_poets = False
-            self._cache: "WeakKeyDictionary[Request, bytes]" = WeakKeyDictionary()
+            self._cache: WeakKeyDictionary[Request, bytes] = WeakKeyDictionary()
             self._param_parser = _ParamParser(crawler, cookies_enabled=False)
             self._crawler = crawler
 

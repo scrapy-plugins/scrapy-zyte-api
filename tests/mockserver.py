@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import argparse
 import json
 import socket
@@ -8,20 +9,23 @@ from base64 import b64encode
 from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from scrapy import Request
 from twisted.internet import reactor
-from twisted.internet.defer import Deferred
 from twisted.internet.task import deferLater
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET, Site
 
-from scrapy_zyte_api._annotations import _ActionResult, ExtractFrom
-from scrapy_zyte_api.responses import _API_RESPONSE
+from scrapy_zyte_api._annotations import ExtractFrom, _ActionResult
 
-from . import SETTINGS, make_handler, download_request
+from . import SETTINGS, download_request, make_handler
+
+if TYPE_CHECKING:
+    from twisted.internet.defer import Deferred
+
+    from scrapy_zyte_api.responses import _API_RESPONSE
 
 
 # https://github.com/scrapy/scrapy/blob/02b97f98e74a994ad3e4d74e7ed55207e508a576/tests/mockserver.py#L27C1-L33C19
@@ -208,7 +212,7 @@ class DefaultResource(Resource):
 
         actions = request_data.get("actions")
         if actions:
-            results: List[_ActionResult] = []
+            results: list[_ActionResult] = []
             for action in actions:
                 result: _ActionResult = {
                     "action": action["action"],
@@ -300,7 +304,7 @@ class DelayedResource(LeafResource):
 class MockServer:
     def __init__(self, resource=None, port=None):
         resource = resource or DefaultResource
-        self.resource = "{}.{}".format(resource.__module__, resource.__name__)
+        self.resource = f"{resource.__module__}.{resource.__name__}"
         self.proc = None
         self.host = socket.gethostbyname(socket.gethostname())
         self.port = port or get_ephemeral_port()
@@ -333,7 +337,7 @@ class MockServer:
         return self.root_url + path
 
     @asynccontextmanager
-    async def make_handler(self, settings: Optional[Dict] = None):
+    async def make_handler(self, settings: dict | None = None):
         settings = settings or {}
         async with make_handler(settings, self.urljoin("/")) as handler:
             yield handler
@@ -352,11 +356,7 @@ def main():
 
     def print_listening():
         host = http_port.getHost()
-        print(
-            "Mock server {} running at http://{}:{}".format(
-                resource, host.host, host.port
-            )
-        )
+        print(f"Mock server {resource} running at http://{host.host}:{host.port}")
 
     # Typing issue: https://github.com/twisted/twisted/issues/9909
     reactor.callWhenRunning(print_listening)  # type: ignore[attr-defined]

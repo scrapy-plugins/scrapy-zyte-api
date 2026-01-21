@@ -1,8 +1,8 @@
 from copy import deepcopy
 
 import pytest
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Spider, signals
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT, maybe_deferred_to_future
@@ -19,7 +19,7 @@ else:
 
 @pytest.mark.parametrize(
     ("settings", "meta", "headers", "expected"),
-    (
+    [
         # Default behavior of non-Zyte-API, transparent/automap, and manual
         # Zyte API requests.
         ({}, {}, {}, True),
@@ -261,7 +261,7 @@ else:
             {},
             "https://example.com",
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_main(settings, meta, headers, expected, mockserver):

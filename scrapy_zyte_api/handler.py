@@ -2,8 +2,7 @@ import json
 import logging
 import time
 from copy import deepcopy
-from typing import Any, Optional, Union
-
+from typing import Any
 
 from scrapy import Spider, signals
 from scrapy.crawler import Crawler
@@ -36,8 +35,8 @@ logger = logging.getLogger(__name__)
 
 def _body_max_size_exceeded(
     body_size: int,
-    warnsize: Optional[int],
-    maxsize: Optional[int],
+    warnsize: int | None,
+    maxsize: int | None,
     request_url: str,
 ) -> bool:
     if warnsize and body_size > warnsize:
@@ -90,7 +89,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self,
         settings: Settings,
         crawler: Crawler,
-        client: Optional[AsyncZyteAPI] = None,
+        client: AsyncZyteAPI | None = None,
     ):
         if not settings.getbool("ZYTE_API_ENABLED", True):
             raise NotConfigured(
@@ -276,7 +275,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     async def _download_request(
         self, api_params: dict, request: Request
-    ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
+    ) -> ZyteAPITextResponse | ZyteAPIResponse | None:
         # Define url by default
         retrying = request.meta.get("zyte_api_retry_policy")
         if retrying:
@@ -304,9 +303,8 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             # would cause AutoThrottle to adjust the download delay of the
             # request slot, and we do not want AutoThrottle to do that for Zyte
             # API slots since Zyte API already handles throtling.
-            if (
-                not self._autothrottle_is_enabled
-                or _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT
+            if not self._autothrottle_is_enabled or (
+                _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT
                 and request.meta.get("autothrottle_dont_adjust_delay", False)
             ):
                 request.meta["download_latency"] = time.time() - start_time
@@ -375,7 +373,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 await self._fallback_handler.close()
             await self._close()
 
-    async def _close(self) -> None:  # NOQA
+    async def _close(self) -> None:
         await self._session.close()
 
 
@@ -384,7 +382,7 @@ class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
         self,
         settings: Settings,
         crawler: Crawler,
-        client: Optional[AsyncZyteAPI] = None,
+        client: AsyncZyteAPI | None = None,
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
@@ -397,7 +395,7 @@ class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
         self,
         settings: Settings,
         crawler: Crawler,
-        client: Optional[AsyncZyteAPI] = None,
+        client: AsyncZyteAPI | None = None,
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
@@ -413,7 +411,7 @@ class ScrapyZyteAPIHTTPSDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
         self,
         settings: Settings,
         crawler: Crawler,
-        client: Optional[AsyncZyteAPI] = None,
+        client: AsyncZyteAPI | None = None,
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
