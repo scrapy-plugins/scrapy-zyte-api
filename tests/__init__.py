@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager, contextmanager
 from copy import deepcopy
 from os import environ
-from typing import Any, Dict, Optional
+from typing import Any
 from urllib.request import Request
 
 from packaging.version import Version
@@ -16,16 +16,16 @@ from zyte_api import AsyncZyteAPI
 from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _POET_ADDON_SUPPORT,
     _ensure_awaitable,
     maybe_deferred_to_future,
-    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
 )
 
 _API_KEY = "a"
 
 DEFAULT_CLIENT_CONCURRENCY = AsyncZyteAPI(api_key=_API_KEY).n_conn
-SETTINGS_T = Dict[str, Any]
+SETTINGS_T = dict[str, Any]
 SETTINGS: SETTINGS_T = {
     "DOWNLOAD_HANDLERS": {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
@@ -105,7 +105,7 @@ def get_download_handler(crawler, schema):
 
 @asynccontextmanager
 async def make_handler(
-    settings: SETTINGS_T, api_url: Optional[str] = None, *, use_addon: bool = False
+    settings: SETTINGS_T, api_url: str | None = None, *, use_addon: bool = False
 ):
     if api_url is not None:
         settings["ZYTE_API_URL"] = api_url
@@ -118,7 +118,7 @@ async def make_handler(
         yield handler
     finally:
         if handler is not None:
-            await handler._close()  # NOQA
+            await handler._close()
 
 
 def serialize_settings(settings):

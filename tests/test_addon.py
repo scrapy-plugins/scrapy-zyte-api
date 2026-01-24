@@ -1,12 +1,9 @@
-from typing import Optional, Type
-
 import pytest
-
 from scrapy import Request, Spider
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.http.response import Response
 from scrapy.settings.default_settings import TWISTED_REACTOR
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred, succeed
 
@@ -22,8 +19,8 @@ from scrapy_zyte_api.utils import (
     _POET_ADDON_SUPPORT,
 )
 
+from . import download_request, get_download_handler, make_handler, serialize_settings
 from . import get_crawler as get_crawler_zyte_api
-from . import get_download_handler, make_handler, serialize_settings, download_request
 
 pytest.importorskip("scrapy.addons")
 
@@ -32,7 +29,7 @@ try:
 except ImportError:
     POET = False
     InjectionMiddleware = None
-    ZyteApiProvider: Optional[Type] = None
+    ZyteApiProvider: type | None = None
 else:
     POET = True
     from scrapy_zyte_api.providers import ZyteApiProvider
@@ -200,7 +197,7 @@ if TWISTED_REACTOR != "twisted.internet.asyncioreactor.AsyncioSelectorReactor":
 )
 @pytest.mark.parametrize(
     ("initial_settings", "expected_settings"),
-    (
+    [
         (
             {},
             BASE_EXPECTED,
@@ -248,7 +245,7 @@ if TWISTED_REACTOR != "twisted.internet.asyncioreactor.AsyncioSelectorReactor":
                 },
             },
         ),
-    ),
+    ],
 )
 def test_no_poet_setting_changes(initial_settings, expected_settings):
     _test_setting_changes(initial_settings, expected_settings)
@@ -267,7 +264,7 @@ if not _POET_ADDON_SUPPORT:
 )
 @pytest.mark.parametrize(
     ("initial_settings", "expected_settings"),
-    (
+    [
         (
             {},
             {
@@ -278,7 +275,7 @@ if not _POET_ADDON_SUPPORT:
                 },
             },
         ),
-    ),
+    ],
 )
 def test_poet_setting_changes(initial_settings, expected_settings):
     _test_setting_changes(initial_settings, expected_settings)
