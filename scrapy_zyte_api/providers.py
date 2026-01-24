@@ -1,5 +1,5 @@
 from collections.abc import Callable, Coroutine, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Set, cast
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
@@ -142,7 +142,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         crawler.stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)
 
     async def __call__(
-        self, to_provide: set[Callable], request: Request, crawler: Crawler
+        self, to_provide: Set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
         results: list[Any] = []
