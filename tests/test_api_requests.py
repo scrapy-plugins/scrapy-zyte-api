@@ -410,9 +410,8 @@ GET_API_PARAMS_KWARGS = {
 @deferred_f_from_coro_f
 async def test_params_parser_input_default(mockserver):
     async with mockserver.make_handler() as handler:
-        for key in GET_API_PARAMS_KWARGS:
+        for key, expected in GET_API_PARAMS_KWARGS.items():
             actual = getattr(handler._param_parser, f"_{key}")
-            expected = GET_API_PARAMS_KWARGS[key]
             assert actual == expected, key
 
 

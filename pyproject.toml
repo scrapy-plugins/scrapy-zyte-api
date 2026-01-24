@@ -258,22 +258,12 @@ ignore = [
     # TODO
     "B006",
     "B011",
-    "B028",
     "B904",
-    "B905",
-    "PIE810",
-    "PLC0206",
     "PLW2901",
-    "PT003",
     "PT011",
     "PT015",
     "PT017",
     "PYI049",
-    "RUF005",
-    "S324",
-    "S603",
-    "SIM105",
-    "SIM211",
     "UP007",
     "UP031",
 ]
@@ -285,6 +275,7 @@ split-on-trailing-comma = false
 # we need to use typing.Set[] over modern alternatives with web-poet<0.19.0 && Python<3.11
 # see https://github.com/scrapinghub/web-poet/pull/219
 "scrapy_zyte_api/providers.py" = ["UP006", "UP035"]
+"tests/**" = ["S"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"

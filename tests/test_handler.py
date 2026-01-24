@@ -730,7 +730,7 @@ def test_body_max_size_exceeded(
 
     if expected_warnings:
         for call, expected_warning in zip(
-            logger.warning.call_args_list, expected_warnings
+            logger.warning.call_args_list, expected_warnings, strict=True
         ):
             assert call[0][0] == expected_warning
     else:

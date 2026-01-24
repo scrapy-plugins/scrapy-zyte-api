@@ -1,3 +1,4 @@
+import contextlib
 import json
 from asyncio import Task, create_task, sleep
 from collections import defaultdict, deque
@@ -826,10 +827,8 @@ class _SessionManager:
             task = create_task(self._create_session(request, pool))
             self._init_tasks.add(task)
             task.add_done_callback(self._init_tasks.discard)
-        try:
+        with contextlib.suppress(KeyError):
             del self._errors[session_id]
-        except KeyError:
-            pass
 
     def _start_request_session_refresh(self, request: Request, pool: str):
         session_id = get_request_session_id(request)

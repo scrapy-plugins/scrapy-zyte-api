@@ -9,7 +9,7 @@ def mockserver():
         yield server
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def fresh_mockserver():
     with MockServer() as server:
         yield server

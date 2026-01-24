@@ -302,7 +302,7 @@ def str_to_bool(value):
 def _is_safe_header(k, v, /, *, api_params, request):
     k = k.strip()
     lowercase_k = to_bytes(k.lower())
-    if not (lowercase_k.startswith(b"zyte-") or lowercase_k.startswith(b"x-crawlera-")):
+    if not (lowercase_k.startswith((b"zyte-", b"x-crawlera-"))):
         return True
 
     decoded_k = to_unicode(k)
@@ -981,7 +981,7 @@ def _merge_params(
                 param=param,
                 setting=setting,
                 request=request,
-                context=context + [k],
+                context=[*context, k],
             )
         if meta_params[k] not in (None, {}):
             continue
@@ -989,7 +989,7 @@ def _merge_params(
         if k in params:
             params.pop(k)
         else:
-            qual_param = ".".join(context + [k])
+            qual_param = ".".join([*context, k])
             logger.warning(
                 f"In request {request} {param!r} parameter {qual_param} is "
                 f"None, which is a value reserved to unset parameters defined "
@@ -1014,6 +1014,7 @@ def _get_raw_params(
             f"Setting the zyte_api request metadata key to "
             f"{meta_params!r} is deprecated. Use False instead.",
             DeprecationWarning,
+            stacklevel=1,
         )
         return None
 

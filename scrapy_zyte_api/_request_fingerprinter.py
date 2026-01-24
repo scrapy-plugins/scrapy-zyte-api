@@ -149,6 +149,6 @@ else:
                         fingerprint += deps_key
                     if serialized_page_params is not None:
                         fingerprint += serialized_page_params
-                self._cache[request] = hashlib.sha1(fingerprint).digest()
+                self._cache[request] = hashlib.sha1(fingerprint).digest()  # noqa: S324
                 return self._cache[request]
             return self._fallback_request_fingerprinter.fingerprint(request)

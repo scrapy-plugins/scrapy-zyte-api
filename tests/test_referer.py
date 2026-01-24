@@ -25,7 +25,7 @@ else:
         ({}, {}, {}, True),
         (SETTINGS, {"zyte_api_automap": False}, {}, True),
         (SETTINGS, {"zyte_api_automap": True}, {}, False),
-        (SETTINGS, {}, {}, False if ADDON_SUPPORT else True),
+        (SETTINGS, {}, {}, not ADDON_SUPPORT),
         (
             SETTINGS,
             {"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": True}},
