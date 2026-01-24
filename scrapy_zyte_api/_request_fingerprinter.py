@@ -35,7 +35,7 @@ else:
         @staticmethod
         def _poet_is_configured(settings):
             try:
-                from scrapy_poet import InjectionMiddleware
+                from scrapy_poet import InjectionMiddleware  # noqa: PLC0415
             except ImportError:
                 return False
             for k, v in settings.get("DOWNLOADER_MIDDLEWARES", {}).items():
@@ -49,7 +49,7 @@ else:
                 self._poet_is_configured(settings)
             )
             if poet_is_configured:
-                from scrapy_poet import (
+                from scrapy_poet import (  # noqa: PLC0415
                     ScrapyPoetRequestFingerprinter as DefaultFallbackRequestFingerprinter,
                 )
             else:

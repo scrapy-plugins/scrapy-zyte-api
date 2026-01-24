@@ -12,6 +12,7 @@ from scrapy.http.response import Response
 from scrapy.settings import Settings
 from scrapy.utils.misc import load_object
 from scrapy.utils.reactor import verify_installed_reactor
+from twisted.internet.defer import ensureDeferred
 from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
 
@@ -357,8 +358,6 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
 
         def close(self) -> Deferred:
-            from twisted.internet.defer import ensureDeferred
-
             async def _close():
                 if self._fallback_handler and hasattr(self._fallback_handler, "close"):
                     await self._fallback_handler.close()

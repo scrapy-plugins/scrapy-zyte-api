@@ -2157,7 +2157,7 @@ async def test_session_config_pool_error(mockserver):
 async def test_session_config_no_web_poet(mockserver):
     """If web-poet is not installed, @session_config raises a RuntimeError."""
     try:
-        import web_poet  # noqa: F401
+        import web_poet  # noqa: F401, PLC0415
     except ImportError:
         pass
     else:
@@ -2962,8 +2962,8 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
 async def test_provider(mockserver):
     pytest.importorskip("scrapy_poet")
 
-    from scrapy_poet import DummyResponse
-    from zyte_common_items import Product
+    from scrapy_poet import DummyResponse  # noqa: PLC0415
+    from zyte_common_items import Product  # noqa: PLC0415
 
     class Tracker:
         def __init__(self):

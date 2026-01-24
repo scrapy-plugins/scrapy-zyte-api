@@ -8,6 +8,7 @@ pytest.importorskip("scrapy_poet")
 
 import attrs
 from scrapy import Request, Spider
+from scrapy.statscollectors import MemoryStatsCollector
 from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy_poet import DummyResponse
 from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
@@ -1125,8 +1126,6 @@ async def test_auto_field_stats_not_enabled(mockserver):
 async def test_auto_field_stats_no_override(mockserver):
     """When requesting an item directly from Zyte API, without an override to
     change fields, stats reflect the entire list of item fields."""
-
-    from scrapy.statscollectors import MemoryStatsCollector
 
     duplicate_stat_calls: defaultdict[str, int] = defaultdict(int)
 

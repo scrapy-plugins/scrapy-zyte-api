@@ -65,7 +65,7 @@ async def test_poet_installed_but_disabled(caplog):
     """If the scrapy-poet package is installed but its main middleware,
     InjectionMiddleware, is not set in DOWNLOADER_MIDDLEWARES, do not try to
     use its API for request fingerprinting."""
-    from web_poet import WebPage
+    from web_poet import WebPage  # noqa: PLC0415
 
     no_deps_request = Request("https://example.com")
 
@@ -525,7 +525,7 @@ async def test_request_body():
 async def test_deps():
     """Test that some injected dependencies do not affect fingerprinting at
     all (e.g. HttpClient) while others do (e.g. WebPage)."""
-    from web_poet import HttpClient, WebPage
+    from web_poet import HttpClient, WebPage  # noqa: PLC0415
 
     request = Request("https://example.com")
     raw_request = Request(

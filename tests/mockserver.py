@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from scrapy import Request
-from twisted.internet import reactor
 from twisted.internet.task import deferLater
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET, Site
@@ -56,6 +55,8 @@ class LeafResource(Resource):
     isLeaf = True
 
     def deferRequest(self, request, delay, f, *a, **kw):
+        from twisted.internet import reactor  # noqa: PLC0415
+
         def _cancelrequest(_):
             # silence CancelledError
             d.addErrback(lambda _: None)
@@ -340,6 +341,8 @@ class MockServer:
 
 
 def main():
+    from twisted.internet import reactor  # noqa: PLC0415
+
     parser = argparse.ArgumentParser()
     parser.add_argument("resource")
     parser.add_argument("--port", type=int)

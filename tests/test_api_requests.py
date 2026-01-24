@@ -18,7 +18,7 @@ from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from scrapy.utils.defer import deferred_f_from_coro_f
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import Deferred, succeed
 from zyte_api import RequestError
 
 from scrapy_zyte_api._cookies import _get_cookie_jar
@@ -67,7 +67,6 @@ class ParamsDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
         def download_request(self, request: Request, spider: Spider) -> Deferred:
             params = self._param_parser.parse(request)
             self._crawler.signals.send_catch_log(params_signal, params=params)
-            from twisted.internet.defer import succeed
 
             return succeed(Response(request.url))
 

@@ -1,13 +1,15 @@
 import asyncio
+import inspect
 import sys
 from collections.abc import Coroutine
 from importlib.metadata import version
-from typing import Any
+from typing import Any, TypeVar, Union
 from warnings import catch_warnings, filterwarnings
 
 import scrapy
 from packaging.version import Version
 from scrapy.utils.reactor import is_asyncio_reactor_installed
+from twisted.internet.defer import Deferred
 from zyte_api.utils import USER_AGENT as PYTHON_ZYTE_API_USER_AGENT
 
 from .__version__ import __version__
@@ -89,12 +91,6 @@ else:
 try:
     from scrapy.utils.defer import deferred_to_future, maybe_deferred_to_future
 except ImportError:  # Scrapy < 2.7.0
-    import asyncio
-    from typing import TYPE_CHECKING, TypeVar, Union
-    from warnings import catch_warnings, filterwarnings
-
-    if TYPE_CHECKING:
-        from twisted.internet.defer import Deferred
 
     def set_asyncio_event_loop():
         try:
@@ -150,8 +146,6 @@ except ImportError:  # Scrapy < 2.14
 # https://github.com/scrapy/scrapy/blob/0b9d8da09dd2cb1b74ddf025107e6f584839fbff/scrapy/utils/defer.py#L525
 def _schedule_coro(coro: Coroutine[Any, Any, Any]) -> None:
     if not _is_asyncio_available():
-        from twisted.internet.defer import Deferred
-
         Deferred.fromCoroutine(coro)
         return
     loop = asyncio.get_event_loop()
@@ -169,10 +163,6 @@ try:
     from scrapy.utils.defer import ensure_awaitable as _ensure_awaitable
 except ImportError:  # pragma: no cover
     # Scrapy < 2.14
-
-    import inspect
-
-    from twisted.internet.defer import Deferred
 
     def _ensure_awaitable(o):  # type: ignore[no-redef]
         if isinstance(o, Deferred):
