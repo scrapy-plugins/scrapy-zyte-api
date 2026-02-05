@@ -414,16 +414,16 @@ ZYTE_API_SESSION_DELAY
 
 Default: ``1.0``
 
-Minimum number of seconds to wait before reusing a :ref:`scrapy-zyte-api 
+Minimum number of seconds to wait before reusing a :ref:`plugin-managed
 session <session>`.
 
 To override this value for specific pools, use
-:setting:`ZYTE_API_SESSION_POOLS`.
+:setting:`ZYTE_API_SESSION_POOLS` or return a dictionary from
+:meth:`~scrapy_zyte_api.SessionConfig.pool` containing a ``"delay"`` key.
 
 Increasing this number can reduce the number of ban-related session
 expirations, hence increasing the lifetime of each session. See
 :ref:`optimize-sessions`.
-
 
 .. setting:: ZYTE_API_SESSION_ENABLED
 
@@ -553,7 +553,8 @@ The maximum number of active :ref:`scrapy-zyte-api sessions <session>` to keep
 per :ref:`pool <session-pools>`.
 
 To override this value for specific pools, use
-:setting:`ZYTE_API_SESSION_POOLS`.
+:setting:`ZYTE_API_SESSION_POOLS` or return a dictionary from
+:meth:`~scrapy_zyte_api.SessionConfig.pool` containing a ``"size"`` key.
 
 Increase this number to lower the frequency with which requests are sent
 through each session, which on some websites may increase the lifetime of each

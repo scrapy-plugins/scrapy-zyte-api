@@ -274,7 +274,6 @@ The session pool assigned to a request affects the :ref:`fingerprint
 considered different requests, i.e. not duplicate requests, even if they are
 otherwise identical.
 
-
 .. _optimize-sessions:
 
 Optimizing sessions
@@ -290,10 +289,10 @@ Here are some things you can try:
 
 -   On some websites, sending too many requests too fast through a session can
     cause the target website to ban that session.
-
-    On those websites, you can increase the number of sessions in the pool
-    (:setting:`ZYTE_API_SESSION_POOL_SIZE`). The more different sessions you
-    use, the more slowly you send requests through each session.
+    
+    On those websites, you can increase :setting:`ZYTE_API_SESSION_DELAY`,
+    :setting:`ZYTE_API_SESSION_POOL_SIZE`, or both, to lower the rate of
+    session reuse.
 
     Mind, however, that :ref:`user-managed sessions <zapi-session-id>` expire
     after 15 minutes since creation or 2 minutes since the last request (see

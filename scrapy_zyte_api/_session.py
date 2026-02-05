@@ -4,7 +4,18 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from functools import partial
 from logging import getLogger
-from typing import Any, DefaultDict, Deque, Dict, List, Optional, Set, Type, Union
+from typing import (
+    Any,
+    DefaultDict,
+    Deque,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Type,
+    TypedDict,
+    Union,
+)
 from uuid import uuid4
 from weakref import WeakKeyDictionary
 
@@ -24,6 +35,11 @@ from .utils import (  # type: ignore[attr-defined]
     deferred_to_future,
     _close_spider,
 )
+
+try:
+    from typing import NotRequired  # Python 3.11+
+except ImportError:
+    from typing_extensions import NotRequired  # Python 3.10
 
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
@@ -156,6 +172,12 @@ class TooManyBadSessionInits(RuntimeError):
     pass
 
 
+class PoolConfig(TypedDict):
+    id: str
+    delay: NotRequired[float]
+    size: NotRequired[int]
+
+
 class SessionConfig:
     """Default session configuration for :ref:`scrapy-zyte-api sessions
     <session>`."""
@@ -255,8 +277,9 @@ class SessionConfig:
         """
         return None
 
-    def pool(self, request: Request) -> str:
-        """Return the ID of the session pool to use for *request*.
+    def pool(self, request: Request) -> str | dict[str, PoolConfig]:
+        """Return the ID of the session pool to use for *request*, or a
+        :class:`dict` with additional session pool config.
 
         The main aspects of the default implementation are described in
         :ref:`session-pools`.
@@ -270,6 +293,23 @@ class SessionConfig:
         used, the pool ID is the target domain followed by an at sign and the
         comma-separated values of the non-empty fields from
         :data:`ADDRESS_FIELDS` (e.g. ``example.com@US,NY,10001``).
+
+        Instead of a string, this method can also return a :class:`dict`
+        containing the pool ID under the ``id`` key, and optionally a ``delay``
+        key with the minimum delay between reuses of the sessions from that
+        pool, and a ``size`` key with the maximum number of sessions in that
+        pool. For example:
+
+        .. code-block:: python
+
+            def pool(self, request):
+                if "ecommerce.example" in urlparse_cached(request).netloc:
+                    return {
+                        "id": "ecommerce.example",
+                        "delay": 2.0,
+                        "size": 16,
+                    }
+                return super().pool(request)
         """
         meta_pool = request.meta.get("zyte_api_session_pool", "")
         if meta_pool:
