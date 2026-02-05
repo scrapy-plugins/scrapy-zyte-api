@@ -2,22 +2,29 @@ from contextlib import asynccontextmanager, contextmanager
 from copy import deepcopy
 from os import environ
 from typing import Any, Dict, Optional
+from urllib.request import Request
 
 from packaging.version import Version
 from scrapy import Spider
 from scrapy import __version__ as SCRAPY_VERSION
 from scrapy.crawler import Crawler
+from scrapy.http import Response
 from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler as _get_crawler
-from zyte_api.aio.client import AsyncClient
+from zyte_api import AsyncZyteAPI
 
 from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
-from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT
+from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _POET_ADDON_SUPPORT,
+    _ensure_awaitable,
+    maybe_deferred_to_future,
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
+)
 
 _API_KEY = "a"
 
-DEFAULT_CLIENT_CONCURRENCY = AsyncClient(api_key=_API_KEY).n_conn
+DEFAULT_CLIENT_CONCURRENCY = AsyncZyteAPI(api_key=_API_KEY).n_conn
 SETTINGS_T = Dict[str, Any]
 SETTINGS: SETTINGS_T = {
     "DOWNLOAD_HANDLERS": {
@@ -33,8 +40,9 @@ SETTINGS: SETTINGS_T = {
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
         "scrapy_zyte_api.ScrapyZyteAPIRefererSpiderMiddleware": 1000,
     },
-    "ZYTE_API_KEY": _API_KEY,
+    "TELNETCONSOLE_ENABLED": False,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+    "ZYTE_API_KEY": _API_KEY,
 }
 if Version(SCRAPY_VERSION) < Version("2.12"):
     SETTINGS["REQUEST_FINGERPRINTER_IMPLEMENTATION"] = (
@@ -59,6 +67,7 @@ SETTINGS_ADDON: SETTINGS_T = {
     "ADDONS": {
         Addon: 500,
     },
+    "TELNETCONSOLE_ENABLED": False,
     "ZYTE_API_KEY": _API_KEY,
 }
 UNSET = object()
@@ -161,3 +170,27 @@ async def setup_crawler_engine(crawler: Crawler):
     handler = get_download_handler(crawler, "https")
     if hasattr(handler, "engine_started"):
         await handler.engine_started()
+
+
+async def download_request(handler, request) -> Response:
+    if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+        future = handler.download_request(request)
+    else:
+        future = maybe_deferred_to_future(handler.download_request(request, None))
+    return await future
+
+
+async def process_request(middleware, request) -> Request | None:
+    if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+        maybe_awaitable = middleware.process_request(request)
+    else:
+        maybe_awaitable = middleware.process_request(request, spider=None)
+    await _ensure_awaitable(maybe_awaitable)
+
+
+async def process_response(middleware, request, response) -> Request | None:
+    if not _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+        maybe_awaitable = middleware.process_response(request, response)
+    else:
+        maybe_awaitable = middleware.process_response(request, response, spider=None)
+    await _ensure_awaitable(maybe_awaitable)

@@ -5,6 +5,9 @@ if _NEEDS_EARLY_REACTOR:
 
     install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
+# Register web-poet serializers
+from . import _serialization  # noqa: F401
+
 from ._annotations import ExtractFrom, actions, custom_attrs
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,

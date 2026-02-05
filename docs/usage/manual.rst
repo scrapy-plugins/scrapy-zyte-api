@@ -22,7 +22,7 @@ For example:
     class SampleQuotesSpider(scrapy.Spider):
         name = "sample_quotes"
 
-        def start_requests(self):
+        async def start(self):
             yield scrapy.Request(
                 url="https://quotes.toscrape.com/",
                 meta={
@@ -48,7 +48,7 @@ remember to also request :http:`request:httpResponseHeaders`:
     class SampleQuotesSpider(scrapy.Spider):
         name = "sample_quotes"
 
-        def start_requests(self):
+        async def start(self):
             yield scrapy.Request(
                 url="https://quotes.toscrape.com/",
                 meta={

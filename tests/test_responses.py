@@ -271,7 +271,7 @@ INPUT_COOKIES_SIMPLE = [{"name": "c", "value": "d"}]
                         {"name": "Content-Type", "value": "text/html"},
                         {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
                     ],
-                    **cookie_fields,  # type: ignore[dict-item]
+                    **cookie_fields,
                 },
                 response_cls,
                 keep,

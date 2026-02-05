@@ -1,3 +1,4 @@
+from __future__ import annotations
 import argparse
 import json
 import socket
@@ -10,7 +11,6 @@ from subprocess import PIPE, Popen
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
-from pytest_twisted import ensureDeferred
 from scrapy import Request
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
@@ -18,10 +18,10 @@ from twisted.internet.task import deferLater
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET, Site
 
-from scrapy_zyte_api._annotations import _ActionResult
+from scrapy_zyte_api._annotations import _ActionResult, ExtractFrom
 from scrapy_zyte_api.responses import _API_RESPONSE
 
-from . import SETTINGS, make_handler
+from . import SETTINGS, make_handler, download_request
 
 
 # https://github.com/scrapy/scrapy/blob/02b97f98e74a994ad3e4d74e7ed55207e508a576/tests/mockserver.py#L27C1-L33C19
@@ -40,12 +40,11 @@ def get_ephemeral_port():
     return s.getsockname()[1]
 
 
-@ensureDeferred
 async def produce_request_response(mockserver, meta, settings=None):
     settings = settings if settings is not None else {**SETTINGS}
     async with mockserver.make_handler(settings) as handler:
         req = Request(mockserver.urljoin("/"), meta=meta)
-        resp = await handler.download_request(req, None)
+        resp = await download_request(handler, req)
         return req, resp
 
 
@@ -242,8 +241,6 @@ class DefaultResource(Resource):
             assert isinstance(response_data["product"]["name"], str)
             extract_from = request_data.get("productOptions", {}).get("extractFrom")
             if extract_from:
-                from scrapy_zyte_api.providers import ExtractFrom
-
                 if extract_from == ExtractFrom.httpResponseBody:
                     response_data["product"]["name"] += " (from httpResponseBody)"
 

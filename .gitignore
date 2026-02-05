@@ -1,4 +1,4 @@
-.coverage
+.coverage*
 .mypy_cache/
 .tox/
 dist/
@@ -9,3 +9,5 @@ docs/_build
 __pycache__/
 /test-results/
 build/
+.idea/
+.vscode/
