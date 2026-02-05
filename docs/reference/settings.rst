@@ -432,7 +432,7 @@ ZYTE_API_SESSION_ENABLED
 
 Default: ``False``
 
-Enables :ref:`scrapy-zyte-api session management <session>`.
+Enables :ref:`plugin-managed sessions <session>`.
 
 
 .. setting:: ZYTE_API_SESSION_LOCATION
@@ -575,7 +575,7 @@ corresponding setting for that pool:
 
 -   ``"size"`` overrides :setting:`ZYTE_API_SESSION_POOL_SIZE`.
 
-These override take precedence over :attr:`SessionConfig.pool
+These overrides take precedence over :attr:`SessionConfig.pool
 <scrapy_zyte_api.SessionConfig.pool>`.
 
 

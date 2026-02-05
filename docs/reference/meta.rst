@@ -95,8 +95,8 @@ zyte_api_session_enabled
 
 Default: :setting:`ZYTE_API_SESSION_ENABLED`
 
-Whether to use :ref:`scrapy-zyte-api session management <session>` for the
-request (``True``) or not (``False``).
+Whether to send the request with a :ref:`plugin-managed session <session>`
+(``True``) or not (``False``).
 
 .. seealso:: :meth:`scrapy_zyte_api.SessionConfig.enabled`
 

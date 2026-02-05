@@ -30,6 +30,13 @@ SESSION_INIT_META_KEY = "_is_session_init_request"
 ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
 
 
+def _troubleshoot(slug):
+    return (
+        f"https://scrapy-zyte-api.readthedocs.io/en/latest/usage/session.html"
+        f"#session-troubleshooting-{slug}"
+    )
+
+
 def get_request_session_id(request: Request) -> Optional[str]:
     """Return the session ID of *request*, or ``None`` if it does not have a
     session ID assigned."""
@@ -775,16 +782,8 @@ class _SessionManager:
                         f"Could not get a session ID from the session "
                         f"rotation queue after {attempts} attempts, waiting "
                         f"at least {self._queue_wait_time} seconds between "
-                        f"attempts. Either the values of the "
-                        f"ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS and "
-                        f"ZYTE_API_SESSION_QUEUE_WAIT_TIME settings are too "
-                        f"low for your scenario, in which case you can modify "
-                        f"them accordingly, or there might be a bug with "
-                        f"scrapy-zyte-api session management. If you think it "
-                        f"could be the later, please report the issue at "
-                        f"https://github.com/scrapy-plugins/scrapy-zyte-api/issues/new "
-                        f"providing a minimal reproducible example if "
-                        f"possible, or debug logs and stats otherwise."
+                        f"attempts. See "
+                        f"{_troubleshoot('could-not-get-session-id')}"
                     )
                 await sleep(self._queue_wait_time)
         assert session_id is not None

@@ -4,8 +4,8 @@ Changes
 0.33.0 (unreleased)
 -------------------
 
--   Added a minimum delay between reuses of any given :ref:`managed session 
-    <session>`.
+-   Added a minimum delay between reuses of any given :ref:`plugin-managed
+    session <session>`.
 
     It is 1 second by default. Use :setting:`ZYTE_API_SESSION_DELAY` to change
     that, :setting:`ZYTE_API_SESSION_POOLS` to override it for specific
@@ -18,6 +18,15 @@ Changes
 
 -   Deprecated the ``ZYTE_API_SESSION_POOL_SIZES`` setting in favor of the new
     :setting:`ZYTE_API_SESSION_POOLS` setting, where you can set ``"size"``.
+
+-   Changed the terminology around :ref:`session management <session>` to try
+    to make it clearer and more consistent:
+
+    | client-managed sessions → user-managed sessions
+    | server-managed sessions → Zyte-managed sessions
+    | scrapy-zyte-api session management → plugin-managed sessions
+
+-   Added a :ref:`session-troubleshooting` section to the :ref:`session` page.
 
 
 0.32.0 (2026-01-20)
@@ -111,10 +120,10 @@ Changes
     :http:`request:httpResponseHeaders` will no longer be enabled by default,
     and :ref:`request header mapping <request-header-mapping>` is disabled.
 
-* Session pool IDs, of server-managed sessions (:http:`request:sessionContext`)
-  or :ref:`set through the session management API <session-pools>`, now affect
-  request fingerprinting: 2 requests identical except for their session pool ID
-  are *not* considered duplicate requests any longer.
+* Session pool IDs, of Zyte-managed sessions (:http:`request:sessionContext`)
+  or :ref:`plugin-managed sessions <session-pools>`, now affect request
+  fingerprinting: 2 requests identical except for their session pool ID are
+  *not* considered duplicate requests any longer.
 
 * When it is not clear whether a request will use browser rendering or not,
   e.g. an :ref:`automatic extraction request <zapi-extract>` without an
