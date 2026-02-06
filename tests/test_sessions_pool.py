@@ -6,10 +6,13 @@ from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
 
 from scrapy_zyte_api import SessionConfig, session_config
-from scrapy_zyte_api._session import session_config_registry
+from scrapy_zyte_api._session import (
+    ScrapyZyteAPISessionDownloaderMiddleware,
+    session_config_registry,
+)
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import SESSION_SETTINGS, get_crawler
+from . import SESSION_SETTINGS, get_crawler, get_downloader_middleware
 from .helpers import assert_session_stats
 
 
@@ -231,6 +234,26 @@ async def test_pool_error(mockserver, outcome):
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_mw_get_pool(mockserver):
+    settings = {
+        **SESSION_SETTINGS,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+    crawler = await get_crawler(settings)
+    mw = get_downloader_middleware(crawler, ScrapyZyteAPISessionDownloaderMiddleware)
+    request = Request("https://example.com", meta={"zyte_api_session_pool": "foo"})
+    assert mw.get_pool(request) == "foo"
+
+    # get_pool() is None is plugin-managed sessions are disabled.
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+    crawler = await get_crawler(settings)
+    mw = get_downloader_middleware(crawler, ScrapyZyteAPISessionDownloaderMiddleware)
+    assert mw.get_pool(request) is None
 
 
 @pytest.mark.parametrize(

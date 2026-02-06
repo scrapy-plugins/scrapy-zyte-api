@@ -1146,7 +1146,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             reason=reason,
         )
 
-    def get_pool(self, request: Request):
+    def get_pool(self, request: Request) -> PoolConfig | str | None:
         return (
             self._sessions.get_pool(request)
             if self._sessions.is_enabled(request)

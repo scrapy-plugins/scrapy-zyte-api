@@ -7,6 +7,7 @@ import pytest
 from aiohttp.client_exceptions import ServerConnectionError
 from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
+from scrapy.http import Response
 from zyte_api import RequestError
 
 from scrapy_zyte_api import (
@@ -121,6 +122,18 @@ class SessionIDRemovingDownloaderMiddleware:
         del request.meta["zyte_api_automap"]["session"]
         del request.meta["zyte_api_provider"]["session"]
         return None
+
+
+class SessionIDRemovingResponseMiddleware:
+    def process_response(
+        self, request: Request, response: Response, spider: Spider | None = None
+    ) -> Response:
+        if request.meta.get("_is_session_init_request", False):
+            return response
+        for meta_key in ("zyte_api_automap", "zyte_api_provider"):
+            if meta_key in request.meta and isinstance(request.meta[meta_key], dict):
+                request.meta[meta_key].pop("session", None)
+        return response
 
 
 @deferred_f_from_coro_f
@@ -254,3 +267,34 @@ async def test_exceptions(exception, stat, reason, mockserver, caplog):
         assert_session_stats(crawler, {"example.com": {"init/check-passed": 1}})
     if reason is not None:
         assert reason in caplog.text
+
+
+@deferred_f_from_coro_f
+async def test_missing_session_id_on_response(mockserver, caplog):
+    settings = {
+        **SESSION_SETTINGS,
+        "DOWNLOADER_MIDDLEWARES": {
+            "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
+            "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
+            "tests.test_sessions_errors.SessionIDRemovingResponseMiddleware": 675,
+        },
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_CHECKER": "tests.test_sessions_check_errors.DomainChecker",
+        "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://session-check-fails.example"]
+
+        def parse(self, response):
+            pass
+
+    caplog.clear()
+    caplog.set_level("WARNING")
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert "had no session ID assigned, unexpectedly" in caplog.text
