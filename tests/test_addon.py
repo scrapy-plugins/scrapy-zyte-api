@@ -321,7 +321,7 @@ def test_poet_setting_changes(initial_settings, expected_settings):
 )
 @deferred_f_from_coro_f
 async def test_sessions(manual_settings, addon_settings):
-    crawler = await get_crawler(
+    crawler = await get_crawler_zyte_api(
         {
             "ZYTE_API_TRANSPARENT_MODE": True,
             "ZYTE_API_SESSION_ENABLED": True,
@@ -329,7 +329,7 @@ async def test_sessions(manual_settings, addon_settings):
         },
         poet=False,
     )
-    addon_crawler = await get_crawler(
+    addon_crawler = await get_crawler_zyte_api(
         {"ZYTE_API_SESSION_ENABLED": True, **addon_settings}, use_addon=True, poet=False
     )
     assert serialize_settings(crawler.settings) == serialize_settings(

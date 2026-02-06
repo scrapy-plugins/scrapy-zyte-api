@@ -744,7 +744,7 @@ class _SessionManager:
                 raise PoolError(message) from exception
             if isinstance(pool, str):
                 pool_id = pool
-                pool = {}
+                pool = {}  # type: ignore[assignment]
             else:
                 try:
                     pool_id = pool["id"]
@@ -755,6 +755,7 @@ class _SessionManager:
                         f"for request {request}."
                     )
                     raise PoolError(message) from exception
+            assert isinstance(pool, dict)
             pool_delay = pool.get("delay", self._default_pool_delay)
             pool_size = pool.get("size", self._default_pool_size)
             pool_randomize_delay = pool.get("randomize_delay", self._randomize_delay)

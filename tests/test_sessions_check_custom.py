@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 import pytest
 from scrapy.utils.defer import deferred_f_from_coro_f
@@ -104,7 +104,14 @@ class OnlyPassFirstInitChecker:
 # subclasses for the crawler classes because the init use is enough to verify
 # that using the crawler works.
 
-CHECKER_TESTS: Tuple[Tuple[str, str, Dict[str, int]], ...] = (
+CHECKER_TESTS: Tuple[
+    Tuple[
+        Union[type, str],
+        str,
+        Dict[str, Union[Tuple[int, int], Dict[str, int]]],
+    ],
+    ...,
+] = (
     (TrueChecker, "finished", {"example.com": (1, 1)}),
     (FalseChecker, "bad_session_inits", {"example.com": {"init/check-failed": 1}}),
     (
