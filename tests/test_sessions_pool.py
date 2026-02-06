@@ -294,6 +294,43 @@ async def test_delay(settings, meta, expected, mockserver, monkeypatch):
     assert sleep_calls[0] == pytest.approx(expected)
 
 
+@deferred_f_from_coro_f
+async def test_delay_reuse(mockserver, monkeypatch):
+    """Ensure that non-random delays during session reuse (as opposed to
+    creation) work as expected."""
+    expected = 0.0  # No delay by default
+    queue_wait_time = expected + 0.1
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_SESSION_QUEUE_WAIT_TIME": queue_wait_time,
+        "ZYTE_API_SESSION_RANDOMIZE_DELAY": False,
+    }
+
+    sleep_calls = []
+
+    async def fake_sleep(delay):
+        if delay != pytest.approx(queue_wait_time):
+            sleep_calls.append(delay)
+        await sleep(0)
+
+    monkeypatch.setattr("scrapy_zyte_api._session.sleep", fake_sleep)
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"] * 2
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert len(sleep_calls) == 1
+    assert sleep_calls[0] == pytest.approx(expected)
+
+
 @pytest.mark.parametrize(
     ("settings", "start_requests"),
     (

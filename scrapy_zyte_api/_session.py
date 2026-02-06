@@ -906,8 +906,6 @@ class _SessionManager:
                     f"from pool {pool!r} to become available"
                 )
                 await sleep(wait)
-                if session_id not in self._pools[pool]:
-                    continue  # Invalid session
                 now = time.time()
             pool_config = self._pool_configs[pool]
             next_use_delay = pool_config["delay"]
