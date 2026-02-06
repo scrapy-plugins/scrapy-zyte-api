@@ -1,4 +1,5 @@
 import json
+import time
 from asyncio import Task, create_task, sleep
 from collections import defaultdict, deque
 from copy import deepcopy
@@ -7,7 +8,7 @@ from logging import getLogger
 from typing import (
     Any,
     DefaultDict,
-    Deque,
+    Tuple,
     Dict,
     List,
     Optional,
@@ -178,6 +179,9 @@ class PoolConfig(TypedDict):
     size: NotRequired[int]
 
 
+QueueSession = Tuple[str, float]  # (session_id, next_use_timestamp)
+
+
 class SessionConfig:
     """Default session configuration for :ref:`scrapy-zyte-api sessions
     <session>`."""
@@ -277,7 +281,7 @@ class SessionConfig:
         """
         return None
 
-    def pool(self, request: Request) -> str | dict[str, PoolConfig]:
+    def pool(self, request: Request) -> str | PoolConfig:
         """Return the ID of the session pool to use for *request*, or a
         :class:`dict` with additional session pool config.
 
@@ -310,6 +314,15 @@ class SessionConfig:
                         "size": 16,
                     }
                 return super().pool(request)
+
+        The ``delay`` and ``size`` values returned take precedence over
+        :setting:`ZYTE_API_SESSION_DELAY` and
+        :setting:`ZYTE_API_SESSION_POOL_SIZE` for the returned pool ID, but do
+        not override those defined in :setting:`ZYTE_API_SESSION_POOLS`.
+
+        For any given pool ID, ``delay`` and ``size`` values are only taken
+        into account when the pool ID is first encountered. You cannot use this
+        method to change them at run time.
         """
         meta_pool = request.meta.get("zyte_api_session_pool", "")
         if meta_pool:
@@ -604,11 +617,21 @@ class _SessionManager:
 
         settings = crawler.settings
 
-        pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
-        self._pending_initial_sessions: Dict[str, int] = defaultdict(lambda: pool_size)
-        pool_sizes = settings.getdict("ZYTE_API_SESSION_POOL_SIZES", {})
-        for pool, size in pool_sizes.items():
-            self._pending_initial_sessions[pool] = size
+        self._default_pool_delay = settings.getfloat("ZYTE_API_SESSION_DELAY", 1.0)
+        self._default_pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
+        self._pending_initial_sessions: Dict[str, int] = {}
+        self._pool_configs = settings.getdict("ZYTE_API_SESSION_POOLS")
+        pool_sizes = settings.getdict("ZYTE_API_SESSION_POOL_SIZES")
+        if pool_sizes:
+            logger.warning(
+                "ZYTE_API_SESSION_POOL_SIZES is deprecated, use "
+                "ZYTE_API_SESSION_POOLS instead"
+            )
+            for pool_id, pool_size in pool_sizes.items():
+                self._pool_configs.setdefault(pool_id, {}).setdefault("size", pool_size)
+        for pool, config in self._pool_configs.items():
+            if "size" in config:
+                self._pending_initial_sessions[pool] = config["size"]
 
         self._max_check_failures = settings.getint(
             "ZYTE_API_SESSION_MAX_CHECK_FAILURES", 1
@@ -621,7 +644,7 @@ class _SessionManager:
         max_bad_inits = settings.getint("ZYTE_API_SESSION_MAX_BAD_INITS", 8)
         self._max_bad_inits: Dict[str, int] = defaultdict(lambda: max_bad_inits)
         max_bad_inits_per_pool = settings.getdict(
-            "ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL", {}
+            "ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL"
         )
         for pool, pool_max_bad_inits in max_bad_inits_per_pool.items():
             self._max_bad_inits[pool] = pool_max_bad_inits
@@ -663,7 +686,7 @@ class _SessionManager:
         # If the queue is empty, sleep and try again. Sessions from the pool
         # will be appended to the queue as they are initialized and ready to
         # use.
-        self._queues: Dict[str, Deque[str]] = defaultdict(deque)
+        self._queues: Dict[str, deque[QueueSession]] = defaultdict(deque)
         self._queue_max_attempts = settings.getint(
             "ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS", 60
         )
@@ -708,10 +731,38 @@ class _SessionManager:
             session_config = self._get_session_config(request)
             try:
                 pool = session_config.pool(request)
-            except Exception:
-                raise PoolError
-            self._pool_cache[request] = pool
-            return pool
+            except Exception as exception:
+                message = (
+                    f"Exception raised on session config pool() method call "
+                    f"for request {request}."
+                )
+                raise PoolError(message) from exception
+            if isinstance(pool, str):
+                pool_id = pool
+                pool = {}
+            else:
+                try:
+                    pool_id = pool["id"]
+                except KeyError as exception:
+                    message = (
+                        f'Exception raised when accessing pool["id"] on the '
+                        f"return value of the session config pool() method call "
+                        f"for request {request}."
+                    )
+                    raise PoolError(message) from exception
+            pool_delay = pool.get("delay", self._default_pool_delay)
+            pool_size = pool.get("size", self._default_pool_size)
+            if pool_id not in self._pool_configs:
+                self._pool_configs[pool_id] = {"delay": pool_delay, "size": pool_size}
+                self._pending_initial_sessions[pool_id] = pool_size
+            else:
+                config = self._pool_configs[pool_id]
+                config.setdefault("delay", pool_delay)
+                if "size" not in config:
+                    self._pending_initial_sessions[pool_id] = pool_size
+                config.setdefault("size", pool_size)
+            self._pool_cache[request] = pool_id
+            return pool_id
 
     async def _init_session(self, session_id: str, request: Request, pool: str) -> bool:
         assert self._crawler.engine
@@ -806,15 +857,15 @@ class _SessionManager:
                 self._bad_inits[pool] += 1
                 if self._bad_inits[pool] >= self._max_bad_inits[pool]:
                     raise TooManyBadSessionInits
-            self._queues[pool].append(session_id)
+            next_use = time.time() + self._pool_configs[pool]["delay"]
+            self._queues[pool].append((session_id, next_use))
             return session_id
 
     async def _next_from_queue(self, request: Request, pool: str) -> str:
-        session_id = None
         attempts = 0
-        while session_id not in self._pools[pool]:  # After 1st loop: invalid session.
+        while True:
             try:
-                session_id = self._queues[pool].popleft()
+                session_id, next_use = self._queues[pool].popleft()
             except IndexError:  # No ready-to-use session available.
                 attempts += 1
                 if attempts >= self._queue_max_attempts:
@@ -826,9 +877,23 @@ class _SessionManager:
                         f"{_troubleshoot('could-not-get-session-id')}"
                     )
                 await sleep(self._queue_wait_time)
-        assert session_id is not None
-        self._queues[pool].append(session_id)
-        return session_id
+                continue
+            if session_id not in self._pools[pool]:
+                continue  # Invalid session
+            now = time.time()
+            if next_use > now:
+                wait = next_use - now
+                logger.debug(
+                    f"Waiting {wait:.3f} seconds for session {session_id} "
+                    f"from pool {pool!r} to become available"
+                )
+                await sleep(wait)
+                if session_id not in self._pools[pool]:
+                    continue  # Invalid session
+                now = time.time()
+            next_use = now + self._pool_configs[pool]["delay"]
+            self._queues[pool].append((session_id, next_use))
+            return session_id
 
     async def _next(self, request) -> str:
         """Return the ID of the next working session in the session pool

@@ -8,13 +8,16 @@ Changes
     session <session>`.
 
     It is 1 second by default. Use :setting:`ZYTE_API_SESSION_DELAY` to change
-    that, :setting:`ZYTE_API_SESSION_POOLS` to override it for specific
+    that or :setting:`ZYTE_API_SESSION_POOLS` to override it for specific
     :setting:`session pools <session-pools>`.
 
--   :attr:`SessionConfig.pool <scrapy_zyte_api.SessionConfig.pool>` can now
+-   :meth:`SessionConfig.pool <scrapy_zyte_api.SessionConfig.pool>` can now
     return a dictionary instead of a string, allowing session configs to
-    override :setting:`ZYTE_API_SESSION_POOLS` and
-    :setting:`ZYTE_API_SESSION_DELAY` for the corresponding pool.
+    override :setting:`ZYTE_API_SESSION_DELAY` and
+    :setting:`ZYTE_API_SESSION_POOL_SIZE` for any pool.
+    
+    However, it cannot override those defined in
+    :setting:`ZYTE_API_SESSION_POOLS`.
 
 -   Deprecated the ``ZYTE_API_SESSION_POOL_SIZES`` setting in favor of the new
     :setting:`ZYTE_API_SESSION_POOLS` setting, where you can set ``"size"``.
