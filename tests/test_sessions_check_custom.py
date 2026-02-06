@@ -17,6 +17,8 @@ from scrapy_zyte_api.utils import (
 from . import SESSION_SETTINGS, get_crawler
 from .helpers import assert_session_stats
 
+mod = "tests.test_sessions_check_custom."
+
 
 class ConstantChecker:
     def __init__(self, result):
@@ -106,43 +108,47 @@ class OnlyPassFirstInitChecker:
 
 CHECKER_TESTS: Tuple[
     Tuple[
-        Union[type, str],
+        str,
         str,
         Dict[str, Union[Tuple[int, int], Dict[str, int]]],
     ],
     ...,
 ] = (
-    (TrueChecker, "finished", {"example.com": (1, 1)}),
-    (FalseChecker, "bad_session_inits", {"example.com": {"init/check-failed": 1}}),
+    (f"{mod}TrueChecker", "finished", {"example.com": (1, 1)}),
     (
-        FalseUseChecker,
-        "finished",
-        {"example.com": {"init/check-passed": 2, "use/check-failed": 1}},
-    ),
-    (CloseSpiderChecker, "closed_by_checker", {}),
-    (
-        CloseSpiderUseChecker,
-        "closed_by_checker",
-        {"example.com": {"init/check-passed": 1}},
-    ),
-    (
-        UnexpectedExceptionChecker,
-        "bad_session_inits",
-        {"example.com": {"init/check-error": 1}},
-    ),
-    (
-        UnexpectedExceptionUseChecker,
-        "finished",
-        {"example.com": {"init/check-passed": 2, "use/check-error": 1}},
-    ),
-    (TrueCrawlerChecker, "finished", {"example.com": (1, 1)}),
-    (
-        FalseCrawlerChecker,
+        f"{mod}FalseChecker",
         "bad_session_inits",
         {"example.com": {"init/check-failed": 1}},
     ),
     (
-        OnlyPassFirstInitChecker,
+        f"{mod}FalseUseChecker",
+        "finished",
+        {"example.com": {"init/check-passed": 2, "use/check-failed": 1}},
+    ),
+    (f"{mod}CloseSpiderChecker", "closed_by_checker", {}),
+    (
+        f"{mod}CloseSpiderUseChecker",
+        "closed_by_checker",
+        {"example.com": {"init/check-passed": 1}},
+    ),
+    (
+        f"{mod}UnexpectedExceptionChecker",
+        "bad_session_inits",
+        {"example.com": {"init/check-error": 1}},
+    ),
+    (
+        f"{mod}UnexpectedExceptionUseChecker",
+        "finished",
+        {"example.com": {"init/check-passed": 2, "use/check-error": 1}},
+    ),
+    (f"{mod}TrueCrawlerChecker", "finished", {"example.com": (1, 1)}),
+    (
+        f"{mod}FalseCrawlerChecker",
+        "bad_session_inits",
+        {"example.com": {"init/check-failed": 1}},
+    ),
+    (
+        f"{mod}OnlyPassFirstInitChecker",
         "bad_session_inits",
         {
             "example.com": {
