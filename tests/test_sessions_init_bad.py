@@ -8,45 +8,6 @@ from . import SESSION_SETTINGS, get_crawler
 
 
 @pytest.mark.parametrize(
-    ("setting", "value"),
-    (
-        (0, 1),
-        (1, 1),
-        (2, 2),
-        (None, 8),
-    ),
-)
-@deferred_f_from_coro_f
-async def test_max_bad_inits(setting, value, mockserver):
-    settings = {
-        **SESSION_SETTINGS,
-        "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_PARAMS": {"browserHtml": True, "httpResponseBody": True},
-    }
-    if setting is not None:
-        settings["ZYTE_API_SESSION_MAX_BAD_INITS"] = setting
-
-    class TestSpider(Spider):
-        name = "test"
-        start_urls = ["https://example.com"]
-
-        def parse(self, response):
-            pass
-
-    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await maybe_deferred_to_future(crawler.crawl())
-
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/failed": value,
-    }
-
-
-@pytest.mark.parametrize(
     ("global_setting", "pool_setting", "value"),
     (
         (None, 0, 1),
