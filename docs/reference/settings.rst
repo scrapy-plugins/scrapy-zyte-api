@@ -417,9 +417,10 @@ Default: ``1.0``
 Minimum number of seconds to wait before reusing a :ref:`plugin-managed
 session <session>`.
 
-To override this value for specific pools, use
-:setting:`ZYTE_API_SESSION_POOLS` or return a dictionary from
-:meth:`~scrapy_zyte_api.SessionConfig.pool` containing a ``"delay"`` key.
+To override this value for specific pools, use the ``"delay"`` key in a
+:class:`dict` value of the :setting:`ZYTE_API_SESSION_POOLS` setting, of the
+:reqmeta:`zyte_api_session_pool` request metadata key, or that returned by
+:meth:`~scrapy_zyte_api.SessionConfig.pool`.
 
 Increasing this number can reduce the number of ban-related session
 expirations, hence increasing the lifetime of each session. See
