@@ -1,3 +1,4 @@
+from asyncio import sleep
 from collections import deque
 
 import pytest
@@ -336,13 +337,22 @@ async def test_session_config_pool_error(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
+@pytest.mark.parametrize(
+    ("session_delay", "expected_delay"),
+    (
+        (None, 1.0),
+        (1.5, 1.5),
+    ),
+)
 @deferred_f_from_coro_f
-async def test_delay_default(mockserver, monkeypatch):
+async def test_delay(session_delay, expected_delay, mockserver, monkeypatch):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
     }
+    if session_delay is not None:
+        settings["ZYTE_API_SESSION_DELAY"] = session_delay
 
     sleep_calls = []
 
@@ -362,4 +372,66 @@ async def test_delay_default(mockserver, monkeypatch):
     await maybe_deferred_to_future(crawler.crawl())
 
     assert len(sleep_calls) == 1
-    assert sleep_calls[0] == pytest.approx(1.0)
+    assert sleep_calls[0] == pytest.approx(expected_delay)
+
+
+@pytest.mark.parametrize(
+    ("meta", "expected_delay", "expected_size"),
+    (
+        ("example.com", 1, 1),
+        ({"id": "example.com", "delay": 1.5}, 1.5, 1),
+        ({"id": "example.com", "size": 2}, 1, 2),
+        ({"id": "example.com", "delay": 1.5, "size": 2}, 1.5, 2),
+    ),
+)
+@deferred_f_from_coro_f
+async def test_overrides(meta, expected_delay, expected_size, mockserver, monkeypatch):
+    queue_wait_time = expected_delay + 0.1
+    start_request_count = expected_size + 1
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_SESSION_QUEUE_WAIT_TIME": queue_wait_time,
+    }
+
+    sleep_calls = []
+
+    async def fake_sleep(delay):
+        if delay != pytest.approx(queue_wait_time):
+            sleep_calls.append(delay)
+        await sleep(0)
+
+    monkeypatch.setattr("scrapy_zyte_api._session.sleep", fake_sleep)
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"] * start_request_count
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
+        def start_requests(self):
+            for url in self.start_urls:
+                yield Request(
+                    url, meta={"zyte_api_session_pool": meta}, dont_filter=True
+                )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert len(sleep_calls) == start_request_count
+
+    session_stats = {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }
+    assert session_stats == {
+        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": expected_size,
+        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": start_request_count,
+    }
