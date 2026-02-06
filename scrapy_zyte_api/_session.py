@@ -1,4 +1,5 @@
 import json
+import random
 import time
 from asyncio import Task, create_task, sleep
 from collections import defaultdict, deque
@@ -299,10 +300,8 @@ class SessionConfig:
         :data:`ADDRESS_FIELDS` (e.g. ``example.com@US,NY,10001``).
 
         Instead of a string, this method can also return a :class:`dict`
-        containing the pool ID under the ``id`` key, and optionally a ``delay``
-        key with the minimum delay between reuses of the sessions from that
-        pool, and a ``size`` key with the maximum number of sessions in that
-        pool. For example:
+        containing the pool ID under the ``id`` key, and optionally any other
+        key supported by :setting:`ZYTE_API_SESSION_POOLS`. For example:
 
         .. code-block:: python
 
@@ -315,13 +314,13 @@ class SessionConfig:
                     }
                 return super().pool(request)
 
-        The ``delay`` and ``size`` values returned take precedence over
-        :setting:`ZYTE_API_SESSION_DELAY` and
-        :setting:`ZYTE_API_SESSION_POOL_SIZE` for the returned pool ID, but do
+        The values of optional keys take precedence over the corresponding
+        pool-independent settings, e.g. ``delay`` takes precedence over
+        :setting:`ZYTE_API_SESSION_DELAY` for the corresponding pool ID, but do
         not override those defined in :setting:`ZYTE_API_SESSION_POOLS`.
 
-        For any given pool ID, ``delay`` and ``size`` values are only taken
-        into account when the pool ID is first encountered. You cannot use this
+        For any given pool ID, the values of optional keys are only taken into
+        account when the pool ID is first encountered. You cannot use this
         method to change them at run time.
         """
         meta_pool = request.meta.get("zyte_api_session_pool", "")
@@ -620,6 +619,10 @@ class _SessionManager:
         self._default_pool_delay = settings.getfloat(
             "ZYTE_API_SESSION_DELAY", settings.getfloat("DOWNLOAD_DELAY")
         )
+        self._randomize_delay = settings.getbool(
+            "ZYTE_API_SESSION_RANDOMIZE_DELAY",
+            settings.getbool("RANDOMIZE_DOWNLOAD_DELAY"),
+        )
         self._default_pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
         self._pending_initial_sessions: Dict[str, int] = {}
         self._pool_configs = settings.getdict("ZYTE_API_SESSION_POOLS")
@@ -754,12 +757,18 @@ class _SessionManager:
                     raise PoolError(message) from exception
             pool_delay = pool.get("delay", self._default_pool_delay)
             pool_size = pool.get("size", self._default_pool_size)
+            pool_randomize_delay = pool.get("randomize_delay", self._randomize_delay)
             if pool_id not in self._pool_configs:
-                self._pool_configs[pool_id] = {"delay": pool_delay, "size": pool_size}
+                self._pool_configs[pool_id] = {
+                    "delay": pool_delay,
+                    "size": pool_size,
+                    "randomize_delay": pool_randomize_delay,
+                }
                 self._pending_initial_sessions[pool_id] = pool_size
             else:
                 config = self._pool_configs[pool_id]
                 config.setdefault("delay", pool_delay)
+                config.setdefault("randomize_delay", pool_randomize_delay)
                 if "size" not in config:
                     self._pending_initial_sessions[pool_id] = pool_size
                 config.setdefault("size", pool_size)
@@ -859,9 +868,14 @@ class _SessionManager:
                 self._bad_inits[pool] += 1
                 if self._bad_inits[pool] >= self._max_bad_inits[pool]:
                     raise TooManyBadSessionInits
-            delay = self._pool_configs[pool]["delay"]
-            await sleep(delay)
-            next_use = time.time() + delay
+            pool_config = self._pool_configs[pool]
+            delay = pool_config["delay"]
+            sleep_delay = next_use_delay = delay
+            if pool_config["randomize_delay"]:
+                next_use_delay *= random.uniform(0.5, 1.5)
+                sleep_delay *= random.uniform(0.5, 1.5)
+            await sleep(sleep_delay)
+            next_use = time.time() + next_use_delay
             self._queues[pool].append((session_id, next_use))
             return session_id
 
@@ -895,8 +909,11 @@ class _SessionManager:
                 if session_id not in self._pools[pool]:
                     continue  # Invalid session
                 now = time.time()
-            next_use = now + self._pool_configs[pool]["delay"]
-            self._queues[pool].append((session_id, next_use))
+            pool_config = self._pool_configs[pool]
+            next_use_delay = pool_config["delay"]
+            if pool_config["randomize_delay"]:
+                next_use_delay *= random.uniform(0.5, 1.5)
+            self._queues[pool].append((session_id, now + next_use_delay))
             return session_id
 
     async def _next(self, request) -> str:

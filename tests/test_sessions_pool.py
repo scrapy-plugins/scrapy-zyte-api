@@ -276,6 +276,7 @@ async def test_delay(settings, meta, expected, mockserver, monkeypatch):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_SESSION_QUEUE_WAIT_TIME": queue_wait_time,
+        "ZYTE_API_SESSION_RANDOMIZE_DELAY": False,
         **settings,
     }
 
@@ -311,6 +312,78 @@ async def test_delay(settings, meta, expected, mockserver, monkeypatch):
 
     assert len(sleep_calls) == 1
     assert sleep_calls[0] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("settings", "start_requests"),
+    (
+        ({"ZYTE_API_SESSION_RANDOMIZE_DELAY": True}, ["https://example.com"] * 2),
+        (
+            {"ZYTE_API_SESSION_POOLS": {"example.com": {"randomize_delay": True}}},
+            ["https://example.com"] * 2,
+        ),
+        (
+            {},
+            [
+                Request(
+                    "https://example.com",
+                    meta={
+                        "zyte_api_session_pool": {
+                            "id": "example.com",
+                            "randomize_delay": True,
+                        }
+                    },
+                )
+                for _ in range(2)
+            ],
+        ),
+    ),
+)
+@deferred_f_from_coro_f
+async def test_delay_random(settings, start_requests, mockserver, monkeypatch):
+    base_delay = 1.0
+    queue_wait_time = base_delay * 2
+    settings = {
+        "RANDOMIZE_DOWNLOAD_DELAY": False,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_SESSION_DELAY": base_delay,
+        "ZYTE_API_SESSION_QUEUE_WAIT_TIME": queue_wait_time,
+        **settings,
+    }
+
+    sleep_calls = []
+
+    async def fake_sleep(delay):
+        if delay != pytest.approx(queue_wait_time):
+            sleep_calls.append(delay)
+        await sleep(0)
+
+    monkeypatch.setattr("scrapy_zyte_api._session.sleep", fake_sleep)
+
+    class TestSpider(Spider):
+        name = "test"
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
+        def start_requests(self):
+            for item in start_requests:
+                if isinstance(item, str):
+                    yield Request(item, dont_filter=True)
+                else:
+                    yield item.replace(dont_filter=True)
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert len(sleep_calls) == 2
+    assert any(call != pytest.approx(base_delay) for call in sleep_calls)
 
 
 @pytest.mark.parametrize(

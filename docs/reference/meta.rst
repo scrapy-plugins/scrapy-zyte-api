@@ -141,29 +141,5 @@ zyte_api_session_pool
 
 Default: ``""``
 
-Determines the ID of the session pool to assign to the request, overriding the
-:ref:`default pool assignment logic <session-pools>`.
-
-Instead of a string, the value can be a :class:`dict` containing the pool ID
-under the ``id`` key, and optionally a ``delay`` key with the minimum delay
-between reuses of the sessions from that pool, and a ``size`` key with the
-maximum number of sessions in that pool. For example:
-
-.. code-block:: python
-
-    {
-        "id": "ecommerce.example",
-        "delay": 2.0,
-        "size": 16,
-    }
-
-The ``delay`` and ``size`` values returned take precedence over
-:setting:`ZYTE_API_SESSION_DELAY` and :setting:`ZYTE_API_SESSION_POOL_SIZE` for
-the specified pool ID, but do not override those defined in
-:setting:`ZYTE_API_SESSION_POOLS`.
-
-For any given pool ID, ``delay`` and ``size`` values are only taken into
-account when the pool ID is first encountered. You cannot use this request
-metadata key to change them at run time.
-
-.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.pool`
+If not falsy, it determines the default output of
+:meth:`scrapy_zyte_api.SessionConfig.pool` for the request.

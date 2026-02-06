@@ -12,6 +12,10 @@ Changes
     :setting:`ZYTE_API_SESSION_POOLS` to override it for specific
     :setting:`session pools <session-pools>`.
 
+    :setting:`ZYTE_API_SESSION_RANDOMIZE_DELAY` controls whether that minimum
+    delay is randomized by multiplying it by a random factor between 0.5 and
+    1.5. It defaults to :setting:`RANDOMIZE_DOWNLOAD_DELAY`.
+
 -   The value of the :reqmeta:`zyte_api_session_pool` request metadata key and
     the return value of the :meth:`SessionConfig.pool()
     <scrapy_zyte_api.SessionConfig.pool>` method can now be a dictionary

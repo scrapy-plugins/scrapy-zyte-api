@@ -426,6 +426,8 @@ Increasing this number can reduce the number of ban-related session
 expirations, hence increasing the lifetime of each session. See
 :ref:`optimize-sessions`.
 
+.. seealso:: :setting:`ZYTE_API_SESSION_RANDOMIZE_DELAY`
+
 .. setting:: ZYTE_API_SESSION_ENABLED
 
 ZYTE_API_SESSION_ENABLED
@@ -575,6 +577,9 @@ corresponding setting for that pool:
 
 -   ``"delay"`` overrides :setting:`ZYTE_API_SESSION_DELAY`.
 
+-   ``"randomize_delay"`` overrides
+    :setting:`ZYTE_API_SESSION_RANDOMIZE_DELAY`.
+
 -   ``"size"`` overrides :setting:`ZYTE_API_SESSION_POOL_SIZE`.
 
 These overrides take precedence over :attr:`SessionConfig.pool
@@ -614,6 +619,15 @@ queue.
 
 See :setting:`ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS` for details.
 
+.. setting:: ZYTE_API_SESSION_RANDOMIZE_DELAY
+
+ZYTE_API_SESSION_RANDOMIZE_DELAY
+================================
+
+Default: :setting:`RANDOMIZE_DOWNLOAD_DELAY`
+
+If enabled, :setting:`ZYTE_API_SESSION_DELAY` is randomized each time it is
+used by multiplying it by a random factor between 0.5 and 1.5.
 
 .. setting:: ZYTE_API_SKIP_HEADERS
 
