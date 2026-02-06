@@ -334,3 +334,32 @@ async def test_session_config_pool_error(mockserver):
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_delay_default(mockserver, monkeypatch):
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+    }
+
+    sleep_calls = []
+
+    async def fake_sleep(delay):
+        sleep_calls.append(delay)
+
+    monkeypatch.setattr("scrapy_zyte_api._session.sleep", fake_sleep)
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert len(sleep_calls) == 1
+    assert sleep_calls[0] == pytest.approx(1.0)

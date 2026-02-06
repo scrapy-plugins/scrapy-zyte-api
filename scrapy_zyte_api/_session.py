@@ -857,7 +857,9 @@ class _SessionManager:
                 self._bad_inits[pool] += 1
                 if self._bad_inits[pool] >= self._max_bad_inits[pool]:
                     raise TooManyBadSessionInits
-            next_use = time.time() + self._pool_configs[pool]["delay"]
+            delay = self._pool_configs[pool]["delay"]
+            await sleep(delay)
+            next_use = time.time() + delay
             self._queues[pool].append((session_id, next_use))
             return session_id
 
