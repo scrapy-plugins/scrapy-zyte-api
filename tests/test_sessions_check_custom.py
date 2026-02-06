@@ -15,6 +15,7 @@ from scrapy_zyte_api.utils import (
 )
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 class ConstantChecker:
@@ -104,68 +105,44 @@ class OnlyPassFirstInitChecker:
 # that using the crawler works.
 
 CHECKER_TESTS: Tuple[Tuple[str, str, Dict[str, int]], ...] = (
+    (TrueChecker, "finished", {"example.com": (1, 1)}),
+    (FalseChecker, "bad_session_inits", {"example.com": {"init/check-failed": 1}}),
     (
-        "tests.test_sessions_check_custom.TrueChecker",
+        FalseUseChecker,
         "finished",
-        {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-            "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-        },
+        {"example.com": {"init/check-passed": 2, "use/check-failed": 1}},
     ),
+    (CloseSpiderChecker, "closed_by_checker", {}),
     (
-        "tests.test_sessions_check_custom.FalseChecker",
-        "bad_session_inits",
-        {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
-    ),
-    (
-        "tests.test_sessions_check_custom.FalseUseChecker",
-        "finished",
-        {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
-            "scrapy-zyte-api/sessions/pools/example.com/use/check-failed": 1,
-        },
-    ),
-    ("tests.test_sessions_check_custom.CloseSpiderChecker", "closed_by_checker", {}),
-    (
-        "tests.test_sessions_check_custom.CloseSpiderUseChecker",
+        CloseSpiderUseChecker,
         "closed_by_checker",
-        {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-        },
+        {"example.com": {"init/check-passed": 1}},
     ),
     (
-        "tests.test_sessions_check_custom.UnexpectedExceptionChecker",
+        UnexpectedExceptionChecker,
         "bad_session_inits",
-        {"scrapy-zyte-api/sessions/pools/example.com/init/check-error": 1},
+        {"example.com": {"init/check-error": 1}},
     ),
     (
-        "tests.test_sessions_check_custom.UnexpectedExceptionUseChecker",
+        UnexpectedExceptionUseChecker,
         "finished",
-        {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
-            "scrapy-zyte-api/sessions/pools/example.com/use/check-error": 1,
-        },
+        {"example.com": {"init/check-passed": 2, "use/check-error": 1}},
     ),
+    (TrueCrawlerChecker, "finished", {"example.com": (1, 1)}),
     (
-        "tests.test_sessions_check_custom.TrueCrawlerChecker",
-        "finished",
-        {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-            "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-        },
-    ),
-    (
-        "tests.test_sessions_check_custom.FalseCrawlerChecker",
+        FalseCrawlerChecker,
         "bad_session_inits",
-        {"scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1},
+        {"example.com": {"init/check-failed": 1}},
     ),
     (
-        "tests.test_sessions_check_custom.OnlyPassFirstInitChecker",
+        OnlyPassFirstInitChecker,
         "bad_session_inits",
         {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-failed": 1,
-            "scrapy-zyte-api/sessions/pools/example.com/use/check-failed": 1,
+            "example.com": {
+                "init/check-passed": 1,
+                "init/check-failed": 1,
+                "use/check-failed": 1,
+            }
         },
     ),
 )
@@ -215,13 +192,8 @@ async def test_checker(checker, close_reason, stats, mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     assert crawler.spider.close_reason == close_reason
-    assert session_stats == stats
+    assert_session_stats(crawler, stats)
 
 
 class CloseSpiderURLChecker:
@@ -256,15 +228,8 @@ async def test_checker_close_spider_use(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     assert crawler.spider.close_reason == "closed_by_checker"
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-    }
+    assert_session_stats(crawler, {"example.com": {"init/check-passed": 1}})
 
 
 @deferred_f_from_coro_f
@@ -335,15 +300,7 @@ async def test_session_config_check_meta(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com[0]/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com[0]/use/check-passed": 1,
-    }
+    assert_session_stats(crawler, {"example.com[0]": (1, 1)})
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]

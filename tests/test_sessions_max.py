@@ -8,6 +8,7 @@ from scrapy import Spider
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 RETRY_TIMES = 2
 TEST_CASES = [
@@ -99,15 +100,5 @@ async def test_max(start_url, settings, expected_stats, mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-
     pool = urlparse(start_url).netloc
-    expected = {}
-    for suffix, val in expected_stats.items():
-        expected[f"scrapy-zyte-api/sessions/pools/{pool}/{suffix}"] = val
-
-    assert session_stats == expected
+    assert_session_stats(crawler, {pool: expected_stats})

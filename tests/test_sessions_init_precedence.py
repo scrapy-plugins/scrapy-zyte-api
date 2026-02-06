@@ -9,6 +9,7 @@ from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler, UNSET
+from .helpers import assert_session_stats
 
 
 @pytest.mark.parametrize(
@@ -201,20 +202,12 @@ async def test_params_precedence(
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     if outcome:
-        assert session_stats == {
-            f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed": 1,
-            f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed": 1,
-        }
+        assert_session_stats(
+            crawler, {pool: {"init/check-passed": 1, "use/check-passed": 1}}
+        )
     else:
-        assert session_stats == {
-            f"scrapy-zyte-api/sessions/pools/{pool}/init/failed": 1,
-        }
+        assert_session_stats(crawler, {pool: {"init/failed": 1}})
 
 
 @pytest.mark.parametrize(
@@ -326,20 +319,12 @@ async def test_session_config_params_precedence(
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     if outcome:
-        assert session_stats == {
-            f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed": 1,
-            f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed": 1,
-        }
+        assert_session_stats(
+            crawler, {pool: {"init/check-passed": 1, "use/check-passed": 1}}
+        )
     else:
-        assert session_stats == {
-            f"scrapy-zyte-api/sessions/pools/{pool}/init/failed": 1,
-        }
+        assert_session_stats(crawler, {pool: {"init/failed": 1}})
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]

@@ -19,6 +19,7 @@ from scrapy_zyte_api.utils import (
 )
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 def mock_request_error(*, status=200, response_content=None):
@@ -154,15 +155,10 @@ async def test_missing_session_id(mockserver, caplog):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/temporary-download-error.example/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/temporary-download-error.example/use/failed": 1,
-    }
+    assert_session_stats(
+        crawler,
+        {"temporary-download-error.example": {"init/check-passed": 1, "use/failed": 1}},
+    )
     assert "had no session ID assigned, unexpectedly" in caplog.text
 
 
@@ -249,19 +245,12 @@ async def test_exceptions(exception, stat, reason, mockserver, caplog):
     crawler.exception = exception
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     if stat is not None:
-        assert session_stats == {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 2,
-            f"scrapy-zyte-api/sessions/pools/example.com/use/{stat}": 1,
-        }
+        assert_session_stats(
+            crawler,
+            {"example.com": {"init/check-passed": 2, f"use/{stat}": 1}},
+        )
     else:
-        assert session_stats == {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-        }
+        assert_session_stats(crawler, {"example.com": {"init/check-passed": 1}})
     if reason is not None:
         assert reason in caplog.text

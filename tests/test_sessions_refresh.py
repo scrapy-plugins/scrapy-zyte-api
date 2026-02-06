@@ -4,6 +4,7 @@ from scrapy import Request, Spider, signals
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 @deferred_f_from_coro_f
@@ -43,15 +44,15 @@ async def test_session_refresh(mockserver):
     )
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/session-check-fails.example/init/check-passed": 3,
-        "scrapy-zyte-api/sessions/pools/session-check-fails.example/use/check-failed": 2,
-    }
+    assert_session_stats(
+        crawler,
+        {
+            "session-check-fails.example": {
+                "init/check-passed": 3,
+                "use/check-failed": 2,
+            }
+        },
+    )
     assert len(tracker.sessions) == 5
     assert tracker.sessions[0] == tracker.sessions[1]
     assert tracker.sessions[0] != tracker.sessions[2]
@@ -85,14 +86,14 @@ async def test_session_refresh_concurrent(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com/init/failed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com/use/failed": 2,
-    }
+    assert_session_stats(
+        crawler,
+        {
+            "example.com": {
+                "init/check-passed": 1,
+                "init/failed": 1,
+                "use/check-passed": 1,
+                "use/failed": 2,
+            }
+        },
+    )

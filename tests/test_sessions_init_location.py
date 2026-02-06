@@ -7,6 +7,7 @@ from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 @pytest.mark.parametrize(
@@ -90,16 +91,8 @@ async def test_session_config_location(settings, meta, used, mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     if used:
-        assert session_stats == {
-            "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 1,
-            "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/check-passed": 1,
-        }
+        assert_session_stats(crawler, {"postal-code-10001.example": (1, 1)})
     else:
         pool = (
             "postal-code-10001.example[0]"
@@ -110,9 +103,7 @@ async def test_session_config_location(settings, meta, used, mockserver):
                 else "postal-code-10001.example"
             )
         )
-        assert session_stats == {
-            f"scrapy-zyte-api/sessions/pools/{pool}/init/failed": 1,
-        }
+        assert_session_stats(crawler, {pool: {"init/failed": 1}})
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]
@@ -199,11 +190,6 @@ async def test_session_config_location_bad(settings, meta, used, mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     pool = (
         "postal-code-10001.example[0]"
         if "zyte_api_session_params" in meta
@@ -214,14 +200,11 @@ async def test_session_config_location_bad(settings, meta, used, mockserver):
         )
     )
     if used:
-        assert session_stats == {
-            f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed": 1,
-            f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed": 1,
-        }
+        assert_session_stats(
+            crawler, {pool: {"init/check-passed": 1, "use/check-passed": 1}}
+        )
     else:
-        assert session_stats == {
-            f"scrapy-zyte-api/sessions/pools/{pool}/init/failed": 1,
-        }
+        assert_session_stats(crawler, {pool: {"init/failed": 1}})
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]
@@ -288,15 +271,7 @@ async def test_session_config_params_location(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/check-passed": 1,
-    }
+    assert_session_stats(crawler, {"postal-code-10001.example": (1, 1)})
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]
@@ -362,15 +337,7 @@ async def test_session_config_params_location_no_set_location(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-    }
+    assert_session_stats(crawler, {"example.com": (1, 1)})
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]

@@ -201,3 +201,11 @@ async def process_response(middleware, request, response) -> Request | None:
     else:
         maybe_awaitable = middleware.process_response(request, response, spider=None)
     await _ensure_awaitable(maybe_awaitable)
+
+
+def get_session_stats(crawler):
+    return {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }

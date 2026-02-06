@@ -5,6 +5,7 @@ from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 @pytest.mark.parametrize(
@@ -40,14 +41,12 @@ async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mocks
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/failed": (
-            8 if global_setting is None else global_setting
-        ),
-        "scrapy-zyte-api/sessions/pools/pool.example/init/failed": value,
-    }
+    assert_session_stats(
+        crawler,
+        {
+            "example.com": {
+                "init/failed": 8 if global_setting is None else global_setting
+            },
+            "pool.example": {"init/failed": value},
+        },
+    )

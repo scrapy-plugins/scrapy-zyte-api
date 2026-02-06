@@ -11,6 +11,7 @@ from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 @deferred_f_from_coro_f
@@ -98,16 +99,16 @@ async def test_location_session_config(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 2,
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/check-passed": 2,
-        "scrapy-zyte-api/sessions/pools/postal-code-10001-fail.example/init/check-failed": 1,
-    }
+    assert_session_stats(
+        crawler,
+        {
+            "postal-code-10001.example": {
+                "init/check-passed": 2,
+                "use/check-passed": 2,
+            },
+            "postal-code-10001-fail.example": {"init/check-failed": 1},
+        },
+    )
 
     # Clean up the session config registry, and check it, otherwise we could
     # affect other tests.
@@ -117,16 +118,14 @@ async def test_location_session_config(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/failed": 1,
-        "scrapy-zyte-api/sessions/pools/postal-code-10001-alternative.example/init/failed": 1,
-        "scrapy-zyte-api/sessions/pools/postal-code-10001-fail.example/init/failed": 1,
-    }
+    assert_session_stats(
+        crawler,
+        {
+            "postal-code-10001.example": {"init/failed": 1},
+            "postal-code-10001-alternative.example": {"init/failed": 1},
+            "postal-code-10001-fail.example": {"init/failed": 1},
+        },
+    )
 
 
 @deferred_f_from_coro_f
@@ -189,15 +188,10 @@ async def test_location_session_config_no_methods(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/check-passed": 2,
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/use/check-passed": 2,
-    }
+    assert_session_stats(
+        crawler,
+        {"postal-code-10001.example": {"init/check-passed": 2, "use/check-passed": 2}},
+    )
 
     # Clean up the session config registry, and check it, otherwise we could
     # affect other tests.
@@ -259,16 +253,13 @@ async def test_location_session_config_no_location(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/postal-code-10001.example/init/failed": 1,
-        "scrapy-zyte-api/sessions/pools/a.example/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/a.example/use/check-passed": 1,
-    }
+    assert_session_stats(
+        crawler,
+        {
+            "postal-code-10001.example": {"init/failed": 1},
+            "a.example": {"init/check-passed": 1, "use/check-passed": 1},
+        },
+    )
 
     # Clean up the session config registry, and check it, otherwise we could
     # affect other tests.

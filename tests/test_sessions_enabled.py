@@ -11,6 +11,7 @@ from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import get_crawler, UNSET
+from .helpers import assert_session_stats
 
 
 @pytest.mark.parametrize(
@@ -52,20 +53,10 @@ async def test_enabled(setting, meta, outcome, mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     if outcome:
-        assert session_stats == {
-            "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-            "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-        }
+        assert_session_stats(crawler, {"example.com": (1, 1)})
     else:
-        assert session_stats == {
-            "scrapy-zyte-api/sessions/use/disabled": 1,
-        }
+        assert_session_stats(crawler, {"/use/disabled": 1})
 
 
 @deferred_f_from_coro_f
@@ -93,16 +84,14 @@ async def test_session_config_enabled(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/use/disabled": 1,
-        "scrapy-zyte-api/sessions/pools/enabled.example/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/enabled.example/use/check-passed": 1,
-    }
+    assert_session_stats(
+        crawler,
+        {
+            "/use/disabled": 1,
+            "/pools/enabled.example/init/check-passed": 1,
+            "/pools/enabled.example/use/check-passed": 1,
+        },
+    )
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]

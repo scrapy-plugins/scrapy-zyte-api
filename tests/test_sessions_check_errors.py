@@ -8,6 +8,7 @@ from scrapy_zyte_api.utils import (
 )
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 class DomainChecker:
@@ -40,14 +41,12 @@ async def test_check_overrides_error(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/session-check-fails.example/init/check-passed": retry_times
-        + 2,
-        "scrapy-zyte-api/sessions/pools/session-check-fails.example/use/check-failed": retry_times
-        + 1,
-    }
+    assert_session_stats(
+        crawler,
+        {
+            "session-check-fails.example": {
+                "init/check-passed": retry_times + 2,
+                "use/check-failed": retry_times + 1,
+            }
+        },
+    )

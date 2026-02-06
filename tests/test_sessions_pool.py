@@ -10,6 +10,7 @@ from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 @pytest.mark.parametrize(
@@ -81,15 +82,9 @@ async def test_pool(meta, pool, mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed": 1,
-        f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed": 1,
-    }
+    assert_session_stats(
+        crawler, {pool: {"init/check-passed": 1, "use/check-passed": 1}}
+    )
 
 
 @deferred_f_from_coro_f
@@ -129,17 +124,13 @@ async def test_pool_params(mockserver, caplog):
     caplog.set_level("INFO")
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com[0]/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com[0]/use/check-passed": 2,
-        "scrapy-zyte-api/sessions/pools/example.com[1]/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com[1]/use/check-passed": 1,
-    }
+    assert_session_stats(
+        crawler,
+        {
+            "example.com[0]": {"init/check-passed": 1, "use/check-passed": 2},
+            "example.com[1]": {"init/check-passed": 1, "use/check-passed": 1},
+        },
+    )
     expected_logs = {
         (
             "INFO",
@@ -193,15 +184,9 @@ async def test_session_config_pool_caching(mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-    }
+    assert_session_stats(
+        crawler, {"example.com": {"init/check-passed": 1, "use/check-passed": 1}}
+    )
     assert crawler.spider.close_reason == "finished"
 
     # Clean up the session config registry.
@@ -241,12 +226,7 @@ async def test_pool_error(mockserver, outcome):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {}
+    assert_session_stats(crawler, {})
     assert crawler.spider.close_reason == "pool_error"
 
     # Clean up the session config registry.
@@ -475,20 +455,7 @@ async def test_size(settings, start_requests, expected_stats, mockserver, caplog
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    expected_full = {}
-    for pool, (init_count, use_count) in expected_stats.items():
-        expected_full[f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed"] = (
-            init_count
-        )
-        expected_full[f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed"] = (
-            use_count
-        )
-    assert session_stats == expected_full
+    assert_session_stats(crawler, expected_stats)
 
     if "ZYTE_API_SESSION_POOL_SIZES" in settings:
         assert any(

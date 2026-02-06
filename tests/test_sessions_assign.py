@@ -8,6 +8,7 @@ from scrapy import Request, Spider, signals
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 @pytest.mark.parametrize(
@@ -96,15 +97,7 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
     crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": 1,
-        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": 1,
-    }
+    assert_session_stats(crawler, {"example.com": (1, 1)})
 
     assert (
         tracker.meta["zyte_api_provider"]["session"]

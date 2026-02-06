@@ -5,6 +5,7 @@ from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 @pytest.mark.parametrize(
@@ -13,16 +14,12 @@ from . import SESSION_SETTINGS, get_crawler
         (
             {"browserHtml": True},
             "bad_session_inits",
-            {
-                "scrapy-zyte-api/sessions/pools/forbidden.example/init/failed": 1,
-            },
+            {"forbidden.example": {"init/failed": 1}},
         ),
         (
             {"browserHtml": True, "url": "https://example.com"},
             "failed_forbidden_domain",
-            {
-                "scrapy-zyte-api/sessions/pools/forbidden.example/init/check-passed": 1,
-            },
+            {"forbidden.example": {"init/check-passed": 1}},
         ),
     ),
 )
@@ -52,10 +49,5 @@ async def test_url_override(params, close_reason, stats, mockserver):
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     assert crawler.spider.close_reason == close_reason
-    assert session_stats == stats
+    assert_session_stats(crawler, stats)

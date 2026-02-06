@@ -7,6 +7,7 @@ from scrapy_zyte_api.utils import (
 )
 
 from . import SESSION_SETTINGS, get_crawler
+from .helpers import assert_session_stats
 
 
 @pytest.mark.parametrize(
@@ -16,27 +17,19 @@ from . import SESSION_SETTINGS, get_crawler
             None,
             "https://postal-code-10001-soft.example",
             "finished",
-            {
-                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/init/check-passed": 1,
-                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/use/check-passed": 1,
-            },
+            {"postal-code-10001-soft.example": (1, 1)},
         ),
         (
             "10001",
             "https://postal-code-10001-soft.example",
             "finished",
-            {
-                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/init/check-passed": 1,
-                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/use/check-passed": 1,
-            },
+            {"postal-code-10001-soft.example": (1, 1)},
         ),
         (
             "10002",
             "https://postal-code-10001-soft.example",
             "bad_session_inits",
-            {
-                "scrapy-zyte-api/sessions/pools/postal-code-10001-soft.example/init/check-failed": 1
-            },
+            {"postal-code-10001-soft.example": {"init/check-failed": 1}},
         ),
         (
             "10001",
@@ -89,10 +82,5 @@ async def test_checker_location(postal_code, url, close_reason, stats, mockserve
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
     assert crawler.spider.close_reason == close_reason
-    assert session_stats == stats
+    assert_session_stats(crawler, stats)
