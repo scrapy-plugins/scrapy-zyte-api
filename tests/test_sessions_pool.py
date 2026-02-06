@@ -208,19 +208,17 @@ async def test_session_config_pool_caching(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
+@pytest.mark.parametrize("outcome", [Exception, 123, {}])
 @deferred_f_from_coro_f
-async def test_session_config_pool_error(mockserver):
-    # NOTE: This error should only happen during the initial process_request
-    # call. By the time the code reaches process_response, the cached pool
-    # value for that request is reused, so there is no new call to
-    # SessionConfig.pool that could fail during process_response only.
-
+async def test_pool_error(mockserver, outcome):
     pytest.importorskip("web_poet")
 
     @session_config(["example.com"])
     class CustomSessionConfig(SessionConfig):
         def pool(self, request: Request):
-            raise Exception
+            if isinstance(outcome, type) and issubclass(outcome, Exception):
+                raise outcome
+            return outcome
 
     settings = {
         **SESSION_SETTINGS,

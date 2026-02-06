@@ -743,7 +743,7 @@ class _SessionManager:
             else:
                 try:
                     pool_id = pool["id"]
-                except KeyError as exception:
+                except (KeyError, TypeError) as exception:
                     message = (
                         f'Exception raised when accessing pool["id"] on the '
                         f"return value of the session config pool() method call "
