@@ -130,7 +130,7 @@ class SessionIDRemovingResponseMiddleware:
     ) -> Response:
         if request.meta.get("_is_session_init_request", False):
             return response
-        for meta_key in ("zyte_api_automap", "zyte_api_provider"):
+        for meta_key in ("zyte_api", "zyte_api_automap", "zyte_api_provider"):
             if meta_key in request.meta and isinstance(request.meta[meta_key], dict):
                 request.meta[meta_key].pop("session", None)
         return response
