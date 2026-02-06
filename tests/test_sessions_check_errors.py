@@ -10,7 +10,7 @@ from scrapy_zyte_api.utils import (
     maybe_deferred_to_future,
 )
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @pytest.mark.parametrize(
@@ -26,10 +26,10 @@ from . import get_crawler
 async def test_max_check_failures(setting, value, mockserver):
     retry_times = 2
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": retry_times,
         "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
         "ZYTE_API_SESSION_CHECKER": "tests.test_sessions_check_custom.FalseUseChecker",
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_URL": mockserver.urljoin("/"),
@@ -72,11 +72,11 @@ async def test_check_overrides_error(mockserver):
     """Max errors are ignored if a session does not pass its session check."""
     retry_times = 2
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": retry_times,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_CHECKER": "tests.test_sessions_check_errors.DomainChecker",
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_ERRORS": 2,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
     }

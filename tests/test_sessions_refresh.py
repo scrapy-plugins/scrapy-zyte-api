@@ -3,7 +3,7 @@ from scrapy import Request, Spider, signals
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @deferred_f_from_coro_f
@@ -21,10 +21,10 @@ async def test_session_refresh(mockserver):
     tracker = Tracker()
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 1,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_CHECKER": "tests.test_sessions_check_errors.DomainChecker",
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
@@ -67,7 +67,7 @@ async def test_session_refresh_concurrent(mockserver):
     cases, the same session should be refreshed only once, not once per
     response triggering a refresh."""
     settings = {
-        "ZYTE_API_SESSION_ENABLED": True,
+        **SESSION_SETTINGS,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
         "ZYTE_API_SESSION_MAX_ERRORS": 1,
         "ZYTE_API_SESSION_POOL_SIZE": 1,

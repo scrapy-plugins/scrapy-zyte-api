@@ -14,7 +14,7 @@ from scrapy_zyte_api.utils import (
     maybe_deferred_to_future,
 )
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 class ConstantChecker:
@@ -195,10 +195,10 @@ CHECKER_TESTS: Tuple[Tuple[str, str, Dict[str, int]], ...] = (
 @deferred_f_from_coro_f
 async def test_checker(checker, close_reason, stats, mockserver):
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_CHECKER": checker,
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
 
@@ -236,8 +236,8 @@ async def test_checker_close_spider_use(mockserver):
     """A checker can raise CloseSpider not only during session initialization,
     but also during session use."""
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_SESSION_CHECKER": "tests.test_sessions_check_custom.CloseSpiderURLChecker",
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_URL": mockserver.urljoin("/"),
@@ -303,9 +303,9 @@ async def test_session_config_check_meta(mockserver):
             )
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
 

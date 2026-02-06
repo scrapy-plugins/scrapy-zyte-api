@@ -4,7 +4,7 @@ from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @pytest.mark.parametrize(
@@ -32,9 +32,9 @@ async def test_url_override(params, close_reason, stats, mockserver):
     initialization. Otherwise, the URL from the request getting the session
     assigned first is used for session initialization."""
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": params,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }

@@ -18,7 +18,7 @@ from scrapy_zyte_api.utils import (
     maybe_deferred_to_future,
 )
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 def mock_request_error(*, status=200, response_content=None):
@@ -128,6 +128,7 @@ async def test_missing_session_id(mockserver, caplog):
     assigned, a warning is logged about it."""
 
     settings = {
+        **SESSION_SETTINGS,
         "DOWNLOADER_MIDDLEWARES": {
             "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
             "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
@@ -135,7 +136,6 @@ async def test_missing_session_id(mockserver, caplog):
         },
         "RETRY_TIMES": 0,
         "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_TRANSPARENT_MODE": True,
@@ -222,13 +222,13 @@ class ExceptionRaisingDownloaderMiddleware:
 @deferred_f_from_coro_f
 async def test_exceptions(exception, stat, reason, mockserver, caplog):
     settings = {
+        **SESSION_SETTINGS,
         "DOWNLOADER_MIDDLEWARES": {
             "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
             "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
             "tests.test_sessions_errors.ExceptionRaisingDownloaderMiddleware": 675,
         },
         "RETRY_TIMES": 0,
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
     }

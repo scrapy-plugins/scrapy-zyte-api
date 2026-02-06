@@ -8,7 +8,7 @@ from scrapy_zyte_api import SessionConfig, session_config
 from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @pytest.mark.parametrize(
@@ -60,8 +60,8 @@ from . import get_crawler
 @deferred_f_from_coro_f
 async def test_pool(meta, pool, mockserver):
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
     }
 
     class TestSpider(Spider):
@@ -94,8 +94,8 @@ async def test_pool(meta, pool, mockserver):
 @deferred_f_from_coro_f
 async def test_pool_params(mockserver, caplog):
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
     }
 
@@ -167,8 +167,8 @@ async def test_pool_params(mockserver, caplog):
 @deferred_f_from_coro_f
 async def test_pool_size(setting, value, mockserver):
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
     }
     if setting is not None:
         settings["ZYTE_API_SESSION_POOL_SIZE"] = setting
@@ -205,8 +205,8 @@ async def test_pool_size(setting, value, mockserver):
 @deferred_f_from_coro_f
 async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
     }
     if global_setting is not None:
         settings["ZYTE_API_SESSION_POOL_SIZE"] = global_setting
@@ -254,9 +254,9 @@ async def test_session_config_pool_caching(mockserver):
             return self.pools.popleft()
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
@@ -304,9 +304,9 @@ async def test_session_config_pool_error(mockserver):
             raise Exception
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }

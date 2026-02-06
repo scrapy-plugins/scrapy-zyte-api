@@ -10,7 +10,7 @@ from scrapy_zyte_api import LocationSessionConfig, session_config
 from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @deferred_f_from_coro_f
@@ -52,9 +52,9 @@ async def test_location_session_config(mockserver):
             return domain
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         # We set a location to force the location-specific methods of the
         # session config class to be called, but we set the wrong location so
         # that the test would not pass were it not for our custom
@@ -149,9 +149,9 @@ async def test_location_session_config_no_methods(mockserver):
             return domain
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
@@ -223,9 +223,9 @@ async def test_location_session_config_no_location(mockserver):
             assert False
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
 

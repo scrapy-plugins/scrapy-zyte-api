@@ -15,7 +15,7 @@ from scrapy_zyte_api import (
 from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @deferred_f_from_coro_f
@@ -51,9 +51,9 @@ async def test_session_config(mockserver):
             return domain
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
 
@@ -164,9 +164,9 @@ async def test_session_config_process_request_change_request(mockserver):
             request.headers["foo"] = foo
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
     request_headers = []
@@ -222,9 +222,9 @@ async def test_session_config_process_request_new_request(mockserver):
             return request.replace(url=new_url)
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
     output_urls = []
@@ -267,9 +267,9 @@ async def test_session_config_params_error(mockserver):
             raise Exception
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }

@@ -9,7 +9,7 @@ from scrapy import Request, Spider, signals
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 from scrapy_poet import DummyResponse
 from zyte_common_items import Product
@@ -27,7 +27,7 @@ async def test_provider(mockserver):
     tracker = Tracker()
 
     settings = {
-        "ZYTE_API_SESSION_ENABLED": True,
+        **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
     }
 

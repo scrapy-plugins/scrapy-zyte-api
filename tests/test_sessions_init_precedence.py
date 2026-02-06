@@ -8,7 +8,7 @@ from scrapy_zyte_api import SessionConfig, session_config
 from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler, UNSET
+from . import SESSION_SETTINGS, get_crawler, UNSET
 
 
 @pytest.mark.parametrize(
@@ -139,8 +139,8 @@ async def test_params_precedence(
         )
     )
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
     meta: Dict[str, Any] = {}
@@ -288,9 +288,9 @@ async def test_session_config_params_precedence(
             }
 
     settings = {
+        **SESSION_SETTINGS,
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
         **settings,
     }

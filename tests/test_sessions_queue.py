@@ -3,7 +3,7 @@ from scrapy import Spider
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @deferred_f_from_coro_f
@@ -13,8 +13,8 @@ async def test_empty_queue(mockserver):
     pending creation, delay awaiting or a refresh. In those cases, the assign
     process should wait until a session becomes available in the queue."""
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
     }
 
@@ -45,7 +45,7 @@ async def test_empty_queue(mockserver):
 @deferred_f_from_coro_f
 async def test_empty_queue_limit(mockserver):
     settings = {
-        "ZYTE_API_SESSION_ENABLED": True,
+        **SESSION_SETTINGS,
         "ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS": 1,
         "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0,
         "ZYTE_API_SESSION_POOL_SIZE": 1,

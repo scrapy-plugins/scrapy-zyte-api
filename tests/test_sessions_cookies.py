@@ -3,7 +3,7 @@ from scrapy import Request, Spider, signals
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @deferred_f_from_coro_f
@@ -19,7 +19,7 @@ async def test_cookies(mockserver):
     tracker = Tracker()
 
     settings = {
-        "ZYTE_API_SESSION_ENABLED": True,
+        **SESSION_SETTINGS,
         "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
     }

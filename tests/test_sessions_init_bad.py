@@ -4,7 +4,7 @@ from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @pytest.mark.parametrize(
@@ -19,8 +19,8 @@ from . import get_crawler
 @deferred_f_from_coro_f
 async def test_max_bad_inits(setting, value, mockserver):
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": {"browserHtml": True, "httpResponseBody": True},
     }
     if setting is not None:
@@ -58,8 +58,8 @@ async def test_max_bad_inits(setting, value, mockserver):
 @deferred_f_from_coro_f
 async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mockserver):
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": {"browserHtml": True, "httpResponseBody": True},
     }
     if global_setting is not None:

@@ -6,7 +6,7 @@ from scrapy_zyte_api.utils import (
     maybe_deferred_to_future,
 )
 
-from . import get_crawler
+from . import SESSION_SETTINGS, get_crawler
 
 
 @pytest.mark.parametrize(
@@ -51,8 +51,8 @@ async def test_checker_location(postal_code, url, close_reason, stats, mockserve
     """The default checker looks into the outcome of the ``setLocation`` action
     if a location meta/setting was used."""
     settings = {
+        **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
     if postal_code is not None:
