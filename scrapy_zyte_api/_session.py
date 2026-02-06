@@ -177,6 +177,7 @@ class TooManyBadSessionInits(RuntimeError):
 class PoolConfig(TypedDict):
     id: str
     delay: NotRequired[float]
+    randomize_delay: NotRequired[bool]
     size: NotRequired[int]
 
 
