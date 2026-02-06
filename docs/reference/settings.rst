@@ -412,7 +412,7 @@ object, for example to read settings:
 ZYTE_API_SESSION_DELAY
 ======================
 
-Default: ``1.0``
+Default: :setting:`DOWNLOAD_DELAY`
 
 Minimum number of seconds to wait before reusing a :ref:`plugin-managed
 session <session>`.

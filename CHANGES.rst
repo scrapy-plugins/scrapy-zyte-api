@@ -7,8 +7,9 @@ Changes
 -   Added a minimum delay between reuses of any given :ref:`plugin-managed
     session <session>`.
 
-    It is 1 second by default. Use :setting:`ZYTE_API_SESSION_DELAY` to change
-    that or :setting:`ZYTE_API_SESSION_POOLS` to override it for specific
+    It is :setting:`DOWNLOAD_DELAY` by default. Use
+    :setting:`ZYTE_API_SESSION_DELAY` to change that or
+    :setting:`ZYTE_API_SESSION_POOLS` to override it for specific
     :setting:`session pools <session-pools>`.
 
 -   The value of the :reqmeta:`zyte_api_session_pool` request metadata key and

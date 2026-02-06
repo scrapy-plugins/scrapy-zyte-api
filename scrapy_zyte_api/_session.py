@@ -617,7 +617,9 @@ class _SessionManager:
 
         settings = crawler.settings
 
-        self._default_pool_delay = settings.getfloat("ZYTE_API_SESSION_DELAY", 1.0)
+        self._default_pool_delay = settings.getfloat(
+            "ZYTE_API_SESSION_DELAY", settings.getfloat("DOWNLOAD_DELAY")
+        )
         self._default_pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
         self._pending_initial_sessions: Dict[str, int] = {}
         self._pool_configs = settings.getdict("ZYTE_API_SESSION_POOLS")

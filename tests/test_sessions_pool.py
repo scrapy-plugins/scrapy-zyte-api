@@ -256,9 +256,10 @@ async def test_pool_error(mockserver, outcome):
 @pytest.mark.parametrize(
     ("settings", "meta", "expected"),
     (
-        ({}, None, 1.0),
+        ({}, None, 0.0),
+        ({"DOWNLOAD_DELAY": 1.0}, None, 1.0),
         ({"ZYTE_API_SESSION_DELAY": 1.5}, None, 1.5),
-        ({}, "example.com", 1),
+        ({}, "example.com", 0.0),
         ({}, {"id": "example.com", "delay": 1.5}, 1.5),
         (
             {"ZYTE_API_SESSION_POOLS": {"example.com": {"delay": 0.5}}},
