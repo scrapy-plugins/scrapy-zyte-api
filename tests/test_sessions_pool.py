@@ -261,10 +261,11 @@ async def test_session_config_pool_error(mockserver):
         ({}, None, 1.0),
         ({"ZYTE_API_SESSION_DELAY": 1.5}, None, 1.5),
         ({}, "example.com", 1),
+        ({}, {"id": "example.com", "delay": 1.5}, 1.5),
         (
-            {"ZYTE_API_SESSION_QUEUE_WAIT_TIME": 1.6},
+            {"ZYTE_API_SESSION_POOLS": {"example.com": {"delay": 0.5}}},
             {"id": "example.com", "delay": 1.5},
-            1.5,
+            0.5,
         ),
     ),
 )
@@ -332,6 +333,22 @@ async def test_delay(settings, meta, expected, mockserver, monkeypatch):
             {"example.com": (1 + 1, 1 + 1), "pool.example": (1, 1 + 1)},
         ),
         (
+            {
+                "ZYTE_API_SESSION_POOL_SIZES": {"example.com": 2},
+                "ZYTE_API_SESSION_POOLS": {"example.com": {}},
+            },
+            ["https://example.com"] * (2 + 1),
+            {"example.com": (2, 2 + 1)},
+        ),
+        (
+            {
+                "ZYTE_API_SESSION_POOL_SIZES": {"example.com": 2},
+                "ZYTE_API_SESSION_POOLS": {"example.com": {"size": 1}},
+            },
+            ["https://example.com"] * (1 + 1),
+            {"example.com": (1, 1 + 1)},
+        ),
+        (
             {"ZYTE_API_SESSION_POOL_SIZE": 1},
             [
                 Request(
@@ -342,11 +359,29 @@ async def test_delay(settings, meta, expected, mockserver, monkeypatch):
             ],
             {"example.com": (2, 2 + 1)},
         ),
+        (
+            {"ZYTE_API_SESSION_POOLS": {"example.com": {"size": 1}}},
+            [
+                Request(
+                    "https://example.com",
+                    meta={"zyte_api_session_pool": {"id": "example.com", "size": 2}},
+                )
+                for _ in range(2 + 1)
+            ],
+            {"example.com": (1, 2 + 1)},
+        ),
     ),
 )
 @deferred_f_from_coro_f
-async def test_size(settings, start_requests, expected_stats, mockserver):
-    settings = {**SESSION_SETTINGS, "ZYTE_API_URL": mockserver.urljoin("/"), **settings}
+async def test_size(settings, start_requests, expected_stats, mockserver, caplog):
+    settings = {
+        **SESSION_SETTINGS,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        **settings,
+    }
+
+    caplog.clear()
+    caplog.set_level("WARNING")
 
     class TestSpider(Spider):
         name = "test"
@@ -382,3 +417,9 @@ async def test_size(settings, start_requests, expected_stats, mockserver):
             use_count
         )
     assert session_stats == expected_full
+
+    if "ZYTE_API_SESSION_POOL_SIZES" in settings:
+        assert any(
+            "ZYTE_API_SESSION_POOL_SIZES is deprecated" in rec.getMessage()
+            for rec in caplog.records
+        )

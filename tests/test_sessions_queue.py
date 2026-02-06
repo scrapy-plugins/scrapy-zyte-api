@@ -47,7 +47,6 @@ async def test_empty_queue_limit(mockserver):
     settings = {
         **SESSION_SETTINGS,
         "ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS": 1,
-        "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_URL": mockserver.urljoin("/"),
     }
