@@ -88,7 +88,12 @@ TEST_CASES = [
 )
 @deferred_f_from_coro_f
 async def test_max(start_url, settings, expected_stats, mockserver):
-    settings = {**SESSION_SETTINGS, "ZYTE_API_URL": mockserver.urljoin("/"), **settings}
+    settings = {
+        **SESSION_SETTINGS,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0.001,
+        **settings,
+    }
 
     class TestSpider(Spider):
         name = "test"
