@@ -24,7 +24,9 @@ from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
 
 _API_KEY = "a"
 
+UNSET = object()
 DEFAULT_CLIENT_CONCURRENCY = AsyncZyteAPI(api_key=_API_KEY).n_conn
+
 SETTINGS_T = Dict[str, Any]
 SETTINGS: SETTINGS_T = {
     "DOWNLOAD_HANDLERS": {
@@ -70,7 +72,12 @@ SETTINGS_ADDON: SETTINGS_T = {
     "TELNETCONSOLE_ENABLED": False,
     "ZYTE_API_KEY": _API_KEY,
 }
-UNSET = object()
+
+SESSION_SETTINGS: SETTINGS_T = {
+    "ZYTE_API_SESSION_DELAY": 0,
+    "ZYTE_API_SESSION_ENABLED": True,
+    "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0,
+}
 
 
 class DummySpider(Spider):
@@ -194,3 +201,11 @@ async def process_response(middleware, request, response) -> Request | None:
     else:
         maybe_awaitable = middleware.process_response(request, response, spider=None)
     await _ensure_awaitable(maybe_awaitable)
+
+
+def get_session_stats(crawler):
+    return {
+        k: v
+        for k, v in crawler.stats.get_stats().items()
+        if k.startswith("scrapy-zyte-api/sessions")
+    }

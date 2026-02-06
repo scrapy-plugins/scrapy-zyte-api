@@ -407,6 +407,27 @@ object, for example to read settings:
     ZYTE_API_SESSION_CHECKER = MySessionChecker
 
 
+.. setting:: ZYTE_API_SESSION_DELAY
+
+ZYTE_API_SESSION_DELAY
+======================
+
+Default: :setting:`DOWNLOAD_DELAY`
+
+Minimum number of seconds to wait before reusing a :ref:`plugin-managed
+session <session>`.
+
+To override this value for specific pools, use the ``"delay"`` key in a
+:class:`dict` value of the :setting:`ZYTE_API_SESSION_POOLS` setting, of the
+:reqmeta:`zyte_api_session_pool` request metadata key, or that returned by
+:meth:`~scrapy_zyte_api.SessionConfig.pool`.
+
+Increasing this number can reduce the number of ban-related session
+expirations, hence increasing the lifetime of each session. See
+:ref:`optimize-sessions`.
+
+.. seealso:: :setting:`ZYTE_API_SESSION_RANDOMIZE_DELAY`
+
 .. setting:: ZYTE_API_SESSION_ENABLED
 
 ZYTE_API_SESSION_ENABLED
@@ -414,7 +435,7 @@ ZYTE_API_SESSION_ENABLED
 
 Default: ``False``
 
-Enables :ref:`scrapy-zyte-api session management <session>`.
+Enables :ref:`plugin-managed sessions <session>`.
 
 
 .. setting:: ZYTE_API_SESSION_LOCATION
@@ -535,22 +556,34 @@ The maximum number of active :ref:`scrapy-zyte-api sessions <session>` to keep
 per :ref:`pool <session-pools>`.
 
 To override this value for specific pools, use
-:setting:`ZYTE_API_SESSION_POOL_SIZES`.
+:setting:`ZYTE_API_SESSION_POOLS` or return a dictionary from
+:meth:`~scrapy_zyte_api.SessionConfig.pool` containing a ``"size"`` key.
 
 Increase this number to lower the frequency with which requests are sent
 through each session, which on some websites may increase the lifetime of each
 session. See :ref:`optimize-sessions`.
 
 
-.. setting:: ZYTE_API_SESSION_POOL_SIZES
+.. setting:: ZYTE_API_SESSION_POOLS
 
-ZYTE_API_SESSION_POOL_SIZES
-===========================
+ZYTE_API_SESSION_POOLS
+======================
 
 Default: ``{}``
 
 :class:`dict` where keys are :ref:`pool <session-pools>` IDs and values are
-overrides of :setting:`ZYTE_API_SESSION_POOL_SIZE` for those pools.
+dicts with any combination of the following keys that override the
+corresponding setting for that pool:
+
+-   ``"delay"`` overrides :setting:`ZYTE_API_SESSION_DELAY`.
+
+-   ``"randomize_delay"`` overrides
+    :setting:`ZYTE_API_SESSION_RANDOMIZE_DELAY`.
+
+-   ``"size"`` overrides :setting:`ZYTE_API_SESSION_POOL_SIZE`.
+
+These overrides take precedence over :attr:`SessionConfig.pool
+<scrapy_zyte_api.SessionConfig.pool>`.
 
 
 .. setting:: ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS
@@ -586,6 +619,15 @@ queue.
 
 See :setting:`ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS` for details.
 
+.. setting:: ZYTE_API_SESSION_RANDOMIZE_DELAY
+
+ZYTE_API_SESSION_RANDOMIZE_DELAY
+================================
+
+Default: :setting:`RANDOMIZE_DOWNLOAD_DELAY`
+
+If enabled, :setting:`ZYTE_API_SESSION_DELAY` is randomized each time it is
+used by multiplying it by a random factor between 0.5 and 1.5.
 
 .. setting:: ZYTE_API_SKIP_HEADERS
 

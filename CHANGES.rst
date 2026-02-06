@@ -1,6 +1,43 @@
 Changes
 =======
 
+0.33.0 (unreleased)
+-------------------
+
+-   Added a minimum delay between reuses of any given :ref:`plugin-managed
+    session <session>`.
+
+    It is :setting:`DOWNLOAD_DELAY` by default. Use
+    :setting:`ZYTE_API_SESSION_DELAY` to change that or
+    :setting:`ZYTE_API_SESSION_POOLS` to override it for specific
+    :setting:`session pools <session-pools>`.
+
+    :setting:`ZYTE_API_SESSION_RANDOMIZE_DELAY` controls whether that minimum
+    delay is randomized by multiplying it by a random factor between 0.5 and
+    1.5. It defaults to :setting:`RANDOMIZE_DOWNLOAD_DELAY`.
+
+-   The value of the :reqmeta:`zyte_api_session_pool` request metadata key and
+    the return value of the :meth:`SessionConfig.pool()
+    <scrapy_zyte_api.SessionConfig.pool>` method can now be a dictionary
+    instead of a string, allowing to override :setting:`ZYTE_API_SESSION_DELAY`
+    and :setting:`ZYTE_API_SESSION_POOL_SIZE` for the corresponding pool.
+    
+    However, they cannot override values defined in
+    :setting:`ZYTE_API_SESSION_POOLS`.
+
+-   Deprecated the ``ZYTE_API_SESSION_POOL_SIZES`` setting in favor of the new
+    :setting:`ZYTE_API_SESSION_POOLS` setting, where you can set ``"size"``.
+
+-   Changed the terminology around :ref:`session management <session>` to try
+    to make it clearer and more consistent:
+
+    | client-managed sessions → user-managed sessions
+    | server-managed sessions → Zyte-managed sessions
+    | scrapy-zyte-api session management → plugin-managed sessions
+
+-   Added a :ref:`session-troubleshooting` section to the :ref:`session` page.
+
+
 0.32.0 (2026-01-20)
 -------------------
 
@@ -92,10 +129,10 @@ Changes
     :http:`request:httpResponseHeaders` will no longer be enabled by default,
     and :ref:`request header mapping <request-header-mapping>` is disabled.
 
-* Session pool IDs, of server-managed sessions (:http:`request:sessionContext`)
-  or :ref:`set through the session management API <session-pools>`, now affect
-  request fingerprinting: 2 requests identical except for their session pool ID
-  are *not* considered duplicate requests any longer.
+* Session pool IDs, of Zyte-managed sessions (:http:`request:sessionContext`)
+  or :ref:`plugin-managed sessions <session-pools>`, now affect request
+  fingerprinting: 2 requests identical except for their session pool ID are
+  *not* considered duplicate requests any longer.
 
 * When it is not clear whether a request will use browser rendering or not,
   e.g. an :ref:`automatic extraction request <zapi-extract>` without an
