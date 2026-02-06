@@ -11,12 +11,13 @@ Changes
     that or :setting:`ZYTE_API_SESSION_POOLS` to override it for specific
     :setting:`session pools <session-pools>`.
 
--   :meth:`SessionConfig.pool <scrapy_zyte_api.SessionConfig.pool>` can now
-    return a dictionary instead of a string, allowing session configs to
-    override :setting:`ZYTE_API_SESSION_DELAY` and
-    :setting:`ZYTE_API_SESSION_POOL_SIZE` for any pool.
+-   The value of the :reqmeta:`zyte_api_session_pool` request metadata key and
+    the return value of the :meth:`SessionConfig.pool()
+    <scrapy_zyte_api.SessionConfig.pool>` method can now be a dictionary
+    instead of a string, allowing to override :setting:`ZYTE_API_SESSION_DELAY`
+    and :setting:`ZYTE_API_SESSION_POOL_SIZE` for the corresponding tool.
     
-    However, it cannot override those defined in
+    However, they cannot override values defined in
     :setting:`ZYTE_API_SESSION_POOLS`.
 
 -   Deprecated the ``ZYTE_API_SESSION_POOL_SIZES`` setting in favor of the new
