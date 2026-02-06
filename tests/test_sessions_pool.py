@@ -157,88 +157,6 @@ async def test_pool_params(mockserver, caplog):
     assert all(v == 1 for v in expected_logs.values())
 
 
-@pytest.mark.parametrize(
-    ("setting", "value"),
-    (
-        (1, 1),
-        (2, 2),
-        (None, 8),
-    ),
-)
-@deferred_f_from_coro_f
-async def test_pool_size(setting, value, mockserver):
-    settings = {
-        **SESSION_SETTINGS,
-        "ZYTE_API_URL": mockserver.urljoin("/"),
-    }
-    if setting is not None:
-        settings["ZYTE_API_SESSION_POOL_SIZE"] = setting
-
-    class TestSpider(Spider):
-        name = "test"
-        start_urls = ["https://example.com"] * (value + 1)
-
-        def parse(self, response):
-            pass
-
-    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await maybe_deferred_to_future(crawler.crawl())
-
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": value,
-        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": value + 1,
-    }
-
-
-@pytest.mark.parametrize(
-    ("global_setting", "pool_setting", "value"),
-    (
-        (None, 1, 1),
-        (None, 2, 2),
-        (3, None, 3),
-    ),
-)
-@deferred_f_from_coro_f
-async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
-    settings = {
-        **SESSION_SETTINGS,
-        "ZYTE_API_URL": mockserver.urljoin("/"),
-    }
-    if global_setting is not None:
-        settings["ZYTE_API_SESSION_POOL_SIZE"] = global_setting
-    if pool_setting is not None:
-        settings["ZYTE_API_SESSION_POOL_SIZES"] = {"pool.example": pool_setting}
-
-    class TestSpider(Spider):
-        name = "test"
-        start_urls = ["https://example.com", "https://pool.example"] * (value + 1)
-
-        def parse(self, response):
-            pass
-
-    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await maybe_deferred_to_future(crawler.crawl())
-
-    session_stats = {
-        k: v
-        for k, v in crawler.stats.get_stats().items()
-        if k.startswith("scrapy-zyte-api/sessions")
-    }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": (
-            value if pool_setting is None else min(value + 1, 8)
-        ),
-        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": value + 1,
-        "scrapy-zyte-api/sessions/pools/pool.example/init/check-passed": value,
-        "scrapy-zyte-api/sessions/pools/pool.example/use/check-passed": value + 1,
-    }
-
-
 @deferred_f_from_coro_f
 async def test_session_config_pool_caching(mockserver):
     pytest.importorskip("web_poet")
@@ -338,61 +256,27 @@ async def test_session_config_pool_error(mockserver):
 
 
 @pytest.mark.parametrize(
-    ("session_delay", "expected_delay"),
+    ("settings", "meta", "expected"),
     (
-        (None, 1.0),
-        (1.5, 1.5),
+        ({}, None, 1.0),
+        ({"ZYTE_API_SESSION_DELAY": 1.5}, None, 1.5),
+        ({}, "example.com", 1),
+        (
+            {"ZYTE_API_SESSION_QUEUE_WAIT_TIME": 1.6},
+            {"id": "example.com", "delay": 1.5},
+            1.5,
+        ),
     ),
 )
 @deferred_f_from_coro_f
-async def test_delay(session_delay, expected_delay, mockserver, monkeypatch):
-    settings = {
-        "ZYTE_API_URL": mockserver.urljoin("/"),
-        "ZYTE_API_SESSION_ENABLED": True,
-        "ZYTE_API_SESSION_POOL_SIZE": 1,
-    }
-    if session_delay is not None:
-        settings["ZYTE_API_SESSION_DELAY"] = session_delay
-
-    sleep_calls = []
-
-    async def fake_sleep(delay):
-        sleep_calls.append(delay)
-
-    monkeypatch.setattr("scrapy_zyte_api._session.sleep", fake_sleep)
-
-    class TestSpider(Spider):
-        name = "test"
-        start_urls = ["https://example.com"]
-
-        def parse(self, response):
-            pass
-
-    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
-    await maybe_deferred_to_future(crawler.crawl())
-
-    assert len(sleep_calls) == 1
-    assert sleep_calls[0] == pytest.approx(expected_delay)
-
-
-@pytest.mark.parametrize(
-    ("meta", "expected_delay", "expected_size"),
-    (
-        ("example.com", 1, 1),
-        ({"id": "example.com", "delay": 1.5}, 1.5, 1),
-        ({"id": "example.com", "size": 2}, 1, 2),
-        ({"id": "example.com", "delay": 1.5, "size": 2}, 1.5, 2),
-    ),
-)
-@deferred_f_from_coro_f
-async def test_overrides(meta, expected_delay, expected_size, mockserver, monkeypatch):
-    queue_wait_time = expected_delay + 0.1
-    start_request_count = expected_size + 1
+async def test_delay(settings, meta, expected, mockserver, monkeypatch):
+    queue_wait_time = expected + 0.1
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_SESSION_QUEUE_WAIT_TIME": queue_wait_time,
+        **settings,
     }
 
     sleep_calls = []
@@ -406,7 +290,7 @@ async def test_overrides(meta, expected_delay, expected_size, mockserver, monkey
 
     class TestSpider(Spider):
         name = "test"
-        start_urls = ["https://example.com"] * start_request_count
+        start_urls = ["https://example.com"]
 
         async def start(self):
             for request in self.start_requests():
@@ -414,9 +298,10 @@ async def test_overrides(meta, expected_delay, expected_size, mockserver, monkey
 
         def start_requests(self):
             for url in self.start_urls:
-                yield Request(
-                    url, meta={"zyte_api_session_pool": meta}, dont_filter=True
-                )
+                if meta is None:
+                    yield Request(url)
+                else:
+                    yield Request(url, meta={"zyte_api_session_pool": meta})
 
         def parse(self, response):
             pass
@@ -424,14 +309,76 @@ async def test_overrides(meta, expected_delay, expected_size, mockserver, monkey
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    assert len(sleep_calls) == start_request_count
+    assert len(sleep_calls) == 1
+    assert sleep_calls[0] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("settings", "start_requests", "expected_stats"),
+    (
+        (
+            {"ZYTE_API_SESSION_POOL_SIZE": 1},
+            ["https://example.com"] * (1 + 1),
+            {"example.com": (1, 1 + 1)},
+        ),
+        (
+            {},
+            ["https://example.com"] * (8 + 1),
+            {"example.com": (8, 8 + 1)},
+        ),
+        (
+            {"ZYTE_API_SESSION_POOL_SIZES": {"pool.example": 1}},
+            (["https://example.com", "https://pool.example"] * (1 + 1)),
+            {"example.com": (1 + 1, 1 + 1), "pool.example": (1, 1 + 1)},
+        ),
+        (
+            {"ZYTE_API_SESSION_POOL_SIZE": 1},
+            [
+                Request(
+                    "https://example.com",
+                    meta={"zyte_api_session_pool": {"id": "example.com", "size": 2}},
+                )
+                for _ in range(2 + 1)
+            ],
+            {"example.com": (2, 2 + 1)},
+        ),
+    ),
+)
+@deferred_f_from_coro_f
+async def test_size(settings, start_requests, expected_stats, mockserver):
+    settings = {**SESSION_SETTINGS, "ZYTE_API_URL": mockserver.urljoin("/"), **settings}
+
+    class TestSpider(Spider):
+        name = "test"
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
+        def start_requests(self):
+            for item in start_requests:
+                if isinstance(item, str):
+                    yield Request(item, dont_filter=True)
+                else:
+                    yield item.replace(dont_filter=True)
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
 
     session_stats = {
         k: v
         for k, v in crawler.stats.get_stats().items()
         if k.startswith("scrapy-zyte-api/sessions")
     }
-    assert session_stats == {
-        "scrapy-zyte-api/sessions/pools/example.com/init/check-passed": expected_size,
-        "scrapy-zyte-api/sessions/pools/example.com/use/check-passed": start_request_count,
-    }
+    expected_full = {}
+    for pool, (init_count, use_count) in expected_stats.items():
+        expected_full[f"scrapy-zyte-api/sessions/pools/{pool}/init/check-passed"] = (
+            init_count
+        )
+        expected_full[f"scrapy-zyte-api/sessions/pools/{pool}/use/check-passed"] = (
+            use_count
+        )
+    assert session_stats == expected_full
