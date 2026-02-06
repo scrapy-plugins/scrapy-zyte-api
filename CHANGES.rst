@@ -20,7 +20,7 @@ Changes
     the return value of the :meth:`SessionConfig.pool()
     <scrapy_zyte_api.SessionConfig.pool>` method can now be a dictionary
     instead of a string, allowing to override :setting:`ZYTE_API_SESSION_DELAY`
-    and :setting:`ZYTE_API_SESSION_POOL_SIZE` for the corresponding tool.
+    and :setting:`ZYTE_API_SESSION_POOL_SIZE` for the corresponding pool.
     
     However, they cannot override values defined in
     :setting:`ZYTE_API_SESSION_POOLS`.

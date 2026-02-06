@@ -17,6 +17,7 @@ from typing import (
     Type,
     TypedDict,
     Union,
+    cast,
 )
 from uuid import uuid4
 from weakref import WeakKeyDictionary
@@ -176,6 +177,12 @@ class TooManyBadSessionInits(RuntimeError):
 
 class PoolConfig(TypedDict):
     id: str
+    delay: NotRequired[float]
+    randomize_delay: NotRequired[bool]
+    size: NotRequired[int]
+
+
+class PoolOptions(TypedDict):
     delay: NotRequired[float]
     randomize_delay: NotRequired[bool]
     size: NotRequired[int]
@@ -743,9 +750,10 @@ class _SessionManager:
                     f"for request {request}."
                 )
                 raise PoolError(message) from exception
+            options: PoolOptions
             if isinstance(pool, str):
                 pool_id = pool
-                pool = {}  # type: ignore[assignment]
+                options = {}
             else:
                 try:
                     pool_id = pool["id"]
@@ -756,24 +764,27 @@ class _SessionManager:
                         f"for request {request}."
                     )
                     raise PoolError(message) from exception
-            assert isinstance(pool, dict)
-            pool_delay = pool.get("delay", self._default_pool_delay)
-            pool_size = pool.get("size", self._default_pool_size)
-            pool_randomize_delay = pool.get("randomize_delay", self._randomize_delay)
+                else:
+                    options = cast(
+                        PoolOptions, {k: v for k, v in pool.items() if k != "id"}
+                    )
+            delay = options.get("delay", self._default_pool_delay)
+            randomize_delay = options.get("randomize_delay", self._randomize_delay)
+            size = options.get("size", self._default_pool_size)
             if pool_id not in self._pool_configs:
                 self._pool_configs[pool_id] = {
-                    "delay": pool_delay,
-                    "size": pool_size,
-                    "randomize_delay": pool_randomize_delay,
+                    "delay": delay,
+                    "size": size,
+                    "randomize_delay": randomize_delay,
                 }
-                self._pending_initial_sessions[pool_id] = pool_size
+                self._pending_initial_sessions[pool_id] = size
             else:
                 config = self._pool_configs[pool_id]
-                config.setdefault("delay", pool_delay)
-                config.setdefault("randomize_delay", pool_randomize_delay)
+                config.setdefault("delay", delay)
+                config.setdefault("randomize_delay", randomize_delay)
                 if "size" not in config:
-                    self._pending_initial_sessions[pool_id] = pool_size
-                config.setdefault("size", pool_size)
+                    self._pending_initial_sessions[pool_id] = size
+                config.setdefault("size", size)
             self._pool_cache[request] = pool_id
             return pool_id
 

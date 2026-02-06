@@ -141,5 +141,7 @@ zyte_api_session_pool
 
 Default: ``""``
 
-If not falsy, it determines the default output of
-:meth:`scrapy_zyte_api.SessionConfig.pool` for the request.
+If not falsy, it determines the default pool ID and options for the request.
+
+It supports the same values as the return value of
+:meth:`scrapy_zyte_api.SessionConfig.pool`.
