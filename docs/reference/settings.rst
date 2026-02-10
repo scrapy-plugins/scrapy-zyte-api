@@ -587,6 +587,17 @@ queue.
 See :setting:`ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS` for details.
 
 
+.. setting:: ZYTE_API_SESSION_STATS_PER_POOL
+
+ZYTE_API_SESSION_STATS_PER_POOL
+===============================
+
+Default: ``False``
+
+Whether to split :ref:`session stats <session-stats>` by pool (``True``) or
+aggregate them across pools (``False``, default).
+
+
 .. setting:: ZYTE_API_SKIP_HEADERS
 
 ZYTE_API_SKIP_HEADERS

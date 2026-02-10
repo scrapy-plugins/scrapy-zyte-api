@@ -51,7 +51,10 @@ UNSET = object()
 )
 @deferred_f_from_coro_f
 async def test_enabled(setting, meta, outcome, mockserver):
-    settings = {"ZYTE_API_URL": mockserver.urljoin("/")}
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
+    }
     if setting is not UNSET:
         settings["ZYTE_API_SESSION_ENABLED"] = setting
     meta_dict = {}
@@ -219,6 +222,7 @@ async def test_params_precedence(
     )
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
@@ -323,6 +327,7 @@ async def test_url_override(params, close_reason, stats, mockserver):
     settings = {
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": params,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
@@ -530,6 +535,7 @@ async def test_checker(checker, close_reason, stats, mockserver):
     settings = {
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         "ZYTE_API_SESSION_CHECKER": checker,
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
@@ -600,6 +606,7 @@ async def test_checker_location(postal_code, url, close_reason, stats, mockserve
     if a location meta/setting was used."""
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
@@ -663,6 +670,7 @@ async def test_checker_close_spider_use(mockserver):
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -702,6 +710,7 @@ async def test_checker_close_spider_use(mockserver):
 async def test_max_bad_inits(setting, value, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": {"browserHtml": True, "httpResponseBody": True},
     }
@@ -741,6 +750,7 @@ async def test_max_bad_inits(setting, value, mockserver):
 async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_PARAMS": {"browserHtml": True, "httpResponseBody": True},
     }
@@ -794,6 +804,7 @@ async def test_max_check_failures(setting, value, mockserver):
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
     if setting is not None:
         settings["ZYTE_API_SESSION_MAX_CHECK_FAILURES"] = setting
@@ -841,6 +852,7 @@ async def test_max_errors(setting, value, mockserver):
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
     if setting is not None:
         settings["ZYTE_API_SESSION_MAX_ERRORS"] = setting
@@ -888,6 +900,7 @@ async def test_check_overrides_error(mockserver):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_ERRORS": 2,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -964,6 +977,7 @@ async def test_pool(meta, pool, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -999,6 +1013,7 @@ async def test_pool_params(mockserver, caplog):
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -1071,6 +1086,7 @@ async def test_pool_size(setting, value, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
     if setting is not None:
         settings["ZYTE_API_SESSION_POOL_SIZE"] = setting
@@ -1109,6 +1125,7 @@ async def test_pool_sizes(global_setting, pool_setting, value, mockserver):
     settings = {
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
     if global_setting is not None:
         settings["ZYTE_API_SESSION_POOL_SIZE"] = global_setting
@@ -1328,6 +1345,7 @@ async def test_session_config(mockserver):
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -1438,6 +1456,7 @@ async def test_session_config_check_meta(mockserver):
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -1493,6 +1512,7 @@ async def test_session_config_enabled(mockserver):
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -1567,6 +1587,7 @@ async def test_session_config_location(settings, meta, used, mockserver):
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         **settings,
     }
 
@@ -1676,6 +1697,7 @@ async def test_session_config_location_bad(settings, meta, used, mockserver):
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         **settings,
     }
 
@@ -1767,6 +1789,7 @@ async def test_session_config_params_location(mockserver):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -1841,6 +1864,7 @@ async def test_session_config_params_location_no_set_location(mockserver):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -1962,6 +1986,7 @@ async def test_session_config_params_precedence(
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         **settings,
     }
 
@@ -2030,6 +2055,7 @@ async def test_session_config_params_error(mockserver):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2076,6 +2102,7 @@ async def test_session_config_pool_caching(mockserver):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2126,6 +2153,7 @@ async def test_session_config_pool_error(mockserver):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2196,6 +2224,7 @@ async def test_session_config_process_request_change_request(mockserver):
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
     request_headers = []
 
@@ -2254,6 +2283,7 @@ async def test_session_config_process_request_new_request(mockserver):
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
     output_urls = []
 
@@ -2334,6 +2364,7 @@ async def test_location_session_config(mockserver):
         # right one.
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10002"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2426,6 +2457,7 @@ async def test_location_session_config_no_methods(mockserver):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2499,6 +2531,7 @@ async def test_location_session_config_no_location(mockserver):
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2570,6 +2603,7 @@ async def test_session_refresh(mockserver):
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2614,6 +2648,7 @@ async def test_session_refresh_concurrent(mockserver):
         "ZYTE_API_SESSION_MAX_ERRORS": 1,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2656,6 +2691,7 @@ async def test_cookies(mockserver):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2739,6 +2775,7 @@ async def test_empty_queue(mockserver):
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2773,6 +2810,7 @@ async def test_empty_queue_limit(mockserver):
         "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2828,6 +2866,7 @@ async def test_missing_session_id(mockserver, caplog):
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -2917,6 +2956,7 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
     settings = {
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
         **settings,
     }
 
@@ -2977,6 +3017,7 @@ async def test_provider(mockserver):
     settings = {
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
@@ -3073,6 +3114,7 @@ async def test_exceptions(exception, stat, reason, mockserver, caplog):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):

@@ -1,6 +1,13 @@
 Changes
 =======
 
+0.33.0 (unreleased)
+-------------------
+
+-   **Backward-incompatible change:** The ``/pools/<pool>`` part in session
+    stats is now stripped by default. To enable per-pool stats, set the new
+    :setting:`ZYTE_API_SESSION_STATS_PER_POOL` setting to ``True``.
+
 0.32.0 (2026-01-20)
 -------------------
 
