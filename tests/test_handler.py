@@ -559,7 +559,9 @@ def test_log_request_truncate_negative(enabled):
         "ZYTE_API_LOG_REQUESTS_TRUNCATE": -1,
     }
     crawler = get_crawler(settings_dict=settings)
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"ZYTE_API_LOG_REQUESTS_TRUNCATE setting \(-1\) is invalid"
+    ):
         _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
 
 

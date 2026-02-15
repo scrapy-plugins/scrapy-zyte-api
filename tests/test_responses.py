@@ -189,7 +189,9 @@ def test_response_replace(api_response, cls):
     }
 
     # Attempting to replace the raw_api_response value would raise an error
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match="Replacing the value of 'raw_api_response' isn't allowed"
+    ):
         orig_response.replace(raw_api_response=new_raw_api_response)
 
 

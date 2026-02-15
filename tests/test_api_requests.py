@@ -594,7 +594,10 @@ async def test_bad_meta_type(key, value):
     request = Request(url="https://example.com", meta={key: value})
     crawler = await get_crawler()
     param_parser = _ParamParser(crawler)
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="parameters in the request meta should be provided as a dictionary",
+    ):
         param_parser.parse(request)
 
 

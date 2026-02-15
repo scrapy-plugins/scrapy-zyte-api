@@ -256,8 +256,7 @@ ignore = [
     "S101",
 
     # TODO
-    "PT011",
-    "UP031",
+#    "UP031",
 ]
 
 [tool.ruff.lint.isort]

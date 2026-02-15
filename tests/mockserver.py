@@ -305,7 +305,7 @@ class MockServer:
         self.proc = None
         self.host = socket.gethostbyname(socket.gethostname())
         self.port = port or get_ephemeral_port()
-        self.root_url = "http://%s:%d" % (self.host, self.port)
+        self.root_url = f"http://{self.host}:{self.port}"
 
     def __enter__(self):
         self.proc = Popen(
