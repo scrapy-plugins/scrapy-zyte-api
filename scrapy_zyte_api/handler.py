@@ -190,13 +190,13 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 user_agent=settings.get("_ZYTE_API_USER_AGENT", USER_AGENT),
                 **kwargs,
             )
-        except NoApiKey:
+        except NoApiKey as ex:
             message = (
                 "No authentication data provided. See "
                 "https://scrapy-zyte-api.readthedocs.io/en/latest/setup.html#auth"
             )
             logger.warning(message)
-            raise NotConfigured(message)
+            raise NotConfigured(message) from ex
 
     def _create_handler(self, path: Any) -> Any:
         dhcls = load_object(path)
@@ -262,9 +262,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
 
         for error_type, count in self._client.agg_stats.api_error_types.items():
-            error_type = error_type or "/<empty>"
+            error_type = error_type or "/<empty>"  # noqa: PLW2901
             if not error_type.startswith("/"):
-                error_type = f"/{error_type}"
+                error_type = f"/{error_type}"  # noqa: PLW2901
             self._stats.set_value(f"{prefix}/error_types{error_type}", count)
 
         for counter in (

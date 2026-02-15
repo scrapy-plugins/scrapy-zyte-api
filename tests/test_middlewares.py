@@ -418,10 +418,7 @@ async def test_forbidden_domain_with_partial_start_request_consumption():
 )
 @deferred_f_from_coro_f
 async def test_spm_conflict_smartproxy(setting, attribute, conflict):
-    try:
-        import scrapy_zyte_smartproxy  # noqa: F401, PLC0415
-    except ImportError:
-        raise SkipTest("scrapy-zyte-smartproxy missing")
+    pytest.importorskip("scrapy_zyte_smartproxy")
 
     class SPMSpider(Spider):
         name = "spm_spider"

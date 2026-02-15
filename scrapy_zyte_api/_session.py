@@ -662,8 +662,8 @@ class _SessionManager:
             session_config = self._get_session_config(request)
             try:
                 pool = session_config.pool(request)
-            except Exception:
-                raise PoolError
+            except Exception as ex:
+                raise PoolError from ex
             self._pool_cache[request] = pool
             return pool
 
@@ -769,7 +769,7 @@ class _SessionManager:
         while session_id not in self._pools[pool]:  # After 1st loop: invalid session.
             try:
                 session_id = self._queues[pool].popleft()
-            except IndexError:  # No ready-to-use session available.
+            except IndexError as ex:  # No ready-to-use session available.
                 attempts += 1
                 if attempts >= self._queue_max_attempts:
                     raise RuntimeError(
@@ -786,7 +786,7 @@ class _SessionManager:
                         f"https://github.com/scrapy-plugins/scrapy-zyte-api/issues/new "
                         f"providing a minimal reproducible example if "
                         f"possible, or debug logs and stats otherwise."
-                    )
+                    ) from ex
                 await sleep(self._queue_wait_time)
         assert session_id is not None
         self._queues[pool].append(session_id)

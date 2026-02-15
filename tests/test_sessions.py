@@ -1222,7 +1222,7 @@ async def test_retry_stop(monotonic_mock, retrying, outcomes, exhausted):
         await run()
     except Exception as outcome:
         assert exhausted
-        assert outcome is last_outcome
+        assert outcome is last_outcome  # noqa: PT017
     else:
         assert not exhausted
 
@@ -2487,12 +2487,12 @@ async def test_location_session_config_no_location(mockserver):
         def location_params(
             self, request: Request, location: dict[str, Any]
         ) -> dict[str, Any]:
-            assert False
+            raise AssertionError
 
         def location_check(
             self, response: Response, request: Request, location: dict[str, Any]
         ) -> bool:
-            assert False
+            raise AssertionError
 
     settings = {
         "RETRY_TIMES": 0,

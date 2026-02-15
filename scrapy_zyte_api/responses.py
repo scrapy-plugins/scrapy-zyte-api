@@ -1,7 +1,7 @@
 import datetime as dt
 from base64 import b64decode
 from copy import copy
-from typing import Any, Union, cast
+from typing import Any, TypeAlias, cast
 
 from scrapy import Request
 from scrapy.http import Headers, HtmlResponse, Response, TextResponse
@@ -159,11 +159,11 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
         )
 
 
-_IMMUTABLE_JSON = Union[None, str, int, float, bool]
-_JSON = Union[
-    None, str, int, float, bool, list["_JSON"], dict[_IMMUTABLE_JSON, "_JSON"]
-]
-_API_RESPONSE = dict[str, _JSON]
+_IMMUTABLE_JSON: TypeAlias = None | str | int | float | bool
+_JSON: TypeAlias = (
+    None | str | int | float | bool | list["_JSON"] | dict[_IMMUTABLE_JSON, "_JSON"]
+)
+_API_RESPONSE: TypeAlias = dict[str, _JSON]
 
 
 def _process_response(

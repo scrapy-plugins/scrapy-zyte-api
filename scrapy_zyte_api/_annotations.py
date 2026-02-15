@@ -50,7 +50,7 @@ class Action(TypedDict, total=False):
     waitUntil: str | None
 
 
-class _ActionResult(TypedDict, total=False):
+class _ActionResult(TypedDict, total=False):  # noqa: PYI049
     action: str
     elapsedTime: float
     status: str
