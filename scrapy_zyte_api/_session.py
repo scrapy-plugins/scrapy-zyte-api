@@ -639,6 +639,14 @@ class _SessionManager:
 
         self._fatal_error_handler = FatalErrorHandler(crawler)
 
+        self._stats_per_pool: bool = settings.getbool("ZYTE_API_SESSION_STATS_PER_POOL")
+
+    def _inc_stat(self, key: str, pool: str):
+        pool = f"pools/{pool}/" if self._stats_per_pool else ""
+        key = f"scrapy-zyte-api/sessions/{pool}{key}"
+        assert self._crawler.stats
+        self._crawler.stats.inc_value(key)
+
     async def _handle_engine_start(self):
         assert self._crawler.engine
         self._download_async = getattr(self._crawler.engine, "download_async", None)
@@ -668,7 +676,6 @@ class _SessionManager:
 
     async def _init_session(self, session_id: str, request: Request, pool: str) -> bool:
         assert self._crawler.engine
-        assert self._crawler.stats
         session_config = self._get_session_config(request)
         if meta_params := request.meta.get("zyte_api_session_params", None):
             session_params = meta_params
@@ -681,9 +688,7 @@ class _SessionManager:
             try:
                 session_params = session_config.params(request)
             except Exception:
-                self._crawler.stats.inc_value(
-                    f"scrapy-zyte-api/sessions/pools/{pool}/init/param-error"
-                )
+                self._inc_stat("init/param-error", pool)
                 logger.exception(
                     f"Unexpected exception raised while obtaining session "
                     f"initialization parameters for request {request}."
@@ -721,9 +726,7 @@ class _SessionManager:
         try:
             response = await download
         except Exception:
-            self._crawler.stats.inc_value(
-                f"scrapy-zyte-api/sessions/pools/{pool}/init/failed"
-            )
+            self._inc_stat("init/failed", pool)
             return False
         else:
             try:
@@ -731,18 +734,14 @@ class _SessionManager:
             except CloseSpider:
                 raise
             except Exception:
-                self._crawler.stats.inc_value(
-                    f"scrapy-zyte-api/sessions/pools/{pool}/init/check-error"
-                )
+                self._inc_stat("init/check-error", pool)
                 logger.exception(
                     f"Unexpected exception raised while checking session "
                     f"validity on response {response}."
                 )
                 return False
             outcome = "passed" if result else "failed"
-            self._crawler.stats.inc_value(
-                f"scrapy-zyte-api/sessions/pools/{pool}/init/check-{outcome}"
-            )
+            self._inc_stat(f"init/check-{outcome}", pool)
         return result
 
     async def _create_session(self, request: Request, pool: str) -> str:
@@ -850,7 +849,6 @@ class _SessionManager:
         """Check the response for signs of session expiration, update the
         internal session pool accordingly, and return ``False`` if the session
         has expired or ``True`` if the session passed validation."""
-        assert self._crawler.stats
         async with self._fatal_error_handler:
             if self.is_init_request(request):
                 return True
@@ -863,18 +861,14 @@ class _SessionManager:
             except CloseSpider:
                 raise
             except Exception:
-                self._crawler.stats.inc_value(
-                    f"scrapy-zyte-api/sessions/pools/{pool}/use/check-error"
-                )
+                self._inc_stat("use/check-error", pool)
                 logger.exception(
                     f"Unexpected exception raised while checking session "
                     f"validity on response {response}."
                 )
             else:
                 outcome = "passed" if passed else "failed"
-                self._crawler.stats.inc_value(
-                    f"scrapy-zyte-api/sessions/pools/{pool}/use/check-{outcome}"
-                )
+                self._inc_stat(f"use/check-{outcome}", pool)
                 if passed:
                     return True
                 session_id = get_request_session_id(request)
@@ -892,7 +886,6 @@ class _SessionManager:
         request in place, return that new request, to replace the received
         request.
         """
-        assert self._crawler.stats
         async with self._fatal_error_handler:
             if self.is_init_request(request) or request.meta.get(
                 "_zyte_api_session_assigned", False
@@ -900,6 +893,7 @@ class _SessionManager:
                 return None
             session_config = self._get_session_config(request)
             if not session_config.enabled(request):
+                assert self._crawler.stats
                 self._crawler.stats.inc_value("scrapy-zyte-api/sessions/use/disabled")
                 return None
             session_id = await self._next(request)
@@ -937,12 +931,9 @@ class _SessionManager:
         return session_config.enabled(request)
 
     async def handle_error(self, request: Request):
-        assert self._crawler.stats
         async with self._fatal_error_handler:
             pool = self.get_pool(request)
-            self._crawler.stats.inc_value(
-                f"scrapy-zyte-api/sessions/pools/{pool}/use/failed"
-            )
+            self._inc_stat("use/failed", pool)
             session_id = get_request_session_id(request)
             if session_id is not None:
                 self._errors[session_id] += 1
@@ -951,12 +942,9 @@ class _SessionManager:
             self._start_request_session_refresh(request, pool)
 
     async def handle_expiration(self, request: Request):
-        assert self._crawler.stats
         async with self._fatal_error_handler:
             pool = self.get_pool(request)
-            self._crawler.stats.inc_value(
-                f"scrapy-zyte-api/sessions/pools/{pool}/use/expired"
-            )
+            self._inc_stat("use/expired", pool)
             self._start_request_session_refresh(request, pool)
 
 

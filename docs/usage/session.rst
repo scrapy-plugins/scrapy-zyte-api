@@ -445,7 +445,15 @@ implementation may also close your spider with a custom reason by raising a
 Session stats
 =============
 
-The following stats exist for scrapy-zyte-api session management:
+Plugin-managed sessions trigger some stats to help understand how well sessions
+are working.
+
+By default, stats are aggregated across session pools. Set
+:setting:`ZYTE_API_SESSION_STATS_PER_POOL` to ``True`` to enable per-pool
+stats.
+
+Tracked stats are as follows (``pools/{pool}/`` is only present if per-pool
+stats are enabled):
 
 ``scrapy-zyte-api/sessions/pools/{pool}/init/check-error``
     Number of times that a session for pool ``{pool}`` triggered an unexpected
