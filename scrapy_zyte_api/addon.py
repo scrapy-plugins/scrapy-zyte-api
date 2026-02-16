@@ -49,7 +49,7 @@ else:
 
 class Addon:
     def update_settings(self, settings: BaseSettings) -> None:
-        from scrapy.settings.default_settings import (
+        from scrapy.settings.default_settings import (  # noqa: PLC0415
             REQUEST_FINGERPRINTER_CLASS as _SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS,
         )
 
@@ -79,7 +79,7 @@ class Addon:
             settings.set(
                 "REQUEST_FINGERPRINTER_CLASS",
                 "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
-                cast(int, settings.getpriority("REQUEST_FINGERPRINTER_CLASS")),
+                cast("int", settings.getpriority("REQUEST_FINGERPRINTER_CLASS")),
             )
         else:
             settings.set(
@@ -115,11 +115,11 @@ class Addon:
         settings.set("ZYTE_API_TRANSPARENT_MODE", True, "addon")
 
         try:
-            from scrapy_poet import InjectionMiddleware
+            from scrapy_poet import InjectionMiddleware  # noqa: PLC0415
         except ImportError:
             pass
         else:
-            from scrapy_zyte_api.providers import ZyteApiProvider
+            from scrapy_zyte_api.providers import ZyteApiProvider  # noqa: PLC0415
 
             if not _POET_ADDON_SUPPORT:
                 _setdefault(
@@ -136,5 +136,5 @@ class Addon:
             settings.set(
                 "ZYTE_API_RETRY_POLICY",
                 _SESSION_RETRY_POLICIES.get(loaded_retry_policy, retry_policy),
-                cast(int, settings.getpriority("ZYTE_API_RETRY_POLICY")),
+                cast("int", settings.getpriority("ZYTE_API_RETRY_POLICY")),
             )

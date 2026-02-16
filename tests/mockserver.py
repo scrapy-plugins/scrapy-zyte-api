@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import argparse
 import json
 import socket
@@ -8,28 +9,30 @@ from base64 import b64encode
 from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from scrapy import Request
-from twisted.internet import reactor
-from twisted.internet.defer import Deferred
 from twisted.internet.task import deferLater
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET, Site
 
-from scrapy_zyte_api._annotations import _ActionResult, ExtractFrom
-from scrapy_zyte_api.responses import _API_RESPONSE
+from scrapy_zyte_api._annotations import ExtractFrom, _ActionResult
 
-from . import SETTINGS, make_handler, download_request
+from . import SETTINGS, download_request, make_handler
+
+if TYPE_CHECKING:
+    from twisted.internet.defer import Deferred
+
+    from scrapy_zyte_api.responses import _API_RESPONSE
 
 
 # https://github.com/scrapy/scrapy/blob/02b97f98e74a994ad3e4d74e7ed55207e508a576/tests/mockserver.py#L27C1-L33C19
-def getarg(request, name, default=None, type=None):
+def getarg(request, name, default=None, type_=None):
     if name in request.args:
         value = request.args[name][0]
-        if type is not None:
-            value = type(value)
+        if type_ is not None:
+            value = type_(value)
         return value
     return default
 
@@ -52,6 +55,8 @@ class LeafResource(Resource):
     isLeaf = True
 
     def deferRequest(self, request, delay, f, *a, **kw):
+        from twisted.internet import reactor  # noqa: PLC0415
+
         def _cancelrequest(_):
             # silence CancelledError
             d.addErrback(lambda _: None)
@@ -196,10 +201,7 @@ class DefaultResource(Resource):
                     break
             else:
                 headers = request_data.get("requestHeaders", {})
-                if "referer" in headers:
-                    referer = headers["referer"]
-                else:
-                    referer = None
+                referer = headers.get("referer")
             if referer is not None:
                 assert isinstance(response_data["httpResponseHeaders"], list)
                 response_data["httpResponseHeaders"].append(
@@ -208,7 +210,7 @@ class DefaultResource(Resource):
 
         actions = request_data.get("actions")
         if actions:
-            results: List[_ActionResult] = []
+            results: list[_ActionResult] = []
             for action in actions:
                 result: _ActionResult = {
                     "action": action["action"],
@@ -240,9 +242,8 @@ class DefaultResource(Resource):
             assert isinstance(response_data["product"], dict)
             assert isinstance(response_data["product"]["name"], str)
             extract_from = request_data.get("productOptions", {}).get("extractFrom")
-            if extract_from:
-                if extract_from == ExtractFrom.httpResponseBody:
-                    response_data["product"]["name"] += " (from httpResponseBody)"
+            if extract_from == ExtractFrom.httpResponseBody:
+                response_data["product"]["name"] += " (from httpResponseBody)"
 
             if "geolocation" in request_data:
                 response_data["product"]["name"] += (
@@ -300,11 +301,11 @@ class DelayedResource(LeafResource):
 class MockServer:
     def __init__(self, resource=None, port=None):
         resource = resource or DefaultResource
-        self.resource = "{}.{}".format(resource.__module__, resource.__name__)
+        self.resource = f"{resource.__module__}.{resource.__name__}"
         self.proc = None
         self.host = socket.gethostbyname(socket.gethostname())
         self.port = port or get_ephemeral_port()
-        self.root_url = "http://%s:%d" % (self.host, self.port)
+        self.root_url = f"http://{self.host}:{self.port}"
 
     def __enter__(self):
         self.proc = Popen(
@@ -333,13 +334,15 @@ class MockServer:
         return self.root_url + path
 
     @asynccontextmanager
-    async def make_handler(self, settings: Optional[Dict] = None):
+    async def make_handler(self, settings: dict | None = None):
         settings = settings or {}
         async with make_handler(settings, self.urljoin("/")) as handler:
             yield handler
 
 
 def main():
+    from twisted.internet import reactor  # noqa: PLC0415
+
     parser = argparse.ArgumentParser()
     parser.add_argument("resource")
     parser.add_argument("--port", type=int)
@@ -352,11 +355,7 @@ def main():
 
     def print_listening():
         host = http_port.getHost()
-        print(
-            "Mock server {} running at http://{}:{}".format(
-                resource, host.host, host.port
-            )
-        )
+        print(f"Mock server {resource} running at http://{host.host}:{host.port}")
 
     # Typing issue: https://github.com/twisted/twisted/issues/9909
     reactor.callWhenRunning(print_listening)  # type: ignore[attr-defined]

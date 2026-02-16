@@ -7,14 +7,15 @@ import pytest
 pytest.importorskip("scrapy_poet")
 
 import attrs
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
+from scrapy.statscollectors import MemoryStatsCollector
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy_poet import DummyResponse
 from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
 from twisted.internet import reactor
-from twisted.web.client import Agent
 from twisted.internet.defer import Deferred
 from twisted.internet.protocol import Protocol
+from twisted.web.client import Agent
 from web_poet import (
     AnyResponse,
     BrowserHtml,
@@ -147,12 +148,12 @@ async def test_provider(mockserver):
     assert item["html"] == "<html><body>Hello<h1>World!</h1></body></html>"
     assert item["response_html"] == "<html><body>Hello<h1>World!</h1></body></html>"
     assert item["product"] == Product.from_dict(
-        dict(
-            url=url,
-            name="Product name",
-            price="10",
-            currency="USD",
-        )
+        {
+            "url": url,
+            "name": "Product name",
+            "price": "10",
+            "currency": "USD",
+        }
     )
 
 
@@ -190,7 +191,7 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
-    item, url, _ = await _crawl_single_item(
+    item, *_ = await _crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
     count_resp = await maybe_deferred_to_future(
@@ -217,7 +218,7 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
-    item, url, _ = await _crawl_single_item(
+    item, *_ = await _crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
     count_resp = await maybe_deferred_to_future(
@@ -251,7 +252,7 @@ async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mock
     settings = deepcopy(SETTINGS)
     settings["ZYTE_API_URL"] = fresh_mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1}
-    item, url, _ = await _crawl_single_item(
+    item, *_ = await _crawl_single_item(
         ItemDepSpider, HtmlResource, settings, port=port
     )
     count_resp = await maybe_deferred_to_future(
@@ -327,12 +328,12 @@ async def test_provider_extractfrom(mockserver):
         AnnotatedZyteAPISpider, HtmlResource, settings
     )
     assert item["product"] == Product.from_dict(
-        dict(
-            url=url,
-            name="Product name (from httpResponseBody)",
-            price="10",
-            currency="USD",
-        )
+        {
+            "url": url,
+            "name": "Product name (from httpResponseBody)",
+            "price": "10",
+            "currency": "USD",
+        }
     )
 
 
@@ -383,12 +384,12 @@ async def test_provider_extractfrom_override(mockserver):
         AnnotatedZyteAPISpider, HtmlResource, settings
     )
     assert item["product"] == Product.from_dict(
-        dict(
-            url=url,
-            name="Product name",
-            price="10",
-            currency="USD",
-        )
+        {
+            "url": url,
+            "name": "Product name",
+            "price": "10",
+            "currency": "USD",
+        }
     )
 
 
@@ -409,7 +410,7 @@ async def test_provider_geolocation(mockserver):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, url, _ = await _crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
+    item, *_ = await _crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
     assert item["product"].name == "Product name (country DE)"
 
 
@@ -428,7 +429,7 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, url, _ = await _crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
+    item, *_ = await _crawl_single_item(GeoZyteAPISpider, HtmlResource, settings)
     assert item is None
     assert "Geolocation dependencies must be annotated" in caplog.text
 
@@ -470,12 +471,12 @@ async def test_provider_custom_attrs(mockserver, annotation):
         CustomAttrsZyteAPISpider, HtmlResource, settings
     )
     assert item["product"] == Product.from_dict(
-        dict(
-            url=url,
-            name="Product name",
-            price="10",
-            currency="USD",
-        )
+        {
+            "url": url,
+            "name": "Product name",
+            "price": "10",
+            "currency": "USD",
+        }
     )
     assert item["custom_attrs"] == CustomAttributes.from_dict(
         {
@@ -513,12 +514,12 @@ async def test_provider_custom_attrs_values(mockserver):
         CustomAttrsZyteAPISpider, HtmlResource, settings
     )
     assert item["product"] == Product.from_dict(
-        dict(
-            url=url,
-            name="Product name",
-            price="10",
-            currency="USD",
-        )
+        {
+            "url": url,
+            "name": "Product name",
+            "price": "10",
+            "currency": "USD",
+        }
     )
     assert item["custom_attrs"] == {
         "attr1": "foo",
@@ -1076,7 +1077,7 @@ async def test_provider_actions(mockserver, caplog):
     settings["ZYTE_API_URL"] = mockserver.urljoin("/")
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
 
-    item, url, _ = await _crawl_single_item(ActionZyteAPISpider, HtmlResource, settings)
+    item, *_ = await _crawl_single_item(ActionZyteAPISpider, HtmlResource, settings)
     assert isinstance(item["product"], Product)
     assert item["action_results"] == Actions(
         [
@@ -1125,8 +1126,6 @@ async def test_auto_field_stats_not_enabled(mockserver):
 async def test_auto_field_stats_no_override(mockserver):
     """When requesting an item directly from Zyte API, without an override to
     change fields, stats reflect the entire list of item fields."""
-
-    from scrapy.statscollectors import MemoryStatsCollector
 
     duplicate_stat_calls: defaultdict[str, int] = defaultdict(int)
 
@@ -1659,17 +1658,17 @@ async def test_multiple_types(mockserver):
     assert item["html"] == "<html><body>Hello<h1>World!</h1></body></html>"
     assert item["response_html"] == "<html><body>Hello<h1>World!</h1></body></html>"
     assert item["product"] == Product.from_dict(
-        dict(
-            url=url,
-            name="Product name",
-            price="10",
-            currency="USD",
-        )
+        {
+            "url": url,
+            "name": "Product name",
+            "price": "10",
+            "currency": "USD",
+        }
     )
     assert item["productNavigation"] == ProductNavigation.from_dict(
-        dict(
-            url=url,
-            name="Product navigation",
-            pageNumber=0,
-        )
+        {
+            "url": url,
+            "name": "Product navigation",
+            "pageNumber": 0,
+        }
     )

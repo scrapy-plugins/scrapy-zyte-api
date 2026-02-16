@@ -2,8 +2,8 @@ from copy import copy
 
 import pytest
 from packaging.version import Version
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import __version__ as SCRAPY_VERSION
+from scrapy.utils.defer import deferred_f_from_coro_f
 
 if Version(SCRAPY_VERSION) < Version("2.7"):
     pytest.skip("Skipping tests for Scrapy ≥ 2.7", allow_module_level=True)
@@ -65,7 +65,7 @@ async def test_poet_installed_but_disabled(caplog):
     """If the scrapy-poet package is installed but its main middleware,
     InjectionMiddleware, is not set in DOWNLOADER_MIDDLEWARES, do not try to
     use its API for request fingerprinting."""
-    from web_poet import WebPage
+    from web_poet import WebPage  # noqa: PLC0415
 
     no_deps_request = Request("https://example.com")
 
@@ -127,8 +127,8 @@ async def test_headers():
 
 
 @pytest.mark.parametrize(
-    "url,params,fingerprint",
-    (
+    ("url", "params", "fingerprint"),
+    [
         (
             "https://example.com",
             {},
@@ -209,7 +209,7 @@ async def test_headers():
             {"actions": [{"action": "click", "selector": ".button"}]},
             b"\x83\xfa\x04\xfal\xc6d(\xe1\x06\xf1>b\xed\xbe\xb1\xf2\xac5E",
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_known_fingerprints(url, params, fingerprint):
@@ -300,8 +300,8 @@ async def test_only_end_parameters_matter():
 
 
 @pytest.mark.parametrize(
-    "url1,url2,match",
-    (
+    ("url1", "url2", "match"),
+    [
         (
             "https://example.com",
             "https://example.com",
@@ -342,7 +342,7 @@ async def test_only_end_parameters_matter():
             "https://example.com#2",
             True,
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_url(url1, url2, match):
@@ -363,8 +363,8 @@ def merge_dicts(*dicts):
 
 
 @pytest.mark.parametrize(
-    "params,match",
-    (
+    ("params", "match"),
+    [
         # As long as browserHtml or screenshot are True, different fragments
         # make for different fingerprints, regardless of other parameters. Same
         # for extraction types if browserHtml is set in *Options.extractFrom.
@@ -476,7 +476,7 @@ def merge_dicts(*dicts):
                 {"browserHtml": False, "screenshot": False},
             )
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_url_fragments(params, match):
@@ -525,7 +525,7 @@ async def test_request_body():
 async def test_deps():
     """Test that some injected dependencies do not affect fingerprinting at
     all (e.g. HttpClient) while others do (e.g. WebPage)."""
-    from web_poet import HttpClient, WebPage
+    from web_poet import HttpClient, WebPage  # noqa: PLC0415
 
     request = Request("https://example.com")
     raw_request = Request(
@@ -730,7 +730,7 @@ del NO_SESSION_DOWNLOADER_MIDDLEWARES[
 
 @pytest.mark.parametrize(
     ("settings", "meta1", "meta2", "fingerprint_matches"),
-    (
+    [
         # Session pool IDs affect fingerprinting, but session initialization
         # parameters do not.
         #
@@ -855,7 +855,7 @@ del NO_SESSION_DOWNLOADER_MIDDLEWARES[
             },
             True,
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_session_pool_ids(settings, meta1, meta2, fingerprint_matches):

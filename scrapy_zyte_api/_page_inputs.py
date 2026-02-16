@@ -1,5 +1,4 @@
 from base64 import b64decode
-from typing import List, Optional
 
 import attrs
 
@@ -15,7 +14,7 @@ class Actions:
     """
 
     #: Results of actions.
-    results: Optional[List[_ActionResult]]
+    results: list[_ActionResult] | None
 
 
 @attrs.define
@@ -25,8 +24,6 @@ class Geolocation:
     The target geolocation must be :ref:`specified with an annotation
     <geolocation>`.
     """
-
-    pass
 
 
 @attrs.define

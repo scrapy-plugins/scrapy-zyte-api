@@ -1,7 +1,7 @@
 from base64 import b64encode
 from collections import defaultdict
 from functools import partial
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 import pytest
 from scrapy import Request
@@ -110,7 +110,7 @@ EXPECTED_BODY = PAGE_CONTENT.encode("utf-8")
 
 
 @pytest.mark.parametrize(
-    "api_response,cls",
+    ("api_response", "cls"),
     [
         (raw_api_response_browser, ZyteAPITextResponse),
         (raw_api_response_body, ZyteAPIResponse),
@@ -134,7 +134,7 @@ def test_init(api_response, cls):
 
 
 @pytest.mark.parametrize(
-    "api_response,cls,content_length",
+    ("api_response", "cls", "content_length"),
     [
         (raw_api_response_browser, ZyteAPITextResponse, 44),
         (raw_api_response_body, ZyteAPIResponse, 44),
@@ -164,7 +164,7 @@ def test_text_from_api_response(api_response, cls, content_length):
 
 
 @pytest.mark.parametrize(
-    "api_response,cls",
+    ("api_response", "cls"),
     [
         (raw_api_response_browser, ZyteAPITextResponse),
         (raw_api_response_body, ZyteAPIResponse),
@@ -189,7 +189,9 @@ def test_response_replace(api_response, cls):
     }
 
     # Attempting to replace the raw_api_response value would raise an error
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match="Replacing the value of 'raw_api_response' isn't allowed"
+    ):
         orig_response.replace(raw_api_response=new_raw_api_response)
 
 
@@ -222,7 +224,7 @@ def format_to_httpResponseBody(body, encoding="utf-8"):
 
 
 @pytest.mark.parametrize(
-    "api_response,cls",
+    ("api_response", "cls"),
     [
         (raw_api_response_browser, ZyteAPITextResponse),
         (raw_api_response_body, ZyteAPIResponse),
@@ -259,14 +261,14 @@ INPUT_COOKIES_SIMPLE = [{"name": "c", "value": "d"}]
 
 
 @pytest.mark.parametrize(
-    "fields,cls,keep",
+    ("fields", "cls", "keep"),
     [
         # Only keep the Set-Cookie header if experimental.responseCookies is
         # not received.
         *(
             (
                 {
-                    **cast(Dict[Any, Any], output_fields),
+                    **cast("dict[Any, Any]", output_fields),
                     "httpResponseHeaders": [
                         {"name": "Content-Type", "value": "text/html"},
                         {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
@@ -343,7 +345,7 @@ def test__process_response_no_body():
         "product": {"name": "shoes"},
     }
 
-    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
+    resp = _process_response(api_response, Request(cast("str", api_response["url"])))
 
     assert isinstance(resp, Response)
     assert resp.body == b""
@@ -400,7 +402,7 @@ def test__process_response_body_only_infer_encoding():
 
 
 @pytest.mark.parametrize(
-    "encoding,content_type",
+    ("encoding", "content_type"),
     [
         ("utf-8", "text/html; charset=UTF-8"),
         ("gb18030", "text/html; charset=gb2312"),
@@ -425,7 +427,7 @@ def test__process_response_body_and_headers(encoding, content_type):
 
 
 @pytest.mark.parametrize(
-    "body,expected,actual_encoding,inferred_encoding",
+    ("body", "expected", "actual_encoding", "inferred_encoding"),
     [
         ("<html><body>plain</body></html>", "plain", "cp1252", "cp1252"),
         (
@@ -512,7 +514,7 @@ def test__process_response_non_text():
             }
         ],
     }
-    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
+    resp = _process_response(api_response, Request(cast("str", api_response["url"])))
 
     assert isinstance(resp, Response)
     with pytest.raises(NotSupported):
@@ -554,7 +556,7 @@ def test__process_response_browserhtml(api_response):
     ],
 )
 @pytest.mark.parametrize(
-    "kwargs,expected_status_code",
+    ("kwargs", "expected_status_code"),
     [
         ({}, 200),
         ({"statusCode": 200}, 200),

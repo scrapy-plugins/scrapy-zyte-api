@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 project = "scrapy-zyte-api"
-copyright = "2023, Zyte Group Ltd"
+project_copyright = "2023, Zyte Group Ltd"
 author = "Zyte Group Ltd"
 release = "0.32.0"
 
