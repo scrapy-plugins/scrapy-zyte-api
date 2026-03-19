@@ -13,3 +13,6 @@ def mockserver():
 def fresh_mockserver():
     with MockServer() as server:
         yield server
+
+
+pytest.register_assert_rewrite("tests.helpers")

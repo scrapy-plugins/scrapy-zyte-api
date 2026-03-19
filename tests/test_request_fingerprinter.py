@@ -734,7 +734,7 @@ del NO_SESSION_DOWNLOADER_MIDDLEWARES[
         # Session pool IDs affect fingerprinting, but session initialization
         # parameters do not.
         #
-        # When using server-managed requests, that means that a different
+        # When using Zyte-managed sessions, that means that a different
         # sessionContext parameter affects the fingerprint, while a different
         # sessionContextParameters does not, even if sessionContext remains the
         # same (which would be a user error).

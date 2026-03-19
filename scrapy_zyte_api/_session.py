@@ -1,11 +1,13 @@
 import contextlib
 import json
+import random
+import time
 from asyncio import Task, create_task, sleep
 from collections import defaultdict, deque
 from copy import deepcopy
 from functools import partial
 from logging import getLogger
-from typing import Any
+from typing import Any, TypedDict, cast
 from uuid import uuid4
 from weakref import WeakKeyDictionary
 
@@ -26,9 +28,21 @@ from .utils import (  # type: ignore[attr-defined]
     deferred_to_future,
 )
 
+try:
+    from typing import NotRequired  # Python 3.11+
+except ImportError:
+    from typing_extensions import NotRequired  # Python 3.10
+
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
 ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
+
+
+def _troubleshoot(slug):
+    return (
+        f"https://scrapy-zyte-api.readthedocs.io/en/latest/usage/session.html"
+        f"#session-troubleshooting-{slug}"
+    )
 
 
 def get_request_session_id(request: Request) -> str | None:
@@ -150,6 +164,22 @@ class TooManyBadSessionInits(RuntimeError):
     pass
 
 
+class PoolConfig(TypedDict):
+    id: str
+    delay: NotRequired[float]
+    randomize_delay: NotRequired[bool]
+    size: NotRequired[int]
+
+
+class PoolOptions(TypedDict):
+    delay: NotRequired[float]
+    randomize_delay: NotRequired[bool]
+    size: NotRequired[int]
+
+
+QueueSession = tuple[str, float]  # (session_id, next_use_timestamp)
+
+
 class SessionConfig:
     """Default session configuration for :ref:`scrapy-zyte-api sessions
     <session>`."""
@@ -249,8 +279,9 @@ class SessionConfig:
         """
         return None
 
-    def pool(self, request: Request) -> str:
-        """Return the ID of the session pool to use for *request*.
+    def pool(self, request: Request) -> str | PoolConfig:
+        """Return the ID of the session pool to use for *request*, or a
+        :class:`dict` with additional session pool config.
 
         The main aspects of the default implementation are described in
         :ref:`session-pools`.
@@ -264,6 +295,30 @@ class SessionConfig:
         used, the pool ID is the target domain followed by an at sign and the
         comma-separated values of the non-empty fields from
         :data:`ADDRESS_FIELDS` (e.g. ``example.com@US,NY,10001``).
+
+        Instead of a string, this method can also return a :class:`dict`
+        containing the pool ID under the ``id`` key, and optionally any other
+        key supported by :setting:`ZYTE_API_SESSION_POOLS`. For example:
+
+        .. code-block:: python
+
+            def pool(self, request):
+                if "ecommerce.example" in urlparse_cached(request).netloc:
+                    return {
+                        "id": "ecommerce.example",
+                        "delay": 2.0,
+                        "size": 16,
+                    }
+                return super().pool(request)
+
+        The values of optional keys take precedence over the corresponding
+        pool-independent settings, e.g. ``delay`` takes precedence over
+        :setting:`ZYTE_API_SESSION_DELAY` for the corresponding pool ID, but do
+        not override those defined in :setting:`ZYTE_API_SESSION_POOLS`.
+
+        For any given pool ID, the values of optional keys are only taken into
+        account when the pool ID is first encountered. You cannot use this
+        method to change them at run time.
         """
         meta_pool = request.meta.get("zyte_api_session_pool", "")
         if meta_pool:
@@ -558,11 +613,27 @@ class _SessionManager:
 
         settings = crawler.settings
 
-        pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
-        self._pending_initial_sessions: dict[str, int] = defaultdict(lambda: pool_size)
-        pool_sizes = settings.getdict("ZYTE_API_SESSION_POOL_SIZES", {})
-        for pool, size in pool_sizes.items():
-            self._pending_initial_sessions[pool] = size
+        self._default_pool_delay = settings.getfloat(
+            "ZYTE_API_SESSION_DELAY", settings.getfloat("DOWNLOAD_DELAY")
+        )
+        self._randomize_delay = settings.getbool(
+            "ZYTE_API_SESSION_RANDOMIZE_DELAY",
+            settings.getbool("RANDOMIZE_DOWNLOAD_DELAY"),
+        )
+        self._default_pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
+        self._pending_initial_sessions: dict[str, int] = {}
+        self._pool_configs = settings.getdict("ZYTE_API_SESSION_POOLS")
+        pool_sizes = settings.getdict("ZYTE_API_SESSION_POOL_SIZES")
+        if pool_sizes:
+            logger.warning(
+                "ZYTE_API_SESSION_POOL_SIZES is deprecated, use "
+                "ZYTE_API_SESSION_POOLS instead"
+            )
+            for pool_id, pool_size in pool_sizes.items():
+                self._pool_configs.setdefault(pool_id, {}).setdefault("size", pool_size)
+        for pool, config in self._pool_configs.items():
+            if "size" in config:
+                self._pending_initial_sessions[pool] = config["size"]
 
         self._max_check_failures = settings.getint(
             "ZYTE_API_SESSION_MAX_CHECK_FAILURES", 1
@@ -575,7 +646,7 @@ class _SessionManager:
         max_bad_inits = settings.getint("ZYTE_API_SESSION_MAX_BAD_INITS", 8)
         self._max_bad_inits: dict[str, int] = defaultdict(lambda: max_bad_inits)
         max_bad_inits_per_pool = settings.getdict(
-            "ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL", {}
+            "ZYTE_API_SESSION_MAX_BAD_INITS_PER_POOL"
         )
         for pool, pool_max_bad_inits in max_bad_inits_per_pool.items():
             self._max_bad_inits[pool] = pool_max_bad_inits
@@ -617,7 +688,7 @@ class _SessionManager:
         # If the queue is empty, sleep and try again. Sessions from the pool
         # will be appended to the queue as they are initialized and ready to
         # use.
-        self._queues: dict[str, deque[str]] = defaultdict(deque)
+        self._queues: dict[str, deque[QueueSession]] = defaultdict(deque)
         self._queue_max_attempts = settings.getint(
             "ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS", 60
         )
@@ -639,6 +710,14 @@ class _SessionManager:
         self._setting_params = settings.getdict("ZYTE_API_SESSION_PARAMS")
 
         self._fatal_error_handler = FatalErrorHandler(crawler)
+
+        self._stats_per_pool: bool = settings.getbool("ZYTE_API_SESSION_STATS_PER_POOL")
+
+    def _inc_stat(self, key: str, pool: str):
+        pool = f"pools/{pool}/" if self._stats_per_pool else ""
+        key = f"scrapy-zyte-api/sessions/{pool}{key}"
+        assert self._crawler.stats
+        self._crawler.stats.inc_value(key)
 
     async def _handle_engine_start(self):
         assert self._crawler.engine
@@ -662,14 +741,52 @@ class _SessionManager:
             session_config = self._get_session_config(request)
             try:
                 pool = session_config.pool(request)
-            except Exception as ex:
-                raise PoolError from ex
-            self._pool_cache[request] = pool
-            return pool
+            except Exception as exception:
+                message = (
+                    f"Exception raised on session config pool() method call "
+                    f"for request {request}."
+                )
+                raise PoolError(message) from exception
+            options: PoolOptions
+            if isinstance(pool, str):
+                pool_id = pool
+                options = {}
+            else:
+                try:
+                    pool_id = pool["id"]
+                except (KeyError, TypeError) as exception:
+                    message = (
+                        f'Exception raised when accessing pool["id"] on the '
+                        f"return value of the session config pool() method call "
+                        f"for request {request}."
+                    )
+                    raise PoolError(message) from exception
+                else:
+                    options = cast(
+                        "PoolOptions", {k: v for k, v in pool.items() if k != "id"}
+                    )
+            delay = options.get("delay", self._default_pool_delay)
+            randomize_delay = options.get("randomize_delay", self._randomize_delay)
+            size = options.get("size", self._default_pool_size)
+            if pool_id not in self._pool_configs:
+                self._pool_configs[pool_id] = {
+                    "delay": delay,
+                    "size": size,
+                    "randomize_delay": randomize_delay,
+                }
+                self._pending_initial_sessions[pool_id] = size
+            else:
+                config = self._pool_configs[pool_id]
+                config.setdefault("delay", delay)
+                config.setdefault("randomize_delay", randomize_delay)
+                if "size" not in config:
+                    self._pending_initial_sessions[pool_id] = size
+                config.setdefault("size", size)
+            self._pool_cache[request] = pool_id
+            return pool_id
 
     async def _init_session(self, session_id: str, request: Request, pool: str) -> bool:
         assert self._crawler.engine
-        assert self._crawler.stats
         session_config = self._get_session_config(request)
         if meta_params := request.meta.get("zyte_api_session_params", None):
             session_params = meta_params
@@ -682,9 +799,7 @@ class _SessionManager:
             try:
                 session_params = session_config.params(request)
             except Exception:
-                self._crawler.stats.inc_value(
-                    f"scrapy-zyte-api/sessions/pools/{pool}/init/param-error"
-                )
+                self._inc_stat("init/param-error", pool)
                 logger.exception(
                     f"Unexpected exception raised while obtaining session "
                     f"initialization parameters for request {request}."
@@ -722,9 +837,7 @@ class _SessionManager:
         try:
             response = await download
         except Exception:
-            self._crawler.stats.inc_value(
-                f"scrapy-zyte-api/sessions/pools/{pool}/init/failed"
-            )
+            self._inc_stat("init/failed", pool)
             return False
         else:
             try:
@@ -732,18 +845,14 @@ class _SessionManager:
             except CloseSpider:
                 raise
             except Exception:
-                self._crawler.stats.inc_value(
-                    f"scrapy-zyte-api/sessions/pools/{pool}/init/check-error"
-                )
+                self._inc_stat("init/check-error", pool)
                 logger.exception(
                     f"Unexpected exception raised while checking session "
                     f"validity on response {response}."
                 )
                 return False
             outcome = "passed" if result else "failed"
-            self._crawler.stats.inc_value(
-                f"scrapy-zyte-api/sessions/pools/{pool}/init/check-{outcome}"
-            )
+            self._inc_stat(f"init/check-{outcome}", pool)
         return result
 
     async def _create_session(self, request: Request, pool: str) -> str:
@@ -760,15 +869,22 @@ class _SessionManager:
                 self._bad_inits[pool] += 1
                 if self._bad_inits[pool] >= self._max_bad_inits[pool]:
                     raise TooManyBadSessionInits
-            self._queues[pool].append(session_id)
+            pool_config = self._pool_configs[pool]
+            delay = pool_config["delay"]
+            sleep_delay = next_use_delay = delay
+            if pool_config["randomize_delay"]:
+                next_use_delay *= random.uniform(0.5, 1.5)  # noqa: S311
+                sleep_delay *= random.uniform(0.5, 1.5)  # noqa: S311
+            await sleep(sleep_delay)
+            next_use = time.time() + next_use_delay
+            self._queues[pool].append((session_id, next_use))
             return session_id
 
     async def _next_from_queue(self, request: Request, pool: str) -> str:
-        session_id = None
         attempts = 0
-        while session_id not in self._pools[pool]:  # After 1st loop: invalid session.
+        while True:
             try:
-                session_id = self._queues[pool].popleft()
+                session_id, next_use = self._queues[pool].popleft()
             except IndexError as ex:  # No ready-to-use session available.
                 attempts += 1
                 if attempts >= self._queue_max_attempts:
@@ -776,21 +892,28 @@ class _SessionManager:
                         f"Could not get a session ID from the session "
                         f"rotation queue after {attempts} attempts, waiting "
                         f"at least {self._queue_wait_time} seconds between "
-                        f"attempts. Either the values of the "
-                        f"ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS and "
-                        f"ZYTE_API_SESSION_QUEUE_WAIT_TIME settings are too "
-                        f"low for your scenario, in which case you can modify "
-                        f"them accordingly, or there might be a bug with "
-                        f"scrapy-zyte-api session management. If you think it "
-                        f"could be the later, please report the issue at "
-                        f"https://github.com/scrapy-plugins/scrapy-zyte-api/issues/new "
-                        f"providing a minimal reproducible example if "
-                        f"possible, or debug logs and stats otherwise."
+                        f"attempts. See "
+                        f"{_troubleshoot('could-not-get-session-id')}"
                     ) from ex
                 await sleep(self._queue_wait_time)
-        assert session_id is not None
-        self._queues[pool].append(session_id)
-        return session_id
+                continue
+            if session_id not in self._pools[pool]:
+                continue  # Invalid session
+            now = time.time()
+            if next_use > now:
+                wait = next_use - now
+                logger.debug(
+                    f"Waiting {wait:.3f} seconds for session {session_id} "
+                    f"from pool {pool!r} to become available"
+                )
+                await sleep(wait)
+                now = time.time()
+            pool_config = self._pool_configs[pool]
+            next_use_delay = pool_config["delay"]
+            if pool_config["randomize_delay"]:
+                next_use_delay *= random.uniform(0.5, 1.5)  # noqa: S311
+            self._queues[pool].append((session_id, now + next_use_delay))
+            return session_id
 
     async def _next(self, request) -> str:
         """Return the ID of the next working session in the session pool
@@ -849,7 +972,6 @@ class _SessionManager:
         """Check the response for signs of session expiration, update the
         internal session pool accordingly, and return ``False`` if the session
         has expired or ``True`` if the session passed validation."""
-        assert self._crawler.stats
         async with self._fatal_error_handler:
             if self.is_init_request(request):
                 return True
@@ -862,18 +984,14 @@ class _SessionManager:
             except CloseSpider:
                 raise
             except Exception:
-                self._crawler.stats.inc_value(
-                    f"scrapy-zyte-api/sessions/pools/{pool}/use/check-error"
-                )
+                self._inc_stat("use/check-error", pool)
                 logger.exception(
                     f"Unexpected exception raised while checking session "
                     f"validity on response {response}."
                 )
             else:
                 outcome = "passed" if passed else "failed"
-                self._crawler.stats.inc_value(
-                    f"scrapy-zyte-api/sessions/pools/{pool}/use/check-{outcome}"
-                )
+                self._inc_stat(f"use/check-{outcome}", pool)
                 if passed:
                     return True
                 session_id = get_request_session_id(request)
@@ -891,7 +1009,6 @@ class _SessionManager:
         request in place, return that new request, to replace the received
         request.
         """
-        assert self._crawler.stats
         async with self._fatal_error_handler:
             if self.is_init_request(request) or request.meta.get(
                 "_zyte_api_session_assigned", False
@@ -899,6 +1016,7 @@ class _SessionManager:
                 return None
             session_config = self._get_session_config(request)
             if not session_config.enabled(request):
+                assert self._crawler.stats
                 self._crawler.stats.inc_value("scrapy-zyte-api/sessions/use/disabled")
                 return None
             session_id = await self._next(request)
@@ -936,12 +1054,9 @@ class _SessionManager:
         return session_config.enabled(request)
 
     async def handle_error(self, request: Request):
-        assert self._crawler.stats
         async with self._fatal_error_handler:
             pool = self.get_pool(request)
-            self._crawler.stats.inc_value(
-                f"scrapy-zyte-api/sessions/pools/{pool}/use/failed"
-            )
+            self._inc_stat("use/failed", pool)
             session_id = get_request_session_id(request)
             if session_id is not None:
                 self._errors[session_id] += 1
@@ -950,12 +1065,9 @@ class _SessionManager:
             self._start_request_session_refresh(request, pool)
 
     async def handle_expiration(self, request: Request):
-        assert self._crawler.stats
         async with self._fatal_error_handler:
             pool = self.get_pool(request)
-            self._crawler.stats.inc_value(
-                f"scrapy-zyte-api/sessions/pools/{pool}/use/expired"
-            )
+            self._inc_stat("use/expired", pool)
             self._start_request_session_refresh(request, pool)
 
 
@@ -1022,7 +1134,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             reason=reason,
         )
 
-    def get_pool(self, request: Request):
+    def get_pool(self, request: Request) -> PoolConfig | str | None:
         return (
             self._sessions.get_pool(request)
             if self._sessions.is_enabled(request)
