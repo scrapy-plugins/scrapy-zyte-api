@@ -1,9 +1,9 @@
 from copy import deepcopy
-from typing import Any, Dict
+from typing import Any
 
 import pytest
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider, signals
+from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
@@ -13,7 +13,7 @@ from .helpers import assert_session_stats
 
 @pytest.mark.parametrize(
     ("settings", "meta", "meta_key"),
-    (
+    [
         (
             {},
             {},
@@ -54,7 +54,7 @@ from .helpers import assert_session_stats
             {"zyte_api_automap": True},
             "zyte_api_automap",
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_assign_meta_key(settings, meta, meta_key, mockserver):
@@ -64,7 +64,7 @@ async def test_assign_meta_key(settings, meta, meta_key, mockserver):
 
     class Tracker:
         def __init__(self):
-            self.meta: Dict[str, Any] = {}
+            self.meta: dict[str, Any] = {}
 
         def track(self, request: Request, spider: Spider):
             self.meta = deepcopy(request.meta)

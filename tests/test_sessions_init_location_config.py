@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from scrapy import Request, Spider
@@ -27,8 +27,8 @@ async def test_location_session_config(mockserver):
     )
     class CustomSessionConfig(LocationSessionConfig):
         def location_params(
-            self, request: Request, location: Dict[str, Any]
-        ) -> Dict[str, Any]:
+            self, request: Request, location: dict[str, Any]
+        ) -> dict[str, Any]:
             assert location == {"postalCode": "10002"}
             return {
                 "actions": [
@@ -40,7 +40,7 @@ async def test_location_session_config(mockserver):
             }
 
         def location_check(
-            self, response: Response, request: Request, location: Dict[str, Any]
+            self, response: Response, request: Request, location: dict[str, Any]
         ) -> bool:
             assert location == {"postalCode": "10002"}
             domain = urlparse_cached(request).netloc
@@ -207,14 +207,14 @@ async def test_location_session_config_no_location(mockserver):
     @session_config(["postal-code-10001.example", "a.example"])
     class CustomSessionConfig(LocationSessionConfig):
         def location_params(
-            self, request: Request, location: Dict[str, Any]
-        ) -> Dict[str, Any]:
-            assert False
+            self, request: Request, location: dict[str, Any]
+        ) -> dict[str, Any]:
+            raise AssertionError
 
         def location_check(
-            self, response: Response, request: Request, location: Dict[str, Any]
+            self, response: Response, request: Request, location: dict[str, Any]
         ) -> bool:
-            assert False
+            raise AssertionError
 
     settings = {
         **SESSION_SETTINGS,

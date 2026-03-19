@@ -1,30 +1,27 @@
 from collections import deque
 from copy import copy
-from typing import Any, Dict, Union
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 from aiohttp.client_exceptions import ServerConnectionError
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
 from scrapy.http import Response
+from scrapy.utils.defer import deferred_f_from_coro_f
 from zyte_api import RequestError
 
 from scrapy_zyte_api import (
     SESSION_AGGRESSIVE_RETRY_POLICY,
     SESSION_DEFAULT_RETRY_POLICY,
 )
-from scrapy_zyte_api.utils import (
-    _REQUEST_ERROR_HAS_QUERY,
-    maybe_deferred_to_future,
-)
+from scrapy_zyte_api.utils import _REQUEST_ERROR_HAS_QUERY, maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
 from .helpers import assert_session_stats
 
 
 def mock_request_error(*, status=200, response_content=None):
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     if _REQUEST_ERROR_HAS_QUERY:
         kwargs["query"] = {}
     return RequestError(
@@ -47,7 +44,7 @@ class fast_forward:
 
 @pytest.mark.parametrize(
     ("retrying", "outcomes", "exhausted"),
-    (
+    [
         *(
             (retry_policy, outcomes, exhausted)
             for retry_policy in (
@@ -73,7 +70,7 @@ class fast_forward:
                 ),
             )
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 @patch("time.monotonic")
@@ -105,7 +102,7 @@ async def test_retry_stop(monotonic_mock, retrying, outcomes, exhausted):
         await run()
     except Exception as outcome:
         assert exhausted
-        assert outcome is last_outcome
+        assert outcome is last_outcome  # noqa: PT017
     else:
         assert not exhausted
 
@@ -113,7 +110,7 @@ async def test_retry_stop(monotonic_mock, retrying, outcomes, exhausted):
 class SessionIDRemovingDownloaderMiddleware:
     def process_exception(
         self, request: Request, exception: Exception, spider: Spider | None = None
-    ) -> Union[Request, None]:
+    ) -> Request | None:
         if not isinstance(exception, RequestError) or request.meta.get(
             "_is_session_init_request", False
         ):
@@ -193,7 +190,7 @@ class ExceptionRaisingDownloaderMiddleware:
 
 @pytest.mark.parametrize(
     ("exception", "stat", "reason"),
-    (
+    [
         (
             mock_request_error(
                 status=422, response_content=b'{"type": "/problem/session-expired"}'
@@ -226,7 +223,7 @@ class ExceptionRaisingDownloaderMiddleware:
             None,
             None,
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_exceptions(exception, stat, reason, mockserver, caplog):

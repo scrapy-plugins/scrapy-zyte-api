@@ -1,18 +1,13 @@
-from typing import Dict, Tuple, Union
-
 import pytest
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.misc import load_object
 
 from scrapy_zyte_api import SessionConfig, session_config
 from scrapy_zyte_api._session import SESSION_INIT_META_KEY, session_config_registry
-from scrapy_zyte_api.utils import (
-    _RAW_CLASS_SETTING_SUPPORT,
-    maybe_deferred_to_future,
-)
+from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT, maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
 from .helpers import assert_session_stats
@@ -106,11 +101,11 @@ class OnlyPassFirstInitChecker:
 # subclasses for the crawler classes because the init use is enough to verify
 # that using the crawler works.
 
-CHECKER_TESTS: Tuple[
-    Tuple[
+CHECKER_TESTS: tuple[
+    tuple[
         str,
         str,
-        Dict[str, Union[Tuple[int, int], Dict[str, int]]],
+        dict[str, tuple[int, int] | dict[str, int]],
     ],
     ...,
 ] = (
@@ -163,7 +158,7 @@ CHECKER_TESTS: Tuple[
 
 @pytest.mark.parametrize(
     ("checker", "close_reason", "stats"),
-    (
+    [
         *CHECKER_TESTS,
         *(
             pytest.param(
@@ -180,7 +175,7 @@ CHECKER_TESTS: Tuple[
             )
             for checker, close_reason, stats in CHECKER_TESTS
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_checker(checker, close_reason, stats, mockserver):

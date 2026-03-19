@@ -10,7 +10,7 @@ from .helpers import assert_session_stats
 
 @pytest.mark.parametrize(
     ("params", "close_reason", "stats"),
-    (
+    [
         (
             {"browserHtml": True},
             "bad_session_inits",
@@ -21,7 +21,7 @@ from .helpers import assert_session_stats
             "failed_forbidden_domain",
             {"forbidden.example": {"init/check-passed": 1}},
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_url_override(params, close_reason, stats, mockserver):

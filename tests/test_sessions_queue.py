@@ -1,6 +1,6 @@
-from scrapy.utils.defer import deferred_f_from_coro_f
-from scrapy import Spider
 import pytest
+from scrapy import Spider
+from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
@@ -10,10 +10,10 @@ from .helpers import assert_session_stats
 
 @pytest.mark.parametrize(
     ("attempts", "expected_stats"),
-    (
+    [
         (None, {"example.com": (1, 2)}),
         (1, {"example.com": (1, 1)}),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_empty_queue(attempts, expected_stats, mockserver):
