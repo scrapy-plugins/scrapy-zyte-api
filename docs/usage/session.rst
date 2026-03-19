@@ -289,7 +289,7 @@ Here are some things you can try:
 
 -   On some websites, sending too many requests too fast through a session can
     cause the target website to ban that session.
-    
+
     On those websites, you can increase :setting:`ZYTE_API_SESSION_DELAY`,
     :setting:`ZYTE_API_SESSION_POOL_SIZE`, or both, to lower the rate of
     session reuse.
