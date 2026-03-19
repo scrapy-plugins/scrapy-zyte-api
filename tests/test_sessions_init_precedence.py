@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from scrapy import Request, Spider
@@ -8,13 +8,13 @@ from scrapy_zyte_api import SessionConfig, session_config
 from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import SESSION_SETTINGS, get_crawler, UNSET
+from . import SESSION_SETTINGS, UNSET, get_crawler
 from .helpers import assert_session_stats
 
 
 @pytest.mark.parametrize(
     ("params_setting", "params_meta", "location_setting", "location_meta", "outcome"),
-    (
+    [
         (UNSET, UNSET, UNSET, UNSET, False),
         (UNSET, UNSET, UNSET, None, False),
         (UNSET, UNSET, UNSET, False, False),
@@ -123,7 +123,7 @@ from .helpers import assert_session_stats
         (True, True, True, None, True),
         (True, True, True, False, True),
         (True, True, True, True, True),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_params_precedence(
@@ -144,7 +144,7 @@ async def test_params_precedence(
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }
-    meta: Dict[str, Any] = {}
+    meta: dict[str, Any] = {}
 
     if params_setting is not UNSET:
         settings["ZYTE_API_SESSION_PARAMS"] = {
@@ -212,7 +212,7 @@ async def test_params_precedence(
 
 @pytest.mark.parametrize(
     ("meta", "settings", "pool", "outcome"),
-    (
+    [
         ({}, {}, "postal-code-10001.example", False),
         (
             {
@@ -256,7 +256,7 @@ async def test_params_precedence(
             "postal-code-10001.example",
             False,
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_session_config_params_precedence(

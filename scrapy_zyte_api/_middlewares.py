@@ -92,14 +92,14 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         spm_mw_classes = []
 
         try:
-            from scrapy_crawlera import CrawleraMiddleware
+            from scrapy_crawlera import CrawleraMiddleware  # noqa: PLC0415
         except ImportError:
             pass
         else:
             spm_mw_classes.append(CrawleraMiddleware)
 
         try:
-            from scrapy_zyte_smartproxy import ZyteSmartProxyMiddleware
+            from scrapy_zyte_smartproxy import ZyteSmartProxyMiddleware  # noqa: PLC0415
         except ImportError:
             pass
         else:

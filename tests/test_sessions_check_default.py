@@ -1,10 +1,8 @@
 import pytest
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
+from scrapy.utils.defer import deferred_f_from_coro_f
 
-from scrapy_zyte_api.utils import (
-    maybe_deferred_to_future,
-)
+from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
 from .helpers import assert_session_stats
@@ -12,7 +10,7 @@ from .helpers import assert_session_stats
 
 @pytest.mark.parametrize(
     ("postal_code", "url", "close_reason", "stats"),
-    (
+    [
         (
             None,
             "https://postal-code-10001-soft.example",
@@ -37,7 +35,7 @@ from .helpers import assert_session_stats
             "unsupported_set_location",
             {},
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_checker_location(postal_code, url, close_reason, stats, mockserver):

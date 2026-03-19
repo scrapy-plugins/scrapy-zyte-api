@@ -5,8 +5,12 @@ from docutils.parsers.rst.roles import set_classes
 
 
 def http_api_reference_role(
-    name, rawtext, text, lineno, inliner, options={}, content=[]
+    name, rawtext, text, lineno, inliner, options=None, content=None
 ):
+    if options is None:
+        options = {}
+    if content is None:
+        content = []
     match = re.search(
         r"(?s)^(.+?)\s*<\s*((?:request|response):[a-zA-Z.]+)\s*>\s*$", text
     )

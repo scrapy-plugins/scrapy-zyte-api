@@ -1,5 +1,5 @@
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider, signals
+from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 

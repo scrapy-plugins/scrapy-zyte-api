@@ -10,12 +10,12 @@ from .helpers import assert_session_stats
 
 @pytest.mark.parametrize(
     ("global_setting", "pool_setting", "value"),
-    (
+    [
         (None, 0, 1),
         (None, 1, 1),
         (None, 2, 2),
         (3, None, 3),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_max_bad_inits_per_pool(global_setting, pool_setting, value, mockserver):

@@ -12,7 +12,7 @@ from .helpers import assert_session_stats
 
 @pytest.mark.parametrize(
     ("settings", "meta", "used"),
-    (
+    [
         ({}, {}, True),
         (
             {
@@ -38,7 +38,7 @@ from .helpers import assert_session_stats
             False,
         ),
         ({}, {"zyte_api_session_location": {"postalCode": "10002"}}, False),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_session_config_location(settings, meta, used, mockserver):
@@ -111,7 +111,7 @@ async def test_session_config_location(settings, meta, used, mockserver):
 
 @pytest.mark.parametrize(
     ("settings", "meta", "used"),
-    (
+    [
         ({}, {}, True),
         (
             {
@@ -137,7 +137,7 @@ async def test_session_config_location(settings, meta, used, mockserver):
             False,
         ),
         ({}, {"zyte_api_session_location": {"postalCode": "10002"}}, True),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_session_config_location_bad(settings, meta, used, mockserver):

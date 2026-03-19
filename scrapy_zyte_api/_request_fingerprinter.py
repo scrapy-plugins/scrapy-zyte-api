@@ -6,7 +6,7 @@ from ._session import ScrapyZyteAPISessionDownloaderMiddleware
 
 logger = getLogger(__name__)
 
-try:  # noqa: C901
+try:
     from scrapy.utils.request import RequestFingerprinter as _  # noqa: F401
 except ImportError:
     if not TYPE_CHECKING:
@@ -35,7 +35,7 @@ else:
         @staticmethod
         def _poet_is_configured(settings):
             try:
-                from scrapy_poet import InjectionMiddleware
+                from scrapy_poet import InjectionMiddleware  # noqa: PLC0415
             except ImportError:
                 return False
             for k, v in settings.get("DOWNLOADER_MIDDLEWARES", {}).items():
@@ -49,7 +49,7 @@ else:
                 self._poet_is_configured(settings)
             )
             if poet_is_configured:
-                from scrapy_poet import (
+                from scrapy_poet import (  # noqa: PLC0415
                     ScrapyPoetRequestFingerprinter as DefaultFallbackRequestFingerprinter,
                 )
             else:
@@ -65,7 +65,7 @@ else:
             )
             if poet_is_configured and not isinstance(
                 self._fallback_request_fingerprinter,
-                cast(type, DefaultFallbackRequestFingerprinter),
+                cast("type", DefaultFallbackRequestFingerprinter),
             ):
                 logger.warning(
                     f"scrapy-poet is enabled, but your custom value for the "
@@ -82,7 +82,7 @@ else:
                     f"setting instead."
                 )
                 self._fallback_fingerprinter_is_poets = False
-            self._cache: "WeakKeyDictionary[Request, bytes]" = WeakKeyDictionary()
+            self._cache: WeakKeyDictionary[Request, bytes] = WeakKeyDictionary()
             self._param_parser = _ParamParser(crawler, cookies_enabled=False)
             self._crawler = crawler
 
@@ -149,6 +149,6 @@ else:
                         fingerprint += deps_key
                     if serialized_page_params is not None:
                         fingerprint += serialized_page_params
-                self._cache[request] = hashlib.sha1(fingerprint).digest()
+                self._cache[request] = hashlib.sha1(fingerprint).digest()  # noqa: S324
                 return self._cache[request]
             return self._fallback_request_fingerprinter.fingerprint(request)

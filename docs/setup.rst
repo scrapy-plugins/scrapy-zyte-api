@@ -213,7 +213,7 @@ your existing code may need changes, such as:
 x402
 ====
 
-It is possible to use :ref:`Zyte API <zyte-api>` without a Zyte API account by 
+It is possible to use :ref:`Zyte API <zyte-api>` without a Zyte API account by
 using the `x402 <https://www.x402.org/>`__ protocol to handle payments:
 
 #.  Read the `Zyte Terms of Service`_. By using Zyte API, you are accepting
