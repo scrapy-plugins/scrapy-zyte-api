@@ -629,6 +629,17 @@ Default: :setting:`RANDOMIZE_DOWNLOAD_DELAY`
 If enabled, :setting:`ZYTE_API_SESSION_DELAY` is randomized each time it is
 used by multiplying it by a random factor between 0.5 and 1.5.
 
+.. setting:: ZYTE_API_SESSION_STATS_PER_POOL
+
+ZYTE_API_SESSION_STATS_PER_POOL
+===============================
+
+Default: ``False``
+
+Whether to split :ref:`session stats <session-stats>` by pool (``True``) or
+aggregate them across pools (``False``, default).
+
+
 .. setting:: ZYTE_API_SKIP_HEADERS
 
 ZYTE_API_SKIP_HEADERS

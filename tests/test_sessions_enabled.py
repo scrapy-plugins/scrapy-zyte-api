@@ -30,7 +30,10 @@ from .helpers import assert_session_stats
 )
 @deferred_f_from_coro_f
 async def test_enabled(setting, meta, outcome, mockserver):
-    settings = {"ZYTE_API_URL": mockserver.urljoin("/")}
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
+    }
     if setting is not UNSET:
         settings["ZYTE_API_SESSION_ENABLED"] = setting
     meta_dict = {}
@@ -72,6 +75,7 @@ async def test_session_config_enabled(mockserver):
         "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+        "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }
 
     class TestSpider(Spider):
