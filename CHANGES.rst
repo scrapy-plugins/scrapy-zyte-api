@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.33.0 (unreleased)
+0.33.0 (2026-03-19)
 -------------------
 
 -   **Backward-incompatible change:** The ``/pools/<pool>`` part in session
