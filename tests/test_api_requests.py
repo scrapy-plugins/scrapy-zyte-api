@@ -36,6 +36,7 @@ from . import (
     DEFAULT_CLIENT_CONCURRENCY,
     SETTINGS,
     SETTINGS_T,
+    UNSET,
     get_crawler,
     get_download_handler,
     get_downloader_middleware,
@@ -235,9 +236,6 @@ async def test_response_html(meta: Dict[str, Dict[str, Any]], mockserver):
         assert resp.headers == {b"Test_Header": [b"test_value"]}
     else:
         assert not resp.headers
-
-
-UNSET = object()
 
 
 @deferred_f_from_coro_f

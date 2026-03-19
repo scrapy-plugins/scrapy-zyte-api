@@ -22,15 +22,16 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 requires-python = ">=3.10"
-# Sync with [pinned] @ tox.ini
+# Sync with [min] @ tox.ini
 dependencies = [
     "packaging>=20.0",
     "scrapy>=2.0.1",
+    "typing_extensions>=4.1.0",
     "zyte-api>=0.6.0",
 ]
 
 [project.optional-dependencies]
-# Sync with [testenv:pinned-provider] @ tox.ini
+# Sync with [testenv:min-provider] @ tox.ini
 provider = [
     "andi>=0.6.0",
     "scrapy-poet>=0.22.3",
@@ -39,6 +40,7 @@ provider = [
 ]
 x402 = [
     "zyte-api[x402]>=0.8.0",
+    "x402<2.0.0",
 ]
 
 [project.urls]

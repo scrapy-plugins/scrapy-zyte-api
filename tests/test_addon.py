@@ -282,3 +282,56 @@ if not _POET_ADDON_SUPPORT:
 )
 def test_poet_setting_changes(initial_settings, expected_settings):
     _test_setting_changes(initial_settings, expected_settings)
+
+
+@pytest.mark.parametrize(
+    ("manual_settings", "addon_settings"),
+    (
+        (
+            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
+            {},
+        ),
+        (
+            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
+            {"ZYTE_API_RETRY_POLICY": "zyte_api.zyte_api_retrying"},
+        ),
+        (
+            {
+                "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
+            },
+            {"ZYTE_API_RETRY_POLICY": "zyte_api.aggressive_retrying"},
+        ),
+        (
+            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
+            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
+        ),
+        (
+            {
+                "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
+            },
+            {
+                "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
+            },
+        ),
+        (
+            {"ZYTE_API_RETRY_POLICY": "tests.UNSET"},
+            {"ZYTE_API_RETRY_POLICY": "tests.UNSET"},
+        ),
+    ),
+)
+@deferred_f_from_coro_f
+async def test_sessions(manual_settings, addon_settings):
+    crawler = await get_crawler_zyte_api(
+        {
+            "ZYTE_API_TRANSPARENT_MODE": True,
+            "ZYTE_API_SESSION_ENABLED": True,
+            **manual_settings,
+        },
+        poet=False,
+    )
+    addon_crawler = await get_crawler_zyte_api(
+        {"ZYTE_API_SESSION_ENABLED": True, **addon_settings}, use_addon=True, poet=False
+    )
+    assert serialize_settings(crawler.settings) == serialize_settings(
+        addon_crawler.settings
+    )
