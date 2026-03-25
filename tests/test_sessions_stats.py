@@ -1,8 +1,9 @@
 from scrapy import Request, Spider
 from scrapy.utils.defer import deferred_f_from_coro_f
 
-from . import get_crawler
 from scrapy_zyte_api.utils import maybe_deferred_to_future
+
+from . import get_crawler
 
 
 @deferred_f_from_coro_f

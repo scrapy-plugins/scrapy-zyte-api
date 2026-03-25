@@ -7,7 +7,6 @@ if _NEEDS_EARLY_REACTOR:
 
 # Register web-poet serializers
 from . import _serialization  # noqa: F401
-
 from ._annotations import ExtractFrom, actions, custom_attrs
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
@@ -51,25 +50,25 @@ SESSION_AGGRESSIVE_RETRY_POLICY = _SESSION_AGGRESSIVE_RETRY_POLICY
 session_config_registry = _session_config_registry
 
 __all__ = [
-    "ExtractFrom",
+    "SESSION_AGGRESSIVE_RETRY_POLICY",
+    "SESSION_DEFAULT_RETRY_POLICY",
     "Actions",
+    "Addon",
+    "ExtractFrom",
     "Geolocation",
-    "Screenshot",
+    "LocationSessionConfig",
     "ScrapyZyteAPIDownloadHandler",
-    "ScrapyZyteAPIRequestFingerprinter",
     "ScrapyZyteAPIDownloaderMiddleware",
     "ScrapyZyteAPIRefererSpiderMiddleware",
-    "ScrapyZyteAPISpiderMiddleware",
+    "ScrapyZyteAPIRequestFingerprinter",
     "ScrapyZyteAPISessionDownloaderMiddleware",
-    "Addon",
+    "ScrapyZyteAPISpiderMiddleware",
+    "Screenshot",
+    "SessionConfig",
     "actions",
     "custom_attrs",
     "get_request_session_id",
     "is_session_init_request",
     "session_config",
     "session_config_registry",
-    "LocationSessionConfig",
-    "SessionConfig",
-    "SESSION_DEFAULT_RETRY_POLICY",
-    "SESSION_AGGRESSIVE_RETRY_POLICY",
 ]

@@ -1,9 +1,7 @@
-from typing import Optional
-
 import pytest
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
 from scrapy.http import Response
+from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.httpobj import urlparse_cached
 
 from scrapy_zyte_api import (
@@ -128,7 +126,7 @@ async def test_session_config(mockserver):
 async def test_session_config_no_web_poet(mockserver):
     """If web-poet is not installed, @session_config raises a RuntimeError."""
     try:
-        import web_poet  # noqa: F401
+        import web_poet  # noqa: F401,PLC0415
     except ImportError:
         pass
     else:
@@ -157,7 +155,7 @@ async def test_session_config_process_request_change_request(mockserver):
                 self.session_data[session_id] = {"foo": "bar"}
             return super().check(response, request)
 
-        def process_request(self, request: Request) -> Optional[Request]:
+        def process_request(self, request: Request) -> Request | None:
             session_id = get_request_session_id(request)
             foo = self.session_data[session_id]["foo"]
             request.headers["foo"] = foo
@@ -206,7 +204,7 @@ async def test_session_config_process_request_new_request(mockserver):
                 self.session_data[session_id] = {"foo": "bar"}
             return super().check(response, request)
 
-        def process_request(self, request: Request) -> Optional[Request]:
+        def process_request(self, request: Request) -> Request | None:
             session_id = get_request_session_id(request)
             foo = self.session_data[session_id]["foo"]
             new_url = request.url.rstrip("/") + f"/{foo}"

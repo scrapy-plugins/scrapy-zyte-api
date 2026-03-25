@@ -2,25 +2,24 @@ import pytest
 
 pytest.importorskip("scrapy_poet")
 
-from typing import Any, Dict
+from typing import Any
 
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider, signals
+from scrapy.utils.defer import deferred_f_from_coro_f
+from scrapy_poet import DummyResponse
+from zyte_common_items import Product
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
 from .helpers import assert_session_stats
 
-from scrapy_poet import DummyResponse
-from zyte_common_items import Product
-
 
 @deferred_f_from_coro_f
 async def test_provider(mockserver):
     class Tracker:
         def __init__(self):
-            self.query: Dict[str, Any] = {}
+            self.query: dict[str, Any] = {}
 
         def track(self, request: Request, spider: Spider):
             self.query = request.meta["zyte_api"]

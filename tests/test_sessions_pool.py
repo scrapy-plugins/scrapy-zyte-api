@@ -2,8 +2,8 @@ from asyncio import sleep
 from collections import deque
 
 import pytest
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Request, Spider
+from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api import SessionConfig, session_config
 from scrapy_zyte_api._session import (
@@ -18,7 +18,7 @@ from .helpers import assert_session_stats
 
 @pytest.mark.parametrize(
     ("meta", "pool"),
-    (
+    [
         ({}, "example.com"),
         ({"zyte_api_session_location": {"postalCode": "10001"}}, "example.com@10001"),
         (
@@ -60,7 +60,7 @@ from .helpers import assert_session_stats
             },
             "foo",
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_pool(meta, pool, mockserver):
@@ -258,7 +258,7 @@ async def test_mw_get_pool(mockserver):
 
 @pytest.mark.parametrize(
     ("settings", "meta", "expected"),
-    (
+    [
         ({}, None, 0.0),
         ({"DOWNLOAD_DELAY": 1.0}, None, 1.0),
         ({"ZYTE_API_SESSION_DELAY": 1.5}, None, 1.5),
@@ -269,7 +269,7 @@ async def test_mw_get_pool(mockserver):
             {"id": "example.com", "delay": 1.5},
             0.5,
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_delay(settings, meta, expected, mockserver, monkeypatch):
@@ -356,7 +356,7 @@ async def test_delay_reuse(mockserver, monkeypatch):
 
 @pytest.mark.parametrize(
     ("settings", "start_requests"),
-    (
+    [
         ({"ZYTE_API_SESSION_RANDOMIZE_DELAY": True}, ["https://example.com"] * 2),
         (
             {"ZYTE_API_SESSION_POOLS": {"example.com": {"randomize_delay": True}}},
@@ -377,7 +377,7 @@ async def test_delay_reuse(mockserver, monkeypatch):
                 for _ in range(2)
             ],
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_delay_random(settings, start_requests, mockserver, monkeypatch):
@@ -428,7 +428,7 @@ async def test_delay_random(settings, start_requests, mockserver, monkeypatch):
 
 @pytest.mark.parametrize(
     ("settings", "start_requests", "expected_stats"),
-    (
+    [
         (
             {"ZYTE_API_SESSION_POOL_SIZE": 1},
             ["https://example.com"] * (1 + 1),
@@ -482,7 +482,7 @@ async def test_delay_random(settings, start_requests, mockserver, monkeypatch):
             ],
             {"example.com": (1, 2 + 1)},
         ),
-    ),
+    ],
 )
 @deferred_f_from_coro_f
 async def test_size(settings, start_requests, expected_stats, mockserver, caplog):

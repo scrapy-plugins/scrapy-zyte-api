@@ -2,8 +2,8 @@ from math import floor
 from urllib.parse import urlparse
 
 import pytest
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy import Spider
+from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
