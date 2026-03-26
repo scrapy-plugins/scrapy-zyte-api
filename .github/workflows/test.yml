@@ -70,7 +70,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]  # Keep in sync with .readthedocs.yml
+        # Keep in sync with pyproject.toml tool.sphinx-scrapy.python-version.
+        python-version: ["3.13"]
         tox-job: ["pre-commit", "mypy", "twine", "docs"]
 
     steps:
