@@ -1,4 +1,4 @@
 enum-tools[sphinx]
 sphinx<9  # https://github.com/domdfcoding/enum_tools/issues/118
 sphinx-rtd-theme
-sphinx-scrapy @ git+https://github.com/scrapy/sphinx-scrapy.git@544546f16fc7d23e786c71f5286aa882951fa6be
+sphinx-scrapy @ git+https://github.com/scrapy/sphinx-scrapy.git@60817316665e620196721b82f2c40b15a450abcd

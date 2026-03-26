@@ -271,6 +271,4 @@ split-on-trailing-comma = false
 convention = "pep257"
 
 [tool.sphinx-scrapy]
-extras = ["provider"]
-# Keep in sync with .github/workflows/test.yml.
-python-version = "3.13"
+python-version = "3.13"  # Keep in sync with .github/workflows/test.yml.
