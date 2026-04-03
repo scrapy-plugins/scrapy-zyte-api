@@ -2945,7 +2945,7 @@ async def test_automap_all_cookies(meta):
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = await get_crawler(settings)
+    crawler = await get_crawler(settings, start_handler=True)
     cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -3029,6 +3029,7 @@ async def test_automap_all_cookies(meta):
             # {"name": "c", "value": "d", "domain": "b.example"},
         ]
     )
+    await handler._close()
 
 
 @pytest.mark.parametrize(
@@ -3053,7 +3054,7 @@ async def test_automap_cookie_jar(meta):
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = await get_crawler(settings)
+    crawler = await get_crawler(settings, start_handler=True)
     cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -3090,6 +3091,7 @@ async def test_automap_cookie_jar(meta):
             {"name": "z", "value": "y", "domain": "example.com"},
         ]
     )
+    await handler._close()
 
 
 @pytest.mark.parametrize(
@@ -3106,7 +3108,7 @@ async def test_automap_cookie_limit(meta, caplog):
         "ZYTE_API_MAX_COOKIES": 1,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = await get_crawler(settings)
+    crawler = await get_crawler(settings, start_handler=True)
     cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -3196,6 +3198,7 @@ async def test_automap_cookie_limit(meta, caplog):
     assert "would get 2 cookies" in caplog.text
     assert "limited to 1 cookies" in caplog.text
     caplog.clear()
+    await handler._close()
 
 
 class CustomCookieJar(CookieJar):
@@ -3241,7 +3244,7 @@ async def test_automap_custom_cookie_middleware():
         "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
-    crawler = await get_crawler(settings)
+    crawler = await get_crawler(settings, start_handler=True)
     cookie_middleware = get_downloader_middleware(crawler, mw_cls)
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
@@ -3252,6 +3255,7 @@ async def test_automap_custom_cookie_middleware():
     assert api_params["experimental"]["requestCookies"] == [
         {"name": "z", "value": "y", "domain": "example.com"}
     ]
+    await handler._close()
 
 
 @pytest.mark.parametrize(

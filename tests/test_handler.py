@@ -65,10 +65,11 @@ async def test_concurrency_configuration(concurrency):
         **SETTINGS,
         "CONCURRENT_REQUESTS": concurrency,
     }
-    crawler = await get_crawler_zyte_api(settings=settings)
+    crawler = await get_crawler_zyte_api(settings=settings, start_handler=True)
     handler = get_download_handler(crawler, "https")
     assert handler._client.n_conn == concurrency
     assert handler._session._session.connector.limit == concurrency
+    await handler._close()
 
 
 ETH_KEY = "c85ef7d79691fe79573b1a7064c5232332f53bb1b44a08f1a737f57a68a4706e"
@@ -274,6 +275,7 @@ async def test_retry_policy(
     async with make_handler(settings) as handler:
         req = Request("https://example.com", meta=meta)
         unmocked_session = handler._session
+        await unmocked_session.close()
         handler._session = mock.AsyncMock(unmocked_session)
         handler._session.get.return_value = {
             "browserHtml": "",
@@ -528,6 +530,7 @@ async def test_log_request_truncate(
         meta = {"zyte_api": input_params}
         request = Request("https://example.com", meta=meta)
         unmocked_session = handler._session
+        await unmocked_session.close()
         handler._session = mock.AsyncMock(unmocked_session)
         handler._session.get.return_value = {
             "browserHtml": "",
@@ -575,9 +578,10 @@ async def test_trust_env(enabled):
         settings["ZYTE_API_USE_ENV_PROXY"] = enabled
     else:
         enabled = False
-    crawler = await get_crawler_zyte_api(settings=settings)
+    crawler = await get_crawler_zyte_api(settings=settings, start_handler=True)
     handler = get_download_handler(crawler, "https")
     assert handler._session._session._trust_env == enabled
+    await handler._close()
 
 
 @pytest.mark.parametrize(
@@ -765,6 +769,7 @@ async def test_download_request_limits(
 ):
     settings: SETTINGS_T = {"DOWNLOAD_WARNSIZE": warnsize, "DOWNLOAD_MAXSIZE": maxsize}
     async with make_handler(settings, mockserver.urljoin("/")) as handler:
+        await handler._session.close()
         handler._session = mock.AsyncMock()
         handler._session.get.return_value = mock.Mock(body=b"x" * body_size)
 

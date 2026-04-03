@@ -86,7 +86,12 @@ class DummySpider(Spider):
 
 
 async def get_crawler(
-    settings=None, spider_cls=DummySpider, setup_engine=True, use_addon=False, poet=True
+    settings=None,
+    spider_cls=DummySpider,
+    setup_engine=True,
+    start_handler=False,
+    use_addon=False,
+    poet=True,
 ):
     settings = settings or {}
     base_settings: SETTINGS_T = deepcopy(SETTINGS if not use_addon else SETTINGS_ADDON)
@@ -95,7 +100,7 @@ async def get_crawler(
         final_settings.setdefault("ADDONS", {})["scrapy_poet.Addon"] = 300
     crawler = _get_crawler(settings_dict=final_settings, spidercls=spider_cls)
     if setup_engine:
-        await setup_crawler_engine(crawler)
+        await setup_crawler_engine(crawler, start_handler=start_handler)
     return crawler
 
 
@@ -117,7 +122,9 @@ async def make_handler(
 ):
     if api_url is not None:
         settings["ZYTE_API_URL"] = api_url
-    crawler = await get_crawler(settings, use_addon=use_addon)
+    crawler = await get_crawler(
+        settings, setup_engine=True, start_handler=True, use_addon=use_addon
+    )
     handler = get_download_handler(crawler, "https")
     if not isinstance(handler, _ScrapyZyteAPIBaseDownloadHandler):
         # i.e. ZYTE_API_ENABLED=False
@@ -164,7 +171,7 @@ def set_env(**env_vars):
         environ.update(old_environ)
 
 
-async def setup_crawler_engine(crawler: Crawler):
+async def setup_crawler_engine(crawler: Crawler, start_handler: bool = False) -> None:
     """Run the crawl steps until engine setup, so that crawler.engine is not
     None.
 
@@ -175,9 +182,10 @@ async def setup_crawler_engine(crawler: Crawler):
     crawler.spider = crawler._create_spider()
     crawler.engine = crawler._create_engine()
 
-    handler = get_download_handler(crawler, "https")
-    if hasattr(handler, "engine_started"):
-        await handler.engine_started()
+    if start_handler:
+        handler = get_download_handler(crawler, "https")
+        if hasattr(handler, "engine_started"):
+            await handler.engine_started()
 
 
 async def download_request(handler, request) -> Response:

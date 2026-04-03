@@ -3,6 +3,9 @@
 
 name: tox
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [ main ]
