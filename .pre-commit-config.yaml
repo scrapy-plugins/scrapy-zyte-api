@@ -25,6 +25,6 @@ repos:
   hooks:
     - id: actionlint
 - repo: https://github.com/scrapy/sphinx-scrapy
-  rev: 544546f16fc7d23e786c71f5286aa882951fa6be
+  rev: 0.7.0
   hooks:
     - id: sphinx-scrapy

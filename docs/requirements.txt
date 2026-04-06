@@ -106,6 +106,7 @@ sphinx==8.2.3
     #   autodocsumm
     #   enum-tools
     #   sphinx-autodoc-typehints
+    #   sphinx-copybutton
     #   sphinx-llms-txt
     #   sphinx-markdown-builder
     #   sphinx-prompt
@@ -116,19 +117,21 @@ sphinx==8.2.3
     #   sphinxcontrib-jquery
 sphinx-autodoc-typehints==3.5.2
     # via sphinx-toolbox
+sphinx-copybutton==0.5.2
+    # via sphinx-scrapy
 sphinx-jinja2-compat==0.4.1
     # via
     #   enum-tools
     #   sphinx-toolbox
-sphinx-llms-txt==0.7.1
+sphinx-llms-txt @ git+https://github.com/zytedata/sphinx-llms-txt.git@5e8866cb0cc249aa2017ad9050b3b83a7ca16f69
     # via sphinx-scrapy
-sphinx-markdown-builder @ git+https://github.com/AdrianAtZyte/sphinx-markdown-builder.git@2050ffaed43fcc523e03cc7a677cbcb5f5f6d30b
+sphinx-markdown-builder @ git+https://github.com/zytedata/sphinx-markdown-builder.git@ac9f8babfe622e4300099ab44b96d9d9228e742e
     # via sphinx-scrapy
 sphinx-prompt==1.10.2
     # via sphinx-toolbox
 sphinx-rtd-theme==3.1.0
     # via -r requirements.in
-sphinx-scrapy @ git+https://github.com/scrapy/sphinx-scrapy.git@60817316665e620196721b82f2c40b15a450abcd
+sphinx-scrapy @ git+https://github.com/scrapy/sphinx-scrapy.git@46c52fc3a6d5ee632a8ef6bccf4daa1ff53e96fd
     # via -r requirements.in
 sphinx-tabs==3.4.5
     # via sphinx-toolbox
