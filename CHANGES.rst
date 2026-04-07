@@ -1,6 +1,12 @@
 Changes
 =======
 
+0.33.1 (unreleased)
+-------------------
+
+-   Made the documentation more LLM-friendly, with markdown versions of every
+    page and :file:`llms.txt` and :file:`llms-full.txt` files.
+
 0.33.0 (2026-03-19)
 -------------------
 
