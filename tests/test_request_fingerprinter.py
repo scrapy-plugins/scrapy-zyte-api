@@ -29,7 +29,7 @@ async def test_cache():
     fingerprint = fingerprinter.fingerprint(request)
 
     # Prevent later calls from working:
-    fingerprinter._param_parser = None  # type: ignore[assignment]
+    fingerprinter._param_parser = None
     cached_fingerprint = fingerprinter.fingerprint(request)
 
     assert fingerprint == cached_fingerprint

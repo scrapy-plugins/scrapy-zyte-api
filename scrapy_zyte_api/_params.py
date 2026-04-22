@@ -288,14 +288,13 @@ _BAN_SENSITIVE_REQUEST_HEADER_KEYS = {
 
 def _iter_ban_sensitive_headers_in_params(
     api_params: dict[str, Any],
-    browser_headers: dict[bytes, str],
 ) -> Iterable[bytes]:
     seen = set()
     for header in api_params.get("customHttpRequestHeaders") or []:
         header_name = header.get("name")
         if not header_name:
             continue
-        lowercase_header = to_bytes(header_name).strip().lower()
+        lowercase_header: bytes | None = to_bytes(header_name).strip().lower()
         if lowercase_header in _BAN_SENSITIVE_HEADERS and lowercase_header not in seen:
             seen.add(lowercase_header)
             yield lowercase_header
@@ -1292,10 +1291,7 @@ class _ParamParser:
         request: Request,
         params: dict[str, Any],
     ) -> None:
-        for lowercase_header in _iter_ban_sensitive_headers_in_params(
-            params,
-            self._browser_headers,
-        ):
+        for lowercase_header in _iter_ban_sensitive_headers_in_params(params):
             if lowercase_header in self._warned_ban_sensitive_headers:
                 continue
             self._warned_ban_sensitive_headers.add(lowercase_header)

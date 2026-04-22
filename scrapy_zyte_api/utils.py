@@ -65,7 +65,7 @@ except ImportError:  # Scrapy < 2.12
 
     T = TypeVar("T")
 
-    def _build_from_crawler(
+    def _build_from_crawler(  # type: ignore[no-redef]
         objcls: type[T], crawler: Crawler, /, *args: Any, **kwargs: Any
     ) -> T:
         return create_instance(objcls, None, crawler, *args, **kwargs)
