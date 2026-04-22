@@ -274,6 +274,40 @@ ANY_VALUE = object()
 ANY_VALUE_T = Any
 SKIP_HEADER_T = dict[bytes, ANY_VALUE_T | str]
 
+_BAN_SENSITIVE_HEADERS = {
+    b"accept": "Accept",
+    b"accept-encoding": "Accept-Encoding",
+    b"accept-language": "Accept-Language",
+    b"cookie": "Cookie",
+    b"user-agent": "User-Agent",
+}
+_BAN_SENSITIVE_REQUEST_HEADER_KEYS = {
+    header.replace(b"-", b"").decode(): header for header in _BAN_SENSITIVE_HEADERS
+}
+
+
+def _iter_ban_sensitive_headers_in_params(
+    api_params: dict[str, Any],
+    browser_headers: dict[bytes, str],
+) -> Iterable[bytes]:
+    seen = set()
+    for header in api_params.get("customHttpRequestHeaders") or []:
+        header_name = header.get("name")
+        if not header_name:
+            continue
+        lowercase_header = to_bytes(header_name).strip().lower()
+        if lowercase_header in _BAN_SENSITIVE_HEADERS and lowercase_header not in seen:
+            seen.add(lowercase_header)
+            yield lowercase_header
+
+    for key in api_params.get("requestHeaders") or {}:
+        lowercase_header = _BAN_SENSITIVE_REQUEST_HEADER_KEYS.get(key.lower())
+        if not lowercase_header:
+            continue
+        if lowercase_header in _BAN_SENSITIVE_HEADERS and lowercase_header not in seen:
+            seen.add(lowercase_header)
+            yield lowercase_header
+
 
 def _may_use_browser(api_params: dict[str, Any]) -> bool:
     """Return ``False`` if *api_params* indicate with certainty that browser
@@ -1202,6 +1236,11 @@ class _ParamParser:
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._http_skip_headers = _load_http_skip_headers(settings)
         self._mw_skip_headers = _load_mw_skip_headers(crawler)
+        self._warn_on_ban_sensitive_headers = settings.getbool(
+            "ZYTE_API_WARN_ON_BAN_SENSITIVE_HEADERS",
+            True,
+        )
+        self._warned_ban_sensitive_headers: set[bytes] = set()
         self._warn_on_cookies = False
         if cookies_enabled is not None:
             self._cookies_enabled = cookies_enabled
@@ -1216,7 +1255,6 @@ class _ParamParser:
             self._cookies_enabled = False
             self._warn_on_cookies = settings.getbool("COOKIES_ENABLED")
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 100)
-        self._crawler = crawler
         self._cookie_jars = None
 
     def _request_skip_headers(self, request):
@@ -1243,9 +1281,34 @@ class _ParamParser:
             cookie_jars=self._cookie_jars,
             max_cookies=self._max_cookies,
         )
+        if params and self._warn_on_ban_sensitive_headers:
+            self._warn_about_ban_sensitive_headers(request, params)
         if not dont_merge_cookies and self._warn_on_cookies:
             self._handle_warn_on_cookies(request, params)
         return params
+
+    def _warn_about_ban_sensitive_headers(
+        self,
+        request: Request,
+        params: dict[str, Any],
+    ) -> None:
+        for lowercase_header in _iter_ban_sensitive_headers_in_params(
+            params,
+            self._browser_headers,
+        ):
+            if lowercase_header in self._warned_ban_sensitive_headers:
+                continue
+            self._warned_ban_sensitive_headers.add(lowercase_header)
+            display_name = _BAN_SENSITIVE_HEADERS[lowercase_header]
+            logger.warning(
+                f"Request {request} sends ban-sensitive header {display_name} "
+                f"to Zyte API. User-defined values can negatively impact ban "
+                "avoidance effectiveness. If unintended, remove it where it "
+                "is defined (for example in Request.headers, USER_AGENT, or "
+                "DEFAULT_REQUEST_HEADERS). If intentional, set "
+                "ZYTE_API_WARN_ON_BAN_SENSITIVE_HEADERS to False to silence "
+                "this warning.",
+            )
 
     def _handle_warn_on_cookies(self, request, params):
         if params and params.get("experimental", {}).get("requestCookies") is not None:

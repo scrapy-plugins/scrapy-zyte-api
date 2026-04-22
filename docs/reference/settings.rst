@@ -670,3 +670,20 @@ Default: ``False``
 
 Set to ``True`` to make Zyte API requests respect system proxy settings. See
 :ref:`proxy`.
+
+
+.. setting:: ZYTE_API_WARN_ON_BAN_SENSITIVE_HEADERS
+
+ZYTE_API_WARN_ON_BAN_SENSITIVE_HEADERS
+======================================
+
+Default: ``True``
+
+If enabled, a warning is logged if a header is set that may have a negative
+effect on ban avoidance.
+
+If you are sure that setting those headers is safe, e.g. if you are following
+instructions from experts at Zyte, set to ``False`` to disable those warnings.
+
+Otherwise, figure out where in your code you are setting those headers, and
+remove them to let Zyte API handle them for better ban avoidance.
