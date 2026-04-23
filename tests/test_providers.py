@@ -1131,6 +1131,26 @@ async def test_provider_actions(mockserver, caplog):
     )
 
 
+@deferred_f_from_coro_f
+async def test_provider_actions_unannotated(mockserver, caplog):
+    @attrs.define
+    class ActionProductPage(BasePage):
+        product: Product
+        actions: Actions
+
+    class ActionZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: ActionProductPage):  # type: ignore[override]
+            pass
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, *_ = await _crawl_single_item(ActionZyteAPISpider, HtmlResource, settings)
+    assert item is None
+    assert "Actions dependencies must be annotated" in caplog.text
+
+
 def test_item_keywords():
     assert set(_EXTRACT_KEYS) == set(_ITEM_KEYWORDS.values())
 
