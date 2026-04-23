@@ -705,9 +705,9 @@ def test_provider_fingerprint_combined_with_regular():
     )
     fingerprinter._cache = WeakKeyDictionary()
     fingerprinter._fallback_request_fingerprinter = FallbackFingerprinter()
-    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"
-    fingerprinter._is_provider_only_request = lambda request: False
-    fingerprinter._get_regular_request_fingerprint = lambda request: b"regular"
+    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"  # type: ignore[method-assign]
+    fingerprinter._is_provider_only_request = lambda request: False  # type: ignore[method-assign]
+    fingerprinter._get_regular_request_fingerprint = lambda request: b"regular"  # type: ignore[method-assign]
 
     expected_fingerprint = hashlib.sha1(
         b"regular" + b"provider", usedforsecurity=False
@@ -726,8 +726,8 @@ def test_provider_only_request_uses_provider_fingerprint():
     )
     fingerprinter._cache = WeakKeyDictionary()
     fingerprinter._fallback_request_fingerprinter = FallbackFingerprinter()
-    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"
-    fingerprinter._is_provider_only_request = lambda request: True
+    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"  # type: ignore[method-assign]
+    fingerprinter._is_provider_only_request = lambda request: True  # type: ignore[method-assign]
 
     def _unexpected_regular_fingerprint(request):
         raise AssertionError(
@@ -735,7 +735,7 @@ def test_provider_only_request_uses_provider_fingerprint():
             "for provider-only requests"
         )
 
-    fingerprinter._get_regular_request_fingerprint = _unexpected_regular_fingerprint
+    fingerprinter._get_regular_request_fingerprint = _unexpected_regular_fingerprint  # type: ignore[method-assign]
     assert fingerprinter.fingerprint(request) == b"provider"
 
 
@@ -750,9 +750,9 @@ def test_provider_fingerprint_used_when_regular_fingerprint_is_missing():
     )
     fingerprinter._cache = WeakKeyDictionary()
     fingerprinter._fallback_request_fingerprinter = FallbackFingerprinter()
-    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"
-    fingerprinter._is_provider_only_request = lambda request: False
-    fingerprinter._get_regular_request_fingerprint = lambda request: None
+    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"  # type: ignore[method-assign]
+    fingerprinter._is_provider_only_request = lambda request: False  # type: ignore[method-assign]
+    fingerprinter._get_regular_request_fingerprint = lambda request: None  # type: ignore[method-assign]
 
     assert fingerprinter.fingerprint(request) == b"provider"
 

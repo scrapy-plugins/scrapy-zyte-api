@@ -577,7 +577,7 @@ def test_provider_meta_any_response_http_response_available(
     actual_meta, html_requested = _build_zyte_api_provider_meta(
         {AnyResponse},
         request,
-        DummyCrawler(),
+        DummyCrawler(),  # type: ignore[arg-type]
         http_response_available=http_response_available,
     )
 

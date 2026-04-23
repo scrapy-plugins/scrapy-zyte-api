@@ -146,16 +146,16 @@ def _build_zyte_api_provider_meta(
         if not is_typing_annotated(cls):
             continue
         metadata = cls.__metadata__  # type: ignore[attr-defined]
-        for extract_from in ExtractFrom:
-            if extract_from in metadata:
+        for extract_from_annotation in ExtractFrom:
+            if extract_from_annotation in metadata:
                 prev_extract_from = extract_from_seen.get(kw)
-                if prev_extract_from and prev_extract_from != extract_from:
+                if prev_extract_from and prev_extract_from != extract_from_annotation:
                     raise ValueError(
                         f"Multiple different extractFrom specified for {kw}"
                     )
-                extract_from_seen[kw] = extract_from
+                extract_from_seen[kw] = extract_from_annotation
                 options = zyte_api_meta.setdefault(f"{kw}Options", {})
-                options.setdefault("extractFrom", extract_from.value)
+                options.setdefault("extractFrom", extract_from_annotation.value)
                 break
 
     http_response_needed = (
