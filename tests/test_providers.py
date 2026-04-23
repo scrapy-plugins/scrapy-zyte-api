@@ -48,7 +48,12 @@ from scrapy_zyte_api import (
 )
 from scrapy_zyte_api._params import _EXTRACT_KEYS
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
-from scrapy_zyte_api.providers import _AUTO_PAGES, _ITEM_KEYWORDS, ZyteApiProvider
+from scrapy_zyte_api.providers import (
+    _AUTO_PAGES,
+    _ITEM_KEYWORDS,
+    ZyteApiProvider,
+    _build_zyte_api_provider_meta,
+)
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SETTINGS
@@ -549,6 +554,35 @@ def provider_settings(server):
     settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
     settings["DOWNLOAD_HANDLERS"]["http"] = RecordingHandler
     return settings
+
+
+@pytest.mark.parametrize(
+    ("http_response_available", "expected_meta"),
+    [
+        (False, {"httpResponseBody": True, "httpResponseHeaders": True}),
+        (True, {}),
+    ],
+)
+def test_provider_meta_any_response_http_response_available(
+    http_response_available, expected_meta
+):
+    class DummySettings(dict):
+        def getdict(self, key):
+            return dict(self.get(key, {}))
+
+    class DummyCrawler:
+        settings = DummySettings()
+
+    request = Request("https://example.com")
+    actual_meta, html_requested = _build_zyte_api_provider_meta(
+        {AnyResponse},
+        request,
+        DummyCrawler(),
+        http_response_available=http_response_available,
+    )
+
+    assert actual_meta == expected_meta
+    assert html_requested is False
 
 
 @deferred_f_from_coro_f

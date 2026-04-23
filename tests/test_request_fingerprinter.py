@@ -1,4 +1,6 @@
+import hashlib
 from copy import copy
+from weakref import WeakKeyDictionary
 
 import pytest
 from packaging.version import Version
@@ -690,6 +692,69 @@ async def test_deps():
     assert page_request_transparent_fp == page_raw_request_transparent_fp
     assert page_request_transparent_fp == page_auto_request_default_fp
     assert page_request_transparent_fp == page_auto_request_transparent_fp
+
+
+def test_provider_fingerprint_combined_with_regular():
+    class FallbackFingerprinter:
+        def fingerprint(self, request):
+            return b"fallback"
+
+    request = Request("https://example.com")
+    fingerprinter = ScrapyZyteAPIRequestFingerprinter.__new__(
+        ScrapyZyteAPIRequestFingerprinter
+    )
+    fingerprinter._cache = WeakKeyDictionary()
+    fingerprinter._fallback_request_fingerprinter = FallbackFingerprinter()
+    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"
+    fingerprinter._is_provider_only_request = lambda request: False
+    fingerprinter._get_regular_request_fingerprint = lambda request: b"regular"
+
+    expected_fingerprint = hashlib.sha1(
+        b"regular" + b"provider", usedforsecurity=False
+    ).digest()
+    assert fingerprinter.fingerprint(request) == expected_fingerprint
+
+
+def test_provider_only_request_uses_provider_fingerprint():
+    class FallbackFingerprinter:
+        def fingerprint(self, request):
+            return b"fallback"
+
+    request = Request("https://example.com")
+    fingerprinter = ScrapyZyteAPIRequestFingerprinter.__new__(
+        ScrapyZyteAPIRequestFingerprinter
+    )
+    fingerprinter._cache = WeakKeyDictionary()
+    fingerprinter._fallback_request_fingerprinter = FallbackFingerprinter()
+    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"
+    fingerprinter._is_provider_only_request = lambda request: True
+
+    def _unexpected_regular_fingerprint(request):
+        raise AssertionError(
+            "regular request fingerprint must not be computed "
+            "for provider-only requests"
+        )
+
+    fingerprinter._get_regular_request_fingerprint = _unexpected_regular_fingerprint
+    assert fingerprinter.fingerprint(request) == b"provider"
+
+
+def test_provider_fingerprint_used_when_regular_fingerprint_is_missing():
+    class FallbackFingerprinter:
+        def fingerprint(self, request):
+            return b"fallback"
+
+    request = Request("https://example.com")
+    fingerprinter = ScrapyZyteAPIRequestFingerprinter.__new__(
+        ScrapyZyteAPIRequestFingerprinter
+    )
+    fingerprinter._cache = WeakKeyDictionary()
+    fingerprinter._fallback_request_fingerprinter = FallbackFingerprinter()
+    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"
+    fingerprinter._is_provider_only_request = lambda request: False
+    fingerprinter._get_regular_request_fingerprint = lambda request: None
+
+    assert fingerprinter.fingerprint(request) == b"provider"
 
 
 @deferred_f_from_coro_f

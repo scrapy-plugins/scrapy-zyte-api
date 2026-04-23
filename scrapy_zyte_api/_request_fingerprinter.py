@@ -7,7 +7,9 @@ from ._session import ScrapyZyteAPISessionDownloaderMiddleware
 logger = getLogger(__name__)
 
 try:
-    from scrapy.utils.request import RequestFingerprinter as _  # noqa: F401
+    from scrapy.utils.request import (
+        RequestFingerprinter as _RequestFingerprinter,  # noqa: F401
+    )
 except ImportError:
     if not TYPE_CHECKING:
         ScrapyZyteAPIRequestFingerprinter = None
@@ -127,29 +129,116 @@ else:
         def _get_pool(self, request: Request) -> str:
             return self._session_mw.get_pool(request)
 
+        @staticmethod
+        def _contains_dependency(dependencies, dependency_cls) -> bool:
+            from andi.typeutils import strip_annotated  # noqa: PLC0415
+
+            for dependency in dependencies:
+                if strip_annotated(dependency) is dependency_cls:
+                    return True
+            return False
+
+        def _is_provider_only_request(self, request: Request) -> bool:
+            if not self._fallback_fingerprinter_is_poets:
+                return False
+            injector = self._fallback_request_fingerprinter._injector
+            return not injector.is_scrapy_response_required(request)
+
+        def _get_regular_request_fingerprint(self, request: Request) -> bytes | None:
+            api_params = self._param_parser.parse(request)
+            if api_params is None:
+                return None
+
+            session_pool = self._get_pool(request)
+            if session_pool is not None:
+                api_params.setdefault("sessionContext", session_pool)
+            self._normalize_params(api_params)
+            fingerprint = json.dumps(api_params, sort_keys=True).encode()
+            if self._fallback_fingerprinter_is_poets:
+                deps_key = self._fallback_request_fingerprinter.get_deps_key(request)
+                serialized_page_params = (
+                    self._fallback_request_fingerprinter.serialize_page_params(request)
+                )
+                if deps_key is not None:
+                    fingerprint += deps_key
+                if serialized_page_params is not None:
+                    fingerprint += serialized_page_params
+            return hashlib.sha1(fingerprint, usedforsecurity=False).digest()
+
+        def _get_provider_request_fingerprint(self, request: Request) -> bytes | None:
+            if not self._fallback_fingerprinter_is_poets:
+                return None
+
+            from web_poet import HttpResponse  # noqa: PLC0415
+
+            from .providers import (  # noqa: PLC0415
+                ZyteApiProvider,
+                _build_zyte_api_provider_meta,
+            )
+
+            injector = self._fallback_request_fingerprinter._injector
+            plan = injector.build_plan(request)
+
+            remaining_dependencies = {dependency for dependency, _ in plan.dependencies}
+            provided_dependencies: set = set()
+
+            for provider in injector.providers:
+                to_provide = {
+                    dependency
+                    for dependency in remaining_dependencies
+                    if provider.is_provided(dependency)
+                }
+                if not to_provide:
+                    continue
+                if isinstance(provider, ZyteApiProvider):
+                    api_params, _html_requested = _build_zyte_api_provider_meta(
+                        to_provide,
+                        request,
+                        self._crawler,
+                        http_response_available=self._contains_dependency(
+                            provided_dependencies,
+                            HttpResponse,
+                        ),
+                    )
+                    api_params["url"] = request.url
+                    session_pool = self._get_pool(request)
+                    if session_pool is not None:
+                        api_params.setdefault("sessionContext", session_pool)
+                    self._normalize_params(api_params)
+                    return hashlib.sha1(
+                        json.dumps(api_params, sort_keys=True).encode(),
+                        usedforsecurity=False,
+                    ).digest()
+                provided_dependencies |= to_provide
+                remaining_dependencies -= to_provide
+
+            return None
+
         def fingerprint(self, request):
             if request in self._cache:
                 return self._cache[request]
-            api_params = self._param_parser.parse(request)
-            if api_params is not None:
-                session_pool = self._get_pool(request)
-                if session_pool is not None:
-                    api_params.setdefault("sessionContext", session_pool)
-                self._normalize_params(api_params)
-                fingerprint = json.dumps(api_params, sort_keys=True).encode()
-                if self._fallback_fingerprinter_is_poets:
-                    deps_key = self._fallback_request_fingerprinter.get_deps_key(
-                        request
-                    )
-                    serialized_page_params = (
-                        self._fallback_request_fingerprinter.serialize_page_params(
-                            request
-                        )
-                    )
-                    if deps_key is not None:
-                        fingerprint += deps_key
-                    if serialized_page_params is not None:
-                        fingerprint += serialized_page_params
-                self._cache[request] = hashlib.sha1(fingerprint).digest()  # noqa: S324
+
+            provider_fingerprint = self._get_provider_request_fingerprint(request)
+            if provider_fingerprint is not None and self._is_provider_only_request(
+                request
+            ):
+                self._cache[request] = provider_fingerprint
                 return self._cache[request]
+
+            regular_fingerprint = self._get_regular_request_fingerprint(request)
+
+            if regular_fingerprint is not None and provider_fingerprint is not None:
+                self._cache[request] = hashlib.sha1(
+                    regular_fingerprint + provider_fingerprint, usedforsecurity=False
+                ).digest()
+                return self._cache[request]
+
+            if regular_fingerprint is not None:
+                self._cache[request] = regular_fingerprint
+                return self._cache[request]
+
+            if provider_fingerprint is not None:
+                self._cache[request] = provider_fingerprint
+                return self._cache[request]
+
             return self._fallback_request_fingerprinter.fingerprint(request)

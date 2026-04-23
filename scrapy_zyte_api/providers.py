@@ -85,6 +85,114 @@ _AUTO_PAGES: set[type] = {
 }
 
 
+def _build_zyte_api_provider_meta(
+    to_provide: Set[Callable],
+    request: Request,
+    crawler: Crawler,
+    *,
+    screenshot_requested: bool | None = None,
+    http_response_available: bool = False,
+) -> tuple[dict[str, Any], bool]:
+    """Build Zyte API params for a provider request.
+
+    Returns the params dict and whether browser HTML must be requested.
+    """
+    if screenshot_requested is None:
+        screenshot_requested = Screenshot in to_provide
+
+    html_requested = BrowserResponse in to_provide or BrowserHtml in to_provide
+
+    zyte_api_meta = {
+        **crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS"),
+        **request.meta.get("zyte_api_provider", {}),
+    }
+
+    to_provide_stripped: set[type] = set()
+    extract_from_seen: dict[str, str] = {}
+    item_requested: bool = False
+
+    for cls in to_provide:
+        cls_stripped = strip_annotated(cls)
+        assert isinstance(cls_stripped, type)
+        if cls_stripped is Geolocation:
+            if not is_typing_annotated(cls):
+                raise ValueError("Geolocation dependencies must be annotated.")
+            zyte_api_meta["geolocation"] = cls.__metadata__[0]  # type: ignore[attr-defined]
+            continue
+        if cls_stripped is Actions:
+            if not is_typing_annotated(cls):
+                raise ValueError(
+                    "Actions dependencies must be annotated, "
+                    "e.g. Annotated[Actions, actions([...list of actions...])]."
+                )
+            zyte_api_meta["actions"] = []
+            for action in cls.__metadata__[0]:  # type: ignore[attr-defined]
+                zyte_api_meta["actions"].append(_from_hashable(action))
+            continue
+        if cls_stripped in {CustomAttributes, CustomAttributesValues}:
+            custom_attrs_input, custom_attrs_options = cls.__metadata__[0]  # type: ignore[attr-defined]
+            zyte_api_meta["customAttributes"] = _from_hashable(custom_attrs_input)
+            if custom_attrs_options:
+                zyte_api_meta["customAttributesOptions"] = _from_hashable(
+                    custom_attrs_options
+                )
+            continue
+        kw = _ITEM_KEYWORDS.get(cls_stripped)
+        if not kw:
+            continue
+        item_requested = True
+        to_provide_stripped.add(cls_stripped)
+        zyte_api_meta[kw] = True
+        if not is_typing_annotated(cls):
+            continue
+        metadata = cls.__metadata__  # type: ignore[attr-defined]
+        for extract_from in ExtractFrom:
+            if extract_from in metadata:
+                prev_extract_from = extract_from_seen.get(kw)
+                if prev_extract_from and prev_extract_from != extract_from:
+                    raise ValueError(
+                        f"Multiple different extractFrom specified for {kw}"
+                    )
+                extract_from_seen[kw] = extract_from
+                options = zyte_api_meta.setdefault(f"{kw}Options", {})
+                options.setdefault("extractFrom", extract_from.value)
+                break
+
+    http_response_needed = (
+        AnyResponse in to_provide
+        and BrowserResponse not in to_provide
+        and BrowserHtml not in to_provide
+        and not screenshot_requested
+        and not http_response_available
+    )
+
+    extract_from: str | None = None
+    for item_type, kw in _ITEM_KEYWORDS.items():
+        options_name = f"{kw}Options"
+        if item_type not in to_provide_stripped and options_name in zyte_api_meta:
+            del zyte_api_meta[options_name]
+        elif zyte_api_meta.get(options_name, {}).get("extractFrom"):
+            extract_from = zyte_api_meta[options_name]["extractFrom"]
+
+    if AnyResponse in to_provide:
+        if (
+            (item_requested and extract_from != "httpResponseBody")
+            or extract_from == "browserHtml"
+            or zyte_api_meta.get("browserHtml", False) is True
+        ):
+            html_requested = True
+        elif extract_from == "httpResponseBody" or http_response_needed:
+            zyte_api_meta["httpResponseBody"] = True
+            zyte_api_meta["httpResponseHeaders"] = True
+
+    if html_requested:
+        zyte_api_meta["browserHtml"] = True
+    if screenshot_requested:
+        zyte_api_meta["screenshot"] = True
+
+    return zyte_api_meta, html_requested
+
+
 class ZyteApiProvider(PageObjectInputProvider):
     name = "zyte_api"
 
@@ -173,95 +281,13 @@ class ZyteApiProvider(PageObjectInputProvider):
         if not to_provide:
             return results
 
-        html_requested = BrowserResponse in to_provide or BrowserHtml in to_provide
-
-        zyte_api_meta = {
-            **crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS"),
-            **request.meta.get("zyte_api_provider", {}),
-        }
-
-        to_provide_stripped: set[type] = set()
-        extract_from_seen: dict[str, str] = {}
-        item_requested: bool = False
-
-        for cls in to_provide:
-            cls_stripped = strip_annotated(cls)
-            assert isinstance(cls_stripped, type)
-            if cls_stripped is Geolocation:
-                if not is_typing_annotated(cls):
-                    raise ValueError("Geolocation dependencies must be annotated.")
-                zyte_api_meta["geolocation"] = cls.__metadata__[0]  # type: ignore[attr-defined]
-                continue
-            if cls_stripped is Actions:
-                if not is_typing_annotated(cls):
-                    raise ValueError(
-                        "Actions dependencies must be annotated, "
-                        "e.g. Annotated[Actions, actions([...list of actions...])]."
-                    )
-                zyte_api_meta["actions"] = []
-                for action in cls.__metadata__[0]:  # type: ignore[attr-defined]
-                    zyte_api_meta["actions"].append(_from_hashable(action))
-                continue
-            if cls_stripped in {CustomAttributes, CustomAttributesValues}:
-                custom_attrs_input, custom_attrs_options = cls.__metadata__[0]  # type: ignore[attr-defined]
-                zyte_api_meta["customAttributes"] = _from_hashable(custom_attrs_input)
-                if custom_attrs_options:
-                    zyte_api_meta["customAttributesOptions"] = _from_hashable(
-                        custom_attrs_options
-                    )
-                continue
-            kw = _ITEM_KEYWORDS.get(cls_stripped)
-            if not kw:
-                continue
-            item_requested = True
-            to_provide_stripped.add(cls_stripped)
-            zyte_api_meta[kw] = True
-            if not is_typing_annotated(cls):
-                continue
-            metadata = cls.__metadata__  # type: ignore[attr-defined]
-            for extract_from in ExtractFrom:
-                if extract_from in metadata:
-                    prev_extract_from = extract_from_seen.get(kw)
-                    if prev_extract_from and prev_extract_from != extract_from:
-                        raise ValueError(
-                            f"Multiple different extractFrom specified for {kw}"
-                        )
-                    extract_from_seen[kw] = extract_from
-                    options = zyte_api_meta.setdefault(f"{kw}Options", {})
-                    options.setdefault("extractFrom", extract_from.value)
-                    break
-
-        http_response_needed = (
-            AnyResponse in to_provide
-            and BrowserResponse not in to_provide
-            and BrowserHtml not in to_provide
-            and not screenshot_requested
-            and not http_response
+        zyte_api_meta, html_requested = _build_zyte_api_provider_meta(
+            to_provide,
+            request,
+            crawler,
+            screenshot_requested=screenshot_requested,
+            http_response_available=http_response is not None,
         )
-
-        extract_from = None  # type: ignore[assignment]
-        for item_type, kw in _ITEM_KEYWORDS.items():
-            options_name = f"{kw}Options"
-            if item_type not in to_provide_stripped and options_name in zyte_api_meta:
-                del zyte_api_meta[options_name]
-            elif zyte_api_meta.get(options_name, {}).get("extractFrom"):
-                extract_from = zyte_api_meta[options_name]["extractFrom"]
-
-        if AnyResponse in to_provide:
-            if (
-                (item_requested and extract_from != "httpResponseBody")
-                or extract_from == "browserHtml"
-                or zyte_api_meta.get("browserHtml", False) is True
-            ):
-                html_requested = True
-            elif extract_from == "httpResponseBody" or http_response_needed:
-                zyte_api_meta["httpResponseBody"] = True
-                zyte_api_meta["httpResponseHeaders"] = True
-
-        if html_requested:
-            zyte_api_meta["browserHtml"] = True
-        if screenshot_requested:
-            zyte_api_meta["screenshot"] = True
 
         api_request = Request(
             url=request.url,
