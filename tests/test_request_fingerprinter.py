@@ -698,9 +698,9 @@ async def test_provider_fingerprint_combined_with_regular():
     crawler = await get_crawler()
     request = Request("https://example.com")
     fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
-    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"  # type: ignore[method-assign]
-    fingerprinter._is_provider_only_request = lambda request: False  # type: ignore[method-assign]
-    fingerprinter._get_regular_request_fingerprint = lambda request: b"regular"  # type: ignore[method-assign]
+    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"
+    fingerprinter._is_provider_only_request = lambda request: False
+    fingerprinter._get_regular_request_fingerprint = lambda request: b"regular"
 
     expected_fingerprint = hashlib.sha1(
         b"regular" + b"provider", usedforsecurity=False
@@ -728,7 +728,7 @@ async def test_provider_only_request_with_non_poet_fallback():
             )
             self.dummy_response_request = Request(
                 "https://example.com",
-                callback=self.parse_dummy_response,
+                callback=self.parse_dummy_response,  # type: ignore[arg-type]
                 meta={"zyte_api_automap": True},
             )
 
@@ -772,7 +772,34 @@ async def test_provider_only_request_with_non_poet_fallback():
         non_poet_fallback_crawler.spider.dummy_response_request
     )
 
-    assert default_untyped_fingerprint != default_dummy_response_fingerprint
+    assert (
+        default_fingerprinter._is_provider_only_request(
+            default_crawler.spider.untyped_request
+        )
+        is False
+    )
+    assert (
+        default_fingerprinter._is_provider_only_request(
+            default_crawler.spider.dummy_response_request
+        )
+        is True
+    )
+    assert (
+        non_poet_fallback_fingerprinter._is_provider_only_request(
+            non_poet_fallback_crawler.spider.untyped_request
+        )
+        is False
+    )
+    assert (
+        non_poet_fallback_fingerprinter._is_provider_only_request(
+            non_poet_fallback_crawler.spider.dummy_response_request
+        )
+        is False
+    )
+
+    # scrapy-poet does not include DummyResponse annotation changes in
+    # dependency fingerprinting, so these requests hash the same.
+    assert default_untyped_fingerprint == default_dummy_response_fingerprint
     assert non_poet_untyped_fingerprint == non_poet_dummy_response_fingerprint
 
 
@@ -781,8 +808,8 @@ async def test_provider_only_request_uses_provider_fingerprint():
     crawler = await get_crawler()
     request = Request("https://example.com")
     fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
-    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"  # type: ignore[method-assign]
-    fingerprinter._is_provider_only_request = lambda request: True  # type: ignore[method-assign]
+    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"
+    fingerprinter._is_provider_only_request = lambda request: True
 
     def _unexpected_regular_fingerprint(request):
         raise AssertionError(
@@ -790,7 +817,7 @@ async def test_provider_only_request_uses_provider_fingerprint():
             "for provider-only requests"
         )
 
-    fingerprinter._get_regular_request_fingerprint = _unexpected_regular_fingerprint  # type: ignore[method-assign]
+    fingerprinter._get_regular_request_fingerprint = _unexpected_regular_fingerprint
     assert fingerprinter.fingerprint(request) == b"provider"
 
 
@@ -799,9 +826,9 @@ async def test_provider_fingerprint_used_when_regular_fingerprint_is_missing():
     crawler = await get_crawler()
     request = Request("https://example.com")
     fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
-    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"  # type: ignore[method-assign]
-    fingerprinter._is_provider_only_request = lambda request: False  # type: ignore[method-assign]
-    fingerprinter._get_regular_request_fingerprint = lambda request: None  # type: ignore[method-assign]
+    fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"
+    fingerprinter._is_provider_only_request = lambda request: False
+    fingerprinter._get_regular_request_fingerprint = lambda request: None
 
     assert fingerprinter.fingerprint(request) == b"provider"
 
