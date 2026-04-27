@@ -1,6 +1,5 @@
 import hashlib
 from copy import copy
-from weakref import WeakKeyDictionary
 
 import pytest
 from packaging.version import Version
@@ -694,17 +693,11 @@ async def test_deps():
     assert page_request_transparent_fp == page_auto_request_transparent_fp
 
 
-def test_provider_fingerprint_combined_with_regular():
-    class FallbackFingerprinter:
-        def fingerprint(self, request):
-            return b"fallback"
-
+@deferred_f_from_coro_f
+async def test_provider_fingerprint_combined_with_regular():
+    crawler = await get_crawler()
     request = Request("https://example.com")
-    fingerprinter = ScrapyZyteAPIRequestFingerprinter.__new__(
-        ScrapyZyteAPIRequestFingerprinter
-    )
-    fingerprinter._cache = WeakKeyDictionary()
-    fingerprinter._fallback_request_fingerprinter = FallbackFingerprinter()
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"  # type: ignore[method-assign]
     fingerprinter._is_provider_only_request = lambda request: False  # type: ignore[method-assign]
     fingerprinter._get_regular_request_fingerprint = lambda request: b"regular"  # type: ignore[method-assign]
@@ -715,17 +708,79 @@ def test_provider_fingerprint_combined_with_regular():
     assert fingerprinter.fingerprint(request) == expected_fingerprint
 
 
-def test_provider_only_request_uses_provider_fingerprint():
-    class FallbackFingerprinter:
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@deferred_f_from_coro_f
+async def test_provider_only_request_with_non_poet_fallback():
+    from scrapy_poet import DummyResponse  # noqa: PLC0415
+
+    class CustomFallbackFingerprinter:
         def fingerprint(self, request):
             return b"fallback"
 
-    request = Request("https://example.com")
-    fingerprinter = ScrapyZyteAPIRequestFingerprinter.__new__(
-        ScrapyZyteAPIRequestFingerprinter
+    class DummyResponseSpider(Spider):
+        name = "dummy_response"
+
+        def __init__(self, *args, **kwargs):
+            self.untyped_request = Request(
+                "https://example.com",
+                callback=self.parse_untyped,
+                meta={"zyte_api_automap": True},
+            )
+            self.dummy_response_request = Request(
+                "https://example.com",
+                callback=self.parse_dummy_response,
+                meta={"zyte_api_automap": True},
+            )
+
+        async def parse_untyped(self, response):
+            pass
+
+        async def parse_dummy_response(self, response: DummyResponse):
+            pass
+
+    default_crawler = await get_crawler(
+        {"ZYTE_API_TRANSPARENT_MODE": True}, spider_cls=DummyResponseSpider
     )
-    fingerprinter._cache = WeakKeyDictionary()
-    fingerprinter._fallback_request_fingerprinter = FallbackFingerprinter()
+    default_fingerprinter = _build_from_crawler(
+        ScrapyZyteAPIRequestFingerprinter, default_crawler
+    )
+
+    non_poet_fallback_crawler = await get_crawler(
+        {
+            "ZYTE_API_TRANSPARENT_MODE": True,
+            "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS": (
+                CustomFallbackFingerprinter
+            ),
+        },
+        spider_cls=DummyResponseSpider,
+    )
+    non_poet_fallback_fingerprinter = _build_from_crawler(
+        ScrapyZyteAPIRequestFingerprinter, non_poet_fallback_crawler
+    )
+
+    default_untyped_fingerprint = default_fingerprinter.fingerprint(
+        default_crawler.spider.untyped_request
+    )
+    default_dummy_response_fingerprint = default_fingerprinter.fingerprint(
+        default_crawler.spider.dummy_response_request
+    )
+
+    non_poet_untyped_fingerprint = non_poet_fallback_fingerprinter.fingerprint(
+        non_poet_fallback_crawler.spider.untyped_request
+    )
+    non_poet_dummy_response_fingerprint = non_poet_fallback_fingerprinter.fingerprint(
+        non_poet_fallback_crawler.spider.dummy_response_request
+    )
+
+    assert default_untyped_fingerprint != default_dummy_response_fingerprint
+    assert non_poet_untyped_fingerprint == non_poet_dummy_response_fingerprint
+
+
+@deferred_f_from_coro_f
+async def test_provider_only_request_uses_provider_fingerprint():
+    crawler = await get_crawler()
+    request = Request("https://example.com")
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"  # type: ignore[method-assign]
     fingerprinter._is_provider_only_request = lambda request: True  # type: ignore[method-assign]
 
@@ -739,17 +794,11 @@ def test_provider_only_request_uses_provider_fingerprint():
     assert fingerprinter.fingerprint(request) == b"provider"
 
 
-def test_provider_fingerprint_used_when_regular_fingerprint_is_missing():
-    class FallbackFingerprinter:
-        def fingerprint(self, request):
-            return b"fallback"
-
+@deferred_f_from_coro_f
+async def test_provider_fingerprint_used_when_regular_fingerprint_is_missing():
+    crawler = await get_crawler()
     request = Request("https://example.com")
-    fingerprinter = ScrapyZyteAPIRequestFingerprinter.__new__(
-        ScrapyZyteAPIRequestFingerprinter
-    )
-    fingerprinter._cache = WeakKeyDictionary()
-    fingerprinter._fallback_request_fingerprinter = FallbackFingerprinter()
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
     fingerprinter._get_provider_request_fingerprint = lambda request: b"provider"  # type: ignore[method-assign]
     fingerprinter._is_provider_only_request = lambda request: False  # type: ignore[method-assign]
     fingerprinter._get_regular_request_fingerprint = lambda request: None  # type: ignore[method-assign]
