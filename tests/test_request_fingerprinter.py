@@ -705,7 +705,7 @@ async def test_zyte_api_provider_meta_affects_fingerprint():
         def __init__(self, *args, **kwargs):
             self.browser_request = Request(
                 "https://example.com",
-                callback=self.parse,
+                callback=self.parse,  # type: ignore[arg-type]
                 meta={
                     "zyte_api_provider": {
                         "jobPostingNavigationOptions": {"extractFrom": "browserHtml"},
@@ -714,7 +714,7 @@ async def test_zyte_api_provider_meta_affects_fingerprint():
             )
             self.http_request = Request(
                 "https://example.com",
-                callback=self.parse,
+                callback=self.parse,  # type: ignore[arg-type]
                 meta={
                     "zyte_api_provider": {
                         "jobPostingNavigationOptions": {
@@ -876,11 +876,11 @@ async def test_provider_only_request_reuses_dependency_plan():
         def __init__(self, *args, **kwargs):
             self.request = Request(
                 "https://example.com",
-                callback=self.parse,
+                callback=self.parse,  # type: ignore[arg-type]
                 meta={"zyte_api_automap": True},
             )
 
-        async def parse(self, response: DummyResponse, product: Product):
+        async def parse(self, response: DummyResponse, product: Product):  # type: ignore[override]
             pass
 
     crawler = await get_crawler(
