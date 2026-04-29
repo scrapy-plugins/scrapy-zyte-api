@@ -94,6 +94,8 @@ roman-numerals-py==4.1.0
     # via sphinx
 ruamel-yaml==0.18.16
     # via sphinx-toolbox
+ruamel-yaml-clib==0.2.15
+    # via ruamel-yaml
 six==1.17.0
     # via html5lib
 snowballstemmer==3.0.1
@@ -107,6 +109,7 @@ sphinx==8.2.3
     #   enum-tools
     #   sphinx-autodoc-typehints
     #   sphinx-copybutton
+    #   sphinx-last-updated-by-git
     #   sphinx-llms-txt
     #   sphinx-markdown-builder
     #   sphinx-prompt
@@ -123,16 +126,20 @@ sphinx-jinja2-compat==0.4.1
     # via
     #   enum-tools
     #   sphinx-toolbox
+sphinx-last-updated-by-git==0.3.8
+    # via sphinx-sitemap
 sphinx-llms-txt @ git+https://github.com/zytedata/sphinx-llms-txt.git@5e8866cb0cc249aa2017ad9050b3b83a7ca16f69
     # via sphinx-scrapy
-sphinx-markdown-builder @ git+https://github.com/zytedata/sphinx-markdown-builder.git@ac9f8babfe622e4300099ab44b96d9d9228e742e
+sphinx-markdown-builder @ git+https://github.com/zytedata/sphinx-markdown-builder.git@cfe4c0bfd7b4542f7e6b65a58cdf9ec765829940
     # via sphinx-scrapy
 sphinx-prompt==1.10.2
     # via sphinx-toolbox
 sphinx-rtd-theme==3.1.0
     # via -r requirements.in
-sphinx-scrapy @ git+https://github.com/scrapy/sphinx-scrapy.git@2b5f6c7de64c8317cb771fdeb2e5020d1c9c9dcf
+sphinx-scrapy @ git+https://github.com/scrapy/sphinx-scrapy.git@eef1f8c3ab3b74b6891752b8f4624373345bae26
     # via -r requirements.in
+sphinx-sitemap==2.9.0
+    # via sphinx-scrapy
 sphinx-tabs==3.4.5
     # via sphinx-toolbox
 sphinx-toolbox==4.1.2
@@ -151,8 +158,6 @@ sphinxcontrib-qthelp==2.0.0
     # via sphinx
 sphinxcontrib-serializinghtml==2.0.0
     # via sphinx
-standard-imghdr==3.10.14
-    # via sphinx-jinja2-compat
 tabulate==0.10.0
     # via
     #   sphinx-markdown-builder
