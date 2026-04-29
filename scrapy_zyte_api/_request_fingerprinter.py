@@ -129,17 +129,28 @@ else:
                 mw = NoOpSessionDownloaderMiddleware()
             return mw
 
-        def _get_pool(self, request: Request) -> str:
+        def _get_pool(self, request: Request) -> str | None:
             return self._session_mw.get_pool(request)
+
+        def _serialize_api_params(self, request: Request, api_params) -> bytes:
+            session_pool = self._get_pool(request)
+            if session_pool is not None:
+                api_params.setdefault("sessionContext", session_pool)
+            self._normalize_params(api_params)
+            return json.dumps(api_params, sort_keys=True).encode()
+
+        @staticmethod
+        def _hash_fingerprint(fingerprint_data: bytes) -> bytes:
+            return hashlib.sha1(fingerprint_data, usedforsecurity=False).digest()
 
         @staticmethod
         def _contains_dependency(dependencies, dependency_cls) -> bool:
             from andi.typeutils import strip_annotated  # noqa: PLC0415
 
-            for dependency in dependencies:
-                if strip_annotated(dependency) is dependency_cls:
-                    return True
-            return False
+            return any(
+                strip_annotated(dependency) is dependency_cls
+                for dependency in dependencies
+            )
 
         @staticmethod
         def _is_scrapy_response_required(injector, request: Request, plan) -> bool:
@@ -172,6 +183,13 @@ else:
 
             injector = self._fallback_request_fingerprinter._injector
             plan = injector.build_plan(request)
+            return self._set_provider_only_cache(
+                request,
+                injector,
+                plan,
+            )
+
+        def _set_provider_only_cache(self, request: Request, injector, plan) -> bool:
             is_provider_only = not self._is_scrapy_response_required(
                 injector,
                 request,
@@ -185,21 +203,16 @@ else:
             if api_params is None:
                 return None
 
-            session_pool = self._get_pool(request)
-            if session_pool is not None:
-                api_params.setdefault("sessionContext", session_pool)
-            self._normalize_params(api_params)
-            fingerprint = json.dumps(api_params, sort_keys=True).encode()
+            fingerprint = self._serialize_api_params(request, api_params)
             if self._fallback_fingerprinter_is_poets:
                 deps_key = self._fallback_request_fingerprinter.get_deps_key(request)
                 serialized_page_params = (
                     self._fallback_request_fingerprinter.serialize_page_params(request)
                 )
-                if deps_key is not None:
-                    fingerprint += deps_key
-                if serialized_page_params is not None:
-                    fingerprint += serialized_page_params
-            return hashlib.sha1(fingerprint, usedforsecurity=False).digest()
+                for extra_fingerprint_part in (deps_key, serialized_page_params):
+                    if extra_fingerprint_part is not None:
+                        fingerprint += extra_fingerprint_part
+            return self._hash_fingerprint(fingerprint)
 
         def _get_provider_request_fingerprint(self, request: Request) -> bytes | None:
             if not self._fallback_fingerprinter_is_poets:
@@ -216,9 +229,9 @@ else:
             plan = injector.build_plan(request)
 
             dependencies = {dependency for dependency, _ in plan.dependencies}
-            self._provider_only_cache[request] = not self._is_scrapy_response_required(
-                injector,
+            self._set_provider_only_cache(
                 request,
+                injector,
                 plan,
             )
 
@@ -244,14 +257,9 @@ else:
                         ),
                     )
                     api_params["url"] = request.url
-                    session_pool = self._get_pool(request)
-                    if session_pool is not None:
-                        api_params.setdefault("sessionContext", session_pool)
-                    self._normalize_params(api_params)
-                    return hashlib.sha1(
-                        json.dumps(api_params, sort_keys=True).encode(),
-                        usedforsecurity=False,
-                    ).digest()
+                    return self._hash_fingerprint(
+                        self._serialize_api_params(request, api_params)
+                    )
                 provided_dependencies |= to_provide
                 remaining_dependencies -= to_provide
 
@@ -271,9 +279,9 @@ else:
             regular_fingerprint = self._get_regular_request_fingerprint(request)
 
             if regular_fingerprint is not None and provider_fingerprint is not None:
-                self._cache[request] = hashlib.sha1(
-                    regular_fingerprint + provider_fingerprint, usedforsecurity=False
-                ).digest()
+                self._cache[request] = self._hash_fingerprint(
+                    regular_fingerprint + provider_fingerprint
+                )
                 return self._cache[request]
 
             if regular_fingerprint is not None:

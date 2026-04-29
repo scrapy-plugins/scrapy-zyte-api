@@ -693,6 +693,49 @@ async def test_deps():
     assert page_request_transparent_fp == page_auto_request_transparent_fp
 
 
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@deferred_f_from_coro_f
+async def test_zyte_api_provider_meta_affects_fingerprint():
+    from scrapy_poet import DummyResponse  # noqa: PLC0415
+    from zyte_common_items import JobPostingNavigation  # noqa: PLC0415
+
+    class ProviderMetaSpider(Spider):
+        name = "provider_meta"
+
+        def __init__(self, *args, **kwargs):
+            self.browser_request = Request(
+                "https://example.com",
+                callback=self.parse,
+                meta={
+                    "zyte_api_provider": {
+                        "jobPostingNavigationOptions": {"extractFrom": "browserHtml"},
+                    },
+                },
+            )
+            self.http_request = Request(
+                "https://example.com",
+                callback=self.parse,
+                meta={
+                    "zyte_api_provider": {
+                        "jobPostingNavigationOptions": {
+                            "extractFrom": "httpResponseBody"
+                        },
+                    },
+                },
+            )
+
+        async def parse(self, response: DummyResponse, item: JobPostingNavigation):  # type: ignore[override]
+            pass
+
+    crawler = await get_crawler(spider_cls=ProviderMetaSpider)
+    fingerprinter = crawler.request_fingerprinter
+
+    browser_fingerprint = fingerprinter.fingerprint(crawler.spider.browser_request)
+    http_fingerprint = fingerprinter.fingerprint(crawler.spider.http_request)
+
+    assert browser_fingerprint != http_fingerprint
+
+
 @deferred_f_from_coro_f
 async def test_provider_fingerprint_combined_with_regular():
     crawler = await get_crawler()
