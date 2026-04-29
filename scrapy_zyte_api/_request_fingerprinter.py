@@ -86,6 +86,9 @@ else:
                 )
                 self._fallback_fingerprinter_is_poets = False
             self._cache: WeakKeyDictionary[Request, bytes] = WeakKeyDictionary()
+            self._provider_only_cache: WeakKeyDictionary[Request, bool] = (
+                WeakKeyDictionary()
+            )
             self._param_parser = _ParamParser(crawler, cookies_enabled=False)
             self._crawler = crawler
 
@@ -138,11 +141,44 @@ else:
                     return True
             return False
 
+        @staticmethod
+        def _is_scrapy_response_required(injector, request: Request, plan) -> bool:
+            from scrapy_poet.injection import (  # noqa: PLC0415
+                get_callback,
+                is_callback_requiring_scrapy_response,
+            )
+
+            callback = get_callback(request, injector.spider)
+            if is_callback_requiring_scrapy_response(callback, request.callback):
+                return True
+
+            for dependency, _ in plan.dependencies:
+                for provider in injector.providers:
+                    if not injector.is_provider_requiring_scrapy_response[provider]:
+                        continue
+                    if provider.is_provided(dependency):
+                        return True
+
+            return False
+
         def _is_provider_only_request(self, request: Request) -> bool:
             if not self._fallback_fingerprinter_is_poets:
                 return False
+
+            try:
+                return self._provider_only_cache[request]
+            except KeyError:
+                pass
+
             injector = self._fallback_request_fingerprinter._injector
-            return not injector.is_scrapy_response_required(request)
+            plan = injector.build_plan(request)
+            is_provider_only = not self._is_scrapy_response_required(
+                injector,
+                request,
+                plan,
+            )
+            self._provider_only_cache[request] = is_provider_only
+            return is_provider_only
 
         def _get_regular_request_fingerprint(self, request: Request) -> bytes | None:
             api_params = self._param_parser.parse(request)
@@ -179,7 +215,14 @@ else:
             injector = self._fallback_request_fingerprinter._injector
             plan = injector.build_plan(request)
 
-            remaining_dependencies = {dependency for dependency, _ in plan.dependencies}
+            dependencies = {dependency for dependency, _ in plan.dependencies}
+            self._provider_only_cache[request] = not self._is_scrapy_response_required(
+                injector,
+                request,
+                plan,
+            )
+
+            remaining_dependencies = set(dependencies)
             provided_dependencies: set = set()
 
             for provider in injector.providers:

@@ -821,6 +821,52 @@ async def test_provider_only_request_uses_provider_fingerprint():
     assert fingerprinter.fingerprint(request) == b"provider"
 
 
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@deferred_f_from_coro_f
+async def test_provider_only_request_reuses_dependency_plan():
+    from scrapy_poet import DummyResponse  # noqa: PLC0415
+    from zyte_common_items import Product  # noqa: PLC0415
+
+    class ProviderOnlySpider(Spider):
+        name = "provider_only"
+
+        def __init__(self, *args, **kwargs):
+            self.request = Request(
+                "https://example.com",
+                callback=self.parse,
+                meta={"zyte_api_automap": True},
+            )
+
+        async def parse(self, response: DummyResponse, product: Product):
+            pass
+
+    crawler = await get_crawler(
+        {"ZYTE_API_TRANSPARENT_MODE": True},
+        spider_cls=ProviderOnlySpider,
+    )
+    fingerprinter = crawler.request_fingerprinter
+    request = crawler.spider.request
+
+    assert fingerprinter._get_provider_request_fingerprint(request) is not None
+
+    injector = fingerprinter._fallback_request_fingerprinter._injector
+    build_plan_calls = 0
+    original_build_plan = injector.build_plan
+
+    def _tracked_build_plan(inner_request):
+        nonlocal build_plan_calls
+        build_plan_calls += 1
+        return original_build_plan(inner_request)
+
+    injector.build_plan = _tracked_build_plan
+    try:
+        fingerprinter.fingerprint(request)
+    finally:
+        injector.build_plan = original_build_plan
+
+    assert build_plan_calls == 1
+
+
 @deferred_f_from_coro_f
 async def test_provider_fingerprint_used_when_regular_fingerprint_is_missing():
     crawler = await get_crawler()
