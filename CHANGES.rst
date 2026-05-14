@@ -1,6 +1,19 @@
 Changes
 =======
 
+0.34.0 (unreleased)
+-------------------
+
+-   New setting: :setting:`ZYTE_API_WARN_ON_BAN_SENSITIVE_HEADERS` (enabled by
+    default). When enabled, scrapy-zyte-api logs a warning when requests send
+    headers that can hurt ban avoidance, such as ``User-Agent`` or
+    ``Accept-Language``.
+
+-   :meth:`SessionConfig.params() <scrapy_zyte_api.SessionConfig.params>` can
+    now be an async coroutine method. This also applies to
+    :meth:`LocationSessionConfig.location_params()
+    <scrapy_zyte_api.LocationSessionConfig.location_params>`.
+
 0.33.1 (2026-04-07)
 -------------------
 
