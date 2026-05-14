@@ -1176,7 +1176,7 @@ class LocationSessionConfig(SessionConfig):
     as a parameter.
     """
 
-    def params(self, request: Request) -> dict[str, Any]:
+    def params(self, request: Request) -> dict[str, Any] | Awaitable[dict[str, Any]]:
         if not (location := self.location(request)):
             return super().params(request)
         return self.location_params(request, location)
@@ -1188,7 +1188,7 @@ class LocationSessionConfig(SessionConfig):
 
     def location_params(
         self, request: Request, location: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | Awaitable[dict[str, Any]]:
         """Like :class:`SessionConfig.params
         <scrapy_zyte_api.SessionConfig.params>`, but it is only called when a
         location is set, and gets that *location* as a parameter."""
