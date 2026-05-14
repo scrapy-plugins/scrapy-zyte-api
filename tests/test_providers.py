@@ -53,6 +53,7 @@ from scrapy_zyte_api.providers import (
     _ITEM_KEYWORDS,
     ZyteApiProvider,
     _build_zyte_api_provider_meta,
+    _get_zyte_api_provider_params,
 )
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
@@ -583,6 +584,92 @@ def test_provider_meta_any_response_http_response_available(
 
     assert actual_meta == expected_meta
     assert html_requested is False
+
+
+def test_provider_meta_unknown_setting_param_accepted():
+    class DummySettings(dict):
+        def getdict(self, key):
+            return dict(self.get(key, {}))
+
+    class DummyCrawler:
+        settings = DummySettings({"ZYTE_API_PROVIDER_PARAMS": {"slot": 1}})
+
+    request = Request("https://example.com")
+    assert _get_zyte_api_provider_params(request, DummyCrawler()) == {
+        "slot": 1,
+    }  # type: ignore[arg-type]
+
+
+def test_provider_meta_unknown_request_param_accepted():
+    class DummySettings(dict):
+        def getdict(self, key):
+            return dict(self.get(key, {}))
+
+    class DummyCrawler:
+        settings = DummySettings()
+
+    request = Request("https://example.com", meta={"zyte_api_provider": {"slot": 1}})
+    assert _get_zyte_api_provider_params(request, DummyCrawler()) == {
+        "slot": 1,
+    }  # type: ignore[arg-type]
+
+
+@deferred_f_from_coro_f
+async def test_provider_reuses_cached_provider_meta_from_fingerprinter(
+    mockserver, monkeypatch
+):
+    settings = provider_settings(mockserver)
+    settings["RETRY_TIMES"] = 0
+
+    build_meta_calls = 0
+    original_build_meta = _build_zyte_api_provider_meta
+
+    def _tracked_build_meta(*args, **kwargs):
+        nonlocal build_meta_calls
+        build_meta_calls += 1
+        return original_build_meta(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "scrapy_zyte_api.providers._build_zyte_api_provider_meta",
+        _tracked_build_meta,
+    )
+
+    await _crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+
+    assert build_meta_calls == 1
+
+
+@deferred_f_from_coro_f
+async def test_provider_meta_keeps_non_fingerprint_params_isolated(mockserver):
+    class TestSpider(Spider):
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
+        def start_requests(self):
+            for suffix, referer in (("a", "a"), ("b", "b")):
+                yield Request(
+                    mockserver.urljoin(f"/{suffix}"),
+                    callback=self.parse_,  # type: ignore[arg-type]
+                    dont_filter=True,
+                    meta={
+                        "zyte_api_provider": {
+                            "requestHeaders": {"referer": referer},
+                        },
+                    },
+                )
+
+        def parse_(self, response: DummyResponse, product: Product):  # type: ignore[override]
+            pass
+
+    settings = provider_settings(mockserver)
+    settings["RETRY_TIMES"] = 0
+
+    _, _, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 2
+    assert {param["requestHeaders"]["referer"] for param in params} == {"a", "b"}
 
 
 @deferred_f_from_coro_f

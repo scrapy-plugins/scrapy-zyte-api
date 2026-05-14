@@ -1,4 +1,4 @@
-from collections.abc import Callable, Coroutine, Sequence
+from collections.abc import Callable, Coroutine, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Set, cast
 
 from andi.typeutils import is_typing_annotated, strip_annotated
@@ -45,6 +45,11 @@ from zyte_common_items.fields import is_auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
+from scrapy_zyte_api._provider_fingerprint_cache import (
+    _get_cached_zyte_api_provider_meta,
+    _get_provider_fingerprint_cache_state,
+    _set_cached_zyte_api_provider_meta,
+)
 from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
 
 if TYPE_CHECKING:
@@ -85,11 +90,30 @@ _AUTO_PAGES: set[type] = {
 }
 
 
+def _get_zyte_api_provider_params(request: Request, crawler: Crawler) -> dict[str, Any]:
+    setting_params = crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS")
+
+    request_params = request.meta.get("zyte_api_provider", {})
+    if request_params is None:
+        request_params = {}
+    if not isinstance(request_params, Mapping):
+        raise ValueError(
+            f"Request {request} has {request_params!r} as the "
+            f"zyte_api_provider value, but only dictionaries are supported."
+        )
+
+    return {
+        **setting_params,
+        **dict(request_params),
+    }
+
+
 def _build_zyte_api_provider_meta(
     to_provide: Set[Callable],
     request: Request,
     crawler: Crawler,
     *,
+    provider_params: dict[str, Any] | None = None,
     screenshot_requested: bool | None = None,
     http_response_available: bool = False,
 ) -> tuple[dict[str, Any], bool]:
@@ -102,10 +126,10 @@ def _build_zyte_api_provider_meta(
 
     html_requested = BrowserResponse in to_provide or BrowserHtml in to_provide
 
-    zyte_api_meta = {
-        **crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS"),
-        **request.meta.get("zyte_api_provider", {}),
-    }
+    if provider_params is None:
+        provider_params = _get_zyte_api_provider_params(request, crawler)
+
+    zyte_api_meta = dict(provider_params)
 
     to_provide_stripped: set[type] = set()
     extract_from_seen: dict[str, str] = {}
@@ -281,13 +305,36 @@ class ZyteApiProvider(PageObjectInputProvider):
         if not to_provide:
             return results
 
-        zyte_api_meta, html_requested = _build_zyte_api_provider_meta(
-            to_provide,
-            request,
-            crawler,
-            screenshot_requested=screenshot_requested,
-            http_response_available=http_response is not None,
+        provider_params = _get_zyte_api_provider_params(request, crawler)
+
+        http_response_available = http_response is not None
+        cache_state = _get_provider_fingerprint_cache_state(crawler)
+        cached_provider_meta = _get_cached_zyte_api_provider_meta(
+            cache_state,
+            to_provide=to_provide,
+            http_response_available=http_response_available,
+            provider_params=provider_params,
         )
+
+        if cached_provider_meta is None:
+            zyte_api_meta, html_requested = _build_zyte_api_provider_meta(
+                to_provide,
+                request,
+                crawler,
+                provider_params=provider_params,
+                screenshot_requested=screenshot_requested,
+                http_response_available=http_response_available,
+            )
+            _set_cached_zyte_api_provider_meta(
+                cache_state,
+                to_provide=to_provide,
+                http_response_available=http_response_available,
+                provider_params=provider_params,
+                zyte_api_meta=zyte_api_meta,
+                html_requested=html_requested,
+            )
+        else:
+            zyte_api_meta, html_requested = cached_provider_meta
 
         api_request = Request(
             url=request.url,
