@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.34.0 (unreleased)
+0.34.0 (2026-05-14)
 -------------------
 
 -   New setting: :setting:`ZYTE_API_WARN_ON_BAN_SENSITIVE_HEADERS` (enabled by
