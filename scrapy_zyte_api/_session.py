@@ -4,6 +4,7 @@ import random
 import time
 from asyncio import Task, create_task, sleep
 from collections import defaultdict, deque
+from collections.abc import Awaitable
 from copy import deepcopy
 from functools import partial
 from logging import getLogger
@@ -25,6 +26,7 @@ from .utils import (  # type: ignore[attr-defined]
     _DOWNLOAD_NEEDS_SPIDER,
     _build_from_crawler,
     _close_spider,
+    _ensure_awaitable,
     deferred_to_future,
 )
 
@@ -391,7 +393,7 @@ class SessionConfig:
         """
         return request.meta.get("zyte_api_session_location", self._setting_location)
 
-    def params(self, request: Request) -> dict[str, Any]:
+    def params(self, request: Request) -> dict[str, Any] | Awaitable[dict[str, Any]]:
         """Return the Zyte API request parameters to use to initialize a
         session for *request*.
 
@@ -420,6 +422,28 @@ class SessionConfig:
         The returned parameters do not need to include :http:`request:url`. If
         missing, it is picked from the request :ref:`triggering a session
         initialization request <pool-size>`.
+
+        This method can be implemented as a coroutine function. For example:
+
+        .. code-block:: python
+
+            async def params(self, request: Request) -> Dict[str, Any]:
+                bootstrap_request = Request(
+                    "https://example.com/api/get-session",
+                    meta={
+                        "zyte_api_session_enabled": False,
+                        "zyte_api": {
+                            "httpResponseBody": True,
+                            "responseCookies": True,
+                        },
+                    },
+                )
+                response = await self.crawler.engine.download_async(bootstrap_request)
+                return {
+                    "url": "https://example.com/new-session",
+                    "httpResponseBody": True,
+                    "requestCookies": response.raw_api_response["responseCookies"],
+                }
 
         .. seealso:: :class:`~scrapy_zyte_api.LocationSessionConfig`
         """
@@ -797,7 +821,7 @@ class _SessionManager:
             session_params = self._setting_params
         else:
             try:
-                session_params = session_config.params(request)
+                session_params = await _ensure_awaitable(session_config.params(request))
             except Exception:
                 self._inc_stat("init/param-error", pool)
                 logger.exception(
