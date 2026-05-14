@@ -26,6 +26,7 @@ async def test_check_overrides_error(mockserver):
         "ZYTE_API_SESSION_CHECKER": "tests.test_sessions_check_errors.DomainChecker",
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_MAX_ERRORS": 2,
+        "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0.001,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
     }
 
