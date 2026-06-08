@@ -1,5 +1,8 @@
+import json
+from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Set, cast
+from weakref import WeakKeyDictionary
 
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
@@ -45,12 +48,75 @@ from zyte_common_items.fields import is_auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
-from scrapy_zyte_api._provider_fingerprint_cache import (
-    _get_cached_zyte_api_provider_meta,
-    _get_provider_fingerprint_cache_state,
-    _set_cached_zyte_api_provider_meta,
-)
 from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
+
+_PROVIDER_META_CACHE_MAX_SIZE = 1024
+_provider_meta_caches: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def _get_provider_meta_cache(crawler) -> OrderedDict:
+    try:
+        return _provider_meta_caches[crawler]
+    except KeyError:
+        cache: OrderedDict = OrderedDict()
+        _provider_meta_caches[crawler] = cache
+        return cache
+
+
+def _build_provider_meta_cache_key(
+    to_provide, http_response_available: bool, provider_params: dict
+) -> tuple:
+    return (
+        frozenset(to_provide),
+        http_response_available,
+        json.dumps(provider_params, sort_keys=True, separators=(",", ":")),
+    )
+
+
+def _set_in_provider_meta_cache(
+    cache: OrderedDict,
+    key: tuple,
+    meta: dict,
+    html_requested: bool,
+    max_size: int = _PROVIDER_META_CACHE_MAX_SIZE,
+) -> None:
+    if max_size <= 0:
+        return
+    cache[key] = (dict(meta), html_requested)
+    while len(cache) > max_size:
+        cache.popitem(last=False)
+
+
+def _get_or_build_zyte_api_provider_meta(
+    to_provide,
+    request: Request,
+    crawler: Crawler,
+    *,
+    provider_params,
+    screenshot_requested=None,
+    http_response_available: bool = False,
+) -> tuple[dict, bool]:
+    cache = _get_provider_meta_cache(crawler)
+    key = _build_provider_meta_cache_key(
+        to_provide, http_response_available, provider_params
+    )
+    try:
+        meta, html_requested = cache[key]
+        cache.move_to_end(key)
+        return dict(meta), html_requested
+    except KeyError:
+        pass
+    result = _build_zyte_api_provider_meta(
+        to_provide,
+        request,
+        crawler,
+        provider_params=provider_params,
+        screenshot_requested=screenshot_requested,
+        http_response_available=http_response_available,
+    )
+    _set_in_provider_meta_cache(cache, key, result[0], result[1])
+    return result
+
 
 if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
@@ -308,33 +374,14 @@ class ZyteApiProvider(PageObjectInputProvider):
         provider_params = _get_zyte_api_provider_params(request, crawler)
 
         http_response_available = http_response is not None
-        cache_state = _get_provider_fingerprint_cache_state(crawler)
-        cached_provider_meta = _get_cached_zyte_api_provider_meta(
-            cache_state,
-            to_provide=to_provide,
-            http_response_available=http_response_available,
+        zyte_api_meta, html_requested = _get_or_build_zyte_api_provider_meta(
+            to_provide,
+            request,
+            crawler,
             provider_params=provider_params,
+            screenshot_requested=screenshot_requested,
+            http_response_available=http_response_available,
         )
-
-        if cached_provider_meta is None:
-            zyte_api_meta, html_requested = _build_zyte_api_provider_meta(
-                to_provide,
-                request,
-                crawler,
-                provider_params=provider_params,
-                screenshot_requested=screenshot_requested,
-                http_response_available=http_response_available,
-            )
-            _set_cached_zyte_api_provider_meta(
-                cache_state,
-                to_provide=to_provide,
-                http_response_available=http_response_available,
-                provider_params=provider_params,
-                zyte_api_meta=zyte_api_meta,
-                html_requested=html_requested,
-            )
-        else:
-            zyte_api_meta, html_requested = cached_provider_meta
 
         api_request = Request(
             url=request.url,

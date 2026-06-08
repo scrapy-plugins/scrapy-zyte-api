@@ -557,6 +557,11 @@ def provider_settings(server):
     return settings
 
 
+class _DummySettings(dict):
+    def getdict(self, key):
+        return dict(self.get(key, {}))
+
+
 @pytest.mark.parametrize(
     ("http_response_available", "expected_meta"),
     [
@@ -567,12 +572,8 @@ def provider_settings(server):
 def test_provider_meta_any_response_http_response_available(
     http_response_available, expected_meta
 ):
-    class DummySettings(dict):
-        def getdict(self, key):
-            return dict(self.get(key, {}))
-
     class DummyCrawler:
-        settings = DummySettings()
+        settings = _DummySettings()
 
     request = Request("https://example.com")
     actual_meta, html_requested = _build_zyte_api_provider_meta(
@@ -587,31 +588,23 @@ def test_provider_meta_any_response_http_response_available(
 
 
 def test_provider_meta_unknown_setting_param_accepted():
-    class DummySettings(dict):
-        def getdict(self, key):
-            return dict(self.get(key, {}))
-
     class DummyCrawler:
-        settings = DummySettings({"ZYTE_API_PROVIDER_PARAMS": {"slot": 1}})
+        settings = _DummySettings({"ZYTE_API_PROVIDER_PARAMS": {"slot": 1}})
 
     request = Request("https://example.com")
-    assert _get_zyte_api_provider_params(request, DummyCrawler()) == {
+    assert _get_zyte_api_provider_params(request, DummyCrawler()) == {  # type: ignore[arg-type]
         "slot": 1,
-    }  # type: ignore[arg-type]
+    }
 
 
 def test_provider_meta_unknown_request_param_accepted():
-    class DummySettings(dict):
-        def getdict(self, key):
-            return dict(self.get(key, {}))
-
     class DummyCrawler:
-        settings = DummySettings()
+        settings = _DummySettings()
 
     request = Request("https://example.com", meta={"zyte_api_provider": {"slot": 1}})
-    assert _get_zyte_api_provider_params(request, DummyCrawler()) == {
+    assert _get_zyte_api_provider_params(request, DummyCrawler()) == {  # type: ignore[arg-type]
         "slot": 1,
-    }  # type: ignore[arg-type]
+    }
 
 
 @deferred_f_from_coro_f
@@ -640,7 +633,37 @@ async def test_provider_reuses_cached_provider_meta_from_fingerprinter(
 
 
 @deferred_f_from_coro_f
-async def test_provider_meta_keeps_non_fingerprint_params_isolated(mockserver):
+async def test_provider_rebuilds_meta_for_non_fingerprint_params(
+    mockserver, monkeypatch
+):
+    settings = provider_settings(mockserver)
+    settings["RETRY_TIMES"] = 0
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "requestHeaders": {"Referer": "example.com"}
+    }
+
+    build_meta_calls = 0
+    original_build_meta = _build_zyte_api_provider_meta
+
+    def _tracked_build_meta(*args, **kwargs):
+        nonlocal build_meta_calls
+        build_meta_calls += 1
+        return original_build_meta(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "scrapy_zyte_api.providers._build_zyte_api_provider_meta",
+        _tracked_build_meta,
+    )
+
+    await _crawl_single_item(ZyteAPISpider, HtmlResource, settings)
+
+    # Called twice: once during fingerprinting (with requestHeaders filtered out)
+    # and once during actual provider execution (with requestHeaders included).
+    assert build_meta_calls == 2
+
+
+@deferred_f_from_coro_f
+async def test_provider_non_fingerprint_params_passed_to_api(mockserver):
     class TestSpider(Spider):
         async def start(self):
             for request in self.start_requests():
@@ -659,7 +682,7 @@ async def test_provider_meta_keeps_non_fingerprint_params_isolated(mockserver):
                     },
                 )
 
-        def parse_(self, response: DummyResponse, product: Product):  # type: ignore[override]
+        def parse_(self, response: DummyResponse, product: Product):
             pass
 
     settings = provider_settings(mockserver)

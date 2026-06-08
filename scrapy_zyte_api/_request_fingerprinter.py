@@ -1,15 +1,13 @@
 from functools import cached_property
 from logging import getLogger
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, NamedTuple, cast
 
 from ._session import ScrapyZyteAPISessionDownloaderMiddleware
 
 logger = getLogger(__name__)
 
 try:
-    from scrapy.utils.request import (
-        RequestFingerprinter as _RequestFingerprinter,  # noqa: F401
-    )
+    from scrapy.utils.request import RequestFingerprinter as _  # noqa: F401
 except ImportError:
     if not TYPE_CHECKING:
         ScrapyZyteAPIRequestFingerprinter = None
@@ -27,22 +25,12 @@ else:
     from w3lib.url import canonicalize_url
 
     from ._params import _REQUEST_PARAMS, _may_use_browser, _ParamParser
-    from ._provider_fingerprint_cache import (
-        _get_cached_zyte_api_provider_meta as _shared_get_cached_zyte_api_provider_meta,
-    )
-    from ._provider_fingerprint_cache import (
-        _get_provider_fingerprint_cache_state as _shared_get_provider_fingerprint_cache_state,
-    )
-    from ._provider_fingerprint_cache import (
-        _set_cached_zyte_api_provider_meta as _shared_set_cached_zyte_api_provider_meta,
-    )
     from .utils import _build_from_crawler  # type: ignore[attr-defined]
 
-    _ProviderPlanData = tuple[
-        bool,
-        frozenset[object] | None,
-        bool,
-    ]
+    class _ProviderPlanData(NamedTuple):
+        is_provider_only: bool
+        to_provide: frozenset[object] | None
+        http_response_available: bool
 
     _PROVIDER_FINGERPRINT_PARAM_KEYS = frozenset(
         key
@@ -111,9 +99,6 @@ else:
                 Request,
                 _ProviderPlanData,
             ] = WeakKeyDictionary()
-            self._provider_cache_state = _shared_get_provider_fingerprint_cache_state(
-                crawler
-            )
             self._param_parser = _ParamParser(crawler, cookies_enabled=False)
             self._crawler = crawler
 
@@ -157,6 +142,10 @@ else:
         def _get_pool(self, request: Request) -> str | None:
             return self._session_mw.get_pool(request)
 
+        @cached_property
+        def _injector(self):
+            return self._fallback_request_fingerprinter._injector
+
         def _serialize_api_params(self, request: Request, api_params) -> bytes:
             session_pool = self._get_pool(request)
             if session_pool is not None:
@@ -179,7 +168,6 @@ else:
         def _analyze_provider_plan(
             self,
             request: Request,
-            injector,
             plan,
         ) -> _ProviderPlanData:
             from scrapy_poet.injection import (  # noqa: PLC0415
@@ -190,13 +178,16 @@ else:
 
             from .providers import ZyteApiProvider  # noqa: PLC0415
 
+            injector = self._injector
             callback = get_callback(request, injector.spider)
             scrapy_response_required = is_callback_requiring_scrapy_response(
                 callback,
                 request.callback,
             )
 
-            remaining_dependencies = {dependency for dependency, _ in plan.dependencies}
+            remaining_dependencies = {
+                dependency for dependency, _kwargs in plan.dependencies
+            }
             provided_dependencies: set = set()
             zyte_api_provider_dependencies: frozenset[object] | None = None
             http_response_available = False
@@ -215,9 +206,11 @@ else:
 
                 if isinstance(provider, ZyteApiProvider):
                     zyte_api_provider_dependencies = frozenset(to_provide)
-                    http_response_available = self._contains_dependency(
-                        provided_dependencies,
-                        HttpResponse,
+                    from andi.typeutils import strip_annotated  # noqa: PLC0415
+
+                    http_response_available = any(
+                        strip_annotated(dep) is HttpResponse
+                        for dep in provided_dependencies
                     )
 
                 provided_dependencies |= to_provide
@@ -225,10 +218,10 @@ else:
                 if not remaining_dependencies:
                     break
 
-            return (
-                not scrapy_response_required,
-                zyte_api_provider_dependencies,
-                (
+            return _ProviderPlanData(
+                is_provider_only=not scrapy_response_required,
+                to_provide=zyte_api_provider_dependencies,
+                http_response_available=(
                     http_response_available
                     if zyte_api_provider_dependencies is not None
                     else False
@@ -241,31 +234,16 @@ else:
             except KeyError:
                 pass
 
-            injector = self._fallback_request_fingerprinter._injector
-            plan = injector.build_plan(request)
-            provider_plan_data = self._analyze_provider_plan(
-                request,
-                injector,
-                plan,
-            )
+            plan = self._injector.build_plan(request)
+            provider_plan_data = self._analyze_provider_plan(request, plan)
             self._provider_plan_data_cache[request] = provider_plan_data
             return provider_plan_data
-
-        @staticmethod
-        def _contains_dependency(dependencies, dependency_cls) -> bool:
-            from andi.typeutils import strip_annotated  # noqa: PLC0415
-
-            return any(
-                strip_annotated(dependency) is dependency_cls
-                for dependency in dependencies
-            )
 
         def _is_provider_only_request(self, request: Request) -> bool:
             if not self._fallback_fingerprinter_is_poets:
                 return False
 
-            provider_plan_data = self._get_provider_plan_data(request)
-            return provider_plan_data[0]
+            return self._get_provider_plan_data(request).is_provider_only
 
         def _get_regular_request_fingerprint(self, request: Request) -> bytes | None:
             api_params = self._param_parser.parse(request)
@@ -293,50 +271,34 @@ else:
                 return None, False
 
             from .providers import (  # noqa: PLC0415
-                _build_zyte_api_provider_meta,
+                _get_or_build_zyte_api_provider_meta,
                 _get_zyte_api_provider_params,
             )
 
             if provider_plan_data is None:
                 provider_plan_data = self._get_provider_plan_data(request)
-            is_provider_only, to_provide, http_response_available = provider_plan_data
-            if to_provide is None:
-                return None, is_provider_only
+            if provider_plan_data.to_provide is None:
+                return None, provider_plan_data.is_provider_only
 
             provider_params = self._get_fingerprint_provider_params(
                 _get_zyte_api_provider_params(request, self._crawler)
             )
 
-            provider_meta = _shared_get_cached_zyte_api_provider_meta(
-                self._provider_cache_state,
-                to_provide=to_provide,
-                http_response_available=http_response_available,
+            zyte_api_meta, _html_requested = _get_or_build_zyte_api_provider_meta(
+                provider_plan_data.to_provide,
+                request,
+                self._crawler,
                 provider_params=provider_params,
+                http_response_available=provider_plan_data.http_response_available,
             )
-            if provider_meta is None:
-                provider_meta = _build_zyte_api_provider_meta(
-                    to_provide,
-                    request,
-                    self._crawler,
-                    http_response_available=http_response_available,
-                    provider_params=provider_params,
-                )
-                _shared_set_cached_zyte_api_provider_meta(
-                    self._provider_cache_state,
-                    to_provide=to_provide,
-                    http_response_available=http_response_available,
-                    provider_params=provider_params,
-                    zyte_api_meta=provider_meta[0],
-                    html_requested=provider_meta[1],
-                )
 
-            fingerprint_api_params = dict(provider_meta[0])
+            fingerprint_api_params = dict(zyte_api_meta)
             fingerprint_api_params["url"] = request.url
             return (
                 self._hash_fingerprint(
                     self._serialize_api_params(request, fingerprint_api_params)
                 ),
-                is_provider_only,
+                provider_plan_data.is_provider_only,
             )
 
         def fingerprint(self, request):
