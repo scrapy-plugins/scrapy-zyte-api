@@ -489,6 +489,7 @@ async def test_size(settings, start_requests, expected_stats, mockserver, caplog
     settings = {
         **SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS": 10_000,
         **settings,
     }
 
