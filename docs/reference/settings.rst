@@ -406,6 +406,22 @@ object, for example to read settings:
 
     ZYTE_API_SESSION_CHECKER = MySessionChecker
 
+.. setting:: ZYTE_API_SESSION_CREATION_RETRY_DELAY
+
+ZYTE_API_SESSION_CREATION_RETRY_DELAY
+======================================
+
+Default: ``60.0``
+
+Number of seconds to wait before retrying :ref:`session <session>`
+initialization after a server-side failure: either the active session limit
+being reached (``/problem/over-session-limit``) or a session creation error
+(``/problem/session-creation-error``).
+
+Unlike failures counted by :setting:`ZYTE_API_SESSION_MAX_BAD_INITS`, these
+errors do not indicate a problem with the session parameters; they are
+transient server-side conditions. Retrying immediately after such a failure
+is unlikely to succeed, so scrapy-zyte-api waits this many seconds first.
 
 .. setting:: ZYTE_API_SESSION_DELAY
 
