@@ -225,6 +225,67 @@ when :setting:`ZYTE_API_LOG_REQUESTS` is enabled, excluding object keys.
 
 To disable truncation, set this to ``0``.
 
+.. setting:: ZYTE_API_MAX_COOKIE_BYTES
+
+ZYTE_API_MAX_COOKIE_BYTES
+=========================
+
+Default: ``4097``
+
+During :ref:`request mapping <request>`, cookies whose serialized size exceeds
+this limit are dropped and a warning is logged. The serialized size is
+calculated as:
+
+.. code-block:: text
+
+    len(name) + 1 + len(value) + 9 + len(domain) [+ 7 + len(path)]
+
+which corresponds to the ``name=value; Domain=domain[; Path=path]``
+representation used by Zyte API.
+
+To silence this warning, set :http:`request:experimental.requestCookies`
+manually, e.g. to an empty :class:`dict`.
+
+Alternatively, if :http:`request:experimental.requestCookies` starts supporting
+larger cookies, update this setting accordingly.
+
+See also :setting:`ZYTE_API_MAX_COOKIE_NAME_LENGTH` and
+:setting:`ZYTE_API_MAX_COOKIE_VALUE_LENGTH`.
+
+
+.. setting:: ZYTE_API_MAX_COOKIE_NAME_LENGTH
+
+ZYTE_API_MAX_COOKIE_NAME_LENGTH
+===============================
+
+Default: ``4085``
+
+During :ref:`request mapping <request>`, cookies whose ``name`` length exceeds
+this limit are dropped and a warning is logged.
+
+To silence this warning, set :http:`request:experimental.requestCookies`
+manually, e.g. to an empty :class:`dict`.
+
+Alternatively, if :http:`request:experimental.requestCookies` starts supporting
+longer cookie names, update this setting accordingly.
+
+
+.. setting:: ZYTE_API_MAX_COOKIE_VALUE_LENGTH
+
+ZYTE_API_MAX_COOKIE_VALUE_LENGTH
+================================
+
+Default: ``4085``
+
+During :ref:`request mapping <request>`, cookies whose ``value`` length exceeds
+this limit are dropped and a warning is logged.
+
+To silence this warning, set :http:`request:experimental.requestCookies`
+manually, e.g. to an empty :class:`dict`.
+
+Alternatively, if :http:`request:experimental.requestCookies` starts supporting
+longer cookie values, update this setting accordingly.
+
 
 .. setting:: ZYTE_API_MAX_COOKIES
 
