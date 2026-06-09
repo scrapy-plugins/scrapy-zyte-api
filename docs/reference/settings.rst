@@ -544,6 +544,9 @@ Example:
 .. tip:: The example above is equivalent to setting
     :setting:`ZYTE_API_SESSION_LOCATION` to ``{"postalCode": "10001"}``.
 
+For session initialization requiring a chain of multiple requests, see
+:meth:`~scrapy_zyte_api.SessionConfig.init_session`.
+
 
 .. setting:: ZYTE_API_SESSION_POOL_SIZE
 
