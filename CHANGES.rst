@@ -731,9 +731,8 @@ Changes
 0.7.1 (2023-01-25)
 ------------------
 
-* It is now possible to `log the parameters of requests sent`_.
-
-  .. _log the parameters of requests sent: https://github.com/scrapy-plugins/scrapy-zyte-api#logging-request-parameters
+* It is now possible to log the parameters of requests sent by enabling
+  :setting:`ZYTE_API_LOG_REQUESTS`.
 
 * Stats for HTTP and HTTPS traffic used to be kept separate, and only one of
   those sets of stats would be reported. This is fixed now.
@@ -771,12 +770,11 @@ When upgrading, you should set the following in your Scrapy settings:
   to allow custom fingerprinting. By default, the default Scrapy request
   fingerprinter is used for non-Zyte API requests.
 
-  For users having ``scrapy < 2.7``, check the following link to see different
-  ways on handling the duplicate request issue:
-  https://github.com/scrapy-plugins/scrapy-zyte-api#request-fingerprinting-before-scrapy-27.
+  For users having ``scrapy < 2.7``, see :ref:`fingerprint-pre-2.7` for
+  different ways on handling the duplicate request issue.
 
   More information about the request fingerprinting topic can be found in
-  https://github.com/scrapy-plugins/scrapy-zyte-api#request-fingerprinting.
+  :ref:`fingerprint`.
 
 * Various improvements to docs and tests.
 
