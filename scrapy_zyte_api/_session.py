@@ -609,6 +609,7 @@ class SessionConfig:
         )
         response = await download(session_init_request)
         try:
+            assert response.request is not None
             result = self.check(response, response.request)
         except CloseSpider:
             raise
@@ -956,8 +957,8 @@ class _SessionManager:
             assert self._download
             if not _DOWNLOAD_NEEDS_SPIDER:
                 return await deferred_to_future(self._download(init_request))
-            return await deferred_to_future(  # type: ignore[call-arg]
-                self._download(init_request, spider=self._crawler.spider)
+            return await deferred_to_future(
+                self._download(init_request, spider=self._crawler.spider)  # type: ignore[call-arg]
             )
 
         try:
