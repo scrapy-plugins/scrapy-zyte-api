@@ -631,8 +631,12 @@ session_config = session_config_registry.session_config
 class _SessionManager:
     def __init__(self, crawler: Crawler):
         self._crawler = crawler
+        self._closing = False
         crawler.signals.connect(
             self._handle_engine_start, signal=signals.engine_started
+        )
+        crawler.signals.connect(
+            self._handle_spider_closed, signal=signals.spider_closed
         )
 
         settings = crawler.settings
@@ -747,6 +751,11 @@ class _SessionManager:
         assert self._crawler.engine
         self._download_async = getattr(self._crawler.engine, "download_async", None)
         self._download = None if self._download_async else self._crawler.engine.download
+
+    def _handle_spider_closed(self):
+        self._closing = True
+        for task in list(self._init_tasks):
+            task.cancel()
 
     def _get_session_config(self, request: Request) -> SessionConfig:
         try:
@@ -882,6 +891,8 @@ class _SessionManager:
     async def _create_session(self, request: Request, pool: str) -> str:
         async with self._fatal_error_handler:
             while True:
+                if self._closing:
+                    raise IgnoreRequest
                 session_id = str(uuid4())
                 session_init_succeeded = await self._init_session(
                     session_id, request, pool
@@ -910,6 +921,8 @@ class _SessionManager:
             try:
                 session_id, next_use = self._queues[pool].popleft()
             except IndexError as ex:  # No ready-to-use session available.
+                if self._closing:
+                    raise IgnoreRequest from ex
                 attempts += 1
                 if attempts >= self._queue_max_attempts:
                     raise RuntimeError(
@@ -924,7 +937,7 @@ class _SessionManager:
             if session_id not in self._pools[pool]:
                 continue  # Invalid session
             now = time.time()
-            if next_use > now:
+            if next_use > now and not self._closing:
                 wait = next_use - now
                 logger.debug(
                     f"Waiting {wait:.3f} seconds for session {session_id} "
@@ -971,9 +984,13 @@ class _SessionManager:
             # not refresh the session again.
             pass
         else:
-            task = create_task(self._create_session(request, pool))
-            self._init_tasks.add(task)
-            task.add_done_callback(self._init_tasks.discard)
+            if not self._closing:
+                task = create_task(self._create_session(request, pool))
+                self._init_tasks.add(task)
+                task.add_done_callback(self._init_tasks.discard)
+                task.add_done_callback(
+                    lambda t: None if t.cancelled() else t.exception()
+                )
         with contextlib.suppress(KeyError):
             del self._errors[session_id]
 
