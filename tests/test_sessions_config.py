@@ -347,3 +347,70 @@ async def test_session_config_async_params_error(mockserver):
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_session_config_params_wrong_type(mockserver):
+    pytest.importorskip("web_poet")
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        def params(self, request: Request):
+            return []
+
+    settings = {
+        **SESSION_SETTINGS,
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert_session_stats(crawler, {"example.com": {"init/param-error": 1}})
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_session_config_async_params_wrong_type(mockserver):
+    pytest.importorskip("web_poet")
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        async def params(self, request: Request):
+            await asyncio.sleep(0)
+            return []
+
+    settings = {
+        **SESSION_SETTINGS,
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
+        "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert_session_stats(crawler, {"example.com": {"init/param-error": 1}})
+
+    # Clean up the session config registry.
+    session_config_registry.__init__()  # type: ignore[misc]

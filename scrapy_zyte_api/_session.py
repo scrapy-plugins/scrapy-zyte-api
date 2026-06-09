@@ -829,6 +829,14 @@ class _SessionManager:
                     f"initialization parameters for request {request}."
                 )
                 return False
+            if not isinstance(session_params, dict):
+                self._inc_stat("init/param-error", pool)
+                logger.error(
+                    f"{session_config.__class__.__qualname__}.params returned "
+                    f"{session_params!r} ({type(session_params).__name__}) for "
+                    f"request {request}, but a dict was expected."
+                )
+                return False
         session_params = deepcopy(session_params)
         session_init_url = session_params.pop("url", request.url)
         session_init_request = Request(
