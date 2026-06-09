@@ -186,6 +186,10 @@ class _SessionInitParamError(Exception):
     """Raised by SessionConfig.init_session() when params() fails, so that
     _SessionManager._init_session() can distinguish the stat to increment."""
 
+    def __init__(self, message: str | None = None):
+        super().__init__()
+        self.message = message
+
 
 class _SessionInitCheckError(Exception):
     """Raised by SessionConfig.init_session() when check() raises an
@@ -583,6 +587,12 @@ class SessionConfig:
                 session_params = await _ensure_awaitable(self.params(request))
             except Exception as e:
                 raise _SessionInitParamError from e
+            if not isinstance(session_params, dict):
+                raise _SessionInitParamError(
+                    f"{type(self).__qualname__}.params returned "
+                    f"{session_params!r} ({type(session_params).__name__}) for "
+                    f"request {request}, but a dict was expected."
+                )
         session_params = deepcopy(session_params)
         session_init_url = session_params.pop("url", request.url)
         session_init_request = Request(
@@ -954,11 +964,14 @@ class _SessionManager:
             result = await session_config.init_session(session_id, request, download)
         except _SessionInitParamError as e:
             self._inc_stat("init/param-error", pool)
-            logger.exception(
-                f"Unexpected exception raised while obtaining session "
-                f"initialization parameters for request {request}.",
-                exc_info=e.__cause__,
-            )
+            if e.message:
+                logger.error(e.message)
+            else:
+                logger.exception(
+                    f"Unexpected exception raised while obtaining session "
+                    f"initialization parameters for request {request}.",
+                    exc_info=e.__cause__,
+                )
             return False
         except _SessionInitCheckError as e:
             self._inc_stat("init/check-error", pool)
