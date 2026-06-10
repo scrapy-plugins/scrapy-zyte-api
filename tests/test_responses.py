@@ -580,14 +580,29 @@ XML_BODY = b'<?xml version="1.0"?><Error><Code>NoSuchKey</Code></Error>'
 JSON_BODY = b'{"status": "ok", "count": 42}'
 
 
+_SCRAPY_JSON_RESPONSE_MARK = pytest.mark.skipif(
+    ZyteAPIJsonResponse is None, reason="Scrapy < 2.12"
+)
+
+
 @pytest.mark.parametrize(
     ("content_type", "body", "expected_cls"),
     [
         ("text/xml", XML_BODY, ZyteAPIXmlResponse),
         ("application/xml", XML_BODY, ZyteAPIXmlResponse),
         ("application/rss+xml", XML_BODY, ZyteAPIXmlResponse),
-        ("application/json", JSON_BODY, ZyteAPIJsonResponse),
-        ("application/x-json", JSON_BODY, ZyteAPIJsonResponse),
+        pytest.param(
+            "application/json",
+            JSON_BODY,
+            ZyteAPIJsonResponse,
+            marks=_SCRAPY_JSON_RESPONSE_MARK,
+        ),
+        pytest.param(
+            "application/x-json",
+            JSON_BODY,
+            ZyteAPIJsonResponse,
+            marks=_SCRAPY_JSON_RESPONSE_MARK,
+        ),
     ],
 )
 def test__process_response_xml_json(content_type, body, expected_cls):
@@ -598,6 +613,7 @@ def test__process_response_xml_json(content_type, body, expected_cls):
         "statusCode": 200,
     }
     resp = _process_response(api_response, Request(cast("str", api_response["url"])))
+    assert expected_cls is not None
     assert isinstance(resp, expected_cls)
     assert isinstance(resp, ZyteAPIMixin)
     assert resp.body == body
@@ -622,7 +638,9 @@ def test_xml_from_api_response():
     assert resp.xpath("//error/code/text()").get() is None
 
 
+@_SCRAPY_JSON_RESPONSE_MARK
 def test_json_from_api_response():
+    assert ZyteAPIJsonResponse is not None
     api_response = {
         "url": "https://example.com",
         "httpResponseBody": b64encode(JSON_BODY).decode(),

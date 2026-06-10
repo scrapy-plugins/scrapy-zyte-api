@@ -1,19 +1,16 @@
+from __future__ import annotations
+
 import datetime as dt
 from base64 import b64decode
 from copy import copy
-from typing import Any, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from scrapy import Request
-from scrapy.http import (
-    Headers,
-    HtmlResponse,
-    JsonResponse,
-    Response,
-    TextResponse,
-    XmlResponse,
-)
-from scrapy.http.cookies import CookieJar
+from scrapy.http import Headers, HtmlResponse, Response, TextResponse, XmlResponse
 from scrapy.responsetypes import responsetypes
+
+if TYPE_CHECKING:
+    from scrapy import Request
+    from scrapy.http.cookies import CookieJar
 
 from scrapy_zyte_api._cookies import _process_cookies
 from scrapy_zyte_api.utils import (
@@ -170,8 +167,16 @@ class ZyteAPIXmlResponse(ZyteAPIMixin, XmlResponse):
     pass
 
 
-class ZyteAPIJsonResponse(ZyteAPIMixin, JsonResponse):
-    pass
+try:
+    from scrapy.http import JsonResponse as _JsonResponse
+
+    class ZyteAPIJsonResponse(ZyteAPIMixin, _JsonResponse):
+        pass
+
+    _SCRAPY_JSON_CLS: type | None = _JsonResponse
+except ImportError:
+    ZyteAPIJsonResponse = None  # type: ignore[assignment]
+    _SCRAPY_JSON_CLS = None
 
 
 class ZyteAPIResponse(ZyteAPIMixin, Response):
@@ -186,8 +191,9 @@ _API_RESPONSE: TypeAlias = dict[str, _JSON]
 
 _SCRAPY_TO_ZYTE_RESPONSE: dict[type[TextResponse], type[ZyteAPIMixin]] = {
     XmlResponse: ZyteAPIXmlResponse,
-    JsonResponse: ZyteAPIJsonResponse,
 }
+if _SCRAPY_JSON_CLS is not None and ZyteAPIJsonResponse is not None:
+    _SCRAPY_TO_ZYTE_RESPONSE[_SCRAPY_JSON_CLS] = ZyteAPIJsonResponse
 
 
 def _process_response(
