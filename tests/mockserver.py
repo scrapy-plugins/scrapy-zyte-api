@@ -176,7 +176,9 @@ class DefaultResource(Resource):
                     return b""
             response_data["session"] = request_data["session"]
 
-        if request_data.get("responseCookies"):
+        if request_data.get("responseCookies") and not domain.startswith(
+            "no-response-cookies"
+        ):
             cookies = [
                 {
                     "name": "test_cookie",

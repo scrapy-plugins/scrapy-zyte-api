@@ -517,3 +517,51 @@ async def test_subsequent_requests_carry_updated_cookies(mockserver):
     # first use response.
     assert _EXPECTED_COOKIES[0] in use_cookies[1]
     assert _EXTRA_COOKIE in use_cookies[1]
+
+
+@deferred_f_from_coro_f
+async def test_cookie_jar_unchanged_when_use_response_has_no_cookies(mockserver):
+    """When a use response contains no responseCookies, the session cookie jar
+    is left unchanged (the _merge_cookies early-return path is exercised)."""
+    settings = {
+        **COOKIE_SESSION_SETTINGS,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_POOL_SIZE": 1,
+    }
+
+    jar_after_use: list = []
+
+    class TestSpider(Spider):
+        name = "test"
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
+        def start_requests(self):
+            # The no-response-cookies domain prefix makes the mockserver omit
+            # responseCookies from use responses, exercising the early return.
+            yield Request("https://no-response-cookies.example.com")
+
+        def parse(self, response):
+            session_id = response.request.meta.get(COOKIE_SESSION_ID_META_KEY)
+            assert self.crawler.engine is not None
+            for m in self.crawler.engine.downloader.middleware.middlewares:
+                if isinstance(m, ScrapyZyteAPISessionDownloaderMiddleware):
+                    sm: _SessionManager = m._sessions
+                    jar_after_use.extend(sm._cookie_jar.get(session_id, []))
+                    break
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    # The cookie jar should only contain the init cookie; no extra cookies were
+    # merged because the use response carried no responseCookies.
+    assert jar_after_use == [
+        {
+            "name": "test_cookie",
+            "value": "test_value",
+            "domain": "no-response-cookies.example.com",
+            "path": "/",
+        }
+    ]
