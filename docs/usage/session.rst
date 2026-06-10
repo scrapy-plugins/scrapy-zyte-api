@@ -180,6 +180,13 @@ Precedence, from higher to lower, is:
 
 #.  :meth:`~scrapy_zyte_api.SessionConfig.params`
 
+.. note::
+
+    The IP address assigned to a session is determined during session
+    initialization and remains fixed for the lifetime of the session. Using a
+    different :http:`request:geolocation` in a follow-up request that reuses a
+    session is not supported and results in undefined behavior.
+
 .. _session-check:
 
 Checking sessions
@@ -413,6 +420,17 @@ To include cookies in session initialization requests, use
 :ref:`they are not added to the session cookie jar
 <zapi-session-cookie-jar>`.
 
+.. _session-cookies-no-ip:
+
+Because sessions tie cookies and IP addresses together, it is not possible to
+use session cookie sharing while switching IP types or geolocations between
+requests. For example, you cannot initialize a session with residential IPs and
+then reuse its cookies with datacenter IPs.
+
+To share cookies across requests that use different IP types or geolocations,
+use :http:`response:responseCookies` from the first request as
+:http:`request:requestCookies` in follow-up requests, instead of using
+sessions.
 
 Session retry policies
 ======================
