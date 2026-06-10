@@ -78,7 +78,15 @@ customize most of this logic through request metadata, settings and
 :ref:`session config overrides <session-configs>`.
 
 For session management to work as expected, your
-:setting:`ZYTE_API_RETRY_POLICY` should not retry 520 and 521 responses:
+:setting:`ZYTE_API_RETRY_POLICY` should not retry 520 and 521 responses.
+
+520 and 521 are Zyte API status codes for download errors (e.g. connection
+refused). When session management receives a 520 or 521 response, it counts
+it as a session error, potentially discards the session (see
+:setting:`ZYTE_API_SESSION_MAX_ERRORS`), and retries the request with a
+different session. If the retry policy also retried 520 and 521 responses, it
+would do so before the session middleware can swap the session, potentially
+reusing the same problematic session for the retry.
 
 -   If you are using the default retry policy
     (:data:`~zyte_api.zyte_api_retrying`) or
@@ -100,8 +108,18 @@ For session management to work as expected, your
 
             ZYTE_API_RETRY_POLICY = "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"
 
--   If you are using a custom retry policy, modify it to not retry 520 and 521
-    responses.
+-   If you are using a custom retry policy:
+
+    -   If your custom retry policy only adds extra retries for 520 and 521
+        responses (or increases their retry count), you do not need that
+        customization with session management: session management already
+        handles 520 and 521 responses. You can simply use
+        :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` or
+        :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY` instead.
+
+    -   If your custom retry policy adds retries for other errors (e.g. other
+        5xx responses) in addition to, or instead of, 520 and 521 retries,
+        create a version of it that does not retry 520 and 521 responses.
 
 .. _session-init:
 
@@ -164,6 +182,13 @@ Precedence, from higher to lower, is:
 #.  :meth:`~scrapy_zyte_api.SessionConfig.location`
 
 #.  :meth:`~scrapy_zyte_api.SessionConfig.params`
+
+.. note::
+
+    The IP address assigned to a session is determined during session
+    initialization and remains fixed for the lifetime of the session. Using a
+    different :http:`request:geolocation` in a follow-up request that reuses a
+    session is not supported and results in undefined behavior.
 
 .. _session-check:
 
@@ -398,6 +423,17 @@ To include cookies in session initialization requests, use
 :ref:`they are not added to the session cookie jar
 <zapi-session-cookie-jar>`.
 
+.. _session-cookies-no-ip:
+
+Because sessions tie cookies and IP addresses together, it is not possible to
+use session cookie sharing while switching IP types or geolocations between
+requests. For example, you cannot initialize a session with residential IPs and
+then reuse its cookies with datacenter IPs.
+
+To share cookies across requests that use different IP types or geolocations,
+use :http:`response:responseCookies` from the first request as
+:http:`request:requestCookies` in follow-up requests, instead of using
+sessions.
 
 Session retry policies
 ======================
