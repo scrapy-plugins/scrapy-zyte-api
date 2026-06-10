@@ -519,6 +519,7 @@ async def test_redirect_logging(caplog, response_cls, response_url, should_log):
     crawler = get_crawler(settings_dict={"ZYTE_API_KEY": "a"})
     middleware = _build_from_crawler(ScrapyZyteAPIDownloaderMiddleware, crawler)
     request = Request("https://example.com")
+    response: ZyteAPIResponse | Response
     if response_cls is ZyteAPIResponse:
         response = ZyteAPIResponse(
             url=response_url, raw_api_response={"url": response_url}
