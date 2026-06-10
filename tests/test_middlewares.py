@@ -13,6 +13,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
+from scrapy_zyte_api.responses import ZyteAPIResponse
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _GET_SLOT_NEEDS_SPIDER,
     _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT,
@@ -503,6 +504,32 @@ async def test_spm_conflict_crawlera(setting, attribute, conflict):
         attribute,
         conflict,
     )
+
+
+@pytest.mark.parametrize(
+    ("response_cls", "response_url", "should_log"),
+    [
+        (Response, "https://redirected.example", False),
+        (ZyteAPIResponse, "https://example.com", False),
+        (ZyteAPIResponse, "https://redirected.example", True),
+    ],
+)
+@deferred_f_from_coro_f
+async def test_redirect_logging(caplog, response_cls, response_url, should_log):
+    crawler = get_crawler(settings_dict={"ZYTE_API_KEY": "a"})
+    middleware = _build_from_crawler(ScrapyZyteAPIDownloaderMiddleware, crawler)
+    request = Request("https://example.com")
+    if response_cls is ZyteAPIResponse:
+        response = ZyteAPIResponse(
+            url=response_url, raw_api_response={"url": response_url}
+        )
+    else:
+        response = Response(response_url)
+    with caplog.at_level("DEBUG", logger="scrapy_zyte_api._middlewares"):
+        middleware.process_response(request, response)
+    assert ("Redirecting" in caplog.text) == should_log
+    if should_log:
+        assert f"Redirecting to {response} from {request}" in caplog.text
 
 
 @pytest.mark.skipif(not _START_REQUESTS_CAN_YIELD_ITEMS, reason="Scrapy < 2.12")
