@@ -1,3 +1,4 @@
+import json
 from base64 import b64encode
 from collections import defaultdict
 from functools import partial
@@ -11,8 +12,11 @@ from scrapy.http.cookies import CookieJar
 
 from scrapy_zyte_api.responses import (
     _API_RESPONSE,
+    ZyteAPIJsonResponse,
+    ZyteAPIMixin,
     ZyteAPIResponse,
     ZyteAPITextResponse,
+    ZyteAPIXmlResponse,
 )
 from scrapy_zyte_api.responses import _process_response as _unwrapped_process_response
 from scrapy_zyte_api.utils import _RESPONSE_HAS_IP_ADDRESS, _RESPONSE_HAS_PROTOCOL
@@ -570,3 +574,65 @@ def test_status_code(base_kwargs_func, kwargs, expected_status_code):
     response = _process_response(api_response, Request(api_response["url"]))
     assert response is not None
     assert response.status == expected_status_code
+
+
+XML_BODY = b'<?xml version="1.0"?><Error><Code>NoSuchKey</Code></Error>'
+JSON_BODY = b'{"status": "ok", "count": 42}'
+
+
+@pytest.mark.parametrize(
+    ("content_type", "body", "expected_cls"),
+    [
+        ("text/xml", XML_BODY, ZyteAPIXmlResponse),
+        ("application/xml", XML_BODY, ZyteAPIXmlResponse),
+        ("application/rss+xml", XML_BODY, ZyteAPIXmlResponse),
+        ("application/json", JSON_BODY, ZyteAPIJsonResponse),
+        ("application/x-json", JSON_BODY, ZyteAPIJsonResponse),
+    ],
+)
+def test__process_response_xml_json(content_type, body, expected_cls):
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": b64encode(body).decode(),
+        "httpResponseHeaders": [{"name": "Content-Type", "value": content_type}],
+        "statusCode": 200,
+    }
+    resp = _process_response(api_response, Request(api_response["url"]))
+    assert isinstance(resp, expected_cls)
+    assert isinstance(resp, ZyteAPIMixin)
+    assert resp.body == body
+    assert resp.raw_api_response == api_response
+    assert resp.flags == ["zyte-api"]
+
+
+def test_xml_from_api_response():
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": b64encode(XML_BODY).decode(),
+        "httpResponseHeaders": [{"name": "Content-Type", "value": "text/xml"}],
+        "statusCode": 200,
+    }
+    resp = ZyteAPIXmlResponse.from_api_response(api_response)
+    assert resp.url == "https://example.com"
+    assert resp.status == 200
+    assert resp.body == XML_BODY
+    assert resp.raw_api_response == api_response
+    assert resp.flags == ["zyte-api"]
+    assert resp.xpath("//Error/Code/text()").get() == "NoSuchKey"
+    assert resp.xpath("//error/code/text()").get() is None
+
+
+def test_json_from_api_response():
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": b64encode(JSON_BODY).decode(),
+        "httpResponseHeaders": [{"name": "Content-Type", "value": "application/json"}],
+        "statusCode": 200,
+    }
+    resp = ZyteAPIJsonResponse.from_api_response(api_response)
+    assert resp.url == "https://example.com"
+    assert resp.status == 200
+    assert resp.body == JSON_BODY
+    assert resp.raw_api_response == api_response
+    assert resp.flags == ["zyte-api"]
+    assert json.loads(resp.text) == {"status": "ok", "count": 42}
