@@ -26,6 +26,8 @@ _DEFAULT_ENCODING = "utf-8"
 
 
 class ZyteAPIMixin:
+    url: str
+
     REMOVE_HEADERS = {
         # Zyte API already decompresses the HTTP Response Body. Scrapy's
         # HttpCompressionMiddleware will error out when it attempts to
