@@ -24,6 +24,7 @@ either :ref:`globally <transparent>` or :ref:`per request <automap>`, or
    usage/manual
    usage/automap
    usage/default
+   usage/redirect
    usage/retry
    usage/scrapy-poet
    usage/session
