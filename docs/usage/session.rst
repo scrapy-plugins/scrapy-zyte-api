@@ -4,21 +4,24 @@
 Plugin-managed sessions
 =======================
 
-Zyte API provides powerful session APIs:
+.. note::
 
--   :ref:`User-managed sessions <zapi-session-id>` give you full control over
-    session management.
+    This page covers **plugin-managed sessions**, a session management feature
+    built into scrapy-zyte-api. It does **not** cover the 2 session management
+    features provided natively by Zyte API:
 
--   :ref:`Zyte-managed sessions <zapi-session-contexts>` let Zyte API handle
-    session management for you.
+    -   :ref:`User-managed sessions <zapi-session-id>`, which give you full
+        control over session management via the :http:`request:session` field.
 
-When using scrapy-zyte-api, you can use these session APIs through the
-corresponding Zyte API fields (:http:`request:session`,
-:http:`request:sessionContext`).
+    -   :ref:`Zyte-managed sessions <zapi-session-contexts>`, which let Zyte
+        API handle session management for you via the
+        :http:`request:sessionContext` field.
 
-However, scrapy-zyte-api also provides plugin-managed sessions, with an API
-similar to that of Zyte-managed sessions, but built on top of user-managed
-sessions.
+    You can use both of those Zyte API features directly from scrapy-zyte-api
+    through their corresponding request parameters.
+
+Plugin-managed sessions have an API similar to that of Zyte-managed sessions,
+but are built on top of user-managed sessions.
 
 Plugin-managed sessions offer some advantages over :ref:`Zyte-managed sessions
 <zapi-session-contexts>`:
