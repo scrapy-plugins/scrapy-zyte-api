@@ -370,7 +370,7 @@ session. Because no Zyte API ``session`` is used, cookie sessions are not
 subject to the Zyte API session time limits.
 
 Cookie sessions are most useful on websites where sessions are tracked purely
-through cookies, with no server-side IP binding.
+through cookies, with no server-side IP binding or browser fingerprinting.
 
 .. note::
 
