@@ -285,6 +285,7 @@ async def test_cookie_jar_cleanup_on_refresh(mockserver):
             # manual refresh to verify cleanup.
             session_id = response.request.meta.get(COOKIE_SESSION_ID_META_KEY)
             mw = None
+            assert self.crawler.engine is not None
             for m in self.crawler.engine.downloader.middleware.middlewares:
                 if isinstance(m, ScrapyZyteAPISessionDownloaderMiddleware):
                     mw = m
@@ -457,6 +458,7 @@ async def test_cookie_jar_updated_from_use_response(mockserver):
 
         def parse(self, response):
             session_id = response.request.meta.get(COOKIE_SESSION_ID_META_KEY)
+            assert self.crawler.engine is not None
             for m in self.crawler.engine.downloader.middleware.middlewares:
                 if isinstance(m, ScrapyZyteAPISessionDownloaderMiddleware):
                     sm: _SessionManager = m._sessions

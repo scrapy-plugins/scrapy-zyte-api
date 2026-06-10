@@ -194,7 +194,7 @@ class DefaultResource(Resource):
                         "path": "/",
                     }
                 )
-            response_data["responseCookies"] = cookies
+            response_data["responseCookies"] = cookies  # type: ignore[assignment]
 
         if "httpResponseBody" in request_data:
             headers = request_data.get("customHttpRequestHeaders", [])
