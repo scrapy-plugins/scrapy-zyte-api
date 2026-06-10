@@ -20,7 +20,8 @@ from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import load_object
 from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
-from zyte_api import RequestError, RetryFactory
+from zyte_api import AggressiveRetryFactory, RequestError, RetryFactory, stop_on_count
+from zyte_api import aggressive_retrying as _aggressive_retrying
 from zyte_api import zyte_api_retrying as _zyte_api_retrying
 
 from .utils import (  # type: ignore[attr-defined]
@@ -80,24 +81,16 @@ class SessionRetryFactory(RetryFactory):
 
 SESSION_DEFAULT_RETRY_POLICY = SessionRetryFactory().build()
 
-try:
-    from zyte_api import AggressiveRetryFactory, stop_on_count
-    from zyte_api import aggressive_retrying as _aggressive_retrying
-except ImportError:
-    SESSION_AGGRESSIVE_RETRY_POLICY = SESSION_DEFAULT_RETRY_POLICY
-    _SESSION_RETRY_POLICIES: dict = {
-        _zyte_api_retrying: "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
-    }
-else:
 
-    class AggressiveSessionRetryFactory(AggressiveRetryFactory):
-        download_error_stop = stop_on_count(1)
+class AggressiveSessionRetryFactory(AggressiveRetryFactory):
+    download_error_stop = stop_on_count(1)
 
-    SESSION_AGGRESSIVE_RETRY_POLICY = AggressiveSessionRetryFactory().build()
-    _SESSION_RETRY_POLICIES = {
-        _zyte_api_retrying: "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
-        _aggressive_retrying: "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY",
-    }
+
+SESSION_AGGRESSIVE_RETRY_POLICY = AggressiveSessionRetryFactory().build()
+_SESSION_RETRY_POLICIES = {
+    _zyte_api_retrying: "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
+    _aggressive_retrying: "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY",
+}
 
 
 try:
