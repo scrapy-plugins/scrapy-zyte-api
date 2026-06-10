@@ -752,7 +752,7 @@ class _SessionManager:
                 "ZYTE_API_RETRY_POLICY", "zyte_api.zyte_api_retrying"
             )
             loaded_retry_policy = load_object(retry_policy)
-            session_retry_policy = _SESSION_RETRY_POLICIES[loaded_retry_policy]
+            session_retry_policy = _SESSION_RETRY_POLICIES.get(loaded_retry_policy)
             if session_retry_policy is None:
                 session_retry_policy = retry_policy
                 logger.warning(
