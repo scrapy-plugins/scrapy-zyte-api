@@ -175,7 +175,7 @@ try:
 
     _SCRAPY_JSON_CLS: type | None = _JsonResponse
 except ImportError:
-    ZyteAPIJsonResponse = None  # type: ignore[assignment]
+    ZyteAPIJsonResponse = None  # type: ignore[assignment, misc]
     _SCRAPY_JSON_CLS = None
 
 
