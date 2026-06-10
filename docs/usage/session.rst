@@ -4,21 +4,24 @@
 Plugin-managed sessions
 =======================
 
-Zyte API provides powerful session APIs:
+.. note::
 
--   :ref:`User-managed sessions <zapi-session-id>` give you full control over
-    session management.
+    This page covers **plugin-managed sessions**, a session management feature
+    built into scrapy-zyte-api. It does **not** cover the 2 session management
+    features provided natively by Zyte API:
 
--   :ref:`Zyte-managed sessions <zapi-session-contexts>` let Zyte API handle
-    session management for you.
+    -   :ref:`User-managed sessions <zapi-session-id>`, which give you full
+        control over session management via the :http:`request:session` field.
 
-When using scrapy-zyte-api, you can use these session APIs through the
-corresponding Zyte API fields (:http:`request:session`,
-:http:`request:sessionContext`).
+    -   :ref:`Zyte-managed sessions <zapi-session-contexts>`, which let Zyte
+        API handle session management for you via the
+        :http:`request:sessionContext` field.
 
-However, scrapy-zyte-api also provides plugin-managed sessions, with an API
-similar to that of Zyte-managed sessions, but built on top of user-managed
-sessions.
+    You can use both of those Zyte API features directly from scrapy-zyte-api
+    through their corresponding request parameters.
+
+Plugin-managed sessions have an API similar to that of Zyte-managed sessions,
+but are built on top of user-managed sessions.
 
 Plugin-managed sessions offer some advantages over :ref:`Zyte-managed sessions
 <zapi-session-contexts>`:
@@ -75,7 +78,15 @@ customize most of this logic through request metadata, settings and
 :ref:`session config overrides <session-configs>`.
 
 For session management to work as expected, your
-:setting:`ZYTE_API_RETRY_POLICY` should not retry 520 and 521 responses:
+:setting:`ZYTE_API_RETRY_POLICY` should not retry 520 and 521 responses.
+
+520 and 521 are Zyte API status codes for download errors (e.g. connection
+refused). When session management receives a 520 or 521 response, it counts
+it as a session error, potentially discards the session (see
+:setting:`ZYTE_API_SESSION_MAX_ERRORS`), and retries the request with a
+different session. If the retry policy also retried 520 and 521 responses, it
+would do so before the session middleware can swap the session, potentially
+reusing the same problematic session for the retry.
 
 -   If you are using the default retry policy
     (:data:`~zyte_api.zyte_api_retrying`) or
@@ -97,8 +108,18 @@ For session management to work as expected, your
 
             ZYTE_API_RETRY_POLICY = "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"
 
--   If you are using a custom retry policy, modify it to not retry 520 and 521
-    responses.
+-   If you are using a custom retry policy:
+
+    -   If your custom retry policy only adds extra retries for 520 and 521
+        responses (or increases their retry count), you do not need that
+        customization with session management: session management already
+        handles 520 and 521 responses. You can simply use
+        :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` or
+        :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY` instead.
+
+    -   If your custom retry policy adds retries for other errors (e.g. other
+        5xx responses) in addition to, or instead of, 520 and 521 retries,
+        create a version of it that does not retry 520 and 521 responses.
 
 .. _session-init:
 
@@ -161,6 +182,13 @@ Precedence, from higher to lower, is:
 #.  :meth:`~scrapy_zyte_api.SessionConfig.location`
 
 #.  :meth:`~scrapy_zyte_api.SessionConfig.params`
+
+.. note::
+
+    The IP address assigned to a session is determined during session
+    initialization and remains fixed for the lifetime of the session. Using a
+    different :http:`request:geolocation` in a follow-up request that reuses a
+    session is not supported and results in undefined behavior.
 
 .. _session-check:
 
@@ -463,6 +491,17 @@ To include cookies in session initialization requests, use
 :ref:`they are not added to the session cookie jar
 <zapi-session-cookie-jar>`.
 
+.. _session-cookies-no-ip:
+
+Because sessions tie cookies and IP addresses together, it is not possible to
+use session cookie sharing while switching IP types or geolocations between
+requests. For example, you cannot initialize a session with residential IPs and
+then reuse its cookies with datacenter IPs.
+
+To share cookies across requests that use different IP types or geolocations,
+use :http:`response:responseCookies` from the first request as
+:http:`request:requestCookies` in follow-up requests, instead of using
+sessions.
 
 Session retry policies
 ======================
@@ -504,77 +543,6 @@ Session management can close your spider early in the following scenarios:
 A custom :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`
 implementation may also close your spider with a custom reason by raising a
 :exc:`~scrapy.exceptions.CloseSpider` exception.
-
-
-.. _session-stats:
-
-Session stats
-=============
-
-Plugin-managed sessions trigger some stats to help understand how well sessions
-are working.
-
-By default, stats are aggregated across session pools. Set
-:setting:`ZYTE_API_SESSION_STATS_PER_POOL` to ``True`` to enable per-pool
-stats.
-
-Tracked stats are as follows (``pools/{pool}/`` is only present if per-pool
-stats are enabled):
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/check-error``
-    Number of times that a session for pool ``{pool}`` triggered an unexpected
-    exception during its session validation check right after initialization.
-
-    It is most likely the result of a bad implementation of
-    :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`; the
-    logs should contain an error message with a traceback for such errors.
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/check-failed``
-    Number of times that a session from pool ``{pool}`` failed its session
-    validation check right after initialization.
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/check-passed``
-    Number of times that a session from pool ``{pool}`` passed its session
-    validation check right after initialization.
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/failed``
-    Number of times that initializing a session for pool ``{pool}`` resulted in
-    an :ref:`unsuccessful response <zapi-unsuccessful-responses>`.
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/param-error``
-    Number of times that initializing a session for pool ``{pool}`` triggered
-    an unexpected exception when obtaining the Zyte API parameters for session
-    initialization.
-
-    It is most likely the result of a bad implementation of
-    :meth:`SessionConfig.params <scrapy_zyte_api.SessionConfig.params>`; the
-    logs should contain an error message with a traceback for such errors.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/check-error``
-    Number of times that a response that used a session from pool ``{pool}``
-    triggered an unexpected exception during its session validation check.
-
-    It is most likely the result of a bad implementation of
-    :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`; the
-    logs should contain an error message with a traceback for such errors.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/check-failed``
-    Number of times that a response that used a session from pool ``{pool}``
-    failed its session validation check.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/check-passed``
-    Number of times that a response that used a session from pool ``{pool}``
-    passed its session validation check.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/expired``
-    Number of times that a session from pool ``{pool}`` expired.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/failed``
-    Number of times that a request that used a session from pool ``{pool}``
-    got an :ref:`unsuccessful response <zapi-unsuccessful-responses>`.
-
-``scrapy-zyte-api/sessions/use/disabled``
-    Number of processed requests for which session management was disabled.
 
 .. _session-troubleshooting:
 
