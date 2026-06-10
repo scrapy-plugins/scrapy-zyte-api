@@ -591,13 +591,13 @@ JSON_BODY = b'{"status": "ok", "count": 42}'
     ],
 )
 def test__process_response_xml_json(content_type, body, expected_cls):
-    api_response = {
+    api_response: _API_RESPONSE = {
         "url": "https://example.com",
         "httpResponseBody": b64encode(body).decode(),
         "httpResponseHeaders": [{"name": "Content-Type", "value": content_type}],
         "statusCode": 200,
     }
-    resp = _process_response(api_response, Request(api_response["url"]))
+    resp = _process_response(api_response, Request(cast("str", api_response["url"])))
     assert isinstance(resp, expected_cls)
     assert isinstance(resp, ZyteAPIMixin)
     assert resp.body == body
