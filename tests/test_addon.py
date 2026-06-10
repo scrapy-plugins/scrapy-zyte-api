@@ -49,7 +49,12 @@ async def test_addon(mockserver):
 @deferred_f_from_coro_f
 async def test_addon_disable_transparent(mockserver):
     async with make_handler(
-        {"ZYTE_API_TRANSPARENT_MODE": False}, mockserver.urljoin("/"), use_addon=True
+        {
+            "ZYTE_API_FALLBACK_HTTPS_HANDLER": "tests.test_addon.DummyDownloadHandler",
+            "ZYTE_API_TRANSPARENT_MODE": False,
+        },
+        mockserver.urljoin("/"),
+        use_addon=True,
     ) as handler:
         request = Request("https://toscrape.com")
         await download_request(handler, request)
