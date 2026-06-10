@@ -176,6 +176,28 @@ class DefaultResource(Resource):
                     return b""
             response_data["session"] = request_data["session"]
 
+        if request_data.get("responseCookies") and not domain.startswith(
+            "no-response-cookies"
+        ):
+            cookies = [
+                {
+                    "name": "test_cookie",
+                    "value": "test_value",
+                    "domain": domain,
+                    "path": "/",
+                }
+            ]
+            if request_data.get("requestCookies") is not None:
+                cookies.append(
+                    {
+                        "name": "extra_cookie",
+                        "value": "extra_value",
+                        "domain": domain,
+                        "path": "/",
+                    }
+                )
+            response_data["responseCookies"] = cookies  # type: ignore[assignment]
+
         if "httpResponseBody" in request_data:
             headers = request_data.get("customHttpRequestHeaders", [])
             for header in headers:
