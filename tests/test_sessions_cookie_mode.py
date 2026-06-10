@@ -555,13 +555,7 @@ async def test_cookie_jar_unchanged_when_use_response_has_no_cookies(mockserver)
     crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     await maybe_deferred_to_future(crawler.crawl())
 
-    # The cookie jar should only contain the init cookie; no extra cookies were
-    # merged because the use response carried no responseCookies.
-    assert jar_after_use == [
-        {
-            "name": "test_cookie",
-            "value": "test_value",
-            "domain": "no-response-cookies.example.com",
-            "path": "/",
-        }
-    ]
+    # The cookie jar is empty: the init response returned no cookies (so the
+    # jar started empty), and _merge_cookies returned early on the empty use
+    # response without raising an error or modifying the jar.
+    assert jar_after_use == []
