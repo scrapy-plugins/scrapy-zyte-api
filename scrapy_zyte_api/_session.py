@@ -21,6 +21,7 @@ from scrapy.utils.misc import load_object
 from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
 from zyte_api import RequestError, RetryFactory
+from zyte_api import zyte_api_retrying as _zyte_api_retrying
 
 from .utils import (  # type: ignore[attr-defined]
     _DOWNLOAD_NEEDS_SPIDER,
@@ -81,14 +82,22 @@ SESSION_DEFAULT_RETRY_POLICY = SessionRetryFactory().build()
 
 try:
     from zyte_api import AggressiveRetryFactory, stop_on_count
+    from zyte_api import aggressive_retrying as _aggressive_retrying
 except ImportError:
     SESSION_AGGRESSIVE_RETRY_POLICY = SESSION_DEFAULT_RETRY_POLICY
+    _SESSION_RETRY_POLICIES: dict = {
+        _zyte_api_retrying: "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
+    }
 else:
 
     class AggressiveSessionRetryFactory(AggressiveRetryFactory):
         download_error_stop = stop_on_count(1)
 
     SESSION_AGGRESSIVE_RETRY_POLICY = AggressiveSessionRetryFactory().build()
+    _SESSION_RETRY_POLICIES = {
+        _zyte_api_retrying: "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
+        _aggressive_retrying: "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY",
+    }
 
 
 try:
@@ -737,6 +746,27 @@ class _SessionManager:
 
         self._stats_per_pool: bool = settings.getbool("ZYTE_API_SESSION_STATS_PER_POOL")
 
+        session_retry_policy = settings["ZYTE_API_SESSION_RETRY_POLICY"]
+        if session_retry_policy is None:
+            retry_policy = settings.get(
+                "ZYTE_API_RETRY_POLICY", "zyte_api.zyte_api_retrying"
+            )
+            loaded_retry_policy = load_object(retry_policy)
+            session_retry_policy = _SESSION_RETRY_POLICIES[loaded_retry_policy]
+            if session_retry_policy is None:
+                session_retry_policy = retry_policy
+                logger.warning(
+                    "ZYTE_API_RETRY_POLICY is set to a custom value "
+                    f"({retry_policy!r}), which will also be used for "
+                    "plugin-managed session requests. Session retry policies "
+                    "must not retry 520 or 521 responses; if yours does, "
+                    "plugin-managed sessions may not work as expected. Set "
+                    "ZYTE_API_SESSION_RETRY_POLICY explicitly to silence this "
+                    "warning. See the ZYTE_API_SESSION_RETRY_POLICY setting "
+                    "reference for details.",
+                )
+        self._session_retry_policy = session_retry_policy
+
     def _inc_stat(self, key: str, pool: str):
         pool = f"pools/{pool}/" if self._stats_per_pool else ""
         key = f"scrapy-zyte-api/sessions/{pool}{key}"
@@ -845,6 +875,7 @@ class _SessionManager:
                 SESSION_INIT_META_KEY: True,
                 "dont_merge_cookies": True,
                 "zyte_api": {**session_params, "session": {"id": session_id}},
+                "zyte_api_retry_policy": self._session_retry_policy,
                 **{
                     k: v
                     for k, v in request.meta.items()
@@ -1079,6 +1110,7 @@ class _SessionManager:
             # to the process_request method of the session management
             # middleware does not assign a new session again.
             request.meta.setdefault("_zyte_api_session_assigned", True)
+            request.meta.setdefault("zyte_api_retry_policy", self._session_retry_policy)
             return session_config.process_request(request)
 
     def is_enabled(self, request: Request) -> bool:
