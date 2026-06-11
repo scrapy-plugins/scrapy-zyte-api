@@ -263,6 +263,40 @@ EXPECTED_DOWNLOADER_MIDDLEWARES = {
 if not _POET_ADDON_SUPPORT:
     EXPECTED_DOWNLOADER_MIDDLEWARES[InjectionMiddleware] = 543
 
+_SESSIONS_BASE_EXPECTED = dict(BASE_EXPECTED)
+if POET:
+    _SESSIONS_BASE_EXPECTED["DOWNLOADER_MIDDLEWARES"] = EXPECTED_DOWNLOADER_MIDDLEWARES
+    _SESSIONS_BASE_EXPECTED["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
+
+
+@pytest.mark.parametrize(
+    ("initial_settings", "expected_settings"),
+    [
+        # Sessions enabled: addon does not set ZYTE_API_SESSION_RETRY_POLICY.
+        (
+            {"ZYTE_API_SESSION_ENABLED": True},
+            {
+                **_SESSIONS_BASE_EXPECTED,
+                "ZYTE_API_SESSION_ENABLED": True,
+            },
+        ),
+        # aggressive_retrying: addon still does not set ZYTE_API_SESSION_RETRY_POLICY.
+        (
+            {
+                "ZYTE_API_SESSION_ENABLED": True,
+                "ZYTE_API_RETRY_POLICY": "zyte_api.aggressive_retrying",
+            },
+            {
+                **_SESSIONS_BASE_EXPECTED,
+                "ZYTE_API_SESSION_ENABLED": True,
+                "ZYTE_API_RETRY_POLICY": "zyte_api.aggressive_retrying",
+            },
+        ),
+    ],
+)
+def test_sessions_setting_changes(initial_settings, expected_settings):
+    _test_setting_changes(initial_settings, expected_settings)
+
 
 @pytest.mark.skipif(
     not POET, reason="Test expectations assume scrapy-poet is installed"
@@ -289,35 +323,15 @@ def test_poet_setting_changes(initial_settings, expected_settings):
 @pytest.mark.parametrize(
     ("manual_settings", "addon_settings"),
     [
+        # Default: addon does not set ZYTE_API_SESSION_RETRY_POLICY.
         (
-            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
+            {},
             {},
         ),
+        # aggressive_retrying: addon still does not set ZYTE_API_SESSION_RETRY_POLICY.
         (
-            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
-            {"ZYTE_API_RETRY_POLICY": "zyte_api.zyte_api_retrying"},
-        ),
-        (
-            {
-                "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
-            },
             {"ZYTE_API_RETRY_POLICY": "zyte_api.aggressive_retrying"},
-        ),
-        (
-            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
-            {"ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"},
-        ),
-        (
-            {
-                "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
-            },
-            {
-                "ZYTE_API_RETRY_POLICY": "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
-            },
-        ),
-        (
-            {"ZYTE_API_RETRY_POLICY": "tests.UNSET"},
-            {"ZYTE_API_RETRY_POLICY": "tests.UNSET"},
+            {"ZYTE_API_RETRY_POLICY": "zyte_api.aggressive_retrying"},
         ),
     ],
 )
