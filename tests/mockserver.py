@@ -232,6 +232,24 @@ class DefaultResource(Resource):
                 results.append(result)
             response_data["actions"] = results  # type: ignore[assignment]
 
+        network_capture_filters = request_data.get("networkCapture")
+        if network_capture_filters:
+            captured = []
+            for f in network_capture_filters:
+                entry: dict = {
+                    "url": f"https://api.example.com/data?filter={f.get('value', '')}",
+                    "statusCode": 200,
+                    "headers": {"content-type": "application/json"},
+                    "filter": f,
+                    "interceptionStatus": "success",
+                }
+                if f.get("httpResponseBody"):
+                    entry["httpResponseBody"] = b64encode(
+                        b'{"captured": true}'
+                    ).decode()
+                captured.append(entry)
+            response_data["networkCapture"] = captured
+
         if request_data.get("product") is True:
             response_data["product"] = {
                 "url": response_data["url"],

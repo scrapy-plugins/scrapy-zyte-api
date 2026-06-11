@@ -40,11 +40,14 @@ from zyte_common_items.fields import auto_field
 
 from scrapy_zyte_api import (
     Actions,
+    CapturedResponse,
     ExtractFrom,
     Geolocation,
+    NetworkCapture,
     Screenshot,
     actions,
     custom_attrs,
+    network_capture,
 )
 from scrapy_zyte_api._params import _EXTRACT_KEYS
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
@@ -1095,6 +1098,53 @@ async def test_provider_actions(mockserver, caplog):
             },
         ]
     )
+
+
+@deferred_f_from_coro_f
+async def test_provider_network_capture(mockserver):
+    @attrs.define
+    class NetworkCapturePage(BasePage):
+        product: Product
+        captured: Annotated[
+            NetworkCapture,
+            network_capture(
+                [
+                    {
+                        "filterType": "url",
+                        "value": "/api/",
+                        "matchType": "contains",
+                        "httpResponseBody": True,
+                    },
+                    {"filterType": "resourceType", "value": "xhr"},
+                ]
+            ),
+        ]
+
+    class NetworkCaptureSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: NetworkCapturePage):  # type: ignore[override]
+            yield {"captured": page.captured}
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, *_ = await _crawl_single_item(NetworkCaptureSpider, HtmlResource, settings)
+    nc: NetworkCapture = item["captured"]
+    assert isinstance(nc, NetworkCapture)
+    assert len(nc.results) == 2
+
+    first = nc.results[0]
+    assert isinstance(first, CapturedResponse)
+    assert first.url == "https://api.example.com/data?filter=/api/"
+    assert first.status == 200
+    assert first.headers == {"content-type": "application/json"}
+    assert first.body == b'{"captured": true}'
+
+    second = nc.results[1]
+    assert isinstance(second, CapturedResponse)
+    assert second.url == "https://api.example.com/data?filter=xhr"
+    assert second.status == 200
+    assert second.body is None
 
 
 def test_item_keywords():
