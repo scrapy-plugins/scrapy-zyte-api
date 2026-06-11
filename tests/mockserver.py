@@ -248,7 +248,7 @@ class DefaultResource(Resource):
                         b'{"captured": true}'
                     ).decode()
                 captured.append(entry)
-            response_data["networkCapture"] = captured
+            response_data["networkCapture"] = captured  # type: ignore[assignment]
 
         if request_data.get("product") is True:
             response_data["product"] = {
