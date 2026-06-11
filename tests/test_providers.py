@@ -1147,6 +1147,26 @@ async def test_provider_network_capture(mockserver):
     assert second.body is None
 
 
+@deferred_f_from_coro_f
+async def test_provider_network_capture_unannotated(mockserver, caplog):
+    @attrs.define
+    class NetworkCapturePage(BasePage):
+        product: Product
+        captured: NetworkCapture
+
+    class NetworkCaptureSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: NetworkCapturePage):  # type: ignore[override]
+            pass
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, *_ = await _crawl_single_item(NetworkCaptureSpider, HtmlResource, settings)
+    assert item is None
+    assert "NetworkCapture dependencies must be annotated" in caplog.text
+
+
 def test_item_keywords():
     assert set(_EXTRACT_KEYS) == set(_ITEM_KEYWORDS.values())
 
