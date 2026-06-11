@@ -437,6 +437,21 @@ Default: ``False``
 
 Enables :ref:`plugin-managed sessions <session>`.
 
+.. setting:: ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION
+
+ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION
+========================================================
+
+Default: ``True``
+
+When ``True``, a session is discarded if its :ref:`initialization
+<session-init>` used :http:`actions <request:actions>` and any of them has a
+``returned`` status in the response (failed and stopped execution). See
+:ref:`session-check` for details.
+
+Set to ``False`` to disable this check and rely entirely on your own
+:setting:`ZYTE_API_SESSION_CHECKER` or
+:meth:`~scrapy_zyte_api.SessionConfig.check` implementation.
 
 .. setting:: ZYTE_API_SESSION_LOCATION
 

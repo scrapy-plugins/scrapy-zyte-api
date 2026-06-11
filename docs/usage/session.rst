@@ -204,21 +204,25 @@ initialization fails, e.g. due to rendering issues, IP-geolocation mismatches,
 A-B tests, etc. It can also help in cases where website sessions expire before
 Zyte API sessions.
 
-By default, if a location is defined through
-:reqmeta:`zyte_api_session_location`, :setting:`ZYTE_API_SESSION_LOCATION` or
-:meth:`~scrapy_zyte_api.SessionConfig.location`, even if the parameters used
-for session initialization actually come from
-:reqmeta:`zyte_api_session_params` or :setting:`ZYTE_API_SESSION_LOCATION`, the
-outcome of the first ``setLocation`` action used, if any, is checked. If the
-action fails, the session is discarded. If the action is not even available for
-a given website, the spider is closed with ``unsupported_set_location`` as the
-close reason; in that case, you should define a proper :ref:`session
-initialization logic <session-init>` for requests targeting that website.
+By default, if the :ref:`session initialization parameters <session-init>`
+include :http:`actions <request:actions>`, and any of them has a ``returned``
+status in the response (meaning it failed and stopped execution), the session
+is discarded. Actions with ``onError`` set to ``"continue"`` that fail produce
+a ``continued`` status instead, and do not cause the session to be discarded.
+You can disable this behavior by setting
+:setting:`ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION` to
+``False``.
 
-For sessions initialized without a configured location, no session check is
-performed, sessions are assumed to be fine until they expire or are banned.
-That is so even if session initialization parameters include a ``setLocation``
-action.
+In addition, if a location is defined through
+:reqmeta:`zyte_api_session_location`, :setting:`ZYTE_API_SESSION_LOCATION` or
+:meth:`~scrapy_zyte_api.SessionConfig.location`, and the ``setLocation`` action
+is not available for a given website, the spider is closed with
+``unsupported_set_location`` as the close reason; in that case, you should
+define a proper :ref:`session initialization logic <session-init>` for requests
+targeting that website.
+
+For sessions initialized without actions, no action-based session check is
+performed.
 
 To implement your own code to check session responses and determine whether
 their session should be kept or discarded, use the

@@ -214,6 +214,9 @@ class SessionConfig:
         else:
             self._checker = None
         self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
+        self._init_action_failure_invalidates = settings.getbool(
+            "ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION", True
+        )
         self._pool_counters = defaultdict(int)
         self._param_pools: defaultdict[str, dict[str, int]] = defaultdict(dict)
 
@@ -465,7 +468,10 @@ class SessionConfig:
         :exc:`~scrapy.exceptions.CloseSpider` if the spider should be closed.
 
         The default implementation checks the outcome of the ``setLocation``
-        action if a location was defined, as described in :ref:`session-check`.
+        action if a location was defined, and also discards sessions where any
+        :ref:`action <zapi-actions>` in the initialization response has a
+        ``returned`` status (i.e. failed and stopped execution). Both behaviors
+        are described in :ref:`session-check`.
 
         If you need to tell whether *request* is a :ref:`session initialization
         request <session-init>` or not, use
@@ -475,20 +481,37 @@ class SessionConfig:
         """
         if self._checker:
             return self._checker.check(response, request)
-        location = self.location(request)
-        if not location:
-            return True
-        for action in response.raw_api_response.get("actions", []):  # type: ignore[attr-defined]
-            if action.get("action", None) != "setLocation":
-                continue
-            if action.get("error", "").startswith("Action setLocation not supported "):
-                logger.error(
-                    f"Stopping the spider, tried to use the setLocation "
-                    f"action on an unsupported website "
-                    f"({urlparse_cached(request).netloc})."
-                )
-                raise CloseSpider("unsupported_set_location")
-            return action.get("status", None) == "success"
+
+        response_actions = response.raw_api_response.get("actions", [])  # type: ignore[attr-defined]
+
+        if self.location(request):
+            for action in response_actions:
+                if action.get("action") == "setLocation":
+                    if action.get("error", "").startswith(
+                        "Action setLocation not supported "
+                    ):
+                        logger.error(
+                            f"Stopping the spider, tried to use the setLocation "
+                            f"action on an unsupported website "
+                            f"({urlparse_cached(request).netloc})."
+                        )
+                        raise CloseSpider("unsupported_set_location")
+                    break
+
+        if (
+            self._init_action_failure_invalidates
+            and is_session_init_request(request)
+            and response_actions
+        ):
+            return not any(
+                action.get("status") == "returned" for action in response_actions
+            )
+
+        if self.location(request):
+            for action in response_actions:
+                if action.get("action") == "setLocation":
+                    return action.get("status") == "success"
+
         return True
 
 
