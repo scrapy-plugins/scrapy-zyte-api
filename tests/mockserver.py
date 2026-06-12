@@ -62,8 +62,7 @@ class LeafResource(Resource):
             d.addErrback(lambda _: None)
             d.cancel()
 
-        # Typing issues: https://github.com/twisted/twisted/issues/9909
-        d: Deferred = deferLater(reactor, delay, f, *a, **kw)  # type: ignore[arg-type]
+        d: Deferred = deferLater(reactor, delay, f, *a, **kw)
         request.notifyFinish().addErrback(_cancelrequest)
         return d
 
@@ -362,16 +361,14 @@ def main():
     module_name, name = args.resource.rsplit(".", 1)
     sys.path.append(".")
     resource = getattr(import_module(module_name), name)()
-    # Typing issue: https://github.com/twisted/twisted/issues/9909
-    http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[attr-defined]
+    http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[arg-type]
 
     def print_listening():
-        host = http_port.getHost()
+        host = http_port.getHost()  # type: ignore[misc]
         print(f"Mock server {resource} running at http://{host.host}:{host.port}")
 
-    # Typing issue: https://github.com/twisted/twisted/issues/9909
-    reactor.callWhenRunning(print_listening)  # type: ignore[attr-defined]
-    reactor.run()  # type: ignore[attr-defined]
+    reactor.callWhenRunning(print_listening)
+    reactor.run()  # type: ignore[misc]
 
 
 if __name__ == "__main__":
