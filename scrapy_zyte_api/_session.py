@@ -748,6 +748,9 @@ class _SessionManager:
         self._queue_wait_time = settings.getfloat(
             "ZYTE_API_SESSION_QUEUE_WAIT_TIME", 1.0
         )
+        self._creation_retry_delay = settings.getfloat(
+            "ZYTE_API_SESSION_CREATION_RETRY_DELAY", 60.0
+        )
 
         # Contains the on-going tasks to create new sessions.
         #
@@ -864,7 +867,9 @@ class _SessionManager:
             self._pool_cache[request] = pool_id
             return pool_id
 
-    async def _init_session(self, session_id: str, request: Request, pool: str) -> bool:
+    async def _init_session(
+        self, session_id: str, request: Request, pool: str
+    ) -> bool | None:
         assert self._crawler.engine
         session_config = self._get_session_config(request)
         if meta_params := request.meta.get("zyte_api_session_params", None):
@@ -924,6 +929,28 @@ class _SessionManager:
             download = deferred_to_future(deferred)
         try:
             response = await download
+        except RequestError as e:
+            error_type = e.parsed.type
+            if error_type == "/problem/over-session-limit":
+                self._inc_stat("init/over-limit", pool)
+                logger.warning(
+                    f"Session initialization failed because the active session "
+                    f"limit has been reached for request {request}. Will retry "
+                    f"after {self._creation_retry_delay} seconds."
+                )
+                await sleep(self._creation_retry_delay)
+                return None
+            if error_type == "/problem/session-creation-error":
+                self._inc_stat("init/server-error", pool)
+                logger.warning(
+                    f"Session initialization failed due to a server error for "
+                    f"request {request}. Will retry after "
+                    f"{self._creation_retry_delay} seconds."
+                )
+                await sleep(self._creation_retry_delay)
+                return None
+            self._inc_stat("init/failed", pool)
+            return False
         except Exception:
             self._inc_stat("init/failed", pool)
             return False
@@ -956,6 +983,8 @@ class _SessionManager:
                     self._pools[pool].add(session_id)
                     self._bad_inits[pool] = 0
                     break
+                if session_init_succeeded is None:
+                    continue
                 self._bad_inits[pool] += 1
                 if self._bad_inits[pool] >= self._max_bad_inits[pool]:
                     raise TooManyBadSessionInits
