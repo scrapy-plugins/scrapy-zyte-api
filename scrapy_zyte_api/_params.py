@@ -22,17 +22,7 @@ from ._cookies import _get_all_cookies
 logger = getLogger(__name__)
 
 _NoDefault = object()
-
-
-def _cookie_bytes(name: str, value: str, domain: str, path: str | None = None) -> int:
-    total = len(name) + 1 + len(value) + 9 + len(domain)
-    if path is not None:
-        total += 7 + len(path)
-    return total
-
-
 _MAX_SESSION_CONTEXT_TRACKING = 128
-
 
 # Map of all known root Zyte API request params and how they need to be
 # handled. Sorted by appearance in
@@ -297,6 +287,13 @@ _BAN_SENSITIVE_HEADERS = {
 _BAN_SENSITIVE_REQUEST_HEADER_KEYS = {
     header.replace(b"-", b"").decode(): header for header in _BAN_SENSITIVE_HEADERS
 }
+
+
+def _cookie_bytes(name: str, value: str, domain: str, path: str | None = None) -> int:
+    total = len(name) + 1 + len(value) + 9 + len(domain)
+    if path is not None:
+        total += 7 + len(path)
+    return total
 
 
 def _iter_ban_sensitive_headers_in_params(
@@ -869,7 +866,7 @@ def _set_http_request_cookies_from_request(
         input_cookies = input_cookies[:max_cookies]
     for input_cookie in input_cookies:
         name = input_cookie.name
-        value = input_cookie.value
+        value = input_cookie.value or ""
         domain = input_cookie.domain
         path = input_cookie.path if input_cookie.path_specified else None
         if len(name) > max_cookie_name_length:
