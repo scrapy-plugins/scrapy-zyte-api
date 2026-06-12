@@ -394,6 +394,9 @@ SKIP_HEADERS = {
 JOB_ID = None
 COOKIES_ENABLED = False
 MAX_COOKIES = 100
+MAX_COOKIE_NAME_LENGTH = 4085
+MAX_COOKIE_VALUE_LENGTH = 4085
+MAX_COOKIE_BYTES = 4097
 GET_API_PARAMS_KWARGS = {
     "default_params": DEFAULT_PARAMS,
     "transparent_mode": TRANSPARENT_MODE,
@@ -403,6 +406,9 @@ GET_API_PARAMS_KWARGS = {
     "job_id": JOB_ID,
     "cookies_enabled": COOKIES_ENABLED,
     "max_cookies": MAX_COOKIES,
+    "max_cookie_name_length": MAX_COOKIE_NAME_LENGTH,
+    "max_cookie_value_length": MAX_COOKIE_VALUE_LENGTH,
+    "max_cookie_bytes": MAX_COOKIE_BYTES,
 }
 
 
@@ -422,6 +428,9 @@ async def test_param_parser_input_custom(mockserver):
         "ZYTE_API_BROWSER_HEADERS": {"B": "b"},
         "ZYTE_API_DEFAULT_PARAMS": {"a": "b"},
         "ZYTE_API_MAX_COOKIES": 1,
+        "ZYTE_API_MAX_COOKIE_NAME_LENGTH": 10,
+        "ZYTE_API_MAX_COOKIE_VALUE_LENGTH": 20,
+        "ZYTE_API_MAX_COOKIE_BYTES": 500,
         "ZYTE_API_SKIP_HEADERS": {"A"},
         "ZYTE_API_TRANSPARENT_MODE": True,
     }
@@ -432,6 +441,9 @@ async def test_param_parser_input_custom(mockserver):
         assert parser._cookies_enabled is True
         assert parser._default_params == {"a": "b"}
         assert parser._max_cookies == 1
+        assert parser._max_cookie_name_length == 10
+        assert parser._max_cookie_value_length == 20
+        assert parser._max_cookie_bytes == 500
         assert parser._http_skip_headers == {
             b"a": ANY_VALUE,
         }
@@ -3505,6 +3517,111 @@ async def test_automap_cookie_limit(meta, caplog):
     ]
     assert "would get 2 cookies" in caplog.text
     assert "limited to 1 cookies" in caplog.text
+    caplog.clear()
+    await handler._close()
+
+
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {},
+        {"zyte_api_automap": {"browserHtml": True}},
+    ],
+)
+@deferred_f_from_coro_f
+async def test_automap_cookie_size_limit(meta, caplog):
+    # domain "example.com" = 11 chars; formula: name+1+value+9+11 = name+value+21
+    # With max_cookie_bytes=30, name+value must be <= 9 to pass.
+    settings: dict[str, Any] = {
+        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+        "ZYTE_API_MAX_COOKIE_BYTES": 30,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = await get_crawler(settings, start_handler=True)
+    cookie_middleware = get_downloader_middleware(crawler, CookiesMiddleware)
+    handler = get_download_handler(crawler, "https")
+    param_parser = handler._param_parser
+    cookiejar = 0
+
+    # Cookie within size limit is kept without a warning.
+    # "ab"="cd": 2+1+2+9+11 = 25 bytes ≤ 30
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"ab": "cd"},
+    )
+    cookiejar += 1
+    await process_request(cookie_middleware, request)
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "ab", "value": "cd", "domain": "example.com"}
+    ]
+    assert not caplog.records
+    caplog.clear()
+
+    # Cookie exceeding total serialized size is dropped with a warning.
+    # "ab"="cdefghij": 2+1+8+9+11 = 31 bytes > 30
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"ab": "cdefghij"},
+    )
+    cookiejar += 1
+    await process_request(cookie_middleware, request)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert "requestCookies" not in api_params.get("experimental", {})
+    assert "ab" in caplog.text
+    assert "serialized size" in caplog.text
+    caplog.clear()
+
+    # Short cookie is kept while an oversized one is dropped.
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"ab": "cd", "ab2": "cdefghij"},
+    )
+    cookiejar += 1
+    await process_request(cookie_middleware, request)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert api_params["experimental"]["requestCookies"] == [
+        {"name": "ab", "value": "cd", "domain": "example.com"}
+    ]
+    assert "serialized size" in caplog.text
+    caplog.clear()
+
+    # Cookie with a name exceeding 4085 characters is dropped with a warning.
+    long_name = "a" * 4086
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={long_name: "v"},
+    )
+    cookiejar += 1
+    await process_request(cookie_middleware, request)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert "requestCookies" not in api_params.get("experimental", {})
+    assert "name" in caplog.text
+    assert "4086" in caplog.text
+    caplog.clear()
+
+    # Cookie with a value exceeding 4085 characters is dropped with a warning.
+    long_value = "a" * 4086
+    request = Request(
+        url="https://example.com/1",
+        meta={**meta, "cookiejar": cookiejar},
+        cookies={"v": long_value},
+    )
+    cookiejar += 1
+    await process_request(cookie_middleware, request)
+    with caplog.at_level("WARNING"):
+        api_params = param_parser.parse(request)
+    assert "requestCookies" not in api_params.get("experimental", {})
+    assert "value length" in caplog.text
     caplog.clear()
     await handler._close()
 
