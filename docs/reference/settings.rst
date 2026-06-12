@@ -498,6 +498,21 @@ Default: ``False``
 
 Enables :ref:`plugin-managed sessions <session>`.
 
+.. setting:: ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION
+
+ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION
+========================================================
+
+Default: ``True``
+
+When ``True``, a session is discarded if its :ref:`initialization
+<session-init>` used :http:`actions <request:actions>` and any of them has a
+``returned`` status in the response (failed and stopped execution). See
+:ref:`session-check` for details.
+
+Set to ``False`` to disable this check and rely entirely on your own
+:setting:`ZYTE_API_SESSION_CHECKER` or
+:meth:`~scrapy_zyte_api.SessionConfig.check` implementation.
 
 .. setting:: ZYTE_API_SESSION_LOCATION
 
@@ -679,6 +694,44 @@ Number of seconds to wait between attempts to get a session from a rotation
 queue.
 
 See :setting:`ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS` for details.
+
+.. setting:: ZYTE_API_SESSION_RETRY_POLICY
+
+ZYTE_API_SESSION_RETRY_POLICY
+=============================
+
+Default: A session-compatible version of :setting:`ZYTE_API_RETRY_POLICY`
+(see description below).
+
+Determines the retry policy for Zyte API requests that are assigned a
+:ref:`plugin-managed session <session>`.
+
+Session requests automatically get their :reqmeta:`zyte_api_retry_policy`
+request metadata key set (via :func:`~dict.setdefault`) to the value of this
+setting. This ensures that 520 and 521 responses are not retried at the Zyte
+API client level, letting the session management middleware handle them
+instead. This applies to both regular session requests and session
+initialization requests.
+
+The value must be a string with the import path of a
+:class:`tenacity.AsyncRetrying` subclass, i.e. a retry policy object. See
+:setting:`ZYTE_API_RETRY_POLICY` for details.
+
+When not set explicitly, the value is automatically derived from
+:setting:`ZYTE_API_RETRY_POLICY`: :data:`~zyte_api.zyte_api_retrying` maps to
+:data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY`,
+:data:`~zyte_api.aggressive_retrying` maps to
+:data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY`, and any other
+(custom) value is used as-is with a warning logged, since session retry
+policies must not retry 520 or 521 responses.
+
+To override the retry policy for a specific request, set
+:reqmeta:`zyte_api_retry_policy` in the request metadata before session
+assignment. The :func:`~dict.setdefault` call will not override an
+already-set value.
+
+See :ref:`enable-sessions` for details.
+
 
 .. setting:: ZYTE_API_SESSION_RANDOMIZE_DELAY
 

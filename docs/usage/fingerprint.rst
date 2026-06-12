@@ -17,6 +17,8 @@ Use :setting:`ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS` to define a custom
 request fingerprinting for requests that do not go through Zyte API.
 
 
+.. _fingerprint-pre-2.7:
+
 Request fingerprinting below Scrapy 2.7
 ---------------------------------------
 

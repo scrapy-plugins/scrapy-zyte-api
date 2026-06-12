@@ -1,6 +1,8 @@
 from base64 import b64decode, b64encode
+from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from copy import copy
+from json import dumps as json_dumps
 from logging import getLogger
 from os import environ
 from typing import Any
@@ -27,6 +29,9 @@ def _cookie_bytes(name: str, value: str, domain: str, path: str | None = None) -
     if path is not None:
         total += 7 + len(path)
     return total
+
+
+_MAX_SESSION_CONTEXT_TRACKING = 128
 
 
 # Map of all known root Zyte API request params and how they need to be
@@ -1331,6 +1336,8 @@ class _ParamParser:
         )
         self._max_cookie_bytes = settings.getint("ZYTE_API_MAX_COOKIE_BYTES", 4097)
         self._cookie_jars = None
+        self._session_context_params: OrderedDict[str, Any] = OrderedDict()
+        self._warned_session_contexts: set[str] = set()
 
     def _request_skip_headers(self, request):
         result = dict(self._mw_skip_headers)
@@ -1363,6 +1370,8 @@ class _ParamParser:
             self._warn_about_ban_sensitive_headers(request, params)
         if not dont_merge_cookies and self._warn_on_cookies:
             self._handle_warn_on_cookies(request, params)
+        if params:
+            self._warn_about_session_context_params(params)
         return params
 
     def _warn_about_ban_sensitive_headers(
@@ -1409,3 +1418,30 @@ class _ParamParser:
             },
         )
         self._warn_on_cookies = False
+
+    def _warn_about_session_context_params(self, params: dict) -> None:
+        session_context = params.get("sessionContext")
+        if not session_context:
+            return
+        context_key = json_dumps(session_context, sort_keys=True)
+        if context_key in self._warned_session_contexts:
+            return
+        current = params.get("sessionContextParameters", {})
+        if context_key not in self._session_context_params:
+            if len(self._session_context_params) >= _MAX_SESSION_CONTEXT_TRACKING:
+                self._session_context_params.popitem(last=False)
+            self._session_context_params[context_key] = current
+        elif self._session_context_params[context_key] != current:
+            self._warned_session_contexts.add(context_key)
+            del self._session_context_params[context_key]
+            logger.warning(
+                f"sessionContext {session_context!r} was used with "
+                f"sessionContextParameters {current!r}, but a different "
+                f"sessionContextParameters value was used previously for the "
+                f"same sessionContext. For a given sessionContext value, "
+                f"sessionContextParameters should always be the same "
+                f"throughout a crawl. See https://docs.zyte.com/zyte-api/"
+                f"usage/features.html#server-managed-sessions"
+            )
+        else:
+            self._session_context_params.move_to_end(context_key)

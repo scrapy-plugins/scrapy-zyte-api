@@ -4,21 +4,24 @@
 Plugin-managed sessions
 =======================
 
-Zyte API provides powerful session APIs:
+.. note::
 
--   :ref:`User-managed sessions <zapi-session-id>` give you full control over
-    session management.
+    This page covers **plugin-managed sessions**, a session management feature
+    built into scrapy-zyte-api. It does **not** cover the 2 session management
+    features provided natively by Zyte API:
 
--   :ref:`Zyte-managed sessions <zapi-session-contexts>` let Zyte API handle
-    session management for you.
+    -   :ref:`User-managed sessions <zapi-session-id>`, which give you full
+        control over session management via the :http:`request:session` field.
 
-When using scrapy-zyte-api, you can use these session APIs through the
-corresponding Zyte API fields (:http:`request:session`,
-:http:`request:sessionContext`).
+    -   :ref:`Zyte-managed sessions <zapi-session-contexts>`, which let Zyte
+        API handle session management for you via the
+        :http:`request:sessionContext` field.
 
-However, scrapy-zyte-api also provides plugin-managed sessions, with an API
-similar to that of Zyte-managed sessions, but built on top of user-managed
-sessions.
+    You can use both of those Zyte API features directly from scrapy-zyte-api
+    through their corresponding request parameters.
+
+Plugin-managed sessions have an API similar to that of Zyte-managed sessions,
+but are built on top of user-managed sessions.
 
 Plugin-managed sessions offer some advantages over :ref:`Zyte-managed sessions
 <zapi-session-contexts>`:
@@ -74,31 +77,30 @@ rotated among requests, and refreshed as they expire or get banned. You can
 customize most of this logic through request metadata, settings and
 :ref:`session config overrides <session-configs>`.
 
-For session management to work as expected, your
-:setting:`ZYTE_API_RETRY_POLICY` should not retry 520 and 521 responses:
+For session management to work as expected, session requests must use a retry
+policy that does not retry 520 and 521 responses, so that the session
+management middleware can handle those instead.
 
--   If you are using the default retry policy
-    (:data:`~zyte_api.zyte_api_retrying`) or
-    :data:`~zyte_api.aggressive_retrying`:
+520 and 521 are Zyte API status codes for download errors (e.g. connection
+refused). When session management receives a 520 or 521 response, it counts it
+as a session error, potentially discards the session (see
+:setting:`ZYTE_API_SESSION_MAX_ERRORS`), and retries the request with a
+different session. If the retry policy also retried 520 and 521 responses, it
+would do so before the session middleware can swap the session, potentially
+reusing the same problematic session for the retry.
 
-    -   If you are :ref:`using the scrapy-zyte-api add-on <config-addon>`,
-        these built-in retry policies are automatically replaced with a
-        matching session-specific retry policy, either
-        :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` or
-        :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY`.
+scrapy-zyte-api handles this automatically: all requests that are assigned a
+session get their :reqmeta:`zyte_api_retry_policy` request metadata key set
+(via :func:`~dict.setdefault`) to the value of
+:setting:`ZYTE_API_SESSION_RETRY_POLICY`.
 
-    -   If you are not using the scrapy-zyte-api add-on, set
-        :setting:`ZYTE_API_RETRY_POLICY` manually to either
-        :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` or
-        :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY`. For example:
+Non-session requests continue to use :setting:`ZYTE_API_RETRY_POLICY` as usual,
+unaffected by session management.
 
-        .. code-block:: python
-            :caption: settings.py
-
-            ZYTE_API_RETRY_POLICY = "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"
-
--   If you are using a custom retry policy, modify it to not retry 520 and 521
-    responses.
+To override the retry policy for a specific request only, set
+:reqmeta:`zyte_api_retry_policy` in the request metadata before the request
+reaches the session middleware. The :func:`~dict.setdefault` call will not
+override an already-set value.
 
 .. _session-init:
 
@@ -162,6 +164,13 @@ Precedence, from higher to lower, is:
 
 #.  :meth:`~scrapy_zyte_api.SessionConfig.params`
 
+.. note::
+
+    The IP address assigned to a session is determined during session
+    initialization and remains fixed for the lifetime of the session. Using a
+    different :http:`request:geolocation` in a follow-up request that reuses a
+    session is not supported and results in undefined behavior.
+
 .. _session-check:
 
 Checking sessions
@@ -176,21 +185,25 @@ initialization fails, e.g. due to rendering issues, IP-geolocation mismatches,
 A-B tests, etc. It can also help in cases where website sessions expire before
 Zyte API sessions.
 
-By default, if a location is defined through
-:reqmeta:`zyte_api_session_location`, :setting:`ZYTE_API_SESSION_LOCATION` or
-:meth:`~scrapy_zyte_api.SessionConfig.location`, even if the parameters used
-for session initialization actually come from
-:reqmeta:`zyte_api_session_params` or :setting:`ZYTE_API_SESSION_LOCATION`, the
-outcome of the first ``setLocation`` action used, if any, is checked. If the
-action fails, the session is discarded. If the action is not even available for
-a given website, the spider is closed with ``unsupported_set_location`` as the
-close reason; in that case, you should define a proper :ref:`session
-initialization logic <session-init>` for requests targeting that website.
+By default, if the :ref:`session initialization parameters <session-init>`
+include :http:`actions <request:actions>`, and any of them has a ``returned``
+status in the response (meaning it failed and stopped execution), the session
+is discarded. Actions with ``onError`` set to ``"continue"`` that fail produce
+a ``continued`` status instead, and do not cause the session to be discarded.
+You can disable this behavior by setting
+:setting:`ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION` to
+``False``.
 
-For sessions initialized without a configured location, no session check is
-performed, sessions are assumed to be fine until they expire or are banned.
-That is so even if session initialization parameters include a ``setLocation``
-action.
+In addition, if a location is defined through
+:reqmeta:`zyte_api_session_location`, :setting:`ZYTE_API_SESSION_LOCATION` or
+:meth:`~scrapy_zyte_api.SessionConfig.location`, and the ``setLocation`` action
+is not available for a given website, the spider is closed with
+``unsupported_set_location`` as the close reason; in that case, you should
+define a proper :ref:`session initialization logic <session-init>` for requests
+targeting that website.
+
+For sessions initialized without actions, no action-based session check is
+performed.
 
 To implement your own code to check session responses and determine whether
 their session should be kept or discarded, use the
@@ -395,12 +408,24 @@ To include cookies in session initialization requests, use
 :ref:`they are not added to the session cookie jar
 <zapi-session-cookie-jar>`.
 
+.. _session-cookies-no-ip:
+
+Because sessions tie cookies and IP addresses together, it is not possible to
+use session cookie sharing while switching IP types or geolocations between
+requests. For example, you cannot initialize a session with residential IPs and
+then reuse its cookies with datacenter IPs.
+
+To share cookies across requests that use different IP types or geolocations,
+use :http:`response:responseCookies` from the first request as
+:http:`request:requestCookies` in follow-up requests, instead of using
+sessions.
 
 Session retry policies
 ======================
 
 The following retry policies are designed to work well with session management
-(see :ref:`enable-sessions`):
+(see :ref:`enable-sessions`). They are meant for
+:setting:`ZYTE_API_SESSION_RETRY_POLICY`:
 
 .. autodata:: scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY
     :annotation:
@@ -436,77 +461,6 @@ Session management can close your spider early in the following scenarios:
 A custom :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`
 implementation may also close your spider with a custom reason by raising a
 :exc:`~scrapy.exceptions.CloseSpider` exception.
-
-
-.. _session-stats:
-
-Session stats
-=============
-
-Plugin-managed sessions trigger some stats to help understand how well sessions
-are working.
-
-By default, stats are aggregated across session pools. Set
-:setting:`ZYTE_API_SESSION_STATS_PER_POOL` to ``True`` to enable per-pool
-stats.
-
-Tracked stats are as follows (``pools/{pool}/`` is only present if per-pool
-stats are enabled):
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/check-error``
-    Number of times that a session for pool ``{pool}`` triggered an unexpected
-    exception during its session validation check right after initialization.
-
-    It is most likely the result of a bad implementation of
-    :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`; the
-    logs should contain an error message with a traceback for such errors.
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/check-failed``
-    Number of times that a session from pool ``{pool}`` failed its session
-    validation check right after initialization.
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/check-passed``
-    Number of times that a session from pool ``{pool}`` passed its session
-    validation check right after initialization.
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/failed``
-    Number of times that initializing a session for pool ``{pool}`` resulted in
-    an :ref:`unsuccessful response <zapi-unsuccessful-responses>`.
-
-``scrapy-zyte-api/sessions/pools/{pool}/init/param-error``
-    Number of times that initializing a session for pool ``{pool}`` triggered
-    an unexpected exception when obtaining the Zyte API parameters for session
-    initialization.
-
-    It is most likely the result of a bad implementation of
-    :meth:`SessionConfig.params <scrapy_zyte_api.SessionConfig.params>`; the
-    logs should contain an error message with a traceback for such errors.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/check-error``
-    Number of times that a response that used a session from pool ``{pool}``
-    triggered an unexpected exception during its session validation check.
-
-    It is most likely the result of a bad implementation of
-    :meth:`SessionConfig.check <scrapy_zyte_api.SessionConfig.check>`; the
-    logs should contain an error message with a traceback for such errors.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/check-failed``
-    Number of times that a response that used a session from pool ``{pool}``
-    failed its session validation check.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/check-passed``
-    Number of times that a response that used a session from pool ``{pool}``
-    passed its session validation check.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/expired``
-    Number of times that a session from pool ``{pool}`` expired.
-
-``scrapy-zyte-api/sessions/pools/{pool}/use/failed``
-    Number of times that a request that used a session from pool ``{pool}``
-    got an :ref:`unsuccessful response <zapi-unsuccessful-responses>`.
-
-``scrapy-zyte-api/sessions/use/disabled``
-    Number of processed requests for which session management was disabled.
 
 .. _session-troubleshooting:
 

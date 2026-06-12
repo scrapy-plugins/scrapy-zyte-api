@@ -211,13 +211,16 @@ class DefaultResource(Resource):
         actions = request_data.get("actions")
         if actions:
             results: list[_ActionResult] = []
+            stopped = False
             for action in actions:
                 result: _ActionResult = {
                     "action": action["action"],
                     "elapsedTime": 1.0,
                     "status": "success",
                 }
-                if action["action"] == "setLocation":
+                if stopped:
+                    result["status"] = "notExecuted"
+                elif action["action"] == "setLocation":
                     if domain.startswith("postal-code-10001"):
                         try:
                             postal_code = action["address"]["postalCode"]
@@ -226,9 +229,18 @@ class DefaultResource(Resource):
                         if postal_code != "10001":
                             result["status"] = "returned"
                             result["error"] = "Action setLocation failed"
+                            stopped = True
                     elif domain.startswith("no-location-support"):
                         result["status"] = "returned"
                         result["error"] = "Action setLocation not supported on …"
+                        stopped = True
+                elif domain.startswith("failing-action"):
+                    if action.get("onError") == "continue":
+                        result["status"] = "continued"
+                    else:
+                        result["status"] = "returned"
+                        stopped = True
+                    result["error"] = f"Action {action['action']} failed"
                 results.append(result)
             response_data["actions"] = results  # type: ignore[assignment]
 

@@ -7,6 +7,7 @@ from scrapy.utils.python import global_object_name
 from zyte_api import RequestError
 
 from ._params import _ParamParser
+from .responses import ZyteAPIMixin
 from .utils import (
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
     _GET_SLOT_NEEDS_SPIDER,
@@ -157,6 +158,16 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             )
 
         self.slot_request(request, force=True)
+
+    def process_response(
+        self, request: Request, response, spider: Spider | None = None
+    ):
+        if isinstance(response, ZyteAPIMixin) and response.url != request.url:
+            logger.debug(
+                f"Redirecting to {response} from {request}",
+                extra={"spider": spider},
+            )
+        return response
 
     def process_exception(
         self, request: Request, exception: Exception, spider: Spider | None = None

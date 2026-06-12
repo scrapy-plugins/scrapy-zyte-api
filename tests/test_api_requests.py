@@ -21,6 +21,7 @@ from scrapy.utils.defer import deferred_f_from_coro_f
 from twisted.internet.defer import Deferred, succeed
 from zyte_api import RequestError
 
+import scrapy_zyte_api._params as params_module
 from scrapy_zyte_api._cookies import _get_cookie_jar
 from scrapy_zyte_api._params import ANY_VALUE, _ParamParser
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
@@ -2488,6 +2489,204 @@ async def test_ban_sensitive_header_warning_disabled(caplog):
         [],
         caplog,
     )
+
+
+@deferred_f_from_coro_f
+async def test_session_context_params_warning_no_mismatch(caplog):
+    """No warning when sessionContextParameters is consistent across requests
+    with the same sessionContext."""
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
+    param_parser = _ParamParser(crawler)
+    context = [{"name": "region", "value": "US"}]
+    params = {"sessionContextParameters": {"foo": "bar"}, "sessionContext": context}
+    request1 = Request(url="https://example.com", meta={"zyte_api": params})
+    request2 = Request(url="https://example.com/2", meta={"zyte_api": params})
+    with caplog.at_level("WARNING"):
+        param_parser.parse(request1)
+        param_parser.parse(request2)
+    assert not caplog.records
+
+
+@deferred_f_from_coro_f
+async def test_session_context_params_warning_no_params(caplog):
+    """No warning when sessionContextParameters is consistently absent."""
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
+    param_parser = _ParamParser(crawler)
+    context = [{"name": "region", "value": "US"}]
+    request1 = Request(
+        url="https://example.com", meta={"zyte_api": {"sessionContext": context}}
+    )
+    request2 = Request(
+        url="https://example.com/2", meta={"zyte_api": {"sessionContext": context}}
+    )
+    with caplog.at_level("WARNING"):
+        param_parser.parse(request1)
+        param_parser.parse(request2)
+    assert not caplog.records
+
+
+@deferred_f_from_coro_f
+async def test_session_context_params_warning_mismatch(caplog):
+    """Warning when sessionContextParameters differs across requests with the
+    same sessionContext."""
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
+    param_parser = _ParamParser(crawler)
+    context = [{"name": "region", "value": "US"}]
+    request1 = Request(
+        url="https://example.com",
+        meta={
+            "zyte_api": {
+                "sessionContext": context,
+                "sessionContextParameters": {"foo": "bar"},
+            }
+        },
+    )
+    request2 = Request(
+        url="https://example.com/2",
+        meta={
+            "zyte_api": {
+                "sessionContext": context,
+                "sessionContextParameters": {"foo": "baz"},
+            }
+        },
+    )
+    with caplog.at_level("WARNING"):
+        param_parser.parse(request1)
+        param_parser.parse(request2)
+    assert "sessionContext" in caplog.text
+    assert "server-managed-sessions" in caplog.text
+
+
+@deferred_f_from_coro_f
+async def test_session_context_params_warning_once(caplog):
+    """Warning fires only once per sessionContext value, even across many
+    requests with differing sessionContextParameters."""
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
+    param_parser = _ParamParser(crawler)
+    context = [{"name": "region", "value": "US"}]
+
+    def make_request(url, params_value):
+        return Request(
+            url=url,
+            meta={
+                "zyte_api": {
+                    "sessionContext": context,
+                    "sessionContextParameters": {"foo": params_value},
+                }
+            },
+        )
+
+    with caplog.at_level("WARNING"):
+        param_parser.parse(make_request("https://example.com/1", "bar"))
+        param_parser.parse(make_request("https://example.com/2", "baz"))
+        param_parser.parse(make_request("https://example.com/3", "qux"))
+    assert caplog.text.count("server-managed-sessions") == 1
+
+
+@deferred_f_from_coro_f
+async def test_session_context_params_warning_mismatch_omit_vs_set(caplog):
+    """Warning when sessionContextParameters is absent for one request and
+    present for another with the same sessionContext."""
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
+    param_parser = _ParamParser(crawler)
+    context = [{"name": "region", "value": "US"}]
+    request1 = Request(
+        url="https://example.com",
+        meta={"zyte_api": {"sessionContext": context}},
+    )
+    request2 = Request(
+        url="https://example.com/2",
+        meta={
+            "zyte_api": {
+                "sessionContext": context,
+                "sessionContextParameters": {"foo": "bar"},
+            }
+        },
+    )
+    with caplog.at_level("WARNING"):
+        param_parser.parse(request1)
+        param_parser.parse(request2)
+    assert "server-managed-sessions" in caplog.text
+
+
+@deferred_f_from_coro_f
+async def test_session_context_params_warning_different_contexts(caplog):
+    """No warning when different sessionContext values use different
+    sessionContextParameters."""
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
+    param_parser = _ParamParser(crawler)
+    request1 = Request(
+        url="https://example.com",
+        meta={
+            "zyte_api": {
+                "sessionContext": [{"name": "region", "value": "US"}],
+                "sessionContextParameters": {"foo": "bar"},
+            }
+        },
+    )
+    request2 = Request(
+        url="https://example.com/2",
+        meta={
+            "zyte_api": {
+                "sessionContext": [{"name": "region", "value": "EU"}],
+                "sessionContextParameters": {"foo": "baz"},
+            }
+        },
+    )
+    with caplog.at_level("WARNING"):
+        param_parser.parse(request1)
+        param_parser.parse(request2)
+    assert not caplog.records
+
+
+@deferred_f_from_coro_f
+async def test_session_context_params_warning_lru(caplog, monkeypatch):
+    """When _MAX_SESSION_CONTEXT_TRACKING is reached, the least recently used
+    entry is evicted to make room for a new one."""
+    monkeypatch.setattr(params_module, "_MAX_SESSION_CONTEXT_TRACKING", 2)
+
+    crawler = await get_crawler({"ZYTE_API_TRANSPARENT_MODE": True})
+    param_parser = _ParamParser(crawler)
+
+    ctx_a = [{"name": "id", "value": "a"}]
+    ctx_b = [{"name": "id", "value": "b"}]
+    ctx_c = [{"name": "id", "value": "c"}]
+
+    def req(url, context, params_value):
+        return Request(
+            url=url,
+            meta={
+                "zyte_api": {
+                    "sessionContext": context,
+                    "sessionContextParameters": {"foo": params_value},
+                }
+            },
+        )
+
+    # Fill to cap: a (LRU) → b (MRU).
+    param_parser.parse(req("https://example.com/1", ctx_a, "bar"))
+    param_parser.parse(req("https://example.com/2", ctx_b, "bar"))
+    assert len(param_parser._session_context_params) == 2
+
+    # Re-access a to make it MRU: b (LRU) → a (MRU).
+    param_parser.parse(req("https://example.com/3", ctx_a, "bar"))
+
+    # Adding c evicts b (the current LRU), not a.
+    param_parser.parse(req("https://example.com/4", ctx_c, "bar"))
+    assert len(param_parser._session_context_params) == 2
+
+    # a is still tracked: a mismatch on it triggers a warning.
+    with caplog.at_level("WARNING"):
+        param_parser.parse(req("https://example.com/5", ctx_a, "different"))
+    assert "server-managed-sessions" in caplog.text
+    caplog.clear()
+
+    # b was evicted; re-encountering it starts fresh (no warning on consistent
+    # params, just as when first seen).
+    with caplog.at_level("WARNING"):
+        param_parser.parse(req("https://example.com/6", ctx_b, "bar"))
+        param_parser.parse(req("https://example.com/7", ctx_b, "bar"))
+    assert not caplog.records
 
 
 @pytest.mark.parametrize(
