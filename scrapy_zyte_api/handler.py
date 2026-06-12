@@ -1,23 +1,33 @@
+from __future__ import annotations
+
 import json
 import logging
 import time
 from copy import deepcopy
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from scrapy import Spider, signals
-from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
-from scrapy.http import Request
-from scrapy.http.response import Response
-from scrapy.settings import Settings
 from scrapy.utils.misc import load_object
 from scrapy.utils.reactor import verify_installed_reactor
+
+if TYPE_CHECKING:
+    from scrapy.crawler import Crawler
+    from scrapy.http import Request
+    from scrapy.http.response import Response
+    from scrapy.settings import Settings
 from twisted.internet.defer import ensureDeferred
 from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
 
 from ._params import _ParamParser
-from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
+from .responses import (
+    ZyteAPIJsonResponse,
+    ZyteAPIResponse,
+    ZyteAPITextResponse,
+    ZyteAPIXmlResponse,
+    _process_response,
+)
 from .utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
@@ -276,7 +286,13 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     async def _download_request(
         self, api_params: dict, request: Request
-    ) -> ZyteAPITextResponse | ZyteAPIResponse | None:
+    ) -> (
+        ZyteAPITextResponse
+        | ZyteAPIXmlResponse
+        | ZyteAPIJsonResponse
+        | ZyteAPIResponse
+        | None
+    ):
         # Define url by default
         retrying = request.meta.get("zyte_api_retry_policy")
         if retrying:

@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import datetime as dt
 from base64 import b64decode
 from copy import copy
-from typing import Any, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from scrapy import Request
-from scrapy.http import Headers, HtmlResponse, Response, TextResponse
-from scrapy.http.cookies import CookieJar
+from scrapy.http import Headers, HtmlResponse, Response, TextResponse, XmlResponse
 from scrapy.responsetypes import responsetypes
+
+if TYPE_CHECKING:
+    from scrapy import Request
+    from scrapy.http.cookies import CookieJar
 
 from scrapy_zyte_api._cookies import _process_cookies
 from scrapy_zyte_api.utils import (
@@ -87,6 +91,21 @@ class ZyteAPIMixin:
         return result
 
     @classmethod
+    def from_api_response(cls, api_response: dict, *, request: Request | None = None):
+        """Alternative constructor to instantiate the response from the raw
+        Zyte API response.
+        """
+        return cls(
+            url=api_response["url"],
+            status=api_response.get("statusCode") or 200,
+            body=b64decode(api_response.get("httpResponseBody") or ""),
+            request=request,
+            flags=["zyte-api"],
+            headers=cls._prepare_headers(api_response),
+            raw_api_response=api_response,
+        )
+
+    @classmethod
     def _prepare_headers(cls, api_response: dict[str, Any]):
         result: dict[str, list[str]] = {}
         input_headers: list[dict[str, str]] | None = api_response.get(
@@ -144,21 +163,24 @@ class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
         return ZyteAPIMixin.replace(self, *args, **kwargs)
 
 
+class ZyteAPIXmlResponse(ZyteAPIMixin, XmlResponse):
+    pass
+
+
+try:
+    from scrapy.http import JsonResponse as _JsonResponse
+
+    class ZyteAPIJsonResponse(ZyteAPIMixin, _JsonResponse):
+        pass
+
+    _SCRAPY_JSON_CLS: type | None = _JsonResponse
+except ImportError:
+    ZyteAPIJsonResponse = None  # type: ignore[assignment, misc]
+    _SCRAPY_JSON_CLS = None
+
+
 class ZyteAPIResponse(ZyteAPIMixin, Response):
-    @classmethod
-    def from_api_response(cls, api_response: dict, *, request: Request | None = None):
-        """Alternative constructor to instantiate the response from the raw
-        Zyte API response.
-        """
-        return cls(
-            url=api_response["url"],
-            status=api_response.get("statusCode") or 200,
-            body=b64decode(api_response.get("httpResponseBody") or ""),
-            request=request,
-            flags=["zyte-api"],
-            headers=cls._prepare_headers(api_response),
-            raw_api_response=api_response,
-        )
+    pass
 
 
 _IMMUTABLE_JSON: TypeAlias = None | str | int | float | bool
@@ -167,15 +189,27 @@ _JSON: TypeAlias = (
 )
 _API_RESPONSE: TypeAlias = dict[str, _JSON]
 
+_SCRAPY_TO_ZYTE_RESPONSE: dict[type[TextResponse], type[ZyteAPIMixin]] = {
+    XmlResponse: ZyteAPIXmlResponse,
+}
+if _SCRAPY_JSON_CLS is not None and ZyteAPIJsonResponse is not None:
+    _SCRAPY_TO_ZYTE_RESPONSE[_SCRAPY_JSON_CLS] = ZyteAPIJsonResponse
+
 
 def _process_response(
     api_response: _API_RESPONSE,
     request: Request,
     cookie_jars: dict[Any, CookieJar] | None,
-) -> ZyteAPITextResponse | ZyteAPIResponse | None:
+) -> (
+    ZyteAPITextResponse
+    | ZyteAPIXmlResponse
+    | ZyteAPIJsonResponse
+    | ZyteAPIResponse
+    | None
+):
     """Given a Zyte API Response and the ``scrapy.Request`` that asked for it,
-    this returns either a ``ZyteAPITextResponse`` or ``ZyteAPIResponse`` depending
-    on which if it can properly decode the HTTP Body or have access to browserHtml.
+    this returns the most appropriate Zyte API response class based on the
+    response content type.
     """
 
     # NOTES: Currently, Zyte API does NOT only allow both 'browserHtml' and
@@ -203,6 +237,7 @@ def _process_response(
             body=b64decode(api_response["httpResponseBody"]),  # type: ignore[arg-type]
         )
         if issubclass(response_cls, TextResponse):
-            return ZyteAPITextResponse.from_api_response(api_response, request=request)
+            zyte_cls = _SCRAPY_TO_ZYTE_RESPONSE.get(response_cls, ZyteAPITextResponse)
+            return zyte_cls.from_api_response(api_response, request=request)
 
     return ZyteAPIResponse.from_api_response(api_response, request=request)
