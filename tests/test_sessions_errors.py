@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 from aiohttp.client_exceptions import ServerConnectionError
-from scrapy import Request, Spider
+from scrapy import Request, Spider, signals
 from scrapy.http import Response
 from scrapy.utils.defer import deferred_f_from_coro_f
 from zyte_api import RequestError
@@ -14,6 +14,7 @@ from scrapy_zyte_api import (
     SESSION_AGGRESSIVE_RETRY_POLICY,
     SESSION_DEFAULT_RETRY_POLICY,
 )
+from scrapy_zyte_api._session import SESSION_INIT_META_KEY
 from scrapy_zyte_api.utils import _REQUEST_ERROR_HAS_QUERY, maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
@@ -295,3 +296,192 @@ async def test_missing_session_id_on_response(mockserver, caplog):
     await maybe_deferred_to_future(crawler.crawl())
 
     assert "had no session ID assigned, unexpectedly" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("extra_settings", "expected_policy"),
+    [
+        # Default: SESSION_DEFAULT_RETRY_POLICY is applied.
+        ({}, "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"),
+        # Custom ZYTE_API_SESSION_RETRY_POLICY is applied.
+        (
+            {
+                "ZYTE_API_SESSION_RETRY_POLICY": (
+                    "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
+                ),
+            },
+            "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY",
+        ),
+    ],
+)
+@deferred_f_from_coro_f
+async def test_session_retry_policy_applied(
+    mockserver, extra_settings, expected_policy
+):
+    """Session requests and session init requests both get zyte_api_retry_policy
+    set to ZYTE_API_SESSION_RETRY_POLICY."""
+
+    class Tracker:
+        def __init__(self):
+            self.policy = None
+            self.init_policy = None
+
+        def track(self, request: Request, spider: Spider):
+            if request.meta.get(SESSION_INIT_META_KEY, False):
+                self.init_policy = request.meta.get("zyte_api_retry_policy")
+            else:
+                self.policy = request.meta.get("zyte_api_retry_policy")
+
+    tracker = Tracker()
+
+    settings = {
+        **SESSION_SETTINGS,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        **extra_settings,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert tracker.policy == expected_policy
+    assert tracker.init_policy == expected_policy
+
+
+@deferred_f_from_coro_f
+async def test_session_retry_policy_per_request_override(mockserver):
+    """A zyte_api_retry_policy set on a request before session assignment is not
+    overridden by ZYTE_API_SESSION_RETRY_POLICY."""
+
+    custom_policy = "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
+
+    class Tracker:
+        def __init__(self):
+            self.policy = None
+
+        def track(self, request: Request, spider: Spider):
+            if not request.meta.get(SESSION_INIT_META_KEY, False):
+                self.policy = request.meta.get("zyte_api_retry_policy")
+
+    tracker = Tracker()
+
+    settings = {
+        **SESSION_SETTINGS,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
+        def start_requests(self):
+            yield Request(
+                "https://example.com",
+                meta={"zyte_api_retry_policy": custom_policy},
+            )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert tracker.policy == custom_policy
+
+
+@deferred_f_from_coro_f
+async def test_non_session_request_no_retry_policy_override(mockserver):
+    """Requests with sessions disabled do not get zyte_api_retry_policy set by
+    the session middleware."""
+
+    class Tracker:
+        def __init__(self):
+            self.policy = "not-set"
+
+        def track(self, request: Request, spider: Spider):
+            self.policy = request.meta.get("zyte_api_retry_policy", "not-set")
+
+    tracker = Tracker()
+
+    settings = {
+        **SESSION_SETTINGS,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+
+        async def start(self):
+            for request in self.start_requests():
+                yield request
+
+        def start_requests(self):
+            yield Request(
+                "https://example.com",
+                meta={"zyte_api_session_enabled": False},
+            )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert tracker.policy == "not-set"
+
+
+@deferred_f_from_coro_f
+async def test_custom_retry_policy_warning(mockserver, caplog):
+    """When ZYTE_API_RETRY_POLICY is a custom value and ZYTE_API_SESSION_RETRY_POLICY
+    is not set, the custom policy is used for session requests with a warning."""
+
+    custom_policy = "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY"
+
+    class Tracker:
+        def __init__(self):
+            self.policy = None
+
+        def track(self, request: Request, spider: Spider):
+            if not request.meta.get(SESSION_INIT_META_KEY, False):
+                self.policy = request.meta.get("zyte_api_retry_policy")
+
+    tracker = Tracker()
+
+    settings = {
+        **SESSION_SETTINGS,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_RETRY_POLICY": custom_policy,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    caplog.clear()
+    caplog.set_level("WARNING")
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert tracker.policy == custom_policy
+    assert "ZYTE_API_RETRY_POLICY is set to a custom value" in caplog.text
+    assert "ZYTE_API_SESSION_RETRY_POLICY" in caplog.text

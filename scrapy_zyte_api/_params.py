@@ -1,6 +1,8 @@
 from base64 import b64decode, b64encode
+from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from copy import copy
+from json import dumps as json_dumps
 from logging import getLogger
 from os import environ
 from typing import Any
@@ -20,6 +22,7 @@ from ._cookies import _get_all_cookies
 logger = getLogger(__name__)
 
 _NoDefault = object()
+_MAX_SESSION_CONTEXT_TRACKING = 128
 
 # Map of all known root Zyte API request params and how they need to be
 # handled. Sorted by appearance in
@@ -284,6 +287,13 @@ _BAN_SENSITIVE_HEADERS = {
 _BAN_SENSITIVE_REQUEST_HEADER_KEYS = {
     header.replace(b"-", b"").decode(): header for header in _BAN_SENSITIVE_HEADERS
 }
+
+
+def _cookie_bytes(name: str, value: str, domain: str, path: str | None = None) -> int:
+    total = len(name) + 1 + len(value) + 9 + len(domain)
+    if path is not None:
+        total += 7 + len(path)
+    return total
 
 
 def _iter_ban_sensitive_headers_in_params(
@@ -807,6 +817,9 @@ def _set_http_request_cookies_from_request(
     request: Request,
     cookie_jars: dict[Any, CookieJar],
     max_cookies: int,
+    max_cookie_name_length: int,
+    max_cookie_value_length: int,
+    max_cookie_bytes: int,
 ):
     api_params.setdefault("experimental", {})
     if "requestCookies" in api_params["experimental"]:
@@ -852,13 +865,53 @@ def _set_http_request_cookies_from_request(
         )
         input_cookies = input_cookies[:max_cookies]
     for input_cookie in input_cookies:
-        output_cookie = {
-            "name": input_cookie.name,
-            "value": input_cookie.value,
-            "domain": input_cookie.domain,
-        }
-        if input_cookie.path_specified:
-            output_cookie["path"] = input_cookie.path
+        name = input_cookie.name
+        value = input_cookie.value or ""
+        domain = input_cookie.domain
+        path = input_cookie.path if input_cookie.path_specified else None
+        if len(name) > max_cookie_name_length:
+            logger.warning(
+                f"Request {request!r} has a cookie with a name of "
+                f"{len(name)} characters, which exceeds the limit of "
+                f"{max_cookie_name_length} characters (see the "
+                f"ZYTE_API_MAX_COOKIE_NAME_LENGTH setting), so the cookie "
+                f"has been dropped. To silence this warning, set the request "
+                f"cookies manually through the experimental.requestCookies "
+                f"Zyte API parameter instead. Alternatively, if Zyte API "
+                f"starts supporting longer cookie names, update the "
+                f"ZYTE_API_MAX_COOKIE_NAME_LENGTH setting accordingly."
+            )
+            continue
+        if len(value) > max_cookie_value_length:
+            logger.warning(
+                f"Request {request!r} has a cookie named {name!r} whose "
+                f"value length ({len(value)} characters) exceeds the limit "
+                f"of {max_cookie_value_length} characters (see the "
+                f"ZYTE_API_MAX_COOKIE_VALUE_LENGTH setting), so the cookie "
+                f"has been dropped. To silence this warning, set the request "
+                f"cookies manually through the experimental.requestCookies "
+                f"Zyte API parameter instead. Alternatively, if Zyte API "
+                f"starts supporting longer cookie values, update the "
+                f"ZYTE_API_MAX_COOKIE_VALUE_LENGTH setting accordingly."
+            )
+            continue
+        size = _cookie_bytes(name, value, domain, path)
+        if size > max_cookie_bytes:
+            logger.warning(
+                f"Request {request!r} has a cookie named {name!r} whose "
+                f"serialized size ({size} bytes) exceeds the limit of "
+                f"{max_cookie_bytes} bytes (see the ZYTE_API_MAX_COOKIE_BYTES "
+                f"setting), so the cookie has been dropped. To silence this "
+                f"warning, set the request cookies manually through the "
+                f"experimental.requestCookies Zyte API parameter instead. "
+                f"Alternatively, if Zyte API starts supporting larger "
+                f"cookies, update the ZYTE_API_MAX_COOKIE_BYTES setting "
+                f"accordingly."
+            )
+            continue
+        output_cookie = {"name": name, "value": value, "domain": domain}
+        if path is not None:
+            output_cookie["path"] = path
         output_cookies.append(output_cookie)
     if output_cookies:
         api_params["experimental"]["requestCookies"] = output_cookies
@@ -945,6 +998,9 @@ def _update_api_params_from_request(
     cookies_enabled: bool,
     cookie_jars: dict[Any, CookieJar] | None,
     max_cookies: int,
+    max_cookie_name_length: int,
+    max_cookie_value_length: int,
+    max_cookie_bytes: int,
 ):
     _set_http_response_body_from_request(api_params=api_params, request=request)
     _set_http_response_headers_from_request(
@@ -969,6 +1025,9 @@ def _update_api_params_from_request(
             request=request,
             cookie_jars=cookie_jars,
             max_cookies=max_cookies,
+            max_cookie_name_length=max_cookie_name_length,
+            max_cookie_value_length=max_cookie_value_length,
+            max_cookie_bytes=max_cookie_bytes,
         )
         if not api_params["experimental"]:
             del api_params["experimental"]
@@ -1077,6 +1136,9 @@ def _get_automap_params(
     cookies_enabled: bool,
     cookie_jars: dict[Any, CookieJar] | None,
     max_cookies: int,
+    max_cookie_name_length: int,
+    max_cookie_value_length: int,
+    max_cookie_bytes: int,
 ):
     meta_params = request.meta.get("zyte_api_automap", default_enabled)
     if meta_params is False:
@@ -1107,6 +1169,9 @@ def _get_automap_params(
         cookies_enabled=cookies_enabled,
         cookie_jars=cookie_jars,
         max_cookies=max_cookies,
+        max_cookie_name_length=max_cookie_name_length,
+        max_cookie_value_length=max_cookie_value_length,
+        max_cookie_bytes=max_cookie_bytes,
     )
 
     return params
@@ -1125,6 +1190,9 @@ def _get_api_params(
     cookies_enabled: bool,
     cookie_jars: dict[Any, CookieJar] | None,
     max_cookies: int,
+    max_cookie_name_length: int,
+    max_cookie_value_length: int,
+    max_cookie_bytes: int,
 ) -> dict | None:
     """Returns a dictionary of API parameters that must be sent to Zyte API for
     the specified request, or None if the request should not be sent through
@@ -1141,6 +1209,9 @@ def _get_api_params(
             cookies_enabled=cookies_enabled,
             cookie_jars=cookie_jars,
             max_cookies=max_cookies,
+            max_cookie_name_length=max_cookie_name_length,
+            max_cookie_value_length=max_cookie_value_length,
+            max_cookie_bytes=max_cookie_bytes,
         )
         if api_params is None:
             return None
@@ -1254,7 +1325,16 @@ class _ParamParser:
             self._cookies_enabled = False
             self._warn_on_cookies = settings.getbool("COOKIES_ENABLED")
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 100)
+        self._max_cookie_name_length = settings.getint(
+            "ZYTE_API_MAX_COOKIE_NAME_LENGTH", 4085
+        )
+        self._max_cookie_value_length = settings.getint(
+            "ZYTE_API_MAX_COOKIE_VALUE_LENGTH", 4085
+        )
+        self._max_cookie_bytes = settings.getint("ZYTE_API_MAX_COOKIE_BYTES", 4097)
         self._cookie_jars = None
+        self._session_context_params: OrderedDict[str, Any] = OrderedDict()
+        self._warned_session_contexts: set[str] = set()
 
     def _request_skip_headers(self, request):
         result = dict(self._mw_skip_headers)
@@ -1279,11 +1359,16 @@ class _ParamParser:
             cookies_enabled=cookies_enabled,
             cookie_jars=self._cookie_jars,
             max_cookies=self._max_cookies,
+            max_cookie_name_length=self._max_cookie_name_length,
+            max_cookie_value_length=self._max_cookie_value_length,
+            max_cookie_bytes=self._max_cookie_bytes,
         )
         if params and self._warn_on_ban_sensitive_headers:
             self._warn_about_ban_sensitive_headers(request, params)
         if not dont_merge_cookies and self._warn_on_cookies:
             self._handle_warn_on_cookies(request, params)
+        if params:
+            self._warn_about_session_context_params(params)
         return params
 
     def _warn_about_ban_sensitive_headers(
@@ -1330,3 +1415,30 @@ class _ParamParser:
             },
         )
         self._warn_on_cookies = False
+
+    def _warn_about_session_context_params(self, params: dict) -> None:
+        session_context = params.get("sessionContext")
+        if not session_context:
+            return
+        context_key = json_dumps(session_context, sort_keys=True)
+        if context_key in self._warned_session_contexts:
+            return
+        current = params.get("sessionContextParameters", {})
+        if context_key not in self._session_context_params:
+            if len(self._session_context_params) >= _MAX_SESSION_CONTEXT_TRACKING:
+                self._session_context_params.popitem(last=False)
+            self._session_context_params[context_key] = current
+        elif self._session_context_params[context_key] != current:
+            self._warned_session_contexts.add(context_key)
+            del self._session_context_params[context_key]
+            logger.warning(
+                f"sessionContext {session_context!r} was used with "
+                f"sessionContextParameters {current!r}, but a different "
+                f"sessionContextParameters value was used previously for the "
+                f"same sessionContext. For a given sessionContext value, "
+                f"sessionContextParameters should always be the same "
+                f"throughout a crawl. See https://docs.zyte.com/zyte-api/"
+                f"usage/features.html#server-managed-sessions"
+            )
+        else:
+            self._session_context_params.move_to_end(context_key)
