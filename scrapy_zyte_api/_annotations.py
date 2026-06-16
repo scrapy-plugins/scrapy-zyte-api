@@ -85,6 +85,23 @@ def actions(value: Iterable[Action]) -> tuple[Any, ...]:
     return tuple(make_hashable(action) for action in value)
 
 
+class NetworkCaptureFilter(TypedDict, total=False):
+    """A filter for :func:`~scrapy_zyte_api.network_capture`.
+
+    See :ref:`network-capture`.
+    """
+
+    filterType: str
+    value: str
+    matchType: str
+    httpResponseBody: bool
+
+
+def network_capture(filters: Iterable[NetworkCaptureFilter]) -> tuple[Any, ...]:
+    """Convert an iterable of :class:`~scrapy_zyte_api.NetworkCaptureFilter` dicts into a hashable value."""
+    return tuple(make_hashable(f) for f in filters)
+
+
 def custom_attrs(
     input: dict[str, Any],  # noqa: A002
     options: dict[str, Any] | None = None,

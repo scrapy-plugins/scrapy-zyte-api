@@ -45,6 +45,7 @@ from zyte_common_items.fields import is_auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
+from scrapy_zyte_api._page_inputs import CapturedResponse, NetworkCapture
 from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
 
 if TYPE_CHECKING:
@@ -101,6 +102,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         Geolocation,
         JobPosting,
         JobPostingNavigation,
+        NetworkCapture,
         Product,
         ProductList,
         ProductNavigation,
@@ -201,6 +203,16 @@ class ZyteApiProvider(PageObjectInputProvider):
                 zyte_api_meta["actions"] = []
                 for action in cls.__metadata__[0]:  # type: ignore[attr-defined]
                     zyte_api_meta["actions"].append(_from_hashable(action))
+                continue
+            if cls_stripped is NetworkCapture:
+                if not is_typing_annotated(cls):
+                    raise ValueError(
+                        "NetworkCapture dependencies must be annotated, "
+                        "e.g. Annotated[NetworkCapture, network_capture([...list of filters...])]."
+                    )
+                zyte_api_meta["networkCapture"] = []
+                for f in cls.__metadata__[0]:  # type: ignore[attr-defined]
+                    zyte_api_meta["networkCapture"].append(_from_hashable(f))
                 continue
             if cls_stripped in {CustomAttributes, CustomAttributesValues}:
                 custom_attrs_input, custom_attrs_options = cls.__metadata__[0]  # type: ignore[attr-defined]
@@ -356,6 +368,14 @@ class ZyteApiProvider(PageObjectInputProvider):
                 else:
                     actions_result = None
                 result = AnnotatedInstance(Actions(actions_result), cls.__metadata__)  # type: ignore[attr-defined]
+                results.append(result)
+                continue
+            if cls_stripped is NetworkCapture and is_typing_annotated(cls):
+                captured = [
+                    CapturedResponse.from_dict(item)
+                    for item in api_response.raw_api_response.get("networkCapture", [])
+                ]
+                result = AnnotatedInstance(NetworkCapture(captured), cls.__metadata__)  # type: ignore[attr-defined]
                 results.append(result)
                 continue
             if cls_stripped is CustomAttributes and is_typing_annotated(cls):

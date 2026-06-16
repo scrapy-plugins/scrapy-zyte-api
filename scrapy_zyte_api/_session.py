@@ -20,7 +20,9 @@ from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import load_object
 from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
-from zyte_api import RequestError, RetryFactory
+from zyte_api import AggressiveRetryFactory, RequestError, RetryFactory, stop_on_count
+from zyte_api import aggressive_retrying as _aggressive_retrying
+from zyte_api import zyte_api_retrying as _zyte_api_retrying
 
 from .utils import (  # type: ignore[attr-defined]
     _DOWNLOAD_NEEDS_SPIDER,
@@ -79,16 +81,16 @@ class SessionRetryFactory(RetryFactory):
 
 SESSION_DEFAULT_RETRY_POLICY = SessionRetryFactory().build()
 
-try:
-    from zyte_api import AggressiveRetryFactory, stop_on_count
-except ImportError:
-    SESSION_AGGRESSIVE_RETRY_POLICY = SESSION_DEFAULT_RETRY_POLICY
-else:
 
-    class AggressiveSessionRetryFactory(AggressiveRetryFactory):
-        download_error_stop = stop_on_count(1)
+class AggressiveSessionRetryFactory(AggressiveRetryFactory):
+    download_error_stop = stop_on_count(1)
 
-    SESSION_AGGRESSIVE_RETRY_POLICY = AggressiveSessionRetryFactory().build()
+
+SESSION_AGGRESSIVE_RETRY_POLICY = AggressiveSessionRetryFactory().build()
+_SESSION_RETRY_POLICIES = {
+    _zyte_api_retrying: "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
+    _aggressive_retrying: "scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY",
+}
 
 
 try:
@@ -232,6 +234,9 @@ class SessionConfig:
         else:
             self._checker = None
         self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
+        self._init_action_failure_invalidates = settings.getbool(
+            "ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION", True
+        )
         self._pool_counters = defaultdict(int)
         self._param_pools: defaultdict[str, dict[str, int]] = defaultdict(dict)
 
@@ -483,7 +488,10 @@ class SessionConfig:
         :exc:`~scrapy.exceptions.CloseSpider` if the spider should be closed.
 
         The default implementation checks the outcome of the ``setLocation``
-        action if a location was defined, as described in :ref:`session-check`.
+        action if a location was defined, and also discards sessions where any
+        :ref:`action <zapi-actions>` in the initialization response has a
+        ``returned`` status (i.e. failed and stopped execution). Both behaviors
+        are described in :ref:`session-check`.
 
         If you need to tell whether *request* is a :ref:`session initialization
         request <session-init>` or not, use
@@ -493,20 +501,37 @@ class SessionConfig:
         """
         if self._checker:
             return self._checker.check(response, request)
-        location = self.location(request)
-        if not location:
-            return True
-        for action in response.raw_api_response.get("actions", []):  # type: ignore[attr-defined]
-            if action.get("action", None) != "setLocation":
-                continue
-            if action.get("error", "").startswith("Action setLocation not supported "):
-                logger.error(
-                    f"Stopping the spider, tried to use the setLocation "
-                    f"action on an unsupported website "
-                    f"({urlparse_cached(request).netloc})."
-                )
-                raise CloseSpider("unsupported_set_location")
-            return action.get("status", None) == "success"
+
+        response_actions = response.raw_api_response.get("actions", [])  # type: ignore[attr-defined]
+
+        if self.location(request):
+            for action in response_actions:
+                if action.get("action") == "setLocation":
+                    if action.get("error", "").startswith(
+                        "Action setLocation not supported "
+                    ):
+                        logger.error(
+                            f"Stopping the spider, tried to use the setLocation "
+                            f"action on an unsupported website "
+                            f"({urlparse_cached(request).netloc})."
+                        )
+                        raise CloseSpider("unsupported_set_location")
+                    break
+
+        if (
+            self._init_action_failure_invalidates
+            and is_session_init_request(request)
+            and response_actions
+        ):
+            return not any(
+                action.get("status") == "returned" for action in response_actions
+            )
+
+        if self.location(request):
+            for action in response_actions:
+                if action.get("action") == "setLocation":
+                    return action.get("status") == "success"
+
         return True
 
     async def init_session(
@@ -757,8 +782,12 @@ session_config = session_config_registry.session_config
 class _SessionManager:
     def __init__(self, crawler: Crawler):
         self._crawler = crawler
+        self._closing = False
         crawler.signals.connect(
             self._handle_engine_start, signal=signals.engine_started
+        )
+        crawler.signals.connect(
+            self._handle_spider_closed, signal=signals.spider_closed
         )
 
         settings = crawler.settings
@@ -861,6 +890,27 @@ class _SessionManager:
 
         self._stats_per_pool: bool = settings.getbool("ZYTE_API_SESSION_STATS_PER_POOL")
 
+        session_retry_policy = settings["ZYTE_API_SESSION_RETRY_POLICY"]
+        if session_retry_policy is None:
+            retry_policy = settings.get(
+                "ZYTE_API_RETRY_POLICY", "zyte_api.zyte_api_retrying"
+            )
+            loaded_retry_policy = load_object(retry_policy)
+            session_retry_policy = _SESSION_RETRY_POLICIES.get(loaded_retry_policy)
+            if session_retry_policy is None:
+                session_retry_policy = retry_policy
+                logger.warning(
+                    "ZYTE_API_RETRY_POLICY is set to a custom value "
+                    f"({retry_policy!r}), which will also be used for "
+                    "plugin-managed session requests. Session retry policies "
+                    "must not retry 520 or 521 responses; if yours does, "
+                    "plugin-managed sessions may not work as expected. Set "
+                    "ZYTE_API_SESSION_RETRY_POLICY explicitly to silence this "
+                    "warning. See the ZYTE_API_SESSION_RETRY_POLICY setting "
+                    "reference for details.",
+                )
+        self._session_retry_policy = session_retry_policy
+
     def _inc_stat(self, key: str, pool: str):
         pool = f"pools/{pool}/" if self._stats_per_pool else ""
         key = f"scrapy-zyte-api/sessions/{pool}{key}"
@@ -871,6 +921,11 @@ class _SessionManager:
         assert self._crawler.engine
         self._download_async = getattr(self._crawler.engine, "download_async", None)
         self._download = None if self._download_async else self._crawler.engine.download
+
+    def _handle_spider_closed(self):
+        self._closing = True
+        for task in list(self._init_tasks):
+            task.cancel()
 
     def _get_session_config(self, request: Request) -> SessionConfig:
         try:
@@ -941,6 +996,7 @@ class _SessionManager:
             meta = {**init_request.meta}
             meta[SESSION_INIT_META_KEY] = True
             meta.setdefault("dont_merge_cookies", True)
+            meta.setdefault("zyte_api_retry_policy", self._session_retry_policy)
             if "zyte_api" in meta:
                 zyte_api = {**meta["zyte_api"]}
                 if "session" not in zyte_api:
@@ -994,6 +1050,8 @@ class _SessionManager:
     async def _create_session(self, request: Request, pool: str) -> str:
         async with self._fatal_error_handler:
             while True:
+                if self._closing:
+                    raise IgnoreRequest
                 session_id = str(uuid4())
                 session_init_succeeded = await self._init_session(
                     session_id, request, pool
@@ -1022,6 +1080,8 @@ class _SessionManager:
             try:
                 session_id, next_use = self._queues[pool].popleft()
             except IndexError as ex:  # No ready-to-use session available.
+                if self._closing:
+                    raise IgnoreRequest from ex
                 attempts += 1
                 if attempts >= self._queue_max_attempts:
                     raise RuntimeError(
@@ -1036,7 +1096,7 @@ class _SessionManager:
             if session_id not in self._pools[pool]:
                 continue  # Invalid session
             now = time.time()
-            if next_use > now:
+            if next_use > now and not self._closing:
                 wait = next_use - now
                 logger.debug(
                     f"Waiting {wait:.3f} seconds for session {session_id} "
@@ -1083,9 +1143,13 @@ class _SessionManager:
             # not refresh the session again.
             pass
         else:
-            task = create_task(self._create_session(request, pool))
-            self._init_tasks.add(task)
-            task.add_done_callback(self._init_tasks.discard)
+            if not self._closing:
+                task = create_task(self._create_session(request, pool))
+                self._init_tasks.add(task)
+                task.add_done_callback(self._init_tasks.discard)
+                task.add_done_callback(
+                    lambda t: None if t.cancelled() else t.exception()
+                )
         with contextlib.suppress(KeyError):
             del self._errors[session_id]
 
@@ -1183,6 +1247,7 @@ class _SessionManager:
             # to the process_request method of the session management
             # middleware does not assign a new session again.
             request.meta.setdefault("_zyte_api_session_assigned", True)
+            request.meta.setdefault("zyte_api_retry_policy", self._session_retry_policy)
             return session_config.process_request(request)
 
     def is_enabled(self, request: Request) -> bool:
