@@ -9,7 +9,7 @@ from base64 import b64encode
 from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
 from scrapy import Request
@@ -23,6 +23,7 @@ from . import SETTINGS, download_request, make_handler
 
 if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
+    from twisted.internet.interfaces import IReactorTime
 
     from scrapy_zyte_api.responses import _API_RESPONSE
 
@@ -62,7 +63,7 @@ class LeafResource(Resource):
             d.addErrback(lambda _: None)
             d.cancel()
 
-        d: Deferred = deferLater(reactor, delay, f, *a, **kw)
+        d: Deferred = deferLater(cast("IReactorTime", reactor), delay, f, *a, **kw)
         request.notifyFinish().addErrback(_cancelrequest)
         return d
 
@@ -379,14 +380,14 @@ def main():
     module_name, name = args.resource.rsplit(".", 1)
     sys.path.append(".")
     resource = getattr(import_module(module_name), name)()
-    http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[arg-type]
+    http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[attr-defined]
 
     def print_listening():
-        host = http_port.getHost()  # type: ignore[misc]
+        host = http_port.getHost()
         print(f"Mock server {resource} running at http://{host.host}:{host.port}")
 
-    reactor.callWhenRunning(print_listening)
-    reactor.run()  # type: ignore[misc]
+    reactor.callWhenRunning(print_listening)  # type: ignore[attr-defined]
+    reactor.run()  # type: ignore[attr-defined]
 
 
 if __name__ == "__main__":
