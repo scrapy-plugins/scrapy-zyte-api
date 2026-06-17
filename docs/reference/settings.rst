@@ -319,6 +319,20 @@ reason.
 Note that requests with error responses that cannot be retried or exceed their
 retry limit also count here.
 
+.. setting:: ZYTE_API_MODE
+
+ZYTE_API_MODE
+=============
+
+Default: ``"auto"``
+
+Controls which transport is used for :ref:`automap <automap>` requests.
+Accepted values are ``"auto"``, ``"proxy"``, and ``"http"``. See
+:ref:`proxy-mode`.
+
+This setting is **ignored** for :ref:`manual <manual>` requests
+(:reqmeta:`zyte_api`). Use :reqmeta:`zyte_api_mode` to set the transport for
+a manual request.
 
 .. setting:: ZYTE_API_PRESERVE_DELAY
 
@@ -344,6 +358,19 @@ If you have :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>`
 enabled, and you want it to also work on Zyte API requests, set this setting to
 ``True``.
 
+.. setting:: ZYTE_API_PROVIDER_MODE
+
+ZYTE_API_PROVIDER_MODE
+======================
+
+Default: ``"auto"``
+
+Controls which transport is used for provider-generated requests (see
+:ref:`scrapy-poet <scrapy-poet>` and :ref:`proxy-mode-provider`). Accepted
+values are ``"auto"``, ``"proxy"``, and ``"http"``.
+
+Per-request, use the :reqmeta:`zyte_api_provider_mode` request metadata key on
+the originating request.
 
 .. setting:: ZYTE_API_PROVIDER_PARAMS
 
@@ -366,6 +393,42 @@ For example:
         ],
     }
 
+.. setting:: ZYTE_API_PROXY_KNOWN_HEADER_VALUES
+
+ZYTE_API_PROXY_KNOWN_HEADER_VALUES
+==================================
+
+Default: ``{}``
+
+A :class:`dict` mapping ``Zyte-*`` header names to sets of known values. When
+an automap request carries a known ``Zyte-*`` header with an unrecognised
+value, a one-time warning is emitted per (header, value) pair, and the request
+is forced to :ref:`proxy mode <proxy-mode>`. Add entries here to treat specific
+values as known and suppress those warnings.
+
+.. setting:: ZYTE_API_PROXY_KNOWN_HEADERS
+
+ZYTE_API_PROXY_KNOWN_HEADERS
+============================
+
+Default: ``[]``
+
+A list of ``Zyte-*`` header names to treat as known. When an automap request
+carries an unrecognised ``Zyte-*`` header, a one-time warning is emitted, and
+the request is forced to :ref:`proxy mode <proxy-mode>`. Add headers here to
+suppress those warnings.
+
+.. setting:: ZYTE_API_PROXY_URL
+
+ZYTE_API_PROXY_URL
+==================
+
+Default: ``"http://api.zyte.com:8011"``
+
+URL of the Zyte API proxy endpoint.
+
+Change this to ``"https://api.zyte.com:8014"`` if you want your connection to
+the Zyte API proxy to :ref:`use HTTPS <zapi-proxy-https>`.
 
 .. setting:: ZYTE_API_REFERRER_POLICY
 

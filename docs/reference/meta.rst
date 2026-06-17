@@ -37,6 +37,15 @@ Default: ``True``
 If set to ``False``, the values of :setting:`ZYTE_API_AUTOMAP_PARAMS` and
 :setting:`ZYTE_API_DEFAULT_PARAMS` are ignored for this request.
 
+.. reqmeta:: zyte_api_mode
+
+zyte_api_mode
+=============
+
+Default: ``"auto"`` for :ref:`automap <automap>`, ``"http"`` for :ref:`manual
+<manual>`
+
+Sets the :ref:`mode <request-mode>` of the request.
 
 .. reqmeta:: zyte_api_provider
 
@@ -65,6 +74,15 @@ For example:
 
 See also :setting:`ZYTE_API_PROVIDER_PARAMS`.
 
+.. reqmeta:: zyte_api_provider_mode
+
+zyte_api_provider_mode
+======================
+
+Default: ``"auto"``
+
+Sets the :ref:`mode <proxy-mode-provider>` of requests made by the
+:ref:`scrapy-poet integration <scrapy-poet>`.
 
 .. reqmeta:: zyte_api_retry_policy
 
