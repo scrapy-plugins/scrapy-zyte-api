@@ -150,6 +150,11 @@ To change the :ref:`default session initialization parameters
     location for its :ref:`session config override <session-configs>` to use
     when no location is specified otherwise.
 
+-   When session initialization requires **a chain of multiple requests**
+    (e.g. navigate to a page to get a token, then submit it), override
+    :meth:`~scrapy_zyte_api.SessionConfig.init_session` in a :ref:`session
+    config override <session-configs>`.
+
 Precedence, from higher to lower, is:
 
 #.  :reqmeta:`zyte_api_session_params`
