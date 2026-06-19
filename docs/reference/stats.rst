@@ -71,6 +71,14 @@ the ``scrapy-zyte-api`` prefix:
     ``scrapy-zyte-api/request/transport/http``. Useful to gauge how much
     traffic would shift to proxy mode if you opted in.
 
+``scrapy-zyte-api/request/transport/proxy/experimental/header``
+    Like ``scrapy-zyte-api/request/transport/proxy/experimental``, but counting
+    only requests that would have been dispatched via proxy mode specifically
+    because they carry ``Zyte-*`` headers (see
+    :setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED`). These requests count towards
+    ``scrapy-zyte-api/request/transport/http`` but not towards
+    ``scrapy-zyte-api/request/transport/proxy/experimental``.
+
 .. _session-stats:
 
 .. note:: :ref:`Session <session>` stats (``scrapy-zyte-api/sessions/…``) are

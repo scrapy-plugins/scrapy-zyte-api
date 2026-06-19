@@ -1248,6 +1248,7 @@ def _get_api_params(
     browser_ignore_headers: SKIP_HEADER_T,
     proxy_bound: bool,
     proxy_mode: bool,
+    header_transport_enabled: bool,
     job_id: str | None,
     cookies_enabled: bool,
     cookie_jars: dict[Any, CookieJar] | None,
@@ -1265,7 +1266,7 @@ def _get_api_params(
             request,
             default_enabled=transparent_mode
             or "zyte_api_transport" in request.meta
-            or _has_proxy_mode_headers(request),
+            or (header_transport_enabled and _has_proxy_mode_headers(request)),
             default_params=automap_params,
             skip_headers=skip_headers,
             browser_headers=browser_headers,
@@ -1367,9 +1368,27 @@ def _load_browser_headers(settings) -> dict[bytes, str]:
     return {k.strip().lower().encode(): v for k, v in browser_headers.items()}
 
 
+def _smartproxy_enabled(settings, spider) -> bool:
+    """Return whether scrapy-zyte-smartproxy is enabled for the project.
+
+    This mirrors how scrapy-zyte-smartproxy itself determines this: through its
+    ``ZYTE_SMARTPROXY_ENABLED`` setting and its ``zyte_smartproxy_enabled``
+    spider attribute (the latter taking precedence). It deliberately does not
+    check whether scrapy-zyte-smartproxy is installed or whether its middleware
+    is configured."""
+    return bool(
+        getattr(
+            spider,
+            "zyte_smartproxy_enabled",
+            settings.getbool("ZYTE_SMARTPROXY_ENABLED"),
+        )
+    )
+
+
 class _ParamParser:
     def __init__(self, crawler, cookies_enabled=None):
         settings = crawler.settings
+        self._crawler = crawler
         self._settings = settings
         self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
         self._browser_headers = _load_browser_headers(settings)
@@ -1414,6 +1433,20 @@ class _ParamParser:
             result.pop(name, None)
         return result
 
+    def _header_transport_enabled(self):
+        """Whether the presence of proxy mode (``Zyte-*``) headers should
+        automatically opt a request into :ref:`automap <automap>` and proxy
+        mode.
+
+        This is controlled by the :setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED`
+        setting. When that setting is left unset, it defaults to ``True``,
+        unless scrapy-zyte-smartproxy is enabled for the project, in which case
+        ``Zyte-*`` headers may be intended for scrapy-zyte-smartproxy requests
+        and are left untouched."""
+        if self._settings.get("ZYTE_API_HEADER_TRANSPORT_ENABLED") is not None:
+            return self._settings.getbool("ZYTE_API_HEADER_TRANSPORT_ENABLED")
+        return not _smartproxy_enabled(self._settings, self._crawler.spider)
+
     def _is_proxy_bound(self, request):
         """Whether *request* is going to be sent through proxy mode.
 
@@ -1424,7 +1457,10 @@ class _ParamParser:
         While proxy mode is :ref:`experimental <experimental-proxy>`, the
         ``"auto"``-transport-with-headers case only counts when the transport
         was explicitly configured; otherwise the request falls back to the HTTP
-        API and its ``Zyte-*`` headers are mapped to HTTP API parameters."""
+        API and its ``Zyte-*`` headers are mapped to HTTP API parameters. For
+        requests that are eligible only because of their ``Zyte-*`` headers,
+        :setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED` counts as that explicit
+        configuration (see :func:`_transport_is_explicit`)."""
         transport = _get_assigned_transport(request, self._settings)
         if transport == "proxy":
             return True
@@ -1465,6 +1501,7 @@ class _ParamParser:
             browser_ignore_headers={b"cookie": ANY_VALUE, **request_skip_headers},
             proxy_bound=proxy_bound,
             proxy_mode=final and proxy_bound,
+            header_transport_enabled=self._header_transport_enabled(),
             job_id=self._job_id,
             cookies_enabled=cookies_enabled,
             cookie_jars=self._cookie_jars,

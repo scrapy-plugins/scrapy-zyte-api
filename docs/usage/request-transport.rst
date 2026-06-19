@@ -19,7 +19,9 @@ bandwidth usage.
     :setting:`ZYTE_API_TRANSPORT` or :setting:`ZYTE_API_PROVIDER_TRANSPORT`
     setting, or the :reqmeta:`zyte_api_transport` or
     :reqmeta:`zyte_api_provider_transport` request metadata key, to ``"auto"``
-    or ``"proxy"``.
+    or ``"proxy"``. For requests routed through proxy mode because they carry
+    ``Zyte-*`` headers (see :ref:`header-transport`), you can instead set the
+    :setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED` setting to ``True``.
 
     When a request would be sent through proxy mode automatically once the
     feature is no longer experimental, scrapy-zyte-api sends it through the
@@ -65,7 +67,39 @@ If neither :reqmeta:`zyte_api` nor :reqmeta:`zyte_api_automap` are set, using
 
 If :reqmeta:`zyte_api_transport` is not used either, :ref:`proxy mode headers
 <zapi-proxy>` in :attr:`Request.headers <scrapy.http.Request.headers>` enable
-:ref:`automap <automap>` and proxy mode for the request.
+:ref:`automap <automap>` and proxy mode for the request, as long as the
+:setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED` setting is ``True``.
+
+.. _header-transport:
+
+Header-based transport
+======================
+
+By default, a request that carries ``Zyte-*`` (:ref:`proxy mode <zapi-proxy>`)
+headers is automatically sent through Zyte API in :ref:`proxy mode
+<proxy-transport>`, even if it does not set :reqmeta:`zyte_api`,
+:reqmeta:`zyte_api_automap` or :reqmeta:`zyte_api_transport`.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, a
+    request that is eligible for proxy mode only because it carries ``Zyte-*``
+    headers is sent through the HTTP API instead, and a warning is logged. To
+    send such requests through proxy mode, set
+    :setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED` to ``True``; to ignore those
+    headers instead, set it to ``False``. Either value silences the warning.
+
+This is controlled by the :setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED` setting.
+Its default value is ``True``, unless `scrapy-zyte-smartproxy
+<https://scrapy-zyte-smartproxy.readthedocs.io/en/latest/>`_ is enabled for the
+project (through its ``ZYTE_SMARTPROXY_ENABLED`` setting or its
+``zyte_smartproxy_enabled`` spider attribute), in which case it defaults to
+``False`` so that ``Zyte-*`` headers can be intended for scrapy-zyte-smartproxy
+requests.
+
+Set :setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED` to ``False`` to handle other
+scenarios where ``Zyte-*`` headers should not, on their own, route a request
+through Zyte API. Even then, you can still opt a request into Zyte API
+explicitly through :reqmeta:`zyte_api`, :reqmeta:`zyte_api_automap` or
+:reqmeta:`zyte_api_transport`.
 
 .. _proxy-mode-eligible:
 

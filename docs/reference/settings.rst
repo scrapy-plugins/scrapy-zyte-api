@@ -340,6 +340,43 @@ for a manual request.
     setting (or :reqmeta:`zyte_api_transport`) to ``"auto"`` or ``"proxy"`` to
     opt into proxy mode, or to ``"http"`` to silence the warning.
 
+.. setting:: ZYTE_API_HEADER_TRANSPORT_ENABLED
+
+ZYTE_API_HEADER_TRANSPORT_ENABLED
+=================================
+
+Default: ``True``, unless scrapy-zyte-smartproxy is enabled (see below), in
+which case ``False``.
+
+Controls whether the presence of ``Zyte-*`` (:ref:`proxy mode <zapi-proxy>`)
+headers in :attr:`Request.headers <scrapy.http.Request.headers>` automatically
+enables :ref:`automap <automap>` and routes the request through Zyte API
+:ref:`proxy mode <proxy-transport>` (see :ref:`request-transport`).
+
+When ``True``, a request that carries ``Zyte-*`` headers is automatically sent
+through Zyte API in proxy mode, even if it does not set :reqmeta:`zyte_api`,
+:reqmeta:`zyte_api_automap` or :reqmeta:`zyte_api_transport`.
+
+When ``False``, ``Zyte-*`` headers are left untouched and do not, on their own,
+cause a request to be sent through Zyte API. You can still opt a request into
+Zyte API explicitly through :reqmeta:`zyte_api`, :reqmeta:`zyte_api_automap` or
+:reqmeta:`zyte_api_transport`.
+
+The default value is conditional on whether scrapy-zyte-smartproxy is enabled
+for the project: if its `ZYTE_SMARTPROXY_ENABLED
+<https://scrapy-zyte-smartproxy.readthedocs.io/en/latest/settings.html>`_
+setting is ``True`` or its ``zyte_smartproxy_enabled`` spider attribute is set
+to a true value, this setting defaults to ``False`` (so that ``Zyte-*`` headers
+can be intended for scrapy-zyte-smartproxy); otherwise it defaults to ``True``.
+Setting this value explicitly overrides that automatic default.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, a
+    request that is eligible for proxy mode only because it carries ``Zyte-*``
+    headers (i.e. when this setting is left unset and thus defaults to ``True``)
+    is sent through the Zyte API HTTP API instead, and a warning is logged. Set
+    this setting to ``True`` to use proxy mode for such requests, or to
+    ``False`` to ignore those headers; either value silences the warning.
+
 .. setting:: ZYTE_API_PRESERVE_DELAY
 
 ZYTE_API_PRESERVE_DELAY

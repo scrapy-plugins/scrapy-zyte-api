@@ -168,6 +168,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self._proxy_url = settings.get("ZYTE_API_PROXY_URL", "http://api.zyte.com:8011")
         self._proxy_agg_stats = ProxyAggStats()
         self._warned_experimental_proxy = False
+        self._warned_experimental_header_transport = False
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -251,12 +252,19 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         if api_params is None:
             return await self._download_via_fallback(request, spider)
 
-        assigned_transport, effective_transport, experimental_proxy = (
-            _resolve_transport(
-                request, api_params, self._crawler.settings, self._client.auth.type
-            )
+        assigned_transport, effective_transport, experimental = _resolve_transport(
+            request,
+            api_params,
+            self._crawler.settings,
+            self._client.auth.type,
+            self._param_parser._header_transport_enabled(),
         )
-        if experimental_proxy:
+        if experimental == "header":
+            self._stats.inc_value(
+                "scrapy-zyte-api/request/transport/proxy/experimental/header"
+            )
+            self._warn_experimental_header_transport()
+        elif experimental == "transport":
             self._stats.inc_value(
                 "scrapy-zyte-api/request/transport/proxy/experimental"
             )
@@ -301,6 +309,23 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             "or 'proxy'. To keep using the HTTP API and silence this warning, "
             "set it to 'http' instead. If you enable proxy mode and run into "
             "any issues, please report them at "
+            "https://github.com/scrapy-plugins/scrapy-zyte-api/issues."
+        )
+
+    def _warn_experimental_header_transport(self) -> None:
+        if self._warned_experimental_header_transport:
+            return
+        self._warned_experimental_header_transport = True
+        logger.warning(
+            "Some requests carry Zyte-* headers and would be sent through Zyte "
+            "API in proxy mode automatically in a future version of "
+            "scrapy-zyte-api. However, proxy mode support is currently "
+            "experimental and opt-in, so those requests are being sent "
+            "through the Zyte API HTTP API instead. To send them through proxy "
+            "mode, set the ZYTE_API_HEADER_TRANSPORT_ENABLED setting to True. "
+            "To keep these headers from routing requests through Zyte API and "
+            "silence this warning, set it to False instead. If you enable "
+            "proxy mode and run into any issues, please report them at "
             "https://github.com/scrapy-plugins/scrapy-zyte-api/issues."
         )
 
