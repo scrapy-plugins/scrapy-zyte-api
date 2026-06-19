@@ -86,8 +86,8 @@ def _get_unknown_proxy_mode_headers(request: Request) -> list[str]:
 
 
 def _get_proxy_incompatible_params(params: dict[str, Any]) -> list[str]:
-    """Return the names of the Zyte API parameters in *params* that proxy mode
-    does not support."""
+    """Return the names of the Zyte API parameters in *params* that proxy
+    mode does not support."""
     incompatible: list[str] = []
     for key, value in params.items():
         if key == "experimental":
@@ -187,7 +187,7 @@ def _build_proxy_request(
     new_meta["proxy"] = proxy_url
     new_meta.pop("zyte_api", None)
     new_meta.pop("zyte_api_automap", None)
-    new_meta.pop("zyte_api_mode", None)
+    new_meta.pop("zyte_api_transport", None)
 
     return request.replace(
         headers=new_headers,

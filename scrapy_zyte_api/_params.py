@@ -19,7 +19,7 @@ from scrapy.utils.python import to_bytes, to_unicode
 
 from ._cookies import _get_all_cookies
 from ._proxy import _has_proxy_mode_headers
-from ._request_mode import _get_assigned_mode
+from ._request_transport import _get_assigned_transport
 
 logger = getLogger(__name__)
 
@@ -624,7 +624,10 @@ def _iter_headers(
         )
         if header_parameter == "customHttpRequestHeaders":
             _process_manual_custom_http_request_headers(
-                api_params, request, proxy_bound=proxy_bound, proxy_mode=proxy_mode
+                api_params,
+                request,
+                proxy_bound=proxy_bound,
+                proxy_mode=proxy_mode,
             )
         return
     if not request.headers:
@@ -1261,7 +1264,7 @@ def _get_api_params(
         api_params = _get_automap_params(
             request,
             default_enabled=transparent_mode
-            or "zyte_api_mode" in request.meta
+            or "zyte_api_transport" in request.meta
             or _has_proxy_mode_headers(request),
             default_params=automap_params,
             skip_headers=skip_headers,
@@ -1285,7 +1288,10 @@ def _get_api_params(
         )
     elif "customHttpRequestHeaders" in api_params:
         _process_manual_custom_http_request_headers(
-            api_params, request, proxy_bound=proxy_bound, proxy_mode=proxy_mode
+            api_params,
+            request,
+            proxy_bound=proxy_bound,
+            proxy_mode=proxy_mode,
         )
 
     if job_id is not None:
@@ -1413,11 +1419,11 @@ class _ParamParser:
 
         This can be determined without computing the request parameters: it is
         either explicitly forced, or implied by the presence of proxy mode
-        (``Zyte-*``) headers in an ``"auto"``-mode request."""
-        mode = _get_assigned_mode(request, self._settings)
-        if mode == "proxy":
+        (``Zyte-*``) headers in an ``"auto"``-transport request."""
+        transport = _get_assigned_transport(request, self._settings)
+        if transport == "proxy":
             return True
-        return mode == "auto" and _has_proxy_mode_headers(request)
+        return transport == "auto" and _has_proxy_mode_headers(request)
 
     def parse(self, request, *, final=False, force_http=False):
         """Compute the Zyte API parameters for *request*.

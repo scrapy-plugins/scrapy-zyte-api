@@ -46,7 +46,7 @@ from zyte_common_items.fields import is_auto_field
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
 from scrapy_zyte_api._page_inputs import CapturedResponse, NetworkCapture
-from scrapy_zyte_api._request_mode import _validate_mode
+from scrapy_zyte_api._request_transport import _validate_transport
 from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
 
 if TYPE_CHECKING:
@@ -276,22 +276,23 @@ class ZyteApiProvider(PageObjectInputProvider):
         if screenshot_requested:
             zyte_api_meta["screenshot"] = True
 
-        provider_mode = request.meta.get("zyte_api_provider_mode")
-        if provider_mode is not None:
-            _validate_mode(
-                provider_mode, source="the zyte_api_provider_mode request.meta key"
+        provider_transport = request.meta.get("zyte_api_provider_transport")
+        if provider_transport is not None:
+            _validate_transport(
+                provider_transport,
+                source="the zyte_api_provider_transport request.meta key",
             )
         else:
-            provider_mode = _validate_mode(
-                crawler.settings.get("ZYTE_API_PROVIDER_MODE", "auto"),
-                source="the ZYTE_API_PROVIDER_MODE setting",
+            provider_transport = _validate_transport(
+                crawler.settings.get("ZYTE_API_PROVIDER_TRANSPORT", "auto"),
+                source="the ZYTE_API_PROVIDER_TRANSPORT setting",
             )
         api_request = Request(
             url=request.url,
             meta={
                 "zyte_api": zyte_api_meta,
                 "zyte_api_default_params": False,
-                "zyte_api_mode": provider_mode,
+                "zyte_api_transport": provider_transport,
             },
             callback=NO_CALLBACK,
         )

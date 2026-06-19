@@ -24,7 +24,7 @@ from ._proxy import (
     _get_unknown_proxy_mode_headers,
     _has_proxy_mode_headers,
 )
-from ._request_mode import _resolve_mode
+from ._request_transport import _resolve_transport
 from .responses import (
     ZyteAPIJsonResponse,
     ZyteAPIProxyJsonResponse,
@@ -250,38 +250,38 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         if api_params is None:
             return await self._download_via_fallback(request, spider)
 
-        assigned_mode, effective_mode = _resolve_mode(
+        assigned_transport, effective_transport = _resolve_transport(
             request, api_params, self._crawler.settings, self._client.auth.type
         )
-        if effective_mode == "proxy":
+        if effective_transport == "proxy":
             incompatible = _get_proxy_incompatible_params(api_params)
             if incompatible:
                 # Only reachable when proxy mode was explicitly forced, or when
                 # an unknown Zyte-* header kept an "auto" request in proxy mode
                 # (its effect cannot be reproduced through the HTTP API). Either
                 # way this is a hard error rather than a silent transport
-                # downgrade; _resolve_mode already let eligible "auto" requests
-                # fall back to the HTTP API.
+                # downgrade; _resolve_transport already let eligible "auto"
+                # requests fall back to the HTTP API.
                 raise self._proxy_incompatible_error(
-                    request, incompatible, assigned_mode
+                    request, incompatible, assigned_transport
                 )
-            self._stats.inc_value("scrapy-zyte-api/request/mode/proxy")
+            self._stats.inc_value("scrapy-zyte-api/request/transport/proxy")
             return await self._download_via_proxy_mode(api_params, request)
 
         # An "auto" request that resolved to the HTTP API despite carrying
         # Zyte-* headers was parsed as proxy-bound (its headers left untouched);
         # re-parse forcing HTTP API semantics so those headers map to params.
-        if assigned_mode == "auto" and _has_proxy_mode_headers(request):
+        if assigned_transport == "auto" and _has_proxy_mode_headers(request):
             api_params = self._param_parser.parse(request, final=True, force_http=True)
-        self._stats.inc_value("scrapy-zyte-api/request/mode/http")
+        self._stats.inc_value("scrapy-zyte-api/request/transport/http")
         return await self._download_via_http_api(api_params, request)
 
     def _proxy_incompatible_error(
-        self, request: Request, incompatible: list[str], assigned_mode: str
+        self, request: Request, incompatible: list[str], assigned_transport: str
     ) -> ValueError:
         params = ", ".join(sorted(incompatible))
-        if assigned_mode == "auto":
-            # Reached only via an unknown Zyte-* header (see _resolve_auto_mode).
+        if assigned_transport == "auto":
+            # Reached only via an unknown Zyte-* header (see _resolve_auto_transport).
             unknown_headers = ", ".join(
                 sorted(_get_unknown_proxy_mode_headers(request))
             )
@@ -292,16 +292,16 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 f"also defines the following unknown Zyte-* headers, which the "
                 f"HTTP API does not support and would silently ignore: "
                 f"{unknown_headers}. Remove these headers or the listed "
-                f"parameters, or set the 'http' request mode explicitly if you "
-                f"do not need them."
+                f"parameters, or set the 'http' request transport explicitly if "
+                f"you do not need them."
             )
         return ValueError(
             f"Cannot send {request} via Zyte API proxy mode because the "
             f"following Zyte API parameters are not supported in proxy mode: "
             f"{params}. Remove them, set the corresponding Zyte-* request header "
-            f"instead where available, use the 'auto' or 'http' request mode, or "
-            f"upgrade scrapy-zyte-api in case proxy mode has since added support "
-            f"for them."
+            f"instead where available, use the 'auto' or 'http' request "
+            f"transport, or upgrade scrapy-zyte-api in case proxy mode has since "
+            f"added support for them."
         )
 
     async def _download_via_http_api(

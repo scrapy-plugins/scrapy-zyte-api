@@ -57,11 +57,11 @@ the ``scrapy-zyte-api`` prefix:
     For ``experimental`` sub-parameters, the stat name uses dot notation:
     ``scrapy-zyte-api/request_args/experimental.{subarg}``.
 
-``scrapy-zyte-api/request/mode/{mode}``
-    Number of Zyte API requests dispatched via ``{mode}``, where ``{mode}``
-    is either ``http`` (HTTP API) or ``proxy`` (proxy mode). Useful to verify
-    that :setting:`ZYTE_API_MODE` or :reqmeta:`zyte_api_mode` settings are
-    taking effect.
+``scrapy-zyte-api/request/transport/{transport}``
+    Number of Zyte API requests dispatched via ``{transport}``, where
+    ``{transport}`` is either ``http`` (HTTP API) or ``proxy`` (proxy mode).
+    Useful to verify that :setting:`ZYTE_API_TRANSPORT` or
+    :reqmeta:`zyte_api_transport` settings are taking effect.
 
 .. _session-stats:
 

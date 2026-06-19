@@ -319,20 +319,20 @@ reason.
 Note that requests with error responses that cannot be retried or exceed their
 retry limit also count here.
 
-.. setting:: ZYTE_API_MODE
+.. setting:: ZYTE_API_TRANSPORT
 
-ZYTE_API_MODE
-=============
+ZYTE_API_TRANSPORT
+==================
 
 Default: ``"auto"``
 
 Controls which transport is used for :ref:`automap <automap>` requests.
 Accepted values are ``"auto"``, ``"proxy"``, and ``"http"``. See
-:ref:`proxy-mode`.
+:ref:`request-transport`.
 
 This setting is **ignored** for :ref:`manual <manual>` requests
-(:reqmeta:`zyte_api`). Use :reqmeta:`zyte_api_mode` to set the transport for
-a manual request.
+(:reqmeta:`zyte_api`). Use :reqmeta:`zyte_api_transport` to set the transport
+for a manual request.
 
 .. setting:: ZYTE_API_PRESERVE_DELAY
 
@@ -358,19 +358,19 @@ If you have :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>`
 enabled, and you want it to also work on Zyte API requests, set this setting to
 ``True``.
 
-.. setting:: ZYTE_API_PROVIDER_MODE
+.. setting:: ZYTE_API_PROVIDER_TRANSPORT
 
-ZYTE_API_PROVIDER_MODE
-======================
+ZYTE_API_PROVIDER_TRANSPORT
+===========================
 
 Default: ``"auto"``
 
 Controls which transport is used for provider-generated requests (see
-:ref:`scrapy-poet <scrapy-poet>` and :ref:`request-mode-provider`). Accepted
-values are ``"auto"``, ``"proxy"``, and ``"http"``.
+:ref:`scrapy-poet <scrapy-poet>` and :ref:`request-transport-provider`).
+Accepted values are ``"auto"``, ``"proxy"``, and ``"http"``.
 
-Per-request, use the :reqmeta:`zyte_api_provider_mode` request metadata key on
-the originating request.
+Per-request, use the :reqmeta:`zyte_api_provider_transport` request metadata
+key on the originating request.
 
 .. setting:: ZYTE_API_PROVIDER_PARAMS
 

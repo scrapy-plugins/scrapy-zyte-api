@@ -1,8 +1,8 @@
-.. _request-mode:
+.. _request-transport:
 
-============
-Request mode
-============
+=================
+Request transport
+=================
 
 Zyte API supports 2 different APIs to send requests, an HTTP API and a
 :ref:`proxy mode <zapi-proxy>`.
@@ -14,35 +14,35 @@ bandwidth usage.
 :ref:`automap requests <automap>` compatible with proxy mode use it by default
 instead.
 
-Setting the request mode
-========================
+Setting the request transport
+=============================
 
-You can set the request mode to one of the following:
+You can set the request transport to one of the following:
 
-.. _auto-mode:
+.. _auto-transport:
 
 ``"auto"``
     Use proxy mode if :ref:`eligible <proxy-mode-eligible>` or if the request
     carries ``Zyte-*`` headers, otherwise use the HTTP API.
 
-.. _http-mode:
+.. _http-transport:
 
 ``"http"``
     Use the HTTP API.
 
-.. _proxy-mode:
+.. _proxy-transport:
 
 ``"proxy"``
     Use proxy mode.
 
-You can set the request mode with the :setting:`ZYTE_API_MODE` setting for
-:ref:`automap requests <automap>`, or with the :reqmeta:`zyte_api_mode` request
-metadata key for any request.
+You can set the request transport with the :setting:`ZYTE_API_TRANSPORT`
+setting for :ref:`automap requests <automap>`, or with the
+:reqmeta:`zyte_api_transport` request metadata key for any request.
 
 If neither :reqmeta:`zyte_api` nor :reqmeta:`zyte_api_automap` are set, using
-:reqmeta:`zyte_api_mode` enables :ref:`automap <automap>` for the request.
+:reqmeta:`zyte_api_transport` enables :ref:`automap <automap>` for the request.
 
-If :reqmeta:`zyte_api_mode` is not used either, :ref:`proxy mode headers
+If :reqmeta:`zyte_api_transport` is not used either, :ref:`proxy mode headers
 <zapi-proxy>` in :attr:`Request.headers <scrapy.http.Request.headers>` enable
 :ref:`automap <automap>` and proxy mode for the request.
 
@@ -69,26 +69,27 @@ Extraction parameters (``product``, ``article``, ``actions``, ``screenshot``,
 ``networkCapture``, and so on) are **not** supported by the proxy endpoint and
 force the HTTP API.
 
-.. _request-mode-provider:
+.. _request-transport-provider:
 
 scrapy-poet integration
 =======================
 
-Provider-generated requests respect :setting:`ZYTE_API_PROVIDER_MODE` (default
-``"auto"``). For example, to send all provider requests via the HTTP API:
+Provider-generated requests respect :setting:`ZYTE_API_PROVIDER_TRANSPORT`
+(default ``"auto"``). For example, to send all provider requests via the HTTP
+API:
 
 .. code-block:: python
 
     custom_settings = {
-        "ZYTE_API_PROVIDER_MODE": "http",
+        "ZYTE_API_PROVIDER_TRANSPORT": "http",
     }
 
-To override the mode for a single request, set
-:reqmeta:`zyte_api_provider_mode` in the originating request:
+To override the transport for a single request, set
+:reqmeta:`zyte_api_provider_transport` in the originating request:
 
 .. code-block:: python
 
     yield Request(
         url,
-        meta={"zyte_api_provider_mode": "http"},
+        meta={"zyte_api_provider_transport": "http"},
     )
