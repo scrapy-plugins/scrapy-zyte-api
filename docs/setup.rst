@@ -172,14 +172,16 @@ If you already had a custom value for :setting:`REQUEST_FINGERPRINTER_CLASS
 
     ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS = "myproject.CustomRequestFingerprinter"
 
-For :ref:`session management support <session>`, add the following downloader
-middleware to the :setting:`DOWNLOADER_MIDDLEWARES
-<scrapy:DOWNLOADER_MIDDLEWARES>` setting:
+For :ref:`session management support <session>`, add
+:class:`~scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware` to the
+:setting:`DOWNLOADER_MIDDLEWARES <scrapy:DOWNLOADER_MIDDLEWARES>` setting,
+alongside the main downloader middleware:
 
 .. code-block:: python
     :caption: settings.py
 
     DOWNLOADER_MIDDLEWARES = {
+        "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
         "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
     }
 

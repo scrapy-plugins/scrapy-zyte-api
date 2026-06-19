@@ -111,14 +111,35 @@ Classes
 
 Zyte API responses are mapped with one of the following classes:
 
--   :class:`~scrapy_zyte_api.responses.ZyteAPITextResponse` is used to map text
-    responses, i.e. responses with :http:`response:browserHtml` or responses
-    with both :http:`response:httpResponseBody` and
-    :http:`response:httpResponseHeaders` with a text body (e.g. plain text,
-    HTML, JSON).
+-   :class:`~scrapy_zyte_api.responses.ZyteAPITextResponse` is used for HTML
+    responses: responses with :http:`response:browserHtml`, or responses with
+    both :http:`response:httpResponseBody` and
+    :http:`response:httpResponseHeaders` where the content type is HTML.
 
--   :class:`~scrapy_zyte_api.responses.ZyteAPIResponse` is used to map any
-    other response.
+-   :class:`~scrapy_zyte_api.responses.ZyteAPIXmlResponse` is used for XML
+    responses, i.e. responses with both :http:`response:httpResponseBody` and
+    :http:`response:httpResponseHeaders` where the content type is XML (e.g.
+    ``text/xml``, ``application/xml``, ``application/rss+xml``).
+
+-   :class:`~scrapy_zyte_api.responses.ZyteAPIJsonResponse` is used for JSON
+    responses, i.e. responses with both :http:`response:httpResponseBody` and
+    :http:`response:httpResponseHeaders` where the content type is JSON (e.g.
+    ``application/json``). Requires Scrapy 2.12 or higher; it is not defined
+    when an earlier version of Scrapy is installed.
+
+-   :class:`~scrapy_zyte_api.responses.ZyteAPIResponse` is used for any other
+    response, including binary responses and text responses with an
+    unrecognized content type.
+
+All response classes share a common base mixin,
+:class:`~scrapy_zyte_api.responses.ZyteAPIMixin`, which can be used for
+:func:`isinstance` checks::
+
+    from scrapy_zyte_api.responses import ZyteAPIMixin
+
+    def parse(self, response):
+        if isinstance(response, ZyteAPIMixin):
+            ...  # any Zyte API response
 
 .. autoclass:: scrapy_zyte_api.responses.ZyteAPIResponse
     :show-inheritance:
@@ -148,5 +169,17 @@ Zyte API responses are mapped with one of the following classes:
 
     .. attribute:: text
         :type: str
+
+    .. autoattribute:: raw_api_response
+
+.. autoclass:: scrapy_zyte_api.responses.ZyteAPIXmlResponse
+    :show-inheritance:
+
+    .. autoattribute:: raw_api_response
+
+.. autoclass:: scrapy_zyte_api.responses.ZyteAPIJsonResponse
+    :show-inheritance:
+
+    .. note:: Only available when Scrapy 2.12 or later is installed.
 
     .. autoattribute:: raw_api_response
