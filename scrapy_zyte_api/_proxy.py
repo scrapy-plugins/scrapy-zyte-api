@@ -231,20 +231,6 @@ def _is_proxy_mode_compatible(params: dict[str, Any]) -> bool:
     return params.get("javascript") is not False
 
 
-def _has_non_proxy_params_in_dict(params: dict[str, Any]) -> bool:
-    """Return True if any key in params is not proxy-compatible."""
-    for key in params:
-        if key == "url":
-            continue
-        if key == "experimental":
-            for subkey in params.get(key) or {}:
-                if f"experimental.{subkey}" not in PROXY_MODE_PARAMS:
-                    return True
-        elif key not in PROXY_MODE_PARAMS:
-            return True
-    return False
-
-
 def _check_for_proxy_error(response, query: dict[str, Any]) -> None:
     if response.headers.get(b"Zyte-Error-Type") is not None:
         raise ProxyModeError(response, query=query)

@@ -164,7 +164,6 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self._autothrottle_is_enabled = settings.getbool("AUTOTHROTTLE_ENABLED")
 
         self._proxy_url = settings.get("ZYTE_API_PROXY_URL", "http://api.zyte.com:8011")
-        self._proxy_mode = settings.get("ZYTE_API_MODE", "auto")
         self._proxy_agg_stats = ProxyAggStats()
 
     @classmethod
