@@ -4,7 +4,7 @@
 Request mode
 ============
 
-Zyte API supports 2 different APIs to send requests, and HTTP API and a
+Zyte API supports 2 different APIs to send requests, an HTTP API and a
 :ref:`proxy mode <zapi-proxy>`.
 
 While the HTTP API is more powerful, proxy mode offers lower latency and lower

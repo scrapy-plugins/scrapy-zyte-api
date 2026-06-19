@@ -11,7 +11,7 @@ from scrapy.exceptions import NotConfigured
 from scrapy.utils.misc import load_object
 from scrapy.utils.reactor import verify_installed_reactor
 from twisted.internet.defer import ensureDeferred
-from zyte_api import AsyncZyteAPI, RequestError, zyte_api_retrying
+from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
 
 from ._params import _ParamParser
@@ -381,7 +381,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             self._proxy_url, self._client.auth.key, request, api_params
         )
         self._log_proxy_request(proxy_request)
-        retrying = self._get_request_retrying(request) or zyte_api_retrying
+        retrying = self._get_request_retrying(request)
 
         start_time = time.time()
 
