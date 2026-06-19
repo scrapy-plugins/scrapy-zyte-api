@@ -21,8 +21,8 @@ Setting the request mode
 You can set the request mode to one of the following:
 
 ``"auto"``
-    Use proxy mode if :ref:`eligible <proxy-mode-eligible>`, otherwise use the
-    HTTP API.
+    Use proxy mode if :ref:`eligible <proxy-mode-eligible>` or if the request
+    carries ``Zyte-*`` headers, otherwise use the HTTP API.
 
 ``"http"``
     Use the HTTP API.
@@ -34,11 +34,12 @@ You can set the request mode with the :setting:`ZYTE_API_MODE` setting for
 :ref:`automap requests <automap>`, or with the :reqmeta:`zyte_api_mode` request
 metadata key for any request.
 
-.. tip::
+If neither :reqmeta:`zyte_api` nor :reqmeta:`zyte_api_automap` are set, using
+:reqmeta:`zyte_api_mode` enables :ref:`automap <automap>` for the request.
 
-    If neither :reqmeta:`zyte_api` nor :reqmeta:`zyte_api_automap` are set,
-    using :reqmeta:`zyte_api_mode` enables :ref:`automap <automap>` for the
-    request.
+If :reqmeta:`zyte_api_mode` is not used either, :ref:`proxy mode headers
+<zapi-proxy>` in :attr:`Request.headers <scrapy.http.Request.headers>` enable
+:ref:`automap <automap>` and proxy mode for the request.
 
 .. _proxy-mode-eligible:
 
@@ -62,11 +63,6 @@ belong to the set of proxy-supported parameters:
 Extraction parameters (``product``, ``article``, ``actions``, ``screenshot``,
 ``networkCapture``, and so on) are **not** supported by the proxy endpoint and
 force the HTTP API.
-
-As an alternative to using :reqmeta:`zyte_api` or :reqmeta:`zyte_api_automap`,
-proxy-compatible parameters can also be passed as ``Zyte-*`` headers in
-:attr:`Request.headers <scrapy.http.Request.headers>`, following the
-:ref:`Zyte API proxy format <zapi-proxy>`.
 
 .. _proxy-mode-provider:
 

@@ -18,6 +18,7 @@ from scrapy.settings.default_settings import USER_AGENT
 from scrapy.utils.python import to_bytes, to_unicode
 
 from ._cookies import _get_all_cookies
+from ._proxy import _has_proxy_mode_headers
 
 logger = getLogger(__name__)
 
@@ -1201,7 +1202,9 @@ def _get_api_params(
     if api_params is None:
         api_params = _get_automap_params(
             request,
-            default_enabled=transparent_mode or "zyte_api_mode" in request.meta,
+            default_enabled=transparent_mode
+            or "zyte_api_mode" in request.meta
+            or _has_proxy_mode_headers(request),
             default_params=automap_params,
             skip_headers=skip_headers,
             browser_headers=browser_headers,

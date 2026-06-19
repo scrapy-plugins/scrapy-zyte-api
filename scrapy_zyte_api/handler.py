@@ -20,6 +20,7 @@ from ._proxy import (
     ProxyModeError,
     _build_proxy_request,
     _check_for_proxy_error,
+    _has_proxy_mode_headers,
     _warn_forced_proxy_params,
 )
 from ._request_mode import _resolve_mode
@@ -253,7 +254,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         )
         self._stats.inc_value(f"scrapy-zyte-api/request/mode/{effective_mode}")
         if effective_mode == "proxy":
-            if assigned_mode == "proxy":
+            if assigned_mode == "proxy" or _has_proxy_mode_headers(request):
                 _warn_forced_proxy_params(api_params, request)
             return await self._download_via_proxy_mode(api_params, request)
 
