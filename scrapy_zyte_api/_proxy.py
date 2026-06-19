@@ -67,36 +67,26 @@ _ZYTE_HEADER_TO_PARAM: dict[bytes, str] = {
 }
 
 _warned_conflict_headers: set[bytes] = set()
-_warned_forced_proxy_params: set[str] = set()
 
 
-def _warn_forced_proxy_params(params: dict[str, Any], request) -> None:
+def _get_proxy_incompatible_params(params: dict[str, Any]) -> list[str]:
+    """Return the names of the Zyte API parameters in *params* that proxy mode
+    does not support."""
+    incompatible: list[str] = []
     for key, value in params.items():
         if key == "experimental":
-            for subkey in value or {}:
-                full = f"experimental.{subkey}"
-                if (
-                    subkey not in PROXY_MODE_PARAMS
-                    and full not in _warned_forced_proxy_params
-                ):
-                    _warned_forced_proxy_params.add(full)
-                    logger.warning(
-                        f"In {request}, proxy mode is forced but {full!r} is not "
-                        f"supported by the proxy endpoint and will be ignored."
-                    )
-        elif key == "javascript":
-            if value is False and "javascript:False" not in _warned_forced_proxy_params:
-                _warned_forced_proxy_params.add("javascript:False")
-                logger.warning(
-                    f"In {request}, proxy mode is forced but javascript cannot be "
-                    f"disabled via the proxy endpoint (it is always enabled)."
-                )
-        elif key not in PROXY_MODE_PARAMS and key not in _warned_forced_proxy_params:
-            _warned_forced_proxy_params.add(key)
-            logger.warning(
-                f"In {request}, proxy mode is forced but {key!r} is not "
-                f"supported by the proxy endpoint and will be ignored."
+            incompatible.extend(
+                f"experimental.{subkey}"
+                for subkey in value or {}
+                if subkey not in PROXY_MODE_PARAMS
             )
+        elif key == "javascript":
+            # Proxy mode always runs JavaScript; it cannot be disabled.
+            if value is False:
+                incompatible.append("javascript")
+        elif key not in PROXY_MODE_PARAMS:
+            incompatible.append(key)
+    return incompatible
 
 
 def _get_raw_param_value(api_params: dict[str, Any], header_lower: bytes) -> Any:
@@ -124,17 +114,41 @@ def _get_raw_param_value(api_params: dict[str, Any], header_lower: bytes) -> Any
 def _build_proxy_request(
     proxy_url: str, api_key: str, request: Request, api_params: dict[str, Any]
 ) -> Request:
+    # The headers sent to the target are derived from the computed Zyte API
+    # parameters (e.g. customHttpRequestHeaders, requestHeaders), exactly as
+    # they would be sent through the HTTP API. The raw Request.headers are not
+    # forwarded as-is: in automap mode they have already been mapped into those
+    # parameters (with Scrapy/middleware default headers stripped), and in
+    # manual mode they are not part of the request definition. This keeps both
+    # transports consistent and prevents leaking default headers to the target.
     proxy_headers, proxy_method, proxy_body = _params_to_proxy_headers(api_params)
 
     param_lower_to_key = {k.lower(): k for k in proxy_headers}
     for header_bytes in request.headers:
         lower = header_bytes.strip().lower()
         if not lower.startswith(b"zyte-"):
+            # Only Zyte-* control headers are passed through directly; they have
+            # no api_params counterpart (e.g. Zyte-Client) or enable
+            # forward-compatibility with proxy features not yet known to
+            # scrapy-zyte-api.
             continue
         header_name = header_bytes.decode()
         header_val = request.headers.get(header_bytes, b"").decode()
         lower_str = lower.decode()
-        if lower_str in param_lower_to_key and lower not in _warned_conflict_headers:
+        if lower == b"zyte-override-headers" and lower_str in param_lower_to_key:
+            # Union the user-supplied Zyte-Override-Headers with the ones
+            # auto-generated from protected custom headers.
+            existing = proxy_headers[param_lower_to_key[lower_str]]
+            names = {v.strip() for v in f"{existing},{header_val}".split(",")}
+            proxy_headers[param_lower_to_key[lower_str]] = ",".join(
+                sorted(n for n in names if n)
+            )
+            continue
+        if (
+            lower in _ZYTE_HEADER_TO_PARAM
+            and lower_str in param_lower_to_key
+            and lower not in _warned_conflict_headers
+        ):
             _warned_conflict_headers.add(lower)
             param_name = _ZYTE_HEADER_TO_PARAM[lower]
             param_val = _get_raw_param_value(api_params, lower)
@@ -149,10 +163,7 @@ def _build_proxy_request(
 
     proxy_auth = b64encode(f"{api_key}:".encode()).decode()
 
-    new_headers = {}
-    for k in request.headers:
-        new_headers[k] = request.headers.getlist(k)
-    new_headers[b"Proxy-Authorization"] = [f"Basic {proxy_auth}".encode()]
+    new_headers = {b"Proxy-Authorization": [f"Basic {proxy_auth}".encode()]}
     for header_name, header_val in proxy_headers.items():
         new_headers[header_name.encode()] = [header_val.encode()]
 
@@ -221,14 +232,7 @@ class ProxyAggStats:
 
 
 def _is_proxy_mode_compatible(params: dict[str, Any]) -> bool:
-    for key, value in params.items():
-        if key == "experimental":
-            for subkey in value or {}:
-                if subkey not in PROXY_MODE_PARAMS:
-                    return False
-        elif key not in PROXY_MODE_PARAMS:
-            return False
-    return params.get("javascript") is not False
+    return not _get_proxy_incompatible_params(params)
 
 
 def _check_for_proxy_error(response, query: dict[str, Any]) -> None:

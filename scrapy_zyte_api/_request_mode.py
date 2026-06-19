@@ -9,13 +9,31 @@ if TYPE_CHECKING:
     from scrapy import Request
     from scrapy.settings import Settings
 
+_VALID_MODES = ("auto", "http", "proxy")
+
+
+def _validate_mode(mode: str, *, source: str) -> str:
+    """Validate a request mode value, raising :exc:`ValueError` if it is not
+    one of the supported modes."""
+    if mode not in _VALID_MODES:
+        valid = ", ".join(repr(value) for value in _VALID_MODES)
+        raise ValueError(
+            f"Invalid request mode {mode!r} (from {source}). Supported request "
+            f"modes are: {valid}."
+        )
+    return mode
+
 
 def _get_assigned_mode(request: Request, settings: Settings) -> str:
     """Returns "auto", "http" or "proxy", whichever the request is supposed to
     use."""
-    return request.meta.get(
-        "zyte_api_mode",
-        "http" if is_manual_request(request) else settings.get("ZYTE_API_MODE", "auto"),
+    mode = request.meta.get("zyte_api_mode")
+    if mode is not None:
+        return _validate_mode(mode, source="the zyte_api_mode request.meta key")
+    if is_manual_request(request):
+        return "http"
+    return _validate_mode(
+        settings.get("ZYTE_API_MODE", "auto"), source="the ZYTE_API_MODE setting"
     )
 
 

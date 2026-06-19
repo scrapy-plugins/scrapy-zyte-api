@@ -20,8 +20,7 @@ from ._proxy import (
     ProxyModeError,
     _build_proxy_request,
     _check_for_proxy_error,
-    _has_proxy_mode_headers,
-    _warn_forced_proxy_params,
+    _get_proxy_incompatible_params,
 )
 from ._request_mode import _resolve_mode
 from .responses import (
@@ -245,17 +244,26 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     async def _dispatch_request(
         self, request: Request, spider: Spider | None = None
     ) -> Response | None:
-        api_params = self._param_parser.parse(request)
+        api_params = self._param_parser.parse(request, final=True)
         if api_params is None:
             return await self._download_via_fallback(request, spider)
 
-        assigned_mode, effective_mode = _resolve_mode(
+        _, effective_mode = _resolve_mode(
             request, api_params, self._crawler.settings, self._client.auth.type
         )
         self._stats.inc_value(f"scrapy-zyte-api/request/mode/{effective_mode}")
         if effective_mode == "proxy":
-            if assigned_mode == "proxy" or _has_proxy_mode_headers(request):
-                _warn_forced_proxy_params(api_params, request)
+            incompatible = _get_proxy_incompatible_params(api_params)
+            if incompatible:
+                raise ValueError(
+                    f"Cannot send {request} via Zyte API proxy mode because the "
+                    f"following Zyte API parameters are not supported in proxy "
+                    f"mode: {', '.join(sorted(incompatible))}. Remove them, set "
+                    f"the corresponding Zyte-* request header instead where "
+                    f"available, use the 'auto' or 'http' request mode, or "
+                    f"upgrade scrapy-zyte-api in case proxy mode has since "
+                    f"added support for them."
+                )
             return await self._download_via_proxy_mode(api_params, request)
 
         return await self._download_via_http_api(api_params, request)

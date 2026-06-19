@@ -19,6 +19,7 @@ from scrapy.utils.python import to_bytes, to_unicode
 
 from ._cookies import _get_all_cookies
 from ._proxy import _has_proxy_mode_headers
+from ._request_mode import _get_assigned_mode
 
 logger = getLogger(__name__)
 
@@ -343,7 +344,9 @@ def str_to_bool(value):
     return value.strip().lower() not in ("", "false")
 
 
-def _is_safe_header(k, v, /, *, api_params, request):
+def _is_safe_header(
+    k, v, /, *, api_params, request, proxy_bound=False, proxy_mode=False
+):
     k = k.strip()
     lowercase_k = to_bytes(k.lower())
     if not (lowercase_k.startswith((b"zyte-", b"x-crawlera-"))):
@@ -353,6 +356,21 @@ def _is_safe_header(k, v, /, *, api_params, request):
     decoded_v = to_unicode(v)
 
     if lowercase_k.startswith(b"zyte-"):
+        if proxy_mode:
+            # This is the final parse of a proxy-bound request: Zyte-* headers
+            # are sent as-is to the proxy endpoint, so they must be left in
+            # Request.headers and not mapped to HTTP API parameters.
+            return False
+
+        # When the request is proxy-bound (but this is not its final parse,
+        # e.g. fingerprinting), the header is still mapped to its parameter so
+        # the computation is deterministic, but the warnings below would be
+        # misleading (the header is not dropped, it is used by the proxy), so
+        # they are silenced.
+        def _warn(message):
+            if not proxy_bound:
+                logger.warning(message)
+
         for proxy_header_suffix, zapi_request_param, processor in (
             (b"browser-html", "browserHtml", str_to_bool),
             (b"cookie-management", "cookieManagement", str.strip),
@@ -369,7 +387,7 @@ def _is_safe_header(k, v, /, *, api_params, request):
         ):
             if lowercase_k == b"zyte-" + proxy_header_suffix:
                 if zapi_request_param in api_params:
-                    logger.warning(
+                    _warn(
                         f"Request {request} defines header {decoded_k}. "
                         f"This header has been dropped, the HTTP API of "
                         f"Zyte API does not support proxy mode headers, "
@@ -383,7 +401,7 @@ def _is_safe_header(k, v, /, *, api_params, request):
                     if processed_value != _DEFAULT_API_PARAMS[zapi_request_param]:
                         api_params[zapi_request_param] = processed_value
                         if decoded_v == processed_value:
-                            logger.warning(
+                            _warn(
                                 f"Request {request} defines header "
                                 f"{decoded_k}. This header has been dropped, "
                                 f"the HTTP API of Zyte API does not support "
@@ -393,7 +411,7 @@ def _is_safe_header(k, v, /, *, api_params, request):
                                 f"{zapi_request_param!r}."
                             )
                         else:
-                            logger.warning(
+                            _warn(
                                 f"Request {request} defines header "
                                 f"{decoded_k}. This header has been dropped, "
                                 f"the HTTP API of Zyte API does not support "
@@ -404,7 +422,7 @@ def _is_safe_header(k, v, /, *, api_params, request):
                                 f"{zapi_request_param!r}."
                             )
                     else:
-                        logger.warning(
+                        _warn(
                             f"Request {request} defines header {decoded_k}. "
                             f"This header has been dropped, the HTTP API of "
                             f"Zyte API does not support proxy mode headers, "
@@ -415,7 +433,7 @@ def _is_safe_header(k, v, /, *, api_params, request):
                 break
         else:
             if lowercase_k == b"zyte-client":
-                logger.warning(
+                _warn(
                     f"Request {request} defines header {decoded_k}. This "
                     f"header has been dropped, the HTTP API of Zyte API "
                     f"does not support proxy mode headers, and "
@@ -423,7 +441,7 @@ def _is_safe_header(k, v, /, *, api_params, request):
                     f"header, making this proxy mode header unnecessary."
                 )
             elif lowercase_k == b"zyte-override-headers":
-                logger.warning(
+                _warn(
                     f"Request {request} defines header {decoded_k}. This "
                     f"header has been dropped, the HTTP API of Zyte API "
                     f"does not support proxy mode headers, and this "
@@ -431,7 +449,7 @@ def _is_safe_header(k, v, /, *, api_params, request):
                     f"HTTP API."
                 )
             else:
-                logger.warning(
+                _warn(
                     f"Request {request} defines header {decoded_k}. This "
                     f"header has been dropped, the HTTP API of Zyte API "
                     f"does not support proxy mode headers."
@@ -569,6 +587,9 @@ def _is_safe_header(k, v, /, *, api_params, request):
 def _process_manual_custom_http_request_headers(
     api_params: dict[str, Any],
     request: Request,
+    *,
+    proxy_bound: bool,
+    proxy_mode: bool,
 ) -> None:
     headers = [
         header_dict
@@ -578,6 +599,8 @@ def _process_manual_custom_http_request_headers(
             header_dict["value"],
             api_params=api_params,
             request=request,
+            proxy_bound=proxy_bound,
+            proxy_mode=proxy_mode,
         )
     ]
     if headers:
@@ -589,6 +612,8 @@ def _iter_headers(
     api_params: dict[str, Any],
     request: Request,
     header_parameter: str,
+    proxy_bound: bool,
+    proxy_mode: bool,
 ) -> Iterable[tuple[bytes, bytes, bytes]]:
     headers = api_params.get(header_parameter)
     if headers not in (None, True):
@@ -598,7 +623,9 @@ def _iter_headers(
             f"instead."
         )
         if header_parameter == "customHttpRequestHeaders":
-            _process_manual_custom_http_request_headers(api_params, request)
+            _process_manual_custom_http_request_headers(
+                api_params, request, proxy_bound=proxy_bound, proxy_mode=proxy_mode
+            )
         return
     if not request.headers:
         return
@@ -606,7 +633,14 @@ def _iter_headers(
         if not vs:
             continue
         v = b",".join(vs)
-        if _is_safe_header(k, v, api_params=api_params, request=request):
+        if _is_safe_header(
+            k,
+            v,
+            api_params=api_params,
+            request=request,
+            proxy_bound=proxy_bound,
+            proxy_mode=proxy_mode,
+        ):
             yield k, k.strip().lower(), v
 
 
@@ -615,12 +649,16 @@ def _map_custom_http_request_headers(
     api_params: dict[str, Any],
     request: Request,
     skip_headers: SKIP_HEADER_T,
+    proxy_bound: bool,
+    proxy_mode: bool,
 ):
     headers = []
     for k, lowercase_k, v in _iter_headers(
         api_params=api_params,
         request=request,
         header_parameter="customHttpRequestHeaders",
+        proxy_bound=proxy_bound,
+        proxy_mode=proxy_mode,
     ):
         if skip_headers.get(lowercase_k) in (ANY_VALUE, v):
             continue
@@ -635,12 +673,16 @@ def _map_request_headers(
     request: Request,
     browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
+    proxy_bound: bool,
+    proxy_mode: bool,
 ):
     request_headers = {}
     for k, lowercase_k, v in _iter_headers(
         api_params=api_params,
         request=request,
         header_parameter="requestHeaders",
+        proxy_bound=proxy_bound,
+        proxy_mode=proxy_mode,
     ):
         key = browser_headers.get(lowercase_k)
         if key is not None:
@@ -703,6 +745,8 @@ def _set_request_headers_from_request(
     skip_headers: SKIP_HEADER_T,
     browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
+    proxy_bound: bool,
+    proxy_mode: bool,
 ):
     """Updates *api_params*, in place, based on *request*."""
     if api_params.get("serp", False):
@@ -726,6 +770,8 @@ def _set_request_headers_from_request(
             api_params=api_params,
             request=request,
             skip_headers=skip_headers,
+            proxy_bound=proxy_bound,
+            proxy_mode=proxy_mode,
         )
     elif custom_http_request_headers is False:
         api_params.pop("customHttpRequestHeaders")
@@ -743,6 +789,8 @@ def _set_request_headers_from_request(
             request=request,
             browser_headers=browser_headers,
             browser_ignore_headers=browser_ignore_headers,
+            proxy_bound=proxy_bound,
+            proxy_mode=proxy_mode,
         )
     elif request_headers is False:
         api_params.pop("requestHeaders")
@@ -996,6 +1044,8 @@ def _update_api_params_from_request(
     skip_headers: SKIP_HEADER_T,
     browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
+    proxy_bound: bool,
+    proxy_mode: bool,
     cookies_enabled: bool,
     cookie_jars: dict[Any, CookieJar] | None,
     max_cookies: int,
@@ -1016,6 +1066,8 @@ def _update_api_params_from_request(
         skip_headers=skip_headers,
         browser_headers=browser_headers,
         browser_ignore_headers=browser_ignore_headers,
+        proxy_bound=proxy_bound,
+        proxy_mode=proxy_mode,
     )
     _set_http_request_body_from_request(api_params=api_params, request=request)
     if cookies_enabled:
@@ -1134,6 +1186,8 @@ def _get_automap_params(
     skip_headers: SKIP_HEADER_T,
     browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
+    proxy_bound: bool,
+    proxy_mode: bool,
     cookies_enabled: bool,
     cookie_jars: dict[Any, CookieJar] | None,
     max_cookies: int,
@@ -1167,6 +1221,8 @@ def _get_automap_params(
         skip_headers=skip_headers,
         browser_headers=browser_headers,
         browser_ignore_headers=browser_ignore_headers,
+        proxy_bound=proxy_bound,
+        proxy_mode=proxy_mode,
         cookies_enabled=cookies_enabled,
         cookie_jars=cookie_jars,
         max_cookies=max_cookies,
@@ -1187,6 +1243,8 @@ def _get_api_params(
     skip_headers: SKIP_HEADER_T,
     browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
+    proxy_bound: bool,
+    proxy_mode: bool,
     job_id: str | None,
     cookies_enabled: bool,
     cookie_jars: dict[Any, CookieJar] | None,
@@ -1209,6 +1267,8 @@ def _get_api_params(
             skip_headers=skip_headers,
             browser_headers=browser_headers,
             browser_ignore_headers=browser_ignore_headers,
+            proxy_bound=proxy_bound,
+            proxy_mode=proxy_mode,
             cookies_enabled=cookies_enabled,
             cookie_jars=cookie_jars,
             max_cookies=max_cookies,
@@ -1224,7 +1284,9 @@ def _get_api_params(
             f"automatically-mapped parameters."
         )
     elif "customHttpRequestHeaders" in api_params:
-        _process_manual_custom_http_request_headers(api_params, request)
+        _process_manual_custom_http_request_headers(
+            api_params, request, proxy_bound=proxy_bound, proxy_mode=proxy_mode
+        )
 
     if job_id is not None:
         api_params["jobId"] = job_id
@@ -1302,6 +1364,7 @@ def _load_browser_headers(settings) -> dict[bytes, str]:
 class _ParamParser:
     def __init__(self, crawler, cookies_enabled=None):
         settings = crawler.settings
+        self._settings = settings
         self._automap_params = _load_default_params(settings, "ZYTE_API_AUTOMAP_PARAMS")
         self._browser_headers = _load_browser_headers(settings)
         self._default_params = _load_default_params(settings, "ZYTE_API_DEFAULT_PARAMS")
@@ -1345,11 +1408,32 @@ class _ParamParser:
             result.pop(name, None)
         return result
 
-    def parse(self, request):
+    def _is_proxy_bound(self, request):
+        """Whether *request* is going to be sent through proxy mode.
+
+        This can be determined without computing the request parameters: it is
+        either explicitly forced, or implied by the presence of proxy mode
+        (``Zyte-*``) headers in an ``"auto"``-mode request."""
+        mode = _get_assigned_mode(request, self._settings)
+        if mode == "proxy":
+            return True
+        return mode == "auto" and _has_proxy_mode_headers(request)
+
+    def parse(self, request, *, final=False):
+        """Compute the Zyte API parameters for *request*.
+
+        Set *final* to ``True`` for the authoritative call that determines how
+        the request is actually downloaded (i.e. from the download handler), as
+        opposed to preliminary calls (fingerprinting, slot assignment) that only
+        inspect the request. Only the final call of a proxy-bound request leaves
+        ``Zyte-*`` headers untouched for pass-through to the proxy; this
+        distinction is also a natural place to make future caching conditional.
+        """
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
         use_default_params = request.meta.get("zyte_api_default_params", True)
         cookies_enabled = self._cookies_enabled and not dont_merge_cookies
         request_skip_headers = self._request_skip_headers(request)
+        proxy_bound = self._is_proxy_bound(request)
         params = _get_api_params(
             request,
             default_params=self._default_params if use_default_params else {},
@@ -1358,6 +1442,8 @@ class _ParamParser:
             skip_headers={**request_skip_headers, **self._http_skip_headers},
             browser_headers=self._browser_headers,
             browser_ignore_headers={b"cookie": ANY_VALUE, **request_skip_headers},
+            proxy_bound=proxy_bound,
+            proxy_mode=final and proxy_bound,
             job_id=self._job_id,
             cookies_enabled=cookies_enabled,
             cookie_jars=self._cookie_jars,
