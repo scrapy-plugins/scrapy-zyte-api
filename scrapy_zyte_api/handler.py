@@ -434,7 +434,11 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             self._proxy_url, self._client.auth.key, request, api_params
         )
         self._log_proxy_request(proxy_request)
-        retrying = self._get_request_retrying(request)
+        # The HTTP API path can pass retrying=None and let python-zyte-api fall
+        # back to the client's configured policy (``retrying or self.retrying``),
+        # but proxy mode drives tenacity directly, so resolve None to that same
+        # default here to avoid an AttributeError on ``retrying.wraps``.
+        retrying = self._get_request_retrying(request) or self._client.retrying
 
         start_time = time.time()
 
