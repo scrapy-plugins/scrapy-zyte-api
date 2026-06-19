@@ -24,15 +24,11 @@ You can set the request mode to one of the following:
     Use proxy mode if :ref:`eligible <proxy-mode-eligible>`, otherwise use the
     HTTP API.
 
-``"proxy"``
-    Use proxy mode.
-
-    In practice it works like ``"auto"``, but a warning is logged if the HTTP
-    API is used because the request is not :ref:`eligible for proxy mode
-    <proxy-mode-eligible>`.
-
 ``"http"``
     Use the HTTP API.
+
+``"proxy"``
+    Use proxy mode.
 
 You can set the request mode with the :setting:`ZYTE_API_MODE` setting for
 :ref:`automap requests <automap>`, or with the :reqmeta:`zyte_api_mode` request

@@ -20,8 +20,9 @@ from ._proxy import (
     ProxyModeError,
     _build_proxy_request,
     _check_for_proxy_error,
+    _warn_forced_proxy_params,
 )
-from ._request_mode import _get_effective_mode
+from ._request_mode import _resolve_mode
 from .responses import (
     ZyteAPIJsonResponse,
     ZyteAPIProxyJsonResponse,
@@ -248,11 +249,13 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         if api_params is None:
             return await self._download_via_fallback(request, spider)
 
-        effective_mode = _get_effective_mode(
+        assigned_mode, effective_mode = _resolve_mode(
             request, api_params, self._crawler.settings, self._client.auth.type
         )
         self._stats.inc_value(f"scrapy-zyte-api/request/mode/{effective_mode}")
         if effective_mode == "proxy":
+            if assigned_mode == "proxy":
+                _warn_forced_proxy_params(api_params, request)
             return await self._download_via_proxy_mode(api_params, request)
 
         return await self._download_via_http_api(api_params, request)
@@ -466,7 +469,11 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 return
 
     def _log_proxy_request(self, request: Request):
-        proxy_headers = ...  # TODO: dict with only Zyte-* headers
+        proxy_headers = {
+            k.decode(): request.headers.get(k).decode()
+            for k in request.headers
+            if k.lower().startswith(b"zyte-")
+        }
         self._log_request(proxy_headers, is_proxy=True, url=request.url)
 
     def _log_request(self, params, *, is_proxy: bool = False, url: str = ""):

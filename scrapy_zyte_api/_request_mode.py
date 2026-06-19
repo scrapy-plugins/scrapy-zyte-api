@@ -30,14 +30,16 @@ def _resolve_auto_mode(
     )
 
 
-def _get_effective_mode(
+def _resolve_mode(
     request: Request, api_params: dict[str, Any], settings: Settings, auth_type: str
-) -> str:
-    """Returns "http" or "proxy", whichever the request is supposed to use.
+) -> tuple[str, str]:
+    """Returns (assigned_mode, effective_mode).
 
-    Resolves "auto" to either based on request data.
+    assigned_mode is "auto", "proxy", or "http".
+    effective_mode is "proxy" or "http" — "auto" is resolved based on request
+    data.
     """
     assigned_mode = _get_assigned_mode(request, settings)
     if assigned_mode != "auto":
-        return assigned_mode
-    return _resolve_auto_mode(request, api_params, auth_type)
+        return assigned_mode, assigned_mode
+    return "auto", _resolve_auto_mode(request, api_params, auth_type)

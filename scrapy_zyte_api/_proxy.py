@@ -14,7 +14,6 @@ from scrapy_zyte_api._cookies import _parse_set_cookie_header
 if TYPE_CHECKING:
     from scrapy import Request
     from scrapy.http import Response
-    from scrapy.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +67,36 @@ _ZYTE_HEADER_TO_PARAM: dict[bytes, str] = {
 }
 
 _warned_conflict_headers: set[bytes] = set()
+_warned_forced_proxy_params: set[str] = set()
+
+
+def _warn_forced_proxy_params(params: dict[str, Any], request) -> None:
+    for key, value in params.items():
+        if key == "experimental":
+            for subkey in value or {}:
+                full = f"experimental.{subkey}"
+                if (
+                    subkey not in PROXY_MODE_PARAMS
+                    and full not in _warned_forced_proxy_params
+                ):
+                    _warned_forced_proxy_params.add(full)
+                    logger.warning(
+                        f"In {request}, proxy mode is forced but {full!r} is not "
+                        f"supported by the proxy endpoint and will be ignored."
+                    )
+        elif key == "javascript":
+            if value is False and "javascript:False" not in _warned_forced_proxy_params:
+                _warned_forced_proxy_params.add("javascript:False")
+                logger.warning(
+                    f"In {request}, proxy mode is forced but javascript cannot be "
+                    f"disabled via the proxy endpoint (it is always enabled)."
+                )
+        elif key not in PROXY_MODE_PARAMS and key not in _warned_forced_proxy_params:
+            _warned_forced_proxy_params.add(key)
+            logger.warning(
+                f"In {request}, proxy mode is forced but {key!r} is not "
+                f"supported by the proxy endpoint and will be ignored."
+            )
 
 
 def _get_raw_param_value(api_params: dict[str, Any], header_lower: bytes) -> Any:
@@ -214,26 +243,6 @@ def _has_non_proxy_params_in_dict(params: dict[str, Any]) -> bool:
         elif key not in PROXY_MODE_PARAMS:
             return True
     return False
-
-
-def _known_headers_from_settings(
-    settings: Settings,
-) -> tuple[set[bytes], dict[bytes, set[str]]]:
-    """Return (known_names, known_values) derived from settings."""
-    extra_known_bytes: set[bytes] = set()
-    for h in settings.getlist("ZYTE_API_PROXY_KNOWN_HEADERS", []):
-        key = h.strip().lower()
-        extra_known_bytes.add(key.encode() if isinstance(key, str) else key)
-
-    extra_known_values: dict[bytes, set[str]] = {}
-    for h_name, h_values in settings.getdict(
-        "ZYTE_API_PROXY_KNOWN_HEADER_VALUES", {}
-    ).items():
-        key = h_name.strip().lower()
-        key_bytes = key.encode() if isinstance(key, str) else key
-        extra_known_values[key_bytes] = set(h_values)
-
-    return extra_known_bytes, extra_known_values
 
 
 def _check_for_proxy_error(response, query: dict[str, Any]) -> None:

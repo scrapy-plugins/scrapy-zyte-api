@@ -393,31 +393,6 @@ For example:
         ],
     }
 
-.. setting:: ZYTE_API_PROXY_KNOWN_HEADER_VALUES
-
-ZYTE_API_PROXY_KNOWN_HEADER_VALUES
-==================================
-
-Default: ``{}``
-
-A :class:`dict` mapping ``Zyte-*`` header names to sets of known values. When
-an automap request carries a known ``Zyte-*`` header with an unrecognised
-value, a one-time warning is emitted per (header, value) pair, and the request
-is forced to :ref:`proxy mode <proxy-mode>`. Add entries here to treat specific
-values as known and suppress those warnings.
-
-.. setting:: ZYTE_API_PROXY_KNOWN_HEADERS
-
-ZYTE_API_PROXY_KNOWN_HEADERS
-============================
-
-Default: ``[]``
-
-A list of ``Zyte-*`` header names to treat as known. When an automap request
-carries an unrecognised ``Zyte-*`` header, a one-time warning is emitted, and
-the request is forced to :ref:`proxy mode <proxy-mode>`. Add headers here to
-suppress those warnings.
-
 .. setting:: ZYTE_API_PROXY_URL
 
 ZYTE_API_PROXY_URL

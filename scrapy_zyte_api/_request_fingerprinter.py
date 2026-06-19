@@ -2,7 +2,7 @@ from functools import cached_property
 from logging import getLogger
 from typing import TYPE_CHECKING, cast
 
-from ._request_mode import _get_effective_mode
+from ._request_mode import _get_assigned_mode
 from ._session import ScrapyZyteAPISessionDownloaderMiddleware
 
 logger = getLogger(__name__)
@@ -139,16 +139,17 @@ else:
                     api_params.setdefault("sessionContext", session_pool)
                 self._normalize_params(api_params)
                 fingerprint = json.dumps(api_params, sort_keys=True).encode()
-                mode = _get_effective_mode(request, api_params, self._settings)
-                if mode != "http":
+                assigned_mode = _get_assigned_mode(request, self._settings)
+                if assigned_mode == "proxy":
                     # Note:
-                    # - We keep fingerprints as is in "http" mode for backward
-                    #   compatibility.
+                    # - We keep fingerprints as-is unless proxy mode is
+                    #   explicitly requested, for backward compatibility.
                     # - We use this extra dict instead of a simpler approach in
                     #   case we decide to support additional non-api_params
                     #   data that must affect fingerprinting.
-                    extra = {"mode": mode}
-                    fingerprint += json.dumps(extra, sort_keys=True).encode()
+                    fingerprint += json.dumps(
+                        {"mode": "proxy"}, sort_keys=True
+                    ).encode()
                 if self._fallback_fingerprinter_is_poets:
                     deps_key = self._fallback_request_fingerprinter.get_deps_key(
                         request
