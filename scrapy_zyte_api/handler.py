@@ -21,6 +21,8 @@ from ._proxy import (
     _build_proxy_request,
     _check_for_proxy_error,
     _get_proxy_incompatible_params,
+    _get_unknown_proxy_mode_headers,
+    _has_proxy_mode_headers,
 )
 from ._request_mode import _resolve_mode
 from .responses import (
@@ -248,25 +250,59 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         if api_params is None:
             return await self._download_via_fallback(request, spider)
 
-        _, effective_mode = _resolve_mode(
+        assigned_mode, effective_mode = _resolve_mode(
             request, api_params, self._crawler.settings, self._client.auth.type
         )
-        self._stats.inc_value(f"scrapy-zyte-api/request/mode/{effective_mode}")
         if effective_mode == "proxy":
             incompatible = _get_proxy_incompatible_params(api_params)
             if incompatible:
-                raise ValueError(
-                    f"Cannot send {request} via Zyte API proxy mode because the "
-                    f"following Zyte API parameters are not supported in proxy "
-                    f"mode: {', '.join(sorted(incompatible))}. Remove them, set "
-                    f"the corresponding Zyte-* request header instead where "
-                    f"available, use the 'auto' or 'http' request mode, or "
-                    f"upgrade scrapy-zyte-api in case proxy mode has since "
-                    f"added support for them."
+                # Only reachable when proxy mode was explicitly forced, or when
+                # an unknown Zyte-* header kept an "auto" request in proxy mode
+                # (its effect cannot be reproduced through the HTTP API). Either
+                # way this is a hard error rather than a silent transport
+                # downgrade; _resolve_mode already let eligible "auto" requests
+                # fall back to the HTTP API.
+                raise self._proxy_incompatible_error(
+                    request, incompatible, assigned_mode
                 )
+            self._stats.inc_value("scrapy-zyte-api/request/mode/proxy")
             return await self._download_via_proxy_mode(api_params, request)
 
+        # An "auto" request that resolved to the HTTP API despite carrying
+        # Zyte-* headers was parsed as proxy-bound (its headers left untouched);
+        # re-parse forcing HTTP API semantics so those headers map to params.
+        if assigned_mode == "auto" and _has_proxy_mode_headers(request):
+            api_params = self._param_parser.parse(request, final=True, force_http=True)
+        self._stats.inc_value("scrapy-zyte-api/request/mode/http")
         return await self._download_via_http_api(api_params, request)
+
+    def _proxy_incompatible_error(
+        self, request: Request, incompatible: list[str], assigned_mode: str
+    ) -> ValueError:
+        params = ", ".join(sorted(incompatible))
+        if assigned_mode == "auto":
+            # Reached only via an unknown Zyte-* header (see _resolve_auto_mode).
+            unknown_headers = ", ".join(
+                sorted(_get_unknown_proxy_mode_headers(request))
+            )
+            return ValueError(
+                f"Cannot send {request} via Zyte API proxy mode because the "
+                f"following Zyte API parameters are not supported in proxy mode: "
+                f"{params}. The request could fall back to the HTTP API, but it "
+                f"also defines the following unknown Zyte-* headers, which the "
+                f"HTTP API does not support and would silently ignore: "
+                f"{unknown_headers}. Remove these headers or the listed "
+                f"parameters, or set the 'http' request mode explicitly if you "
+                f"do not need them."
+            )
+        return ValueError(
+            f"Cannot send {request} via Zyte API proxy mode because the "
+            f"following Zyte API parameters are not supported in proxy mode: "
+            f"{params}. Remove them, set the corresponding Zyte-* request header "
+            f"instead where available, use the 'auto' or 'http' request mode, or "
+            f"upgrade scrapy-zyte-api in case proxy mode has since added support "
+            f"for them."
+        )
 
     async def _download_via_http_api(
         self, api_params: dict, request: Request
@@ -352,22 +388,15 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         try:
             response = await retrying.wraps(self._attempt_via_proxy)(proxy_request)
             self._proxy_agg_stats.n_success += 1
-            self._proxy_agg_stats.status_codes[response.status] += 1
         except ProxyModeError as error:
             self._proxy_agg_stats.n_fatal_errors += 1
-            self._proxy_agg_stats.n_errors += 1
-            self._proxy_agg_stats.status_codes[error.status] += 1
-            error_type = error.parsed.type
-            self._proxy_agg_stats.api_error_types[error_type] += 1
             self._process_request_error(request, error)
             raise
         except Exception:
-            self._proxy_agg_stats.n_errors += 1
+            self._proxy_agg_stats.n_fatal_errors += 1
             raise
         finally:
-            elapsed = time.time() - start_time
-            self._proxy_agg_stats.time_total_stats.push(elapsed)
-            self._set_download_latency(request, elapsed)
+            self._set_download_latency(request, time.time() - start_time)
             self._update_stats(api_params)
 
         proxy_response = _process_proxy_response(
@@ -385,11 +414,35 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         return proxy_response
 
     async def _attempt_via_proxy(self, proxy_request: Request) -> Response:
-        self._proxy_agg_stats.n_attempts += 1
-        response = await self._download_via_fallback(
-            proxy_request, self._crawler.spider
-        )
-        _check_for_proxy_error(response, query={"url": proxy_request.url})
+        # Per-attempt accounting mirrors python-zyte-api's AggStats (see
+        # zyte_api.stats.ResponseStats): every counter below is updated once
+        # per attempt, including the attempts that tenacity later retries, so
+        # that proxy mode stats match the HTTP API ones. n_success and
+        # n_fatal_errors (final outcomes) are tracked by the caller instead.
+        proxy = self._proxy_agg_stats
+        proxy.n_attempts += 1
+        start_time = time.time()
+        try:
+            response = await self._download_via_fallback(
+                proxy_request, self._crawler.spider
+            )
+        except Exception as error:
+            proxy.n_errors += 1
+            proxy.status_codes[0] += 1
+            proxy.exception_types[type(error)] += 1
+            raise
+        try:
+            _check_for_proxy_error(response, query={"url": proxy_request.url})
+        except ProxyModeError as error:
+            proxy.status_codes[error.status] += 1
+            if error.status == 429:
+                proxy.n_429 += 1
+            else:
+                proxy.n_errors += 1
+            proxy.api_error_types[error.parsed.type] += 1
+            raise
+        proxy.status_codes[response.status] += 1
+        proxy.time_total_stats.push(time.time() - start_time)
         return response
 
     def _update_stats(self, api_params):

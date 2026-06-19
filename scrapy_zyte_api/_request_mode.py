@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ._proxy import _has_proxy_mode_headers, _is_proxy_mode_compatible
+from ._proxy import _get_unknown_proxy_mode_headers, _is_proxy_mode_compatible
 from ._request_type import is_manual_request
 
 if TYPE_CHECKING:
@@ -40,12 +40,19 @@ def _get_assigned_mode(request: Request, settings: Settings) -> str:
 def _resolve_auto_mode(
     request: Request, api_params: dict[str, Any], auth_type: str
 ) -> str:
-    return (
-        "proxy"
-        if auth_type == "zyte"
-        and (_has_proxy_mode_headers(request) or _is_proxy_mode_compatible(api_params))
-        else "http"
-    )
+    if auth_type != "zyte":
+        return "http"
+    if _is_proxy_mode_compatible(api_params):
+        return "proxy"
+    # The parameters are not proxy-compatible. Only proxy mode could honor any
+    # Zyte-* headers on the request, but it cannot run these parameters, so the
+    # request falls back to the HTTP API — unless it carries an unknown Zyte-*
+    # header, whose effect cannot be reproduced through the HTTP API. In that
+    # case it stays in proxy mode so the handler reports a hard error instead of
+    # silently dropping the header.
+    if _get_unknown_proxy_mode_headers(request):
+        return "proxy"
+    return "http"
 
 
 def _resolve_mode(

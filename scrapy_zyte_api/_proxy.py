@@ -66,7 +66,23 @@ _ZYTE_HEADER_TO_PARAM: dict[bytes, str] = {
     b"zyte-tags": "tags",
 }
 
+_KNOWN_PROXY_HEADERS = set(_ZYTE_HEADER_TO_PARAM) | {
+    b"zyte-client",
+    b"zyte-override-headers",
+}
+
 _warned_conflict_headers: set[bytes] = set()
+
+
+def _get_unknown_proxy_mode_headers(request: Request) -> list[str]:
+    """Return the names of the ``Zyte-*`` headers in *request* that
+    scrapy-zyte-api does not recognize as proxy mode headers."""
+    unknown = []
+    for header in request.headers:
+        lower = header.strip().lower()
+        if lower.startswith(b"zyte-") and lower not in _KNOWN_PROXY_HEADERS:
+            unknown.append(header.decode())
+    return unknown
 
 
 def _get_proxy_incompatible_params(params: dict[str, Any]) -> list[str]:

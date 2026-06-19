@@ -1419,7 +1419,7 @@ class _ParamParser:
             return True
         return mode == "auto" and _has_proxy_mode_headers(request)
 
-    def parse(self, request, *, final=False):
+    def parse(self, request, *, final=False, force_http=False):
         """Compute the Zyte API parameters for *request*.
 
         Set *final* to ``True`` for the authoritative call that determines how
@@ -1428,12 +1428,18 @@ class _ParamParser:
         inspect the request. Only the final call of a proxy-bound request leaves
         ``Zyte-*`` headers untouched for pass-through to the proxy; this
         distinction is also a natural place to make future caching conditional.
+
+        Set *force_http* to ``True`` to compute the parameters as for the HTTP
+        API even for an otherwise proxy-bound request. This is used when an
+        ``"auto"``-mode request that resolved to proxy mode must fall back to
+        the HTTP API, so that its ``Zyte-*`` headers are mapped to the matching
+        HTTP API parameters instead of being left for proxy pass-through.
         """
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)
         use_default_params = request.meta.get("zyte_api_default_params", True)
         cookies_enabled = self._cookies_enabled and not dont_merge_cookies
         request_skip_headers = self._request_skip_headers(request)
-        proxy_bound = self._is_proxy_bound(request)
+        proxy_bound = False if force_http else self._is_proxy_bound(request)
         params = _get_api_params(
             request,
             default_params=self._default_params if use_default_params else {},
