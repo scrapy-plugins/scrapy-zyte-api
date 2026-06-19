@@ -334,6 +334,12 @@ This setting is **ignored** for :ref:`manual <manual>` requests
 (:reqmeta:`zyte_api`). Use :reqmeta:`zyte_api_transport` to set the transport
 for a manual request.
 
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, leaving
+    this setting unset is treated as if proxy mode were disabled: eligible
+    requests are sent through the HTTP API and a warning is logged. Set this
+    setting (or :reqmeta:`zyte_api_transport`) to ``"auto"`` or ``"proxy"`` to
+    opt into proxy mode, or to ``"http"`` to silence the warning.
+
 .. setting:: ZYTE_API_PRESERVE_DELAY
 
 ZYTE_API_PRESERVE_DELAY
@@ -371,6 +377,13 @@ Accepted values are ``"auto"``, ``"proxy"``, and ``"http"``.
 
 Per-request, use the :reqmeta:`zyte_api_provider_transport` request metadata
 key on the originating request.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, leaving
+    this setting unset is treated as if proxy mode were disabled: eligible
+    provider requests are sent through the HTTP API and a warning is logged.
+    Set this setting (or :reqmeta:`zyte_api_provider_transport`) to ``"auto"``
+    or ``"proxy"`` to opt into proxy mode, or to ``"http"`` to silence the
+    warning.
 
 .. setting:: ZYTE_API_PROVIDER_PARAMS
 

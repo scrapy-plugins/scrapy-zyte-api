@@ -19,7 +19,7 @@ from scrapy.utils.python import to_bytes, to_unicode
 
 from ._cookies import _get_all_cookies
 from ._proxy import _has_proxy_mode_headers
-from ._request_transport import _get_assigned_transport
+from ._request_transport import _get_assigned_transport, _transport_is_explicit
 
 logger = getLogger(__name__)
 
@@ -1419,11 +1419,20 @@ class _ParamParser:
 
         This can be determined without computing the request parameters: it is
         either explicitly forced, or implied by the presence of proxy mode
-        (``Zyte-*``) headers in an ``"auto"``-transport request."""
+        (``Zyte-*``) headers in an ``"auto"``-transport request.
+
+        While proxy mode is :ref:`experimental <experimental-proxy>`, the
+        ``"auto"``-transport-with-headers case only counts when the transport
+        was explicitly configured; otherwise the request falls back to the HTTP
+        API and its ``Zyte-*`` headers are mapped to HTTP API parameters."""
         transport = _get_assigned_transport(request, self._settings)
         if transport == "proxy":
             return True
-        return transport == "auto" and _has_proxy_mode_headers(request)
+        return (
+            transport == "auto"
+            and _has_proxy_mode_headers(request)
+            and _transport_is_explicit(request, self._settings)
+        )
 
     def parse(self, request, *, final=False, force_http=False):
         """Compute the Zyte API parameters for *request*.

@@ -278,21 +278,31 @@ class ZyteApiProvider(PageObjectInputProvider):
 
         provider_transport = request.meta.get("zyte_api_provider_transport")
         if provider_transport is not None:
-            _validate_transport(
+            provider_transport = _validate_transport(
                 provider_transport,
                 source="the zyte_api_provider_transport request.meta key",
             )
-        else:
+            transport_explicit = True
+        elif crawler.settings.get("ZYTE_API_PROVIDER_TRANSPORT") is not None:
             provider_transport = _validate_transport(
-                crawler.settings.get("ZYTE_API_PROVIDER_TRANSPORT", "auto"),
+                crawler.settings.get("ZYTE_API_PROVIDER_TRANSPORT"),
                 source="the ZYTE_API_PROVIDER_TRANSPORT setting",
             )
+            transport_explicit = True
+        else:
+            # Proxy mode is experimental and opt-in: when the provider transport
+            # is not explicitly configured, default to "auto" but flag it as
+            # non-explicit so the handler falls back to the HTTP API (and warns)
+            # for eligible requests instead of using proxy mode automatically.
+            provider_transport = "auto"
+            transport_explicit = False
         api_request = Request(
             url=request.url,
             meta={
                 "zyte_api": zyte_api_meta,
                 "zyte_api_default_params": False,
                 "zyte_api_transport": provider_transport,
+                "_zyte_api_transport_explicit": transport_explicit,
             },
             callback=NO_CALLBACK,
         )

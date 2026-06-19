@@ -167,6 +167,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
         self._proxy_url = settings.get("ZYTE_API_PROXY_URL", "http://api.zyte.com:8011")
         self._proxy_agg_stats = ProxyAggStats()
+        self._warned_experimental_proxy = False
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -250,9 +251,16 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         if api_params is None:
             return await self._download_via_fallback(request, spider)
 
-        assigned_transport, effective_transport = _resolve_transport(
-            request, api_params, self._crawler.settings, self._client.auth.type
+        assigned_transport, effective_transport, experimental_proxy = (
+            _resolve_transport(
+                request, api_params, self._crawler.settings, self._client.auth.type
+            )
         )
+        if experimental_proxy:
+            self._stats.inc_value(
+                "scrapy-zyte-api/request/transport/proxy/experimental"
+            )
+            self._warn_experimental_proxy()
         if effective_transport == "proxy":
             incompatible = _get_proxy_incompatible_params(api_params)
             if incompatible:
@@ -275,6 +283,26 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             api_params = self._param_parser.parse(request, final=True, force_http=True)
         self._stats.inc_value("scrapy-zyte-api/request/transport/http")
         return await self._download_via_http_api(api_params, request)
+
+    def _warn_experimental_proxy(self) -> None:
+        if self._warned_experimental_proxy:
+            return
+        self._warned_experimental_proxy = True
+        logger.warning(
+            "Some requests are eligible for Zyte API proxy mode and would be "
+            "sent through it automatically in a future version of "
+            "scrapy-zyte-api. However, proxy mode support is currently "
+            "experimental and opt-in, so those requests are being sent "
+            "through the Zyte API HTTP API instead. To send eligible requests "
+            "through proxy mode, set the ZYTE_API_TRANSPORT setting (or the "
+            "zyte_api_transport request metadata key; for scrapy-poet "
+            "provider requests, the ZYTE_API_PROVIDER_TRANSPORT setting or "
+            "the zyte_api_provider_transport request metadata key) to 'auto' "
+            "or 'proxy'. To keep using the HTTP API and silence this warning, "
+            "set it to 'http' instead. If you enable proxy mode and run into "
+            "any issues, please report them at "
+            "https://github.com/scrapy-plugins/scrapy-zyte-api/issues."
+        )
 
     def _proxy_incompatible_error(
         self, request: Request, incompatible: list[str], assigned_transport: str

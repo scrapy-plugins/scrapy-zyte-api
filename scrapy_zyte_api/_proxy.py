@@ -188,6 +188,7 @@ def _build_proxy_request(
     new_meta.pop("zyte_api", None)
     new_meta.pop("zyte_api_automap", None)
     new_meta.pop("zyte_api_transport", None)
+    new_meta.pop("_zyte_api_transport_explicit", None)
 
     return request.replace(
         headers=new_headers,

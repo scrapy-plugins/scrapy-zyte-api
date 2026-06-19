@@ -10,9 +10,30 @@ Zyte API supports 2 different APIs to send requests, an HTTP API and a
 While the HTTP API is more powerful, proxy mode offers lower latency and lower
 bandwidth usage.
 
+.. _experimental-proxy:
+
+.. note:: Proxy mode support is **experimental**.
+
+    While proxy mode support is experimental, scrapy-zyte-api never sends a
+    request through proxy mode unless you opt in, by setting the
+    :setting:`ZYTE_API_TRANSPORT` or :setting:`ZYTE_API_PROVIDER_TRANSPORT`
+    setting, or the :reqmeta:`zyte_api_transport` or
+    :reqmeta:`zyte_api_provider_transport` request metadata key, to ``"auto"``
+    or ``"proxy"``.
+
+    When a request would be sent through proxy mode automatically once the
+    feature is no longer experimental, scrapy-zyte-api sends it through the
+    HTTP API instead and logs a warning (once) inviting you to opt in. To opt
+    in, set the corresponding setting or metadata key above to ``"auto"`` or
+    ``"proxy"``. To keep using the HTTP API and silence the warning, set it to
+    ``"http"`` instead.
+
+    If you enable proxy mode and run into any issues, please `report them
+    <https://github.com/scrapy-plugins/scrapy-zyte-api/issues>`_.
+
 :ref:`Manual requests <manual>` use the HTTP API by default. However,
-:ref:`automap requests <automap>` compatible with proxy mode use it by default
-instead.
+:ref:`automap requests <automap>` compatible with proxy mode will
+:ref:`eventually <experimental-proxy>` use it by default instead.
 
 Setting the request transport
 =============================

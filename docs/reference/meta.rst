@@ -47,6 +47,10 @@ Default: ``"auto"`` for :ref:`automap <automap>`, ``"http"`` for :ref:`manual
 
 Sets the :ref:`transport <request-transport>` of the request.
 
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, a
+    request only uses proxy mode if this key (or the
+    :setting:`ZYTE_API_TRANSPORT` setting) is set to ``"auto"`` or ``"proxy"``.
+
 .. reqmeta:: zyte_api_provider
 
 zyte_api_provider
@@ -83,6 +87,11 @@ Default: ``"auto"``
 
 Sets the :ref:`transport <request-transport-provider>` of requests made by the
 :ref:`scrapy-poet integration <scrapy-poet>`.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, a
+    provider request only uses proxy mode if this key (or the
+    :setting:`ZYTE_API_PROVIDER_TRANSPORT` setting) is set to ``"auto"`` or
+    ``"proxy"``.
 
 .. reqmeta:: zyte_api_retry_policy
 
