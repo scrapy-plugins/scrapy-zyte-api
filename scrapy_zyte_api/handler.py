@@ -333,14 +333,12 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         | None
     ):
         proxy_request = _build_proxy_request(
-            self._proxy_url, self._client.api_key, request, api_params
+            self._proxy_url, self._client.auth.key, request, api_params
         )
         self._log_proxy_request(proxy_request)
         retrying = self._get_request_retrying(request) or zyte_api_retrying
 
         start_time = time.time()
-
-        self._proxy_agg_stats.n_attempts += 1
 
         try:
             response = await retrying.wraps(self._attempt_via_proxy)(proxy_request)
@@ -378,6 +376,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         return proxy_response
 
     async def _attempt_via_proxy(self, proxy_request: Request) -> Response:
+        self._proxy_agg_stats.n_attempts += 1
         response = await self._download_via_fallback(
             proxy_request, self._crawler.spider
         )

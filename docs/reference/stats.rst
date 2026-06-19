@@ -22,7 +22,7 @@ the ``scrapy-zyte-api`` prefix:
 
 ``scrapy-zyte-api/error_ratio``
     Ratio of :ref:`unsuccessful responses <zapi-unsuccessful-responses>` to
-    ``scrapy-zyte-api/processed``.
+    ``scrapy-zyte-api/attempts``.
 
 ``scrapy-zyte-api/error_types/{error_type}``
     Number of :ref:`unsuccessful responses <zapi-unsuccessful-responses>` for
@@ -56,6 +56,12 @@ the ``scrapy-zyte-api`` prefix:
 
     For ``experimental`` sub-parameters, the stat name uses dot notation:
     ``scrapy-zyte-api/request_args/experimental.{subarg}``.
+
+``scrapy-zyte-api/request/mode/{mode}``
+    Number of Zyte API requests dispatched via ``{mode}``, where ``{mode}``
+    is either ``http`` (HTTP API) or ``proxy`` (proxy mode). Useful to verify
+    that :setting:`ZYTE_API_MODE` or :reqmeta:`zyte_api_mode` settings are
+    taking effect.
 
 .. _session-stats:
 
@@ -140,4 +146,4 @@ the ``scrapy-zyte-api`` prefix:
 
 ``scrapy-zyte-api/throttle_ratio``
     Ratio of :ref:`rate-limited responses <zapi-rate-limit>` to
-    ``scrapy-zyte-api/processed``.
+    ``scrapy-zyte-api/attempts``.

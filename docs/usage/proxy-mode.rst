@@ -37,8 +37,8 @@ metadata key for any request.
 .. tip::
 
     If neither :reqmeta:`zyte_api` nor :reqmeta:`zyte_api_automap` are set,
-    using :reqmeta:`zyte_api_mode` implicitly sets :reqmeta:`zyte_api_automap`
-    to ``True``.
+    using :reqmeta:`zyte_api_mode` enables :ref:`automap <automap>` for the
+    request.
 
 .. _proxy-mode-eligible:
 
@@ -62,6 +62,11 @@ belong to the set of proxy-supported parameters:
 Extraction parameters (``product``, ``article``, ``actions``, ``screenshot``,
 ``networkCapture``, and so on) are **not** supported by the proxy endpoint and
 force the HTTP API.
+
+As an alternative to using :reqmeta:`zyte_api` or :reqmeta:`zyte_api_automap`,
+proxy-compatible parameters can also be passed as ``Zyte-*`` headers in
+:attr:`Request.headers <scrapy.http.Request.headers>`, following the
+:ref:`Zyte API proxy format <zapi-proxy>`.
 
 .. _proxy-mode-provider:
 
