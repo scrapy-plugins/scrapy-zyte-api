@@ -81,7 +81,7 @@ zyte_api_provider_mode
 
 Default: ``"auto"``
 
-Sets the :ref:`mode <proxy-mode-provider>` of requests made by the
+Sets the :ref:`mode <request-mode-provider>` of requests made by the
 :ref:`scrapy-poet integration <scrapy-poet>`.
 
 .. reqmeta:: zyte_api_retry_policy

@@ -366,7 +366,7 @@ ZYTE_API_PROVIDER_MODE
 Default: ``"auto"``
 
 Controls which transport is used for provider-generated requests (see
-:ref:`scrapy-poet <scrapy-poet>` and :ref:`proxy-mode-provider`). Accepted
+:ref:`scrapy-poet <scrapy-poet>` and :ref:`request-mode-provider`). Accepted
 values are ``"auto"``, ``"proxy"``, and ``"http"``.
 
 Per-request, use the :reqmeta:`zyte_api_provider_mode` request metadata key on

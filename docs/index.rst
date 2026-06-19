@@ -23,7 +23,7 @@ either :ref:`globally <transparent>` or :ref:`per request <automap>`, or
    usage/transparent
    usage/manual
    usage/automap
-   usage/proxy-mode
+   usage/request-mode
    usage/default
    usage/redirect
    usage/retry

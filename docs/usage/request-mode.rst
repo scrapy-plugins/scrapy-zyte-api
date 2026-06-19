@@ -1,31 +1,36 @@
-.. _proxy-mode:
+.. _request-mode:
 
-==========
-Proxy mode
-==========
+============
+Request mode
+============
 
-Zyte API supports a :ref:`proxy mode <zapi-proxy>`, i.e. using Zyte API as a
-proxy instead of as an HTTP API.
+Zyte API supports 2 different APIs to send requests, and HTTP API and a
+:ref:`proxy mode <zapi-proxy>`.
 
-While the HTTP API is more powerful, proxy mode offers lower latency and
-lower bandwidth usage.
+While the HTTP API is more powerful, proxy mode offers lower latency and lower
+bandwidth usage.
 
 :ref:`Manual requests <manual>` use the HTTP API by default. However,
-:ref:`automap requests <automap>` compatible with proxy mode use it by default.
-
-.. _request-mode:
+:ref:`automap requests <automap>` compatible with proxy mode use it by default
+instead.
 
 Setting the request mode
 ========================
 
 You can set the request mode to one of the following:
 
+.. _auto-mode:
+
 ``"auto"``
     Use proxy mode if :ref:`eligible <proxy-mode-eligible>` or if the request
     carries ``Zyte-*`` headers, otherwise use the HTTP API.
 
+.. _http-mode:
+
 ``"http"``
     Use the HTTP API.
+
+.. _proxy-mode:
 
 ``"proxy"``
     Use proxy mode.
@@ -64,7 +69,7 @@ Extraction parameters (``product``, ``article``, ``actions``, ``screenshot``,
 ``networkCapture``, and so on) are **not** supported by the proxy endpoint and
 force the HTTP API.
 
-.. _proxy-mode-provider:
+.. _request-mode-provider:
 
 scrapy-poet integration
 =======================
