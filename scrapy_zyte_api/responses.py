@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from scrapy.http.cookies import CookieJar
 
 from scrapy_zyte_api._cookies import _process_cookies
+from scrapy_zyte_api._proxy import _ZyteAPIProxyMixin
 from scrapy_zyte_api.utils import (
     _RESPONSE_HAS_ATTRIBUTES,
     _RESPONSE_HAS_IP_ADDRESS,
@@ -167,20 +168,36 @@ class ZyteAPIXmlResponse(ZyteAPIMixin, XmlResponse):
     pass
 
 
+class ZyteAPIResponse(ZyteAPIMixin, Response):
+    pass
+
+
+class ZyteAPIProxyTextResponse(_ZyteAPIProxyMixin, ZyteAPITextResponse):
+    pass
+
+
+class ZyteAPIProxyXmlResponse(_ZyteAPIProxyMixin, ZyteAPIXmlResponse):
+    pass
+
+
+class ZyteAPIProxyResponse(_ZyteAPIProxyMixin, ZyteAPIResponse):
+    pass
+
+
 try:
     from scrapy.http import JsonResponse as _JsonResponse
 
     class ZyteAPIJsonResponse(ZyteAPIMixin, _JsonResponse):
         pass
 
+    class ZyteAPIProxyJsonResponse(_ZyteAPIProxyMixin, ZyteAPIJsonResponse):
+        pass
+
     _SCRAPY_JSON_CLS: type | None = _JsonResponse
 except ImportError:
     ZyteAPIJsonResponse = None  # type: ignore[assignment, misc]
+    ZyteAPIProxyJsonResponse = None  # type: ignore[assignment, misc]
     _SCRAPY_JSON_CLS = None
-
-
-class ZyteAPIResponse(ZyteAPIMixin, Response):
-    pass
 
 
 _IMMUTABLE_JSON: TypeAlias = None | str | int | float | bool
@@ -241,3 +258,25 @@ def _process_response(
             return zyte_cls.from_api_response(api_response, request=request)
 
     return ZyteAPIResponse.from_api_response(api_response, request=request)
+
+
+def _process_proxy_response(
+    response: Response, request: Request, proxy_request: Request, api_params: dict
+) -> (
+    ZyteAPIProxyTextResponse
+    | ZyteAPIProxyXmlResponse
+    | ZyteAPIProxyJsonResponse
+    | ZyteAPIProxyResponse
+):
+    kwargs = {
+        "request": request,
+        "proxy_request": proxy_request,
+        "api_params": api_params,
+    }
+    if isinstance(response, HtmlResponse):
+        return ZyteAPIProxyTextResponse.from_proxy_response(response, **kwargs)
+    if isinstance(response, XmlResponse):
+        return ZyteAPIProxyXmlResponse.from_proxy_response(response, **kwargs)
+    if _SCRAPY_JSON_CLS is not None and isinstance(response, _SCRAPY_JSON_CLS):
+        return ZyteAPIProxyJsonResponse.from_proxy_response(response, **kwargs)
+    return ZyteAPIProxyResponse.from_proxy_response(response, **kwargs)

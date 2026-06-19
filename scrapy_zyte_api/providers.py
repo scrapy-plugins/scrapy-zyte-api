@@ -275,11 +275,15 @@ class ZyteApiProvider(PageObjectInputProvider):
         if screenshot_requested:
             zyte_api_meta["screenshot"] = True
 
+        provider_mode = request.meta.get(
+            "zyte_api_provider_mode"
+        ) or crawler.settings.get("ZYTE_API_PROVIDER_MODE", "auto")
         api_request = Request(
             url=request.url,
             meta={
                 "zyte_api": zyte_api_meta,
                 "zyte_api_default_params": False,
+                "zyte_api_mode": provider_mode,
             },
             callback=NO_CALLBACK,
         )

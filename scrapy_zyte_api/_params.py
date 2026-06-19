@@ -1201,7 +1201,7 @@ def _get_api_params(
     if api_params is None:
         api_params = _get_automap_params(
             request,
-            default_enabled=transparent_mode,
+            default_enabled=transparent_mode or "zyte_api_mode" in request.meta,
             default_params=automap_params,
             skip_headers=skip_headers,
             browser_headers=browser_headers,

@@ -10,22 +10,28 @@ from scrapy import Spider, signals
 from scrapy.exceptions import NotConfigured
 from scrapy.utils.misc import load_object
 from scrapy.utils.reactor import verify_installed_reactor
-
-if TYPE_CHECKING:
-    from scrapy.crawler import Crawler
-    from scrapy.http import Request
-    from scrapy.http.response import Response
-    from scrapy.settings import Settings
 from twisted.internet.defer import ensureDeferred
-from zyte_api import AsyncZyteAPI, RequestError
+from zyte_api import AsyncZyteAPI, RequestError, zyte_api_retrying
 from zyte_api.apikey import NoApiKey
 
 from ._params import _ParamParser
+from ._proxy import (
+    ProxyAggStats,
+    ProxyModeError,
+    _build_proxy_request,
+    _check_for_proxy_error,
+)
+from ._request_mode import _get_effective_mode
 from .responses import (
     ZyteAPIJsonResponse,
+    ZyteAPIProxyJsonResponse,
+    ZyteAPIProxyResponse,
+    ZyteAPIProxyTextResponse,
+    ZyteAPIProxyXmlResponse,
     ZyteAPIResponse,
     ZyteAPITextResponse,
     ZyteAPIXmlResponse,
+    _process_proxy_response,
     _process_response,
 )
 from .utils import (  # type: ignore[attr-defined]
@@ -35,11 +41,19 @@ from .utils import (  # type: ignore[attr-defined]
     USER_AGENT,
     _build_from_crawler,
     _close_spider,
+    maybe_deferred_to_future,
 )
 
 if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
     from scrapy.utils.defer import deferred_from_coro
     from twisted.internet.defer import Deferred
+
+if TYPE_CHECKING:
+    from scrapy.crawler import Crawler
+    from scrapy.http import Request
+    from scrapy.http.response import Response
+    from scrapy.settings import Settings
+    from tenacity import AsyncRetrying
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +162,10 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
         self._autothrottle_is_enabled = settings.getbool("AUTOTHROTTLE_ENABLED")
 
+        self._proxy_url = settings.get("ZYTE_API_PROXY_URL", "http://api.zyte.com:8011")
+        self._proxy_mode = settings.get("ZYTE_API_MODE", "auto")
+        self._proxy_agg_stats = ProxyAggStats()
+
     @classmethod
     def from_crawler(cls, crawler):
         return cls(crawler.settings, crawler)
@@ -217,74 +235,29 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         def download_request(
             self, request: Request, spider: Spider
         ) -> Deferred[Response | None]:
-            api_params = self._param_parser.parse(request)
-            if api_params is not None:
-                return deferred_from_coro(self._download_request(api_params, request))
-            assert self._fallback_handler
-            return deferred_from_coro(
-                self._fallback_handler.download_request(request, spider)
-            )
+            return deferred_from_coro(self._dispatch_request(request, spider))
     else:
 
         async def download_request(self, request: Request) -> Response | None:  # type: ignore[misc]
-            api_params = self._param_parser.parse(request)
-            if api_params is not None:
-                return await self._download_request(api_params, request)
-            assert self._fallback_handler
-            return await self._fallback_handler.download_request(request)
+            return await self._dispatch_request(request)
 
-    def _update_stats(self, api_params):
-        prefix = "scrapy-zyte-api"
-        for arg in api_params:
-            if arg == "experimental":
-                for subarg in api_params[arg]:
-                    self._stats.inc_value(f"{prefix}/request_args/{arg}.{subarg}")
-            else:
-                self._stats.inc_value(f"{prefix}/request_args/{arg}")
-        for stat in (
-            "429",
-            "attempts",
-            "errors",
-            "fatal_errors",
-            "processed",
-            "success",
-        ):
-            self._stats.set_value(
-                f"{prefix}/{stat}",
-                getattr(self._client.agg_stats, f"n_{stat}"),
-            )
-        for stat in (
-            "error_ratio",
-            "success_ratio",
-            "throttle_ratio",
-        ):
-            self._stats.set_value(
-                f"{prefix}/{stat}",
-                getattr(self._client.agg_stats, stat)(),
-            )
-        for source, target in (
-            ("connect", "connection"),
-            ("total", "response"),
-        ):
-            self._stats.set_value(
-                f"{prefix}/mean_{target}_seconds",
-                getattr(self._client.agg_stats, f"time_{source}_stats").mean(),
-            )
+    async def _dispatch_request(
+        self, request: Request, spider: Spider | None = None
+    ) -> Response | None:
+        api_params = self._param_parser.parse(request)
+        if api_params is None:
+            return await self._download_via_fallback(request, spider)
 
-        for error_type, count in self._client.agg_stats.api_error_types.items():
-            error_type = error_type or "/<empty>"  # noqa: PLW2901
-            if not error_type.startswith("/"):
-                error_type = f"/{error_type}"  # noqa: PLW2901
-            self._stats.set_value(f"{prefix}/error_types{error_type}", count)
+        effective_mode = _get_effective_mode(
+            request, api_params, self._crawler.settings, self._client.auth.type
+        )
+        self._stats.inc_value(f"scrapy-zyte-api/request/mode/{effective_mode}")
+        if effective_mode == "proxy":
+            return await self._download_via_proxy_mode(api_params, request)
 
-        for counter in (
-            "exception_types",
-            "status_codes",
-        ):
-            for key, value in getattr(self._client.agg_stats, counter).items():
-                self._stats.set_value(f"{prefix}/{counter}/{key}", value)
+        return await self._download_via_http_api(api_params, request)
 
-    async def _download_request(
+    async def _download_via_http_api(
         self, api_params: dict, request: Request
     ) -> (
         ZyteAPITextResponse
@@ -293,14 +266,8 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         | ZyteAPIResponse
         | None
     ):
-        # Define url by default
-        retrying = request.meta.get("zyte_api_retry_policy")
-        if retrying:
-            if isinstance(retrying, str):  # Scrapy < 2.4 doesn't have this check
-                retrying = load_object(retrying)
-        else:
-            retrying = self._retry_policy
         self._log_request(api_params)
+        retrying = self._get_request_retrying(request)
 
         start_time = time.time()
 
@@ -315,16 +282,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
             raise
         finally:
-            # If AutoThrottle is enabled, and autothrottle_dont_adjust_delay is
-            # not set or not supported, we do not set download_latency, as it
-            # would cause AutoThrottle to adjust the download delay of the
-            # request slot, and we do not want AutoThrottle to do that for Zyte
-            # API slots since Zyte API already handles throtling.
-            if not self._autothrottle_is_enabled or (
-                _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT
-                and request.meta.get("autothrottle_dont_adjust_delay", False)
-            ):
-                request.meta["download_latency"] = time.time() - start_time
+            self._set_download_latency(request, time.time() - start_time)
             self._update_stats(api_params)
 
         response = _process_response(
@@ -339,6 +297,155 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             return None
 
         return response
+
+    def _set_download_latency(self, request: Request, elapsed: float) -> None:
+        # If AutoThrottle is enabled, and autothrottle_dont_adjust_delay is not
+        # set or not supported, we do not set download_latency, as it would
+        # cause AutoThrottle to adjust the download delay of the request slot,
+        # and we do not want AutoThrottle to do that for Zyte API slots since
+        # Zyte API already handles throttling.
+        if not self._autothrottle_is_enabled or (
+            _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT
+            and request.meta.get("autothrottle_dont_adjust_delay", False)
+        ):
+            request.meta["download_latency"] = elapsed
+
+    def _get_request_retrying(self, request: Request) -> AsyncRetrying:
+        retrying = request.meta.get("zyte_api_retry_policy")
+        if retrying:
+            if isinstance(retrying, str):
+                retrying = load_object(retrying)
+        else:
+            retrying = self._retry_policy
+        return retrying
+
+    async def _download_via_proxy_mode(
+        self,
+        api_params: dict[str, Any],
+        request: Request,
+    ) -> (
+        ZyteAPIProxyTextResponse
+        | ZyteAPIProxyXmlResponse
+        | ZyteAPIProxyJsonResponse
+        | ZyteAPIProxyResponse
+        | None
+    ):
+        proxy_request = _build_proxy_request(
+            self._proxy_url, self._client.api_key, request, api_params
+        )
+        self._log_proxy_request(proxy_request)
+        retrying = self._get_request_retrying(request) or zyte_api_retrying
+
+        start_time = time.time()
+
+        self._proxy_agg_stats.n_attempts += 1
+
+        try:
+            response = await retrying.wraps(self._attempt_via_proxy)(proxy_request)
+            self._proxy_agg_stats.n_success += 1
+            self._proxy_agg_stats.status_codes[response.status] += 1
+        except ProxyModeError as error:
+            self._proxy_agg_stats.n_fatal_errors += 1
+            self._proxy_agg_stats.n_errors += 1
+            self._proxy_agg_stats.status_codes[error.status] += 1
+            error_type = error.parsed.type
+            self._proxy_agg_stats.api_error_types[error_type] += 1
+            self._process_request_error(request, error)
+            raise
+        except Exception:
+            self._proxy_agg_stats.n_errors += 1
+            raise
+        finally:
+            elapsed = time.time() - start_time
+            self._proxy_agg_stats.time_total_stats.push(elapsed)
+            self._set_download_latency(request, elapsed)
+            self._update_stats(api_params)
+
+        proxy_response = _process_proxy_response(
+            response, request, proxy_request, api_params
+        )
+
+        if _body_max_size_exceeded(
+            len(proxy_response.body),
+            self._default_warnsize,
+            self._default_maxsize,
+            request.url,
+        ):
+            return None
+
+        return proxy_response
+
+    async def _attempt_via_proxy(self, proxy_request: Request) -> Response:
+        response = await self._download_via_fallback(
+            proxy_request, self._crawler.spider
+        )
+        _check_for_proxy_error(response, query={"url": proxy_request.url})
+        return response
+
+    def _update_stats(self, api_params):
+        prefix = "scrapy-zyte-api"
+        for arg in api_params:
+            if arg == "experimental":
+                for subarg in api_params[arg]:
+                    self._stats.inc_value(f"{prefix}/request_args/{arg}.{subarg}")
+            else:
+                self._stats.inc_value(f"{prefix}/request_args/{arg}")
+
+        http = self._client.agg_stats
+        proxy = self._proxy_agg_stats
+
+        for field, val in vars(http).items():
+            if not field.startswith("n_") or not isinstance(val, int):
+                continue
+            stat_key = field[2:]  # strip "n_" prefix
+            proxy_val = getattr(proxy, field, None)
+            if proxy_val is None:
+                proxy_val = 0
+            self._stats.set_value(f"{prefix}/{stat_key}", val + proxy_val)
+
+        n_processed = http.n_processed + (proxy.n_success + proxy.n_fatal_errors)
+        self._stats.set_value(f"{prefix}/processed", n_processed)
+
+        n_attempts = http.n_attempts + proxy.n_attempts
+        n_errors = http.n_errors + proxy.n_errors
+        n_429 = http.n_429 + proxy.n_429
+        n_success = http.n_success + proxy.n_success
+        self._stats.set_value(
+            f"{prefix}/error_ratio",
+            n_errors / n_attempts if n_attempts else 0.0,
+        )
+        self._stats.set_value(
+            f"{prefix}/success_ratio",
+            n_success / n_processed if n_processed else 0.0,
+        )
+        self._stats.set_value(
+            f"{prefix}/throttle_ratio",
+            n_429 / n_attempts if n_attempts else 0.0,
+        )
+
+        for source, target in (
+            ("connect", "connection"),
+            ("total", "response"),
+        ):
+            combined = getattr(http, f"time_{source}_stats") + getattr(
+                proxy, f"time_{source}_stats"
+            )
+            self._stats.set_value(
+                f"{prefix}/mean_{target}_seconds",
+                combined.mean(),
+            )
+
+        combined_error_types = http.api_error_types + proxy.api_error_types
+        for error_type, count in combined_error_types.items():
+            error_type = error_type or "/<empty>"  # noqa: PLW2901
+            if not error_type.startswith("/"):
+                error_type = f"/{error_type}"  # noqa: PLW2901
+            self._stats.set_value(f"{prefix}/error_types{error_type}", count)
+
+        for counter in ("exception_types", "status_codes"):
+            combined = getattr(http, counter) + getattr(proxy, counter)
+            for key, value in combined.items():
+                self._stats.set_value(f"{prefix}/{counter}/{key}", value)
 
     def _process_request_error(self, request, error):
         detail = (error.parsed.data or {}).get("detail", error.message)
@@ -358,11 +465,18 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 _close_spider(self._crawler, close_reason)
                 return
 
-    def _log_request(self, params):
+    def _log_proxy_request(self, request: Request):
+        proxy_headers = ...  # TODO: dict with only Zyte-* headers
+        self._log_request(proxy_headers, is_proxy=True, url=request.url)
+
+    def _log_request(self, params, *, is_proxy: bool = False, url: str = ""):
         if not self._must_log_request:
             return
         params = self._truncate_params(params)
-        logger.debug(f"Sending Zyte API extract request: {json.dumps(params)}")
+        if is_proxy:
+            logger.debug(f"Sending Zyte API proxy request: {url} {json.dumps(params)}")
+        else:
+            logger.debug(f"Sending Zyte API extract request: {json.dumps(params)}")
 
     def _truncate_params(self, params):
         if self._truncate_limit == 0:
@@ -370,6 +484,15 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         params = deepcopy(params)
         _truncate(params, self._truncate_limit)
         return params
+
+    async def _download_via_fallback(
+        self, request: Request, spider: Spider | None = None
+    ) -> Response | None:
+        assert self._fallback_handler
+        if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+            d = self._fallback_handler.download_request(request, spider)
+            return await maybe_deferred_to_future(d)
+        return await self._fallback_handler.download_request(request)
 
     if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
 
