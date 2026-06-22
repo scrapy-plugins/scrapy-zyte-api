@@ -384,6 +384,7 @@ async def test_stats(mockserver):
         assert set(scrapy_stats.get_stats()) == {
             f"scrapy-zyte-api/{stat}"
             for stat in (
+                "402_req",
                 "429",
                 "attempts",
                 "error_ratio",
@@ -392,6 +393,7 @@ async def test_stats(mockserver):
                 "mean_connection_seconds",
                 "mean_response_seconds",
                 "processed",
+                "request/transport/http",
                 "request_args/a",
                 "request_args/b",
                 "request_args/experimental.c0",
@@ -403,12 +405,14 @@ async def test_stats(mockserver):
             )
         }
         for suffix, value in (
+            ("402_req", 0),
             ("429", 0),
             ("attempts", 1),
             ("error_ratio", 0.0),
             ("errors", 0),
             ("fatal_errors", 0),
             ("processed", 1),
+            ("request/transport/http", 1),
             ("request_args/a", 1),
             ("request_args/b", 1),
             ("request_args/experimental.c0", 1),
@@ -786,7 +790,7 @@ async def test_download_request_limits(
             ),
         ):
             request = Request("https://example.com")
-            result = await handler._download_request({}, request)
+            result = await handler._download_via_http_api({}, request)
 
             if expect_null:
                 assert result is None
