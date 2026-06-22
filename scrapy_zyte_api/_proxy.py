@@ -152,13 +152,20 @@ def _build_proxy_request(
         header_val = request.headers.get(header_bytes, b"").decode()
         lower_str = lower.decode()
         if lower == b"zyte-override-headers" and lower_str in param_lower_to_key:
-            # Union the user-supplied Zyte-Override-Headers with the ones
-            # auto-generated from protected custom headers.
-            existing = proxy_headers[param_lower_to_key[lower_str]]
-            names = {v.strip() for v in f"{existing},{header_val}".split(",")}
-            proxy_headers[param_lower_to_key[lower_str]] = ",".join(
-                sorted(n for n in names if n)
-            )
+            # A user-supplied Zyte-Override-Headers request header overrides the
+            # value auto-generated from protected custom headers.
+            if lower not in _warned_conflict_headers:
+                _warned_conflict_headers.add(lower)
+                auto = proxy_headers[param_lower_to_key[lower_str]]
+                logger.warning(
+                    f"In {request!r}, the {header_name!r} request header (value "
+                    f"{header_val!r}) overrides the value that would otherwise "
+                    f"be generated automatically ({auto!r}) for protected "
+                    f"headers. Those protected headers may be ignored by Zyte "
+                    f"API unless they are also listed in the custom "
+                    f"Zyte-Override-Headers value."
+                )
+            proxy_headers[param_lower_to_key[lower_str]] = header_val
             continue
         if (
             lower in _ZYTE_HEADER_TO_PARAM
@@ -299,20 +306,31 @@ def _params_to_proxy_headers(
         headers["Referer"] = referer
 
     override_header_names: list[str] = []
+    user_override_headers: str | None = None
     custom_headers = params.get("customHttpRequestHeaders") or []
     for h in custom_headers:
         name = h.get("name", "")
         if name:
-            headers[name] = h.get("value", "")
+            value = h.get("value", "")
+            headers[name] = value
             lower_name = name.lower().encode()
             if lower_name in _PROTECTED_HEADERS:
                 override_header_names.append(_PROTECTED_HEADERS[lower_name])
+            elif lower_name == b"zyte-override-headers":
+                user_override_headers = value
 
-    if override_header_names:
-        existing = headers.get("Zyte-Override-Headers", "")
-        if existing:
-            existing_set = {v.strip() for v in existing.split(",") if v.strip()}
-            override_header_names = list(existing_set | set(override_header_names))
+    if user_override_headers is not None:
+        if override_header_names:
+            logger.warning(
+                f"A custom Zyte-Override-Headers value "
+                f"({user_override_headers!r}) overrides the value that would "
+                f"otherwise be generated automatically for the protected "
+                f"headers {override_header_names!r}. Those protected headers "
+                f"may be ignored by Zyte API unless they are also listed in the "
+                f"custom Zyte-Override-Headers value."
+            )
+        headers["Zyte-Override-Headers"] = user_override_headers
+    elif override_header_names:
         headers["Zyte-Override-Headers"] = ",".join(override_header_names)
 
     if (http_method := params.get("httpRequestMethod")) and http_method != "GET":
