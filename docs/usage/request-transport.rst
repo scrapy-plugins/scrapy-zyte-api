@@ -16,9 +16,10 @@ bandwidth usage.
 
     While proxy mode support is experimental, scrapy-zyte-api never sends a
     request through proxy mode unless you opt in, by setting the
-    :setting:`ZYTE_API_TRANSPORT` or :setting:`ZYTE_API_PROVIDER_TRANSPORT`
-    setting, or the :reqmeta:`zyte_api_transport` or
-    :reqmeta:`zyte_api_provider_transport` request metadata key, to ``"auto"``
+    :setting:`ZYTE_API_TRANSPORT`, :setting:`ZYTE_API_PROVIDER_TRANSPORT` or
+    :setting:`ZYTE_API_SESSION_TRANSPORT` setting, or the
+    :reqmeta:`zyte_api_transport`, :reqmeta:`zyte_api_provider_transport` or
+    :reqmeta:`zyte_api_session_transport` request metadata key, to ``"auto"``
     or ``"proxy"``. For requests routed through proxy mode because they carry
     ``Zyte-*`` headers (see :ref:`header-transport`), you can instead set the
     :setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED` setting to ``True``.
@@ -148,3 +149,33 @@ To override the transport for a single request, set
         url,
         meta={"zyte_api_provider_transport": "http"},
     )
+
+.. _request-transport-session:
+
+Sessions
+========
+
+:ref:`Plugin-managed sessions <session>` work with proxy mode. Because a Zyte
+API session is identified only by its id, it can be initialized through one
+transport and used through another:
+
+-   The transport used to **use** a session follows the regular request
+    transport of the request being sent (:setting:`ZYTE_API_TRANSPORT` or
+    :reqmeta:`zyte_api_transport`).
+
+-   The transport used to **initialize** a session is controlled separately, by
+    the :setting:`ZYTE_API_SESSION_TRANSPORT` setting (default ``"auto"``) or
+    the :reqmeta:`zyte_api_session_transport` request metadata key. A dedicated
+    setting is needed because :ref:`session initialization <session-init>`
+    requests are manual (:reqmeta:`zyte_api`) requests, which always default to
+    the HTTP API.
+
+For example, to send all session traffic (initialization and use) through proxy
+mode:
+
+.. code-block:: python
+
+    custom_settings = {
+        "ZYTE_API_TRANSPORT": "proxy",
+        "ZYTE_API_SESSION_TRANSPORT": "proxy",
+    }

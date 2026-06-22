@@ -24,6 +24,7 @@ from zyte_api import AggressiveRetryFactory, RequestError, RetryFactory, stop_on
 from zyte_api import aggressive_retrying as _aggressive_retrying
 from zyte_api import zyte_api_retrying as _zyte_api_retrying
 
+from ._request_transport import _resolve_configured_transport
 from .utils import (  # type: ignore[attr-defined]
     _DOWNLOAD_NEEDS_SPIDER,
     _build_from_crawler,
@@ -997,11 +998,27 @@ class _SessionManager:
         assert self._crawler.engine
         session_config = self._get_session_config(request)
 
+        # Session initialization requests are manual (``zyte_api``) requests,
+        # which would otherwise always default to the HTTP API transport and
+        # ignore the ZYTE_API_TRANSPORT setting. Their transport is instead
+        # controlled by a dedicated setting and request metadata key, mirroring
+        # the scrapy-poet provider transport, so that the session can be
+        # initialized through proxy mode independently of the transport of the
+        # request that triggered the initialization.
+        session_transport, session_transport_explicit = _resolve_configured_transport(
+            meta_value=request.meta.get("zyte_api_session_transport"),
+            setting_value=self._crawler.settings.get("ZYTE_API_SESSION_TRANSPORT"),
+            meta_source="the zyte_api_session_transport request.meta key",
+            setting_source="the ZYTE_API_SESSION_TRANSPORT setting",
+        )
+
         async def download(init_request: Request) -> Response:
             meta = {**init_request.meta}
             meta[SESSION_INIT_META_KEY] = True
             meta.setdefault("dont_merge_cookies", True)
             meta.setdefault("zyte_api_retry_policy", self._session_retry_policy)
+            meta.setdefault("zyte_api_transport", session_transport)
+            meta.setdefault("_zyte_api_transport_explicit", session_transport_explicit)
             if "zyte_api" in meta:
                 zyte_api = {**meta["zyte_api"]}
                 if "session" not in zyte_api:

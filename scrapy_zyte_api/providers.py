@@ -46,7 +46,7 @@ from zyte_common_items.fields import is_auto_field
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
 from scrapy_zyte_api._page_inputs import CapturedResponse, NetworkCapture
-from scrapy_zyte_api._request_transport import _validate_transport
+from scrapy_zyte_api._request_transport import _resolve_configured_transport
 from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
 
 if TYPE_CHECKING:
@@ -276,26 +276,16 @@ class ZyteApiProvider(PageObjectInputProvider):
         if screenshot_requested:
             zyte_api_meta["screenshot"] = True
 
-        provider_transport = request.meta.get("zyte_api_provider_transport")
-        if provider_transport is not None:
-            provider_transport = _validate_transport(
-                provider_transport,
-                source="the zyte_api_provider_transport request.meta key",
-            )
-            transport_explicit = True
-        elif crawler.settings.get("ZYTE_API_PROVIDER_TRANSPORT") is not None:
-            provider_transport = _validate_transport(
-                crawler.settings.get("ZYTE_API_PROVIDER_TRANSPORT"),
-                source="the ZYTE_API_PROVIDER_TRANSPORT setting",
-            )
-            transport_explicit = True
-        else:
-            # Proxy mode is experimental and opt-in: when the provider transport
-            # is not explicitly configured, default to "auto" but flag it as
-            # non-explicit so the handler falls back to the HTTP API (and warns)
-            # for eligible requests instead of using proxy mode automatically.
-            provider_transport = "auto"
-            transport_explicit = False
+        # Proxy mode is experimental and opt-in: when the provider transport is
+        # not explicitly configured, the resolved transport is "auto" but flagged
+        # as non-explicit, so the handler falls back to the HTTP API (and warns)
+        # for eligible requests instead of using proxy mode automatically.
+        provider_transport, transport_explicit = _resolve_configured_transport(
+            meta_value=request.meta.get("zyte_api_provider_transport"),
+            setting_value=crawler.settings.get("ZYTE_API_PROVIDER_TRANSPORT"),
+            meta_source="the zyte_api_provider_transport request.meta key",
+            setting_source="the ZYTE_API_PROVIDER_TRANSPORT setting",
+        )
         api_request = Request(
             url=request.url,
             meta={

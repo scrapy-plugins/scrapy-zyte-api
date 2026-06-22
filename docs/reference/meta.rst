@@ -172,3 +172,22 @@ If not falsy, it determines the default pool ID and options for the request.
 
 It supports the same values as the return value of
 :meth:`scrapy_zyte_api.SessionConfig.pool`.
+
+
+.. reqmeta:: zyte_api_session_transport
+
+zyte_api_session_transport
+==========================
+
+Default: :setting:`ZYTE_API_SESSION_TRANSPORT`
+
+Sets the :ref:`transport <request-transport-session>` of the :ref:`session
+initialization <session-init>` request triggered by this request.
+
+This is independent of the transport used to *use* the session (see
+:reqmeta:`zyte_api_transport` and :setting:`ZYTE_API_TRANSPORT`).
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, a
+    session initialization request only uses proxy mode if this key (or the
+    :setting:`ZYTE_API_SESSION_TRANSPORT` setting) is set to ``"auto"`` or
+    ``"proxy"``.

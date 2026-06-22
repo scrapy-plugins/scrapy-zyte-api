@@ -861,6 +861,32 @@ Whether to split :ref:`session stats <session-stats>` by pool (``True``) or
 aggregate them across pools (``False``, default).
 
 
+.. setting:: ZYTE_API_SESSION_TRANSPORT
+
+ZYTE_API_SESSION_TRANSPORT
+==========================
+
+Default: ``"auto"``
+
+Controls which :ref:`transport <request-transport>` is used for :ref:`session
+initialization <session-init>` requests (see :ref:`request-transport-session`).
+Accepted values are ``"auto"``, ``"proxy"``, and ``"http"``.
+
+This is independent of :setting:`ZYTE_API_TRANSPORT`, which controls the
+transport of the requests that *use* a session: a session is identified only by
+its id, so it can be initialized through one transport and used through another.
+
+Per-request, use the :reqmeta:`zyte_api_session_transport` request metadata key
+on the request that triggers session initialization.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, leaving
+    this setting unset is treated as if proxy mode were disabled: eligible
+    session initialization requests are sent through the HTTP API and a warning
+    is logged. Set this setting (or :reqmeta:`zyte_api_session_transport`) to
+    ``"auto"`` or ``"proxy"`` to opt into proxy mode, or to ``"http"`` to
+    silence the warning.
+
+
 .. setting:: ZYTE_API_SKIP_HEADERS
 
 ZYTE_API_SKIP_HEADERS

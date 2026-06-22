@@ -28,6 +28,32 @@ def _validate_transport(transport: str, *, source: str) -> str:
     return transport
 
 
+def _resolve_configured_transport(
+    *,
+    meta_value: str | None,
+    setting_value: str | None,
+    meta_source: str,
+    setting_source: str,
+) -> tuple[str, bool]:
+    """Resolve a request transport configured through a request metadata key
+    and a setting, returning ``(transport, explicit)``.
+
+    The metadata value takes precedence over the setting value. *explicit* is
+    ``True`` when either value is set (and thus validated), and ``False`` when
+    both are unset and the transport defaults to ``"auto"``.
+
+    This is shared by the configuration of the scrapy-poet provider transport
+    (see :class:`~scrapy_zyte_api.providers.ZyteApiProvider`) and the session
+    initialization transport (see
+    :class:`scrapy_zyte_api._session._SessionManager`).
+    """
+    if meta_value is not None:
+        return _validate_transport(meta_value, source=meta_source), True
+    if setting_value is not None:
+        return _validate_transport(setting_value, source=setting_source), True
+    return "auto", False
+
+
 def _get_assigned_transport(request: Request, settings: Settings) -> str:
     """Returns "auto", "http" or "proxy", whichever the request is supposed to
     use."""
