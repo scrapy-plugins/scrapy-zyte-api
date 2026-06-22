@@ -174,20 +174,26 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     def from_crawler(cls, crawler):
         return cls(crawler.settings, crawler)
 
+    def _auth_type(self) -> str:
+        if _X402_SUPPORT:
+            return self._client.auth.type
+        return "zyte"
+
+    def _auth_key(self) -> str:
+        if _X402_SUPPORT:
+            return self._client.auth.key
+        return self._client.api_key
+
     def _log_auth(self):
         if _X402_SUPPORT:
             auth_type = (
                 "a Zyte API key"
-                if self._client.auth.type == "zyte"
+                if self._auth_type() == "zyte"
                 else "an Ethereum private key"
             )
-            logger.info(
-                f"Using {auth_type} starting with {self._client.auth.key[:7]!r}"
-            )
+            logger.info(f"Using {auth_type} starting with {self._auth_key()[:7]!r}")
         else:
-            logger.info(
-                f"Using a Zyte API key starting with {self._client.api_key[:7]!r}"
-            )
+            logger.info(f"Using a Zyte API key starting with {self._auth_key()[:7]!r}")
 
     async def engine_started(self):
         self._session = self._client.session(trust_env=self._trust_env)
@@ -256,7 +262,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             request,
             api_params,
             self._crawler.settings,
-            self._client.auth.type,
+            self._auth_type(),
             self._param_parser._header_transport_enabled(),
         )
         if experimental == "header":
@@ -431,7 +437,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         | None
     ):
         proxy_request = _build_proxy_request(
-            self._proxy_url, self._client.auth.key, request, api_params
+            self._proxy_url, self._auth_key(), request, api_params
         )
         self._log_proxy_request(proxy_request)
         # The HTTP API path can pass retrying=None and let python-zyte-api fall
