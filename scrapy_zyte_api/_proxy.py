@@ -11,6 +11,7 @@ from zyte_api.stats import Statistics
 
 from scrapy_zyte_api._cookies import _parse_set_cookie_header
 from scrapy_zyte_api._utils import str_to_bool
+from scrapy_zyte_api.utils import USER_AGENT
 
 if TYPE_CHECKING:
     from scrapy import Request
@@ -146,7 +147,12 @@ def _get_raw_param_value(api_params: dict[str, Any], header_lower: bytes) -> Any
 
 
 def _build_proxy_request(
-    proxy_url: str, api_key: str, request: Request, api_params: dict[str, Any]
+    proxy_url: str,
+    api_key: str,
+    request: Request,
+    api_params: dict[str, Any],
+    *,
+    user_agent: str | None = USER_AGENT,
 ) -> Request:
     # The headers sent to the target are derived from the computed Zyte API
     # parameters (e.g. customHttpRequestHeaders, requestHeaders), exactly as
@@ -158,6 +164,10 @@ def _build_proxy_request(
     proxy_headers, proxy_method, proxy_body = _params_to_proxy_headers(api_params)
 
     param_lower_to_key = {k.lower(): k for k in proxy_headers}
+    # Whether the request explicitly defines a Zyte-Client header, and its value
+    # (empty when set to None or "", which means "do not send Zyte-Client").
+    user_set_zyte_client = False
+    user_zyte_client = ""
     for header_bytes in request.headers:
         lower = header_bytes.strip().lower()
         if not lower.startswith(b"zyte-"):
@@ -165,6 +175,15 @@ def _build_proxy_request(
             # no api_params counterpart (e.g. Zyte-Client) or enable
             # forward-compatibility with proxy features not yet known to
             # scrapy-zyte-api.
+            continue
+        if lower == b"zyte-client":
+            # Zyte-Client is filled automatically below; a user-defined value
+            # (including an empty one, used to suppress the header) takes
+            # precedence. Reading the raw values avoids Headers.get raising on
+            # an empty value list (the None case).
+            user_set_zyte_client = True
+            values = request.headers.getlist(header_bytes)
+            user_zyte_client = values[-1].decode() if values else ""
             continue
         header_name = header_bytes.decode()
         header_val = request.headers.get(header_bytes, b"").decode()
@@ -201,6 +220,15 @@ def _build_proxy_request(
                 f"precedence."
             )
         proxy_headers[header_name] = header_val
+
+    # Mirror the User-Agent used for the HTTP API as the proxy mode Zyte-Client
+    # header, unless the user defined Zyte-Client themselves. A user-defined
+    # empty value (None or "") suppresses the header entirely.
+    if user_set_zyte_client:
+        if user_zyte_client:
+            proxy_headers["Zyte-Client"] = user_zyte_client
+    elif user_agent:
+        proxy_headers["Zyte-Client"] = user_agent
 
     proxy_auth = b64encode(f"{api_key}:".encode()).decode()
 

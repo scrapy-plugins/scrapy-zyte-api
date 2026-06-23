@@ -31,6 +31,7 @@ from scrapy_zyte_api.responses import (
     ZyteAPIProxyXmlResponse,
     _process_proxy_response,
 )
+from scrapy_zyte_api.utils import USER_AGENT
 
 
 @pytest.fixture(autouse=True)
@@ -440,6 +441,67 @@ def test_build_proxy_request_passthrough_zyte_headers():
         "http://proxy:8011", "KEY", request, {"url": "https://example.com"}
     )
     assert proxy_request.headers[b"Zyte-Client"] == b"scrapy-zyte-api/1"
+
+
+def test_build_proxy_request_zyte_client_default():
+    # When the request does not define Zyte-Client, it is filled with the
+    # User-Agent that the HTTP API would use.
+    request = Request(
+        "https://example.com",
+        meta={"zyte_api_transport": "proxy"},
+    )
+    proxy_request = _build_proxy_request(
+        "http://proxy:8011", "KEY", request, {"url": "https://example.com"}
+    )
+    assert proxy_request.headers[b"Zyte-Client"] == USER_AGENT.encode()
+
+
+def test_build_proxy_request_zyte_client_custom_user_agent():
+    # The user_agent argument (the value the handler uses for the HTTP API)
+    # drives the default Zyte-Client value.
+    request = Request(
+        "https://example.com",
+        meta={"zyte_api_transport": "proxy"},
+    )
+    proxy_request = _build_proxy_request(
+        "http://proxy:8011",
+        "KEY",
+        request,
+        {"url": "https://example.com"},
+        user_agent="my-crawler/1.0",
+    )
+    assert proxy_request.headers[b"Zyte-Client"] == b"my-crawler/1.0"
+
+
+def test_build_proxy_request_zyte_client_user_value_takes_precedence():
+    # A user-defined Zyte-Client value wins over the default.
+    request = Request(
+        "https://example.com",
+        headers={b"Zyte-Client": b"scrapy-zyte-api/1"},
+        meta={"zyte_api_transport": "proxy"},
+    )
+    proxy_request = _build_proxy_request(
+        "http://proxy:8011",
+        "KEY",
+        request,
+        {"url": "https://example.com"},
+        user_agent="my-crawler/1.0",
+    )
+    assert proxy_request.headers[b"Zyte-Client"] == b"scrapy-zyte-api/1"
+
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_build_proxy_request_zyte_client_suppressed(value):
+    # Setting Zyte-Client to None (or "") suppresses the header entirely.
+    request = Request(
+        "https://example.com",
+        headers={b"Zyte-Client": value},
+        meta={"zyte_api_transport": "proxy"},
+    )
+    proxy_request = _build_proxy_request(
+        "http://proxy:8011", "KEY", request, {"url": "https://example.com"}
+    )
+    assert b"Zyte-Client" not in proxy_request.headers
 
 
 def test_build_proxy_request_ignores_non_zyte_request_headers():

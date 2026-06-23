@@ -9,6 +9,7 @@ from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api._proxy import ProxyModeError
 from scrapy_zyte_api.responses import ZyteAPIProxyResponse, ZyteAPIProxyTextResponse
+from scrapy_zyte_api.utils import USER_AGENT
 
 from . import SETTINGS, SETTINGS_T, download_request
 
@@ -84,6 +85,27 @@ async def test_dispatch_proxy_transport_success(mockserver):
     assert handler._stats.get_value("scrapy-zyte-api/processed") == 1
     assert handler._proxy_agg_stats.n_success == 1
     assert handler._proxy_agg_stats.n_attempts == 1
+
+
+@deferred_f_from_coro_f
+async def test_proxy_zyte_client_default(mockserver):
+    # The proxy request carries Zyte-Client filled with the HTTP API User-Agent.
+    async with mockserver.make_handler(PROXY_SETTINGS) as handler:
+        calls = _patch_fallback(handler, response=_proxy_target_response())
+        request = Request(mockserver.urljoin("/"), meta={"zyte_api_automap": True})
+        await download_request(handler, request)
+    assert calls[0].headers[b"Zyte-Client"] == USER_AGENT.encode()
+
+
+@deferred_f_from_coro_f
+async def test_proxy_zyte_client_custom_user_agent(mockserver):
+    # A custom HTTP API User-Agent is mirrored into Zyte-Client.
+    settings: SETTINGS_T = {**PROXY_SETTINGS, "_ZYTE_API_USER_AGENT": "my-crawler/1.0"}
+    async with mockserver.make_handler(settings) as handler:
+        calls = _patch_fallback(handler, response=_proxy_target_response())
+        request = Request(mockserver.urljoin("/"), meta={"zyte_api_automap": True})
+        await download_request(handler, request)
+    assert calls[0].headers[b"Zyte-Client"] == b"my-crawler/1.0"
 
 
 @deferred_f_from_coro_f

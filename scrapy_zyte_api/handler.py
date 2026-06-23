@@ -168,6 +168,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self._autothrottle_is_enabled = settings.getbool("AUTOTHROTTLE_ENABLED")
 
         self._proxy_url = settings.get("ZYTE_API_PROXY_URL", "http://api.zyte.com:8011")
+        self._user_agent = settings.get("_ZYTE_API_USER_AGENT", USER_AGENT)
         self._proxy_agg_stats = ProxyAggStats()
         self._warned_experimental_proxy = False
         self._warned_experimental_header_transport = False
@@ -466,7 +467,11 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         | None
     ):
         proxy_request = _build_proxy_request(
-            self._proxy_url, self._auth_key(), request, api_params
+            self._proxy_url,
+            self._auth_key(),
+            request,
+            api_params,
+            user_agent=self._user_agent,
         )
         self._log_proxy_request(proxy_request)
         # The HTTP API path can pass retrying=None and let python-zyte-api fall
