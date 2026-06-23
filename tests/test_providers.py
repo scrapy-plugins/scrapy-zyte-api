@@ -541,7 +541,7 @@ class RecordingHandler(ScrapyZyteAPIDownloadHandler):
         super().__init__(*args, **kwargs)
         self.params = []
 
-    def _log_request(self, params):
+    def _log_request(self, params, *, is_proxy: bool = False, url: str = ""):
         self.params.append(params)
 
 

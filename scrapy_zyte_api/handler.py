@@ -523,6 +523,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             response = await self._download_via_fallback(
                 proxy_request, self._crawler.spider
             )
+            assert response is not None
         except Exception as error:
             proxy.n_errors += 1
             proxy.status_codes[0] += 1
@@ -649,7 +650,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     def _log_proxy_request(self, request: Request):
         proxy_headers = {
-            k.decode(): request.headers.get(k).decode()
+            k.decode(): (request.headers.get(k) or b"").decode()
             for k in request.headers
             if k.lower().startswith(b"zyte-")
         }

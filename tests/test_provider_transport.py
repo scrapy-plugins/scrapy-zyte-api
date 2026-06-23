@@ -2,6 +2,7 @@
 (:class:`scrapy_zyte_api.providers.ZyteApiProvider`)."""
 
 from copy import deepcopy
+from typing import Any
 
 import pytest
 
@@ -82,7 +83,7 @@ class _ProviderTransportSpider(ZyteAPISpider):
     transport = None  # The zyte_api_provider_transport meta value, if any.
 
     def get_start_request(self):
-        meta = {}
+        meta: dict[str, Any] = {}
         if self.transport is not None:
             meta["zyte_api_provider_transport"] = self.transport
         return Request(

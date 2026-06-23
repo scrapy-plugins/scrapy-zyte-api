@@ -7,7 +7,7 @@ from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 from zyte_api import RequestError
-from zyte_api.stats import Statistics
+from zyte_api.stats import Statistics  # type: ignore[attr-defined]
 
 from scrapy_zyte_api._cookies import _parse_set_cookie_header
 from scrapy_zyte_api._utils import str_to_bool
@@ -15,7 +15,7 @@ from scrapy_zyte_api.utils import USER_AGENT
 
 if TYPE_CHECKING:
     from scrapy import Request
-    from scrapy.http import Response
+    from scrapy.http import Headers, Response
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +157,20 @@ def _get_raw_param_value(api_params: dict[str, Any], header_lower: bytes) -> Any
     return None
 
 
+def _param_is_set(api_params: dict[str, Any], header_lower: bytes) -> bool:
+    """Whether the HTTP API parameter that *header_lower* maps to is present in
+    *api_params*.
+
+    Unlike checking the generated proxy headers, this detects a parameter even
+    when its value matches the default and therefore produces no proxy header
+    (e.g. ``device: desktop``): the parameter is still user-defined and thus
+    conflicts with the matching ``Zyte-*`` header.
+    """
+    if header_lower == b"zyte-session-id":
+        return "id" in (api_params.get("session") or {})
+    return _ZYTE_HEADER_TO_PARAM[header_lower] in api_params
+
+
 def _build_proxy_request(
     proxy_url: str,
     api_key: str,
@@ -197,7 +211,7 @@ def _build_proxy_request(
             user_zyte_client = values[-1].decode() if values else ""
             continue
         header_name = header_bytes.decode()
-        header_val = request.headers.get(header_bytes, b"").decode()
+        header_val = (request.headers.get(header_bytes) or b"").decode()
         lower_str = lower.decode()
         if lower == b"zyte-override-headers" and lower_str in param_lower_to_key:
             # A user-supplied Zyte-Override-Headers request header overrides the
@@ -217,7 +231,7 @@ def _build_proxy_request(
             continue
         if (
             lower in _ZYTE_HEADER_TO_PARAM
-            and lower_str in param_lower_to_key
+            and _param_is_set(api_params, lower)
             and lower not in _warned_conflict_headers
         ):
             _warned_conflict_headers.add(lower)
@@ -450,7 +464,9 @@ def _estimate_proxy_header_section_size(
             values = request.headers.getlist(header_bytes)
             headers["Zyte-Client"] = values[-1].decode() if values else ""
             continue
-        headers[header_bytes.decode()] = request.headers.get(header_bytes, b"").decode()
+        headers[header_bytes.decode()] = (
+            request.headers.get(header_bytes) or b""
+        ).decode()
     if not user_set_zyte_client and user_agent:
         headers["Zyte-Client"] = user_agent
     return sum(
@@ -475,6 +491,14 @@ def _proxy_headers_exceed_limit(
 
 
 class _ZyteAPIProxyMixin:
+    if TYPE_CHECKING:
+        url: str
+        status: int
+        body: bytes
+        headers: Headers
+        text: str
+        _raw_api_response: dict | None
+
     def __init__(
         self,
         *args,
@@ -555,6 +579,5 @@ class _ZyteAPIProxyMixin:
         if self._proxy_request is None:
             return False
         return (
-            self._proxy_request.headers.get(b"Zyte-Browser-Html", b"").decode().lower()
-            == "true"
-        )
+            self._proxy_request.headers.get(b"Zyte-Browser-Html") or b""
+        ).decode().lower() == "true"

@@ -268,15 +268,30 @@ def _process_proxy_response(
     | ZyteAPIProxyJsonResponse
     | ZyteAPIProxyResponse
 ):
-    kwargs = {
-        "request": request,
-        "proxy_request": proxy_request,
-        "api_params": api_params,
-    }
     if isinstance(response, HtmlResponse):
-        return ZyteAPIProxyTextResponse.from_proxy_response(response, **kwargs)
+        return ZyteAPIProxyTextResponse.from_proxy_response(
+            response,
+            request=request,
+            proxy_request=proxy_request,
+            api_params=api_params,
+        )
     if isinstance(response, XmlResponse):
-        return ZyteAPIProxyXmlResponse.from_proxy_response(response, **kwargs)
+        return ZyteAPIProxyXmlResponse.from_proxy_response(
+            response,
+            request=request,
+            proxy_request=proxy_request,
+            api_params=api_params,
+        )
     if _SCRAPY_JSON_CLS is not None and isinstance(response, _SCRAPY_JSON_CLS):
-        return ZyteAPIProxyJsonResponse.from_proxy_response(response, **kwargs)
-    return ZyteAPIProxyResponse.from_proxy_response(response, **kwargs)
+        return ZyteAPIProxyJsonResponse.from_proxy_response(
+            response,
+            request=request,
+            proxy_request=proxy_request,
+            api_params=api_params,
+        )
+    return ZyteAPIProxyResponse.from_proxy_response(
+        response,
+        request=request,
+        proxy_request=proxy_request,
+        api_params=api_params,
+    )
