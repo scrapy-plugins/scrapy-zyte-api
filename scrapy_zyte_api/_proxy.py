@@ -51,6 +51,17 @@ _PROXY_STATUS_MAP = {
     431: 400,
 }
 
+# Maximum total request header section size accepted by proxy mode before it
+# responds with 431 /request/header-size.
+_PROXY_HEADER_SECTION_LIMIT = 100 * 1024
+# Per-header bytes the proxy's HTTP decoder counts on top of the name and value:
+# the ": " separator and the trailing CRLF.
+_PROXY_HEADER_LINE_OVERHEAD = len(b": ") + len(b"\r\n")
+# Reserve for header bytes that _estimate_proxy_header_section_size does not
+# model but that the proxy still counts: Proxy-Authorization, Host,
+# Content-Length, Connection.
+_PROXY_HEADER_SECTION_RESERVE = 512
+
 _PROTECTED_HEADERS = {
     b"accept": "Accept",
     b"accept-encoding": "Accept-Encoding",
@@ -412,6 +423,55 @@ def _params_to_proxy_headers(
         headers["Cookie"] = cookie_str
 
     return headers, method, body
+
+
+def _estimate_proxy_header_section_size(
+    request: Request,
+    api_params: dict[str, Any],
+    *,
+    user_agent: str | None = USER_AGENT,
+) -> int:
+    """Estimate, in bytes, the request header section that proxy mode would emit
+    for *request*, as counted by the Zyte API proxy's HTTP decoder.
+
+    This mirrors the headers assembled by :func:`_build_proxy_request` but
+    without its warning side effects, so it is safe to call during transport
+    resolution. Headers it does not model are accounted for by
+    :data:`_PROXY_HEADER_SECTION_RESERVE`.
+    """
+    headers, _, _ = _params_to_proxy_headers(api_params)
+    user_set_zyte_client = False
+    for header_bytes in request.headers:
+        lower = header_bytes.strip().lower()
+        if not lower.startswith(b"zyte-"):
+            continue
+        if lower == b"zyte-client":
+            user_set_zyte_client = True
+            values = request.headers.getlist(header_bytes)
+            headers["Zyte-Client"] = values[-1].decode() if values else ""
+            continue
+        headers[header_bytes.decode()] = request.headers.get(header_bytes, b"").decode()
+    if not user_set_zyte_client and user_agent:
+        headers["Zyte-Client"] = user_agent
+    return sum(
+        len(name.encode()) + len(str(value).encode()) + _PROXY_HEADER_LINE_OVERHEAD
+        for name, value in headers.items()
+    )
+
+
+def _proxy_headers_exceed_limit(
+    request: Request,
+    api_params: dict[str, Any],
+    *,
+    user_agent: str | None = USER_AGENT,
+) -> bool:
+    """Return whether the request header section that proxy mode would emit for
+    *request* would exceed the Zyte API proxy's header-size limit and thus get a
+    431 /request/header-size error."""
+    size = _estimate_proxy_header_section_size(
+        request, api_params, user_agent=user_agent
+    )
+    return size > _PROXY_HEADER_SECTION_LIMIT - _PROXY_HEADER_SECTION_RESERVE
 
 
 class _ZyteAPIProxyMixin:

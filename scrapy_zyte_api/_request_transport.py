@@ -6,6 +6,7 @@ from ._proxy import (
     _get_unknown_proxy_mode_headers,
     _has_proxy_mode_headers,
     _is_proxy_mode_compatible,
+    _proxy_headers_exceed_limit,
     _proxy_uses_browser_rendering,
 )
 from ._request_type import is_manual_request
@@ -110,6 +111,10 @@ def _resolve_auto_transport(
         return "http"
     browser_rendering = _proxy_uses_browser_rendering(request, api_params)
     if _is_proxy_mode_compatible(api_params, browser_rendering=browser_rendering):
+        if _proxy_headers_exceed_limit(request, api_params) and not (
+            _get_unknown_proxy_mode_headers(request)
+        ):
+            return "http"
         return "proxy"
     # The parameters are not proxy-compatible. Only proxy mode could honor any
     # Zyte-* headers on the request, but it cannot run these parameters, so the

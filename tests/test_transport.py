@@ -241,6 +241,29 @@ def test_resolve_auto_transport_incompatible_with_unknown_header():
     assert _resolve_auto_transport(request, INCOMPATIBLE_PARAMS, "zyte") == "proxy"
 
 
+# Proxy-compatible, but the header section proxy mode would emit (here a single
+# oversized custom header) exceeds the Zyte API proxy's ~100 KB limit, so proxy
+# mode would fail with 431 /request/header-size.
+LARGE_HEADER_PARAMS = {
+    "url": "https://example.com",
+    "httpResponseBody": True,
+    "customHttpRequestHeaders": [{"name": "X-Big", "value": "a" * (100 * 1024)}],
+}
+
+
+def test_resolve_auto_transport_compatible_large_headers():
+    # The HTTP API carries the same data in the body, so use it to dodge the 431.
+    request = Request("https://example.com")
+    assert _resolve_auto_transport(request, LARGE_HEADER_PARAMS, "zyte") == "http"
+
+
+def test_resolve_auto_transport_compatible_large_headers_unknown_header():
+    # An unknown Zyte-* header cannot be reproduced over the HTTP API, so the
+    # request stays in proxy mode even though it will hit the header-size limit.
+    request = Request("https://example.com", headers={b"Zyte-Future": b"1"})
+    assert _resolve_auto_transport(request, LARGE_HEADER_PARAMS, "zyte") == "proxy"
+
+
 # ----------------------------------------------------------------------------
 # _header_is_decisive
 # ----------------------------------------------------------------------------
@@ -321,6 +344,19 @@ def test_resolve_transport_auto_incompatible():
 def test_resolve_transport_non_zyte_auth():
     request = Request("https://example.com", meta={"zyte_api_automap": True})
     assert resolve(request, COMPATIBLE_PARAMS, auth="apikey") == ("auto", "http", None)
+
+
+def test_resolve_transport_auto_large_headers_explicit():
+    # Explicit auto + proxy-compatible + oversized headers -> HTTP API, no
+    # experimental fallback (it is not "eligible for proxy", just too big for it).
+    request = Request("https://example.com", meta={"zyte_api_transport": "auto"})
+    assert resolve(request, LARGE_HEADER_PARAMS) == ("auto", "http", None)
+
+
+def test_resolve_transport_explicit_proxy_large_headers():
+    # Forced proxy mode is left to fail (431) rather than silently downgraded.
+    request = Request("https://example.com", meta={"zyte_api_transport": "proxy"})
+    assert resolve(request, LARGE_HEADER_PARAMS) == ("proxy", "proxy", None)
 
 
 def test_resolve_transport_unknown_header_stays_proxy():

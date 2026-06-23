@@ -16,12 +16,14 @@ from scrapy_zyte_api._proxy import (
     ProxyModeError,
     _build_proxy_request,
     _check_for_proxy_error,
+    _estimate_proxy_header_section_size,
     _get_proxy_incompatible_params,
     _get_raw_param_value,
     _get_unknown_proxy_mode_headers,
     _has_proxy_mode_headers,
     _is_proxy_mode_compatible,
     _params_to_proxy_headers,
+    _proxy_headers_exceed_limit,
     _proxy_uses_browser_rendering,
 )
 from scrapy_zyte_api.responses import (
@@ -391,6 +393,63 @@ def test_params_to_proxy_headers_skips_unnamed_custom_header():
     )
     assert headers == {"X-Foo": "bar"}
     assert "Zyte-Override-Headers" not in headers
+
+
+# ----------------------------------------------------------------------------
+# header-size estimation
+# ----------------------------------------------------------------------------
+
+
+def test_estimate_proxy_header_section_size_matches_build():
+    # The estimate should track the header section _build_proxy_request emits,
+    # minus the Proxy-Authorization header (covered by the reserve).
+    request = Request(
+        "https://example.com",
+        headers={b"Zyte-Tags": b"ignored-passthrough"},
+    )
+    api_params = {
+        "url": "https://example.com",
+        "httpResponseBody": True,
+        "customHttpRequestHeaders": [{"name": "X-Foo", "value": "bar"}],
+    }
+    estimate = _estimate_proxy_header_section_size(request, api_params)
+    proxy_request = _build_proxy_request(
+        "http://proxy.example", "api-key", request, api_params
+    )
+    built = sum(
+        len(name) + len(value) + 4
+        for name, values in proxy_request.headers.items()
+        for value in values
+        if name.lower() != b"proxy-authorization"
+    )
+    assert estimate == built
+
+
+def test_proxy_headers_exceed_limit_small():
+    request = Request("https://example.com")
+    api_params = {"url": "https://example.com", "httpResponseBody": True}
+    assert _proxy_headers_exceed_limit(request, api_params) is False
+
+
+def test_proxy_headers_exceed_limit_large():
+    request = Request("https://example.com")
+    api_params = {
+        "url": "https://example.com",
+        "httpResponseBody": True,
+        "customHttpRequestHeaders": [{"name": "X-Big", "value": "a" * (100 * 1024)}],
+    }
+    assert _proxy_headers_exceed_limit(request, api_params) is True
+
+
+def test_proxy_headers_exceed_limit_large_cookie():
+    # A big cookie jar becomes a single oversized Cookie header in proxy mode.
+    request = Request("https://example.com")
+    api_params = {
+        "url": "https://example.com",
+        "httpResponseBody": True,
+        "requestCookies": [{"name": "big", "value": "a" * (100 * 1024)}],
+    }
+    assert _proxy_headers_exceed_limit(request, api_params) is True
 
 
 # ----------------------------------------------------------------------------
