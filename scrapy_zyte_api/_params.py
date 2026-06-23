@@ -20,6 +20,7 @@ from scrapy.utils.python import to_bytes, to_unicode
 from ._cookies import _get_all_cookies
 from ._proxy import _has_proxy_mode_headers
 from ._request_transport import _get_assigned_transport, _transport_is_explicit
+from ._utils import str_to_bool
 
 logger = getLogger(__name__)
 
@@ -338,10 +339,6 @@ def _may_use_browser(api_params: dict[str, Any]) -> bool:
 
 def session_id_to_session(session_id):
     return {"id": session_id}
-
-
-def str_to_bool(value):
-    return value.strip().lower() not in ("", "false")
 
 
 def _is_safe_header(

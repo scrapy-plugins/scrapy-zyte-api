@@ -118,12 +118,40 @@ belong to the set of proxy-supported parameters:
 -   ``jobId``, ``cookieManagement``, ``followRedirect``, ``tags``
 -   ``requestHeaders``, ``customHttpRequestHeaders``
 -   ``httpRequestBody``, ``httpRequestMethod``
--   ``javascript: True`` *(proxy always enables JavaScript)*
--   ``[experimental.]requestCookies`` / ``[experimental.]responseCookies``
+-   ``javascript: True`` *(for browser requests proxy mode always enables
+    JavaScript and it cannot be disabled; for non-browser requests the toggle
+    is a no-op)*
+-   ``[experimental.]requestCookies`` / ``[experimental.]responseCookies``,
+    **except when browser rendering** (``browserHtml``) **is used** (see below)
 
 Extraction parameters (``product``, ``article``, ``actions``, ``screenshot``,
 ``networkCapture``, and so on) are **not** supported by the proxy endpoint and
 force the HTTP API.
+
+.. _proxy-cookies-browser:
+
+Cookies and browser rendering
+-----------------------------
+
+The cookie parameters :http:`request:requestCookies` and
+:http:`request:responseCookies` (and their ``experimental.*`` forms) are
+proxy-eligible only for plain HTTP requests, not when browser rendering
+(``browserHtml``) is used. Proxy mode cannot represent the browser cookie jar:
+
+-   Request cookies can only be sent to the proxy as a flat ``Cookie`` header,
+    which loses the per-cookie ``domain``, ``path`` and flags that the browser
+    cookie jar relies on during rendering.
+
+-   Response cookies can only be recovered from the main response's
+    ``Set-Cookie`` header, which misses cookies set later during rendering
+    (e.g. via JavaScript or redirects). The HTTP API instead returns the
+    *final* cookies in its ``responseCookies`` field.
+
+As a result, a request that combines ``browserHtml`` with any of these cookie
+parameters is **not** eligible for proxy mode: an ``"auto"`` request falls back
+to the HTTP API, while a request that explicitly uses :ref:`proxy mode
+<proxy-transport>` raises an error. Use the :ref:`HTTP API <http-transport>`
+for these requests.
 
 .. _request-transport-provider:
 

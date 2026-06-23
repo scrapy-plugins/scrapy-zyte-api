@@ -16,6 +16,7 @@ from zyte_api.apikey import NoApiKey
 
 from ._params import _ParamParser
 from ._proxy import (
+    _BROWSER_INCOMPATIBLE_COOKIE_PARAMS,
     ProxyAggStats,
     ProxyModeError,
     _build_proxy_request,
@@ -23,6 +24,7 @@ from ._proxy import (
     _get_proxy_incompatible_params,
     _get_unknown_proxy_mode_headers,
     _has_proxy_mode_headers,
+    _proxy_uses_browser_rendering,
 )
 from ._request_transport import _resolve_transport
 from .responses import (
@@ -276,7 +278,10 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
             self._warn_experimental_proxy()
         if effective_transport == "proxy":
-            incompatible = _get_proxy_incompatible_params(api_params)
+            browser_rendering = _proxy_uses_browser_rendering(request, api_params)
+            incompatible = _get_proxy_incompatible_params(
+                api_params, browser_rendering=browser_rendering
+            )
             if incompatible:
                 # Only reachable when proxy mode was explicitly forced, or when
                 # an unknown Zyte-* header kept an "auto" request in proxy mode
@@ -341,6 +346,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self, request: Request, incompatible: list[str], assigned_transport: str
     ) -> ValueError:
         params = ", ".join(sorted(incompatible))
+        cookie_note = self._proxy_cookie_incompatibility_note(incompatible)
         if assigned_transport == "auto":
             # Reached only via an unknown Zyte-* header (see _resolve_auto_transport).
             unknown_headers = ", ".join(
@@ -354,7 +360,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 f"HTTP API does not support and would silently ignore: "
                 f"{unknown_headers}. Remove these headers or the listed "
                 f"parameters, or set the 'http' request transport explicitly if "
-                f"you do not need them."
+                f"you do not need them.{cookie_note}"
             )
         return ValueError(
             f"Cannot send {request} via Zyte API proxy mode because the "
@@ -362,7 +368,28 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             f"{params}. Remove them, set the corresponding Zyte-* request header "
             f"instead where available, use the 'auto' or 'http' request "
             f"transport, or upgrade scrapy-zyte-api in case proxy mode has since "
-            f"added support for them."
+            f"added support for them.{cookie_note}"
+        )
+
+    @staticmethod
+    def _proxy_cookie_incompatibility_note(incompatible: list[str]) -> str:
+        """Return an explanatory note when the incompatibility is due to cookie
+        parameters combined with browser rendering, or an empty string."""
+        cookie_params = sorted(
+            p
+            for p in incompatible
+            if p.rsplit(".", 1)[-1] in _BROWSER_INCOMPATIBLE_COOKIE_PARAMS
+        )
+        if not cookie_params:
+            return ""
+        names = ", ".join(cookie_params)
+        return (
+            f" Note that {names} are supported in proxy mode only without "
+            f"browser rendering: with browserHtml, proxy mode cannot represent "
+            f"the browser cookie jar (request cookies lose their domain, path "
+            f"and flags, and response cookies miss cookies set during "
+            f"rendering), so the HTTP API request transport must be used for "
+            f"these instead."
         )
 
     async def _download_via_http_api(
@@ -462,7 +489,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             raise
         finally:
             self._set_download_latency(request, time.time() - start_time)
-            self._update_stats(api_params)
+            self._update_stats(self._proxy_stats_params(request, api_params))
 
         proxy_response = _process_proxy_response(
             response, request, proxy_request, api_params
@@ -509,6 +536,28 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         proxy.status_codes[response.status] += 1
         proxy.time_total_stats.push(time.time() - start_time)
         return response
+
+    def _proxy_stats_params(self, request: Request, api_params: dict) -> dict:
+        """Return the Zyte API parameters to count in the ``request_args``
+        stats for a proxy-mode *request*.
+
+        In proxy mode, ``Zyte-*`` request headers are passed through to the
+        proxy endpoint untouched and are not mapped to HTTP API parameters, so
+        *api_params* omits them. Re-parse the request with non-final (HTTP API)
+        semantics — which maps those headers to their matching parameters
+        without emitting the misleading "header dropped" warnings — so that the
+        ``request_args`` stats reflect the actual parameters in use (``url``,
+        ``httpRequestBody``, ``device``, ``geolocation``, ...) regardless of
+        the transport. Parameters that are implicit in proxy mode are included
+        too: ``httpResponseBody`` and ``httpResponseHeaders``.
+        """
+        if _has_proxy_mode_headers(request):
+            params = self._param_parser.parse(request) or api_params
+        else:
+            params = api_params
+        params = dict(params)
+        params.setdefault("httpResponseHeaders", True)
+        return params
 
     def _update_stats(self, api_params):
         prefix = "scrapy-zyte-api"

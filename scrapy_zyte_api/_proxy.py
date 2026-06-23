@@ -10,6 +10,7 @@ from zyte_api import RequestError
 from zyte_api.stats import Statistics
 
 from scrapy_zyte_api._cookies import _parse_set_cookie_header
+from scrapy_zyte_api._utils import str_to_bool
 
 if TYPE_CHECKING:
     from scrapy import Request
@@ -38,6 +39,7 @@ PROXY_MODE_PARAMS = {
     "requestCookies",
     "responseCookies",
 }
+_BROWSER_INCOMPATIBLE_COOKIE_PARAMS = frozenset({"requestCookies", "responseCookies"})
 
 _PROXY_TYPE_MAP = {
     "/auth/proxy-auth-not-valid": "/auth/key-not-found",
@@ -85,22 +87,38 @@ def _get_unknown_proxy_mode_headers(request: Request) -> list[str]:
     return unknown
 
 
-def _get_proxy_incompatible_params(params: dict[str, Any]) -> list[str]:
+def _get_proxy_incompatible_params(
+    params: dict[str, Any], *, browser_rendering: bool = False
+) -> list[str]:
     """Return the names of the Zyte API parameters in *params* that proxy
-    mode does not support."""
+    mode does not support.
+
+    Set *browser_rendering* to ``True`` when the request uses browser rendering
+    (``browserHtml``), so that the cookie parameters that proxy mode cannot
+    represent faithfully in that case (see
+    :data:`_BROWSER_INCOMPATIBLE_COOKIE_PARAMS`) are reported as incompatible.
+    """
+
+    def _incompatible(name: str) -> bool:
+        return name not in PROXY_MODE_PARAMS or (
+            browser_rendering and name in _BROWSER_INCOMPATIBLE_COOKIE_PARAMS
+        )
+
     incompatible: list[str] = []
     for key, value in params.items():
         if key == "experimental":
             incompatible.extend(
                 f"experimental.{subkey}"
                 for subkey in value or {}
-                if subkey not in PROXY_MODE_PARAMS
+                if _incompatible(subkey)
             )
         elif key == "javascript":
-            # Proxy mode always runs JavaScript; it cannot be disabled.
+            # For browser requests proxy mode always runs JavaScript and it
+            # cannot be disabled; for non-browser requests the toggle is a
+            # no-op. Either way, javascript: False cannot be honored.
             if value is False:
                 incompatible.append("javascript")
-        elif key not in PROXY_MODE_PARAMS:
+        elif _incompatible(key):
             incompatible.append(key)
     return incompatible
 
@@ -255,8 +273,25 @@ class ProxyAggStats:
         self.api_error_types: Counter[str | None] = Counter()
 
 
-def _is_proxy_mode_compatible(params: dict[str, Any]) -> bool:
-    return not _get_proxy_incompatible_params(params)
+def _proxy_uses_browser_rendering(request: Request, params: dict[str, Any]) -> bool:
+    """Whether *request* invokes browser rendering in proxy mode, either through
+    the ``browserHtml`` parameter or the ``Zyte-Browser-Html`` proxy header
+    (which, in proxy mode, is left in the request rather than mapped to the
+    parameter)."""
+    if params.get("browserHtml"):
+        return True
+    value = request.headers.get(b"Zyte-Browser-Html")
+    if not value:
+        return False
+    return str_to_bool(value.decode())
+
+
+def _is_proxy_mode_compatible(
+    params: dict[str, Any], *, browser_rendering: bool = False
+) -> bool:
+    return not _get_proxy_incompatible_params(
+        params, browser_rendering=browser_rendering
+    )
 
 
 def _check_for_proxy_error(response, query: dict[str, Any]) -> None:
@@ -401,19 +436,21 @@ class _ZyteAPIProxyMixin:
             result["browserHtml"] = self.text
         else:
             result["httpResponseBody"] = b64encode(self.body).decode()
-            headers = []
-            for name, values in self.headers.items():
-                name_str = name.decode() if isinstance(name, bytes) else name
-                name_lower = name_str.lower()
-                if name_lower.startswith("zyte-"):
-                    continue
-                if wants_cookies and name_lower == "set-cookie":
-                    continue
-                for value in values:
-                    value_str = value.decode() if isinstance(value, bytes) else value
-                    headers.append({"name": name_str, "value": value_str})
-            result["httpResponseHeaders"] = headers
+        headers = []
+        for name, values in self.headers.items():
+            name_str = name.decode() if isinstance(name, bytes) else name
+            if name_str.lower().startswith("zyte-"):
+                continue
+            for value in values:
+                value_str = value.decode() if isinstance(value, bytes) else value
+                headers.append({"name": name_str, "value": value_str})
+        result["httpResponseHeaders"] = headers
         if wants_cookies:
+            # Response cookies are reconstructed from the proxied Set-Cookie
+            # headers. This is only faithful for non-browser requests: the
+            # dispatcher rejects responseCookies combined with browser
+            # rendering (see _get_proxy_incompatible_params), because then these
+            # headers would miss cookies set during rendering.
             cookies = []
             for raw in self.headers.getlist(b"Set-Cookie"):
                 raw_str = raw.decode() if isinstance(raw, bytes) else raw

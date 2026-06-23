@@ -107,6 +107,65 @@ async def test_dispatch_proxy_transport_html(mockserver):
     assert isinstance(response, ZyteAPIProxyTextResponse)
 
 
+@deferred_f_from_coro_f
+async def test_proxy_request_args_stats(mockserver):
+    """request_args stats reflect the actual Zyte API parameters in proxy
+    mode, including those carried as Zyte-* headers (counted under their HTTP
+    API parameter names) and parameters that are implicit in proxy mode."""
+    async with mockserver.make_handler(PROXY_SETTINGS) as handler:
+        _patch_fallback(handler, response=_proxy_target_response())
+        request = Request(
+            mockserver.urljoin("/"),
+            method="POST",
+            body=b"hello",
+            headers={b"Zyte-Device": b"mobile", b"Zyte-Geolocation": b"US"},
+        )
+        await download_request(handler, request)
+    stats = handler._stats
+    # Explicit request parameters, including those carried as Zyte-* headers.
+    assert stats.get_value("scrapy-zyte-api/request_args/url") == 1
+    assert stats.get_value("scrapy-zyte-api/request_args/httpRequestMethod") == 1
+    assert stats.get_value("scrapy-zyte-api/request_args/httpRequestBody") == 1
+    assert stats.get_value("scrapy-zyte-api/request_args/device") == 1
+    assert stats.get_value("scrapy-zyte-api/request_args/geolocation") == 1
+    # Implicit request parameters: for a non-browser request, the response body
+    # and headers are always returned, so they are always counted.
+    assert stats.get_value("scrapy-zyte-api/request_args/httpResponseBody") == 1
+    assert stats.get_value("scrapy-zyte-api/request_args/httpResponseHeaders") == 1
+    # responseCookies is not implicit: it is only counted when actually used.
+    assert stats.get_value("scrapy-zyte-api/request_args/responseCookies") is None
+
+
+@pytest.mark.parametrize(
+    ("headers", "meta"),
+    [
+        # browserHtml requested as a parameter.
+        ({}, {"zyte_api_automap": {"browserHtml": True}}),
+        # browserHtml requested as a Zyte-* proxy header.
+        ({b"Zyte-Browser-Html": b"true"}, {"zyte_api_automap": True}),
+    ],
+    ids=["param", "header"],
+)
+@deferred_f_from_coro_f
+async def test_proxy_request_args_stats_browser(mockserver, headers, meta):
+    """With browser rendering, browserHtml is the implicit output, so
+    httpResponseBody/httpResponseHeaders are NOT counted as implicit."""
+    settings = {**PROXY_SETTINGS, "ZYTE_API_HEADER_TRANSPORT_ENABLED": True}
+    async with mockserver.make_handler(settings) as handler:
+        _patch_fallback(handler, response=_proxy_target_response(html=True))
+        request = Request(mockserver.urljoin("/"), headers=headers, meta=meta)
+        await download_request(handler, request)
+    stats = handler._stats
+    assert stats.get_value("scrapy-zyte-api/request_args/url") == 1
+    assert stats.get_value("scrapy-zyte-api/request_args/browserHtml") == 1
+    # browserHtml is the response body, so httpResponseBody is not implicit and
+    # must not be counted.
+    assert stats.get_value("scrapy-zyte-api/request_args/httpResponseBody") is None
+    # httpResponseHeaders stays implicit: proxy mode always returns the HTTP
+    # response headers, even for browser requests.
+    assert stats.get_value("scrapy-zyte-api/request_args/httpResponseHeaders") == 1
+
+
 # ----------------------------------------------------------------------------
 # Experimental gating warnings + stats
 # ----------------------------------------------------------------------------
@@ -213,6 +272,90 @@ async def test_proxy_incompatible_error(mockserver, settings, headers, meta, mat
         request = Request(mockserver.urljoin("/"), headers=headers, meta=meta)
         with pytest.raises(ValueError, match=match):
             await download_request(handler, request)
+
+
+# Cookie parameters combined with browser rendering: proxy mode cannot
+# represent the browser cookie jar, so an explicit proxy request must hard-error
+# (and an "auto" request must fall back to the HTTP API).
+@pytest.mark.parametrize(
+    "automap",
+    [
+        {"browserHtml": True, "responseCookies": True},
+        {"browserHtml": True, "requestCookies": [{"name": "a", "value": "b"}]},
+        {"browserHtml": True, "experimental": {"responseCookies": True}},
+        {
+            "browserHtml": True,
+            "experimental": {"requestCookies": [{"name": "a", "value": "b"}]},
+        },
+    ],
+)
+@deferred_f_from_coro_f
+async def test_proxy_cookies_with_browser_rendering_error(mockserver, automap):
+    async with mockserver.make_handler(PROXY_SETTINGS) as handler:
+        request = Request(mockserver.urljoin("/"), meta={"zyte_api_automap": automap})
+        with pytest.raises(ValueError, match="without browser rendering"):
+            await download_request(handler, request)
+
+
+@deferred_f_from_coro_f
+async def test_proxy_cookies_with_browser_rendering_via_header_error(mockserver):
+    # browserHtml carried as a Zyte-* proxy header (not as a parameter).
+    async with mockserver.make_handler(PROXY_SETTINGS) as handler:
+        request = Request(
+            mockserver.urljoin("/"),
+            headers={b"Zyte-Browser-Html": b"true"},
+            meta={"zyte_api_automap": {"responseCookies": True}},
+        )
+        with pytest.raises(ValueError, match="without browser rendering"):
+            await download_request(handler, request)
+
+
+@deferred_f_from_coro_f
+async def test_proxy_response_cookies_without_browser_ok(mockserver):
+    # responseCookies without browser rendering stays proxy-compatible, and is
+    # reconstructed from the proxied Set-Cookie headers.
+    async with mockserver.make_handler(PROXY_SETTINGS) as handler:
+        response = _proxy_target_response(headers={b"Set-Cookie": [b"a=b"]})
+        _patch_fallback(handler, response=response)
+        request = Request(
+            mockserver.urljoin("/"),
+            meta={"zyte_api_automap": {"responseCookies": True}},
+        )
+        result = await download_request(handler, request)
+    assert handler._stats.get_value("scrapy-zyte-api/request/transport/proxy") == 1
+    assert isinstance(result, ZyteAPIProxyResponse)
+    raw_api = result.raw_api_response
+    assert raw_api is not None
+    assert raw_api["responseCookies"] == [{"name": "a", "value": "b"}]
+
+
+@deferred_f_from_coro_f
+async def test_proxy_browser_rendering_without_cookies_ok(mockserver):
+    # browserHtml without cookie parameters stays proxy-compatible.
+    async with mockserver.make_handler(PROXY_SETTINGS) as handler:
+        _patch_fallback(handler, response=_proxy_target_response(html=True))
+        request = Request(
+            mockserver.urljoin("/"), meta={"zyte_api_automap": {"browserHtml": True}}
+        )
+        await download_request(handler, request)
+    assert handler._stats.get_value("scrapy-zyte-api/request/transport/proxy") == 1
+
+
+@deferred_f_from_coro_f
+async def test_auto_cookies_with_browser_rendering_falls_back_to_http(mockserver):
+    # An "auto" request with cookies + browser rendering is not proxy-compatible,
+    # so it uses the HTTP API (no error, no proxy transport).
+    async with mockserver.make_handler({**SETTINGS}) as handler:
+        request = Request(
+            mockserver.urljoin("/"),
+            meta={
+                "zyte_api_automap": {"browserHtml": True, "responseCookies": True},
+                "zyte_api_transport": "auto",
+            },
+        )
+        await download_request(handler, request)
+    assert handler._stats.get_value("scrapy-zyte-api/request/transport/http") == 1
+    assert handler._stats.get_value("scrapy-zyte-api/request/transport/proxy") is None
 
 
 # ----------------------------------------------------------------------------

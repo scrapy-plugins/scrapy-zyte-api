@@ -22,6 +22,7 @@ from scrapy_zyte_api._proxy import (
     _has_proxy_mode_headers,
     _is_proxy_mode_compatible,
     _params_to_proxy_headers,
+    _proxy_uses_browser_rendering,
 )
 from scrapy_zyte_api.responses import (
     ZyteAPIProxyJsonResponse,
@@ -160,6 +161,72 @@ def test_has_proxy_mode_headers(headers, expected):
 def test_incompatible_params(params, incompatible):
     assert sorted(_get_proxy_incompatible_params(params)) == incompatible
     assert _is_proxy_mode_compatible(params) is (incompatible == [])
+
+
+@pytest.mark.parametrize(
+    ("headers", "params", "expected"),
+    [
+        ({}, {}, False),
+        ({}, {"browserHtml": True}, True),
+        ({b"Zyte-Browser-Html": b"true"}, {}, True),
+        ({b"Zyte-Browser-Html": b"True"}, {}, True),
+        ({b"Zyte-Browser-Html": b"false"}, {}, False),
+        ({b"Zyte-Browser-Html": b""}, {}, False),
+        ({b"Zyte-Device": b"mobile"}, {}, False),
+    ],
+)
+def test_proxy_uses_browser_rendering(headers, params, expected):
+    request = Request("https://example.com", headers=headers)
+    assert _proxy_uses_browser_rendering(request, params) is expected
+
+
+@pytest.mark.parametrize(
+    ("params", "without_browser", "with_browser"),
+    [
+        # Cookie parameters are fine without browser rendering, but incompatible
+        # with it (proxy mode cannot represent the browser cookie jar).
+        ({"requestCookies": [{"name": "a", "value": "b"}]}, [], ["requestCookies"]),
+        ({"responseCookies": True}, [], ["responseCookies"]),
+        (
+            {"experimental": {"requestCookies": [{"name": "a", "value": "b"}]}},
+            [],
+            ["experimental.requestCookies"],
+        ),
+        (
+            {"experimental": {"responseCookies": True}},
+            [],
+            ["experimental.responseCookies"],
+        ),
+        (
+            {"requestCookies": [{"name": "a", "value": "b"}], "responseCookies": True},
+            [],
+            ["requestCookies", "responseCookies"],
+        ),
+        # browserHtml without cookies stays compatible.
+        ({"browserHtml": True, "device": "mobile"}, [], []),
+        # Genuinely unsupported parameters are reported regardless of rendering.
+        (
+            {"product": True, "responseCookies": True},
+            ["product"],
+            ["product", "responseCookies"],
+        ),
+    ],
+)
+def test_incompatible_params_browser_rendering(params, without_browser, with_browser):
+    assert (
+        sorted(_get_proxy_incompatible_params(params, browser_rendering=False))
+        == without_browser
+    )
+    assert (
+        sorted(_get_proxy_incompatible_params(params, browser_rendering=True))
+        == with_browser
+    )
+    assert _is_proxy_mode_compatible(params, browser_rendering=False) is (
+        without_browser == []
+    )
+    assert _is_proxy_mode_compatible(params, browser_rendering=True) is (
+        with_browser == []
+    )
 
 
 # ----------------------------------------------------------------------------
@@ -541,6 +608,10 @@ def test_process_proxy_response_browser_html():
     assert raw_api is not None
     assert raw_api["browserHtml"] == "<html><body>hi</body></html>"
     assert "httpResponseBody" not in raw_api
+    # Proxy mode always returns the HTTP response headers, even for browser
+    # responses.
+    header_names = {h["name"].lower() for h in raw_api["httpResponseHeaders"]}
+    assert "content-type" in header_names
 
 
 def test_process_proxy_response_http_body_filters_headers():
@@ -584,9 +655,12 @@ def test_process_proxy_response_response_cookies():
     assert raw_api["responseCookies"] == [
         {"name": "a", "value": "b", "domain": "example.com"}
     ]
-    # When cookies are requested, Set-Cookie is removed from the headers.
+    # Set-Cookie is kept in httpResponseHeaders even when cookies are requested:
+    # the Zyte API HTTP API returns the main-response Set-Cookie header there
+    # regardless of responseCookies (it just additionally exposes the final
+    # cookies in the responseCookies field), and proxy mode mirrors that.
     header_names = {h["name"].lower() for h in raw_api["httpResponseHeaders"]}
-    assert "set-cookie" not in header_names
+    assert "set-cookie" in header_names
 
 
 def test_process_proxy_response_skips_unparseable_cookie():
