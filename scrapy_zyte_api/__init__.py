@@ -28,6 +28,7 @@ from ._session import SESSION_DEFAULT_RETRY_POLICY as _SESSION_DEFAULT_RETRY_POL
 from ._session import (
     LocationSessionConfig,
     ScrapyZyteAPISessionDownloaderMiddleware,
+    ScrapyZyteAPISessionResetterDownloaderMiddleware,
     SessionConfig,
     get_request_session_id,
     is_session_init_request,
@@ -70,6 +71,7 @@ __all__ = [
     "ScrapyZyteAPIRefererSpiderMiddleware",
     "ScrapyZyteAPIRequestFingerprinter",
     "ScrapyZyteAPISessionDownloaderMiddleware",
+    "ScrapyZyteAPISessionResetterDownloaderMiddleware",
     "ScrapyZyteAPISpiderMiddleware",
     "Screenshot",
     "SessionConfig",

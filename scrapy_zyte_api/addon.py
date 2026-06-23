@@ -7,6 +7,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPIRefererSpiderMiddleware,
     ScrapyZyteAPISessionDownloaderMiddleware,
+    ScrapyZyteAPISessionResetterDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
 
@@ -83,6 +84,12 @@ class Addon:
             "DOWNLOADER_MIDDLEWARES",
             ScrapyZyteAPISessionDownloaderMiddleware,
             667,
+        )
+        _setdefault(
+            settings,
+            "DOWNLOADER_MIDDLEWARES",
+            ScrapyZyteAPISessionResetterDownloaderMiddleware,
+            565,
         )
         _setdefault(settings, "SPIDER_MIDDLEWARES", ScrapyZyteAPISpiderMiddleware, 100)
         _setdefault(

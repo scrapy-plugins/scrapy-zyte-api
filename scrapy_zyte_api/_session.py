@@ -1321,10 +1321,9 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         if isinstance(response, DummyResponse):
             return response
 
-        self._sessions.allow_new_session_assignments(request)
-
         passed = await self._sessions.check(response, request)
         if not passed:
+            self._sessions.allow_new_session_assignments(request)
             assert self._crawler.spider
             new_request_or_none = get_retry_request(
                 request,
@@ -1370,6 +1369,29 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             if self._sessions.is_enabled(request)
             else None
         )
+
+
+class ScrapyZyteAPISessionResetterDownloaderMiddleware:
+    """Downloader middleware that disables session reuse for new requests
+    created from response requests.
+
+    It is meant to be placed between retry downloader middlewares and
+    redirect/refresh downloader middlewares, so that retries get fresh sessions
+    while redirect/refresh requests reuse the same session.
+    """
+
+    @staticmethod
+    def process_response(
+        request: Request, response: Response, spider: Spider | None = None
+    ) -> Response:
+        _SessionManager.allow_new_session_assignments(request)
+        return response
+
+    @staticmethod
+    def process_exception(
+        request: Request, exception: Exception, spider: Spider | None = None
+    ) -> None:
+        _SessionManager.allow_new_session_assignments(request)
 
 
 class LocationSessionConfig(SessionConfig):
