@@ -34,6 +34,7 @@ SETTINGS: SETTINGS_T = {
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIDownloadHandler",
     },
     "DOWNLOADER_MIDDLEWARES": {
+        "scrapy_zyte_api.ScrapyZyteAPISessionResetterDownloaderMiddleware": 565,
         "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
         "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
     },
