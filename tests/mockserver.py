@@ -140,6 +140,23 @@ class DefaultResource(Resource):
             }
             return json.dumps(response_data).encode()
 
+        if "session-redirect" in domain:
+            response_data["httpResponseHeaders"] = [
+                {"name": "Location", "value": "https://example.com/"}
+            ]
+            response_data["statusCode"] = 302
+            if "session" in request_data:
+                response_data["session"] = request_data["session"]
+            return json.dumps(response_data).encode()
+
+        if "session-meta-refresh" in domain:
+            response_data["browserHtml"] = (
+                '<meta http-equiv="refresh" content="0; url=https://example.com/">'
+            )
+            if "session" in request_data:
+                response_data["session"] = request_data["session"]
+            return json.dumps(response_data).encode()
+
         html = "<html><body>Hello<h1>World!</h1></body></html>"
         if "browserHtml" in request_data:
             if "httpResponseBody" in request_data:
@@ -297,6 +314,9 @@ class DefaultResource(Resource):
                     "name": "Product navigation",
                     "pageNumber": 0,
                 }
+
+        if "session-retry" in domain:
+            response_data["statusCode"] = 500
 
         return json.dumps(response_data).encode()
 
