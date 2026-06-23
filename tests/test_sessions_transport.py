@@ -76,6 +76,10 @@ async def _crawl(mockserver, extra_settings, meta=None):
         name = "test"
 
         async def start(self):
+            for request in self.start_requests():
+                yield request
+
+        def start_requests(self):
             yield Request(url, meta=meta or {})
 
         def parse(self, response):

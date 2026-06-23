@@ -384,7 +384,7 @@ async def test_stats(mockserver):
         assert set(scrapy_stats.get_stats()) == {
             f"scrapy-zyte-api/{stat}"
             for stat in (
-                "402_req",
+                *(("402_req",) if _X402_SUPPORT else ()),
                 "429",
                 "attempts",
                 "error_ratio",
@@ -405,7 +405,7 @@ async def test_stats(mockserver):
             )
         }
         for suffix, value in (
-            ("402_req", 0),
+            *((("402_req", 0),) if _X402_SUPPORT else ()),
             ("429", 0),
             ("attempts", 1),
             ("error_ratio", 0.0),

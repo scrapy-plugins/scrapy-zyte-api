@@ -455,9 +455,9 @@ async def test_update_stats_missing_proxy_counter(mockserver):
     # _update_stats tolerates an http n_* counter that has no proxy
     # counterpart, treating the proxy contribution as zero.
     async with mockserver.make_handler(PROXY_SETTINGS) as handler:
-        del handler._proxy_agg_stats.n_402_req
+        handler._client.agg_stats.n_http_only = 5
         handler._update_stats({})
-    assert handler._stats.get_value("scrapy-zyte-api/402_req") == 0
+    assert handler._stats.get_value("scrapy-zyte-api/http_only") == 5
 
 
 @deferred_f_from_coro_f

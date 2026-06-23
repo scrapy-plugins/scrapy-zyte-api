@@ -468,9 +468,7 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
         handler._param_parser.parse = mock.Mock(return_value=output)
         handler._download_via_http_api = mock.AsyncMock(side_effect=RuntimeError)
         handler._fallback_handler = mock.Mock()
-        handler._fallback_handler.download_request = mock.AsyncMock(
-            side_effect=RuntimeError
-        )
+        handler._fallback_handler.download_request = mock.Mock(side_effect=RuntimeError)
         with pytest.raises(RuntimeError):
             await download_request(handler, request)
     if uses_zyte_api:

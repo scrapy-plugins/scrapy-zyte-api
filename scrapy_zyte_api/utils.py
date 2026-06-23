@@ -153,10 +153,12 @@ def _schedule_coro(coro: Coroutine[Any, Any, Any]) -> None:
 
 
 def _close_spider(crawler, reason):
-    if hasattr(crawler.engine, "close_spider_async"):
-        _schedule_coro(crawler.engine.close_spider_async(reason=reason))
-    else:
-        crawler.engine.close_spider(crawler.spider, reason)
+    engine = crawler.engine
+    if hasattr(engine, "close_spider_async"):  # Scrapy >= 2.14
+        _schedule_coro(engine.close_spider_async(reason=reason))
+        return
+    if getattr(engine, "slot", None) is not None:  # Scrapy < 2.14
+        engine.close_spider(crawler.spider, reason)
 
 
 try:
