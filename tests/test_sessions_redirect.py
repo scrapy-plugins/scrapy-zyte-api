@@ -1,5 +1,5 @@
 """Integration tests verifying session behavior across redirects, meta-refreshes,
-and Scrapy-level retries when using the add-on."""
+and Scrapy-level retries."""
 
 from scrapy import Request, Spider, signals
 from scrapy.utils.defer import deferred_f_from_coro_f
@@ -31,6 +31,7 @@ async def test_session_preserved_on_redirect(mockserver):
         **SESSION_SETTINGS,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
     }
 
@@ -42,9 +43,7 @@ async def test_session_preserved_on_redirect(mockserver):
             pass
 
     tracker = _SessionTracker()
-    crawler = await get_crawler(
-        settings, spider_cls=TestSpider, setup_engine=False, use_addon=True
-    )
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
     await maybe_deferred_to_future(crawler.crawl())
 
@@ -62,6 +61,7 @@ async def test_session_preserved_on_meta_refresh(mockserver):
         **SESSION_SETTINGS,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 1,
+        "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
     }
 
@@ -73,9 +73,7 @@ async def test_session_preserved_on_meta_refresh(mockserver):
             pass
 
     tracker = _SessionTracker()
-    crawler = await get_crawler(
-        settings, spider_cls=TestSpider, setup_engine=False, use_addon=True
-    )
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
     await maybe_deferred_to_future(crawler.crawl())
 
@@ -95,6 +93,7 @@ async def test_session_rotated_on_retry(mockserver):
         "RETRY_TIMES": 1,
         "ZYTE_API_SESSION_PARAMS": {"url": "https://example.com"},
         "ZYTE_API_SESSION_POOL_SIZE": 2,
+        "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
     }
 
@@ -106,9 +105,7 @@ async def test_session_rotated_on_retry(mockserver):
             pass
 
     tracker = _SessionTracker()
-    crawler = await get_crawler(
-        settings, spider_cls=TestSpider, setup_engine=False, use_addon=True
-    )
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
     crawler.signals.connect(tracker.track, signal=signals.request_reached_downloader)
     await maybe_deferred_to_future(crawler.crawl())
 
