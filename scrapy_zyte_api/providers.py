@@ -154,13 +154,9 @@ class ZyteApiProvider(PageObjectInputProvider):
         screenshot_requested = Screenshot in to_provide
         for cls in list(to_provide):
             self._track_auto_fields(crawler, request, cast("type", cls))
-            item = self.injector.weak_cache.get(request, {}).get(cls)
-            if item:
-                results.append(item)
-                to_provide.remove(cls)
 
             # BrowserResponse takes precedence over HttpResponse
-            elif (
+            if (
                 cls == AnyResponse
                 and BrowserResponse not in to_provide
                 and not screenshot_requested

@@ -97,7 +97,7 @@ def _truncate(obj, limit):
                 _truncate_str(obj, key, value, limit)
             elif isinstance(value, (list, dict)):
                 _truncate(value, limit)
-    elif isinstance(obj, list):
+    else:  # list
         for index, value in enumerate(obj):
             if isinstance(value, str):
                 _truncate_str(obj, index, value, limit)
@@ -449,7 +449,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     def _get_request_retrying(self, request: Request) -> AsyncRetrying:
         retrying = request.meta.get("zyte_api_retry_policy")
         if retrying:
-            if isinstance(retrying, str):
+            if isinstance(retrying, str):  # Scrapy < 2.4 doesn't have this check
                 retrying = load_object(retrying)
         else:
             retrying = self._retry_policy

@@ -1,6 +1,5 @@
 import asyncio
 import inspect
-import sys
 from collections.abc import Coroutine
 from importlib.metadata import version
 from typing import Any, TypeVar, Union
@@ -122,34 +121,8 @@ except ImportError:  # Scrapy < 2.7.0
         return deferred_to_future(d)
 
 
-try:
-    from scrapy.utils.reactor import is_reactor_installed as _is_reactor_installed
-except ImportError:  # Scrapy < 2.14
-
-    def _is_reactor_installed() -> bool:
-        return "twisted.internet.reactor" in sys.modules
-
-
-try:
-    from scrapy.utils.asyncio import is_asyncio_available as _is_asyncio_available
-except ImportError:  # Scrapy < 2.14
-
-    def _is_asyncio_available() -> bool:
-        if not _is_reactor_installed():
-            raise RuntimeError(
-                "is_asyncio_available() called without an installed reactor."
-            )
-
-        return is_asyncio_reactor_installed()
-
-
-# https://github.com/scrapy/scrapy/blob/0b9d8da09dd2cb1b74ddf025107e6f584839fbff/scrapy/utils/defer.py#L525
 def _schedule_coro(coro: Coroutine[Any, Any, Any]) -> None:
-    if not _is_asyncio_available():
-        Deferred.fromCoroutine(coro)
-        return
-    loop = asyncio.get_event_loop()
-    loop.create_task(coro)  # noqa: RUF006
+    asyncio.get_event_loop().create_task(coro)
 
 
 def _close_spider(crawler, reason):
