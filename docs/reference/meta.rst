@@ -115,6 +115,18 @@ string.
 See :ref:`retry`.
 
 
+.. reqmeta:: zyte_api_session_cookie_mode
+
+zyte_api_session_cookie_mode
+============================
+
+Default: :setting:`ZYTE_API_SESSION_COOKIE_MODE`
+
+Overrides :setting:`ZYTE_API_SESSION_COOKIE_MODE` for a given request.
+
+.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.cookie_mode`
+
+
 .. reqmeta:: zyte_api_session_enabled
 
 zyte_api_session_enabled
