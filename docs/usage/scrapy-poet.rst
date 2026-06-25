@@ -129,6 +129,57 @@ resulting page object:
                 return Product(is_valid=False)
         return None
 
+.. _network-capture:
+
+Network capture
+---------------
+
+You can capture network responses made during browser rendering by adding a
+:class:`scrapy_zyte_api.NetworkCapture` dependency and annotating it with
+filters passed to the :func:`scrapy_zyte_api.network_capture` function:
+
+.. code-block:: python
+
+    from typing import Annotated
+
+    from scrapy_zyte_api import NetworkCapture, network_capture
+
+
+    @attrs.define
+    class MyPageObject(BasePage):
+        response: BrowserResponse
+        network: Annotated[
+            NetworkCapture,
+            network_capture(
+                [
+                    {
+                        "filterType": "url",
+                        "value": "/api/",
+                        "matchType": "contains",
+                        "httpResponseBody": True,
+                    },
+                    {"filterType": "resourceType", "value": "xhr"},
+                ]
+            ),
+        ]
+
+Each filter is a :class:`~scrapy_zyte_api.NetworkCaptureFilter` dict. A
+response is captured if it matches any filter. Set ``httpResponseBody`` to
+``True`` on a filter to include the decoded response body for responses matched
+by that filter.
+
+You can access the captured responses as
+:class:`~scrapy_zyte_api.CapturedResponse` objects in the
+:attr:`.NetworkCapture.results` attribute:
+
+.. code-block:: python
+
+    def parse_network_capture(self):
+        for captured in self.network.results:
+            if "/api/products" in captured.url:
+                data = json.loads(captured.body)
+                ...
+
 .. _custom-attrs:
 
 Custom attribute extraction
