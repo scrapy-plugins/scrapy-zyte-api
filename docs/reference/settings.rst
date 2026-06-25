@@ -467,10 +467,32 @@ object, for example to read settings:
 
     ZYTE_API_SESSION_CHECKER = MySessionChecker
 
+.. setting:: ZYTE_API_SESSION_COOKIE_MODE
+
+ZYTE_API_SESSION_COOKIE_MODE
+============================
+
+Default: ``False``
+
+If :ref:`plugin-managed sessions <session>` are :ref:`enabled
+<enable-sessions>` for a request, this determines whether to use :ref:`cookie
+sessions <cookie-sessions>` (``True``) or Zyte API user-managed sessions
+(``False``).
+
+In cookie mode, the plugin does not use :ref:`Zyte API user-managed sessions
+<zapi-session-id>`, and instead captures the cookies from the session
+initialization response and injects them as :http:`request:requestCookies` into
+subsequent requests.
+
+Can be overriden on specific requests with
+:reqmeta:`zyte_api_session_cookie_mode`. You can also override
+:meth:`~scrapy_zyte_api.SessionConfig.cookie_mode` in a :ref:`session config
+override <session-configs>` to support more complex use cases.
+
 .. setting:: ZYTE_API_SESSION_CREATION_RETRY_DELAY
 
 ZYTE_API_SESSION_CREATION_RETRY_DELAY
-======================================
+=====================================
 
 Default: ``60.0``
 

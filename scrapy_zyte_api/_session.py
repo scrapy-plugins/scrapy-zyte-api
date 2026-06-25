@@ -39,6 +39,7 @@ except ImportError:
 
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
+COOKIE_SESSION_ID_META_KEY = "_zyte_api_cookie_session_id"
 ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
 
 
@@ -52,6 +53,8 @@ def _troubleshoot(slug):
 def get_request_session_id(request: Request) -> str | None:
     """Return the session ID of *request*, or ``None`` if it does not have a
     session ID assigned."""
+    if session_id := request.meta.get(COOKIE_SESSION_ID_META_KEY):
+        return session_id
     for meta_key in ZYTE_API_META_KEYS:
         if meta_key not in request.meta:
             continue
@@ -234,6 +237,7 @@ class SessionConfig:
         else:
             self._checker = None
         self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
+        self._cookie_mode = settings.getbool("ZYTE_API_SESSION_COOKIE_MODE")
         self._init_action_failure_invalidates = settings.getbool(
             "ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION", True
         )
@@ -248,6 +252,15 @@ class SessionConfig:
         keys as described in :ref:`enable-sessions`.
         """
         return request.meta.get("zyte_api_session_enabled", self._enabled)
+
+    def cookie_mode(self, request: Request) -> bool:
+        """Return ``True`` if the request should use :ref:`cookie sessions
+        <cookie-sessions>` or ``False`` to use Zyte API user-managed sessions.
+
+        The default implementation is based on settings and request metadata
+        keys as described in :ref:`cookie-sessions`.
+        """
+        return request.meta.get("zyte_api_session_cookie_mode", self._cookie_mode)
 
     def process_request(self, request: Request) -> Request | None:
         """Process *request* after it has been assigned a session.
@@ -620,6 +633,19 @@ class SessionConfig:
                 )
         session_params = deepcopy(session_params)
         session_init_url = session_params.pop("url", request.url)
+        cookie_mode = self.cookie_mode(request)
+        if cookie_mode:
+            if (
+                "responseCookies" in session_params
+                and not session_params["responseCookies"]
+            ):
+                logger.error(
+                    f"Cookie session initialization parameters for request "
+                    f"{request} have responseCookies set to "
+                    f"{session_params['responseCookies']!r}; forcing it to True."
+                )
+            session_params["responseCookies"] = True
+            session_params["session"] = None  # Suppress Zyte API session ID injection
         session_init_request = Request(
             session_init_url,
             meta={
@@ -629,6 +655,7 @@ class SessionConfig:
                     for k, v in request.meta.items()
                     if k in {"zyte_api_session_location", "zyte_api_session_params"}
                 },
+                **({COOKIE_SESSION_ID_META_KEY: session_id} if cookie_mode else {}),
             },
             callback=NO_CALLBACK,
         )
@@ -849,6 +876,10 @@ class _SessionManager:
         # As soon as a session expires, it is removed from its pool, and a task
         # to initialize that new session is started.
         self._pools: dict[str, set[str]] = defaultdict(set)
+
+        # Maps session_id → list of cookies for cookie sessions. Only
+        # populated for sessions that use cookie-based management.
+        self._cookie_jar: dict[str, list] = {}
         self._pool_cache: WeakKeyDictionary[Request, str] = WeakKeyDictionary()
 
         # The queue is a rotating list of session IDs to use.
@@ -1022,8 +1053,18 @@ class _SessionManager:
                 self._download(init_request, spider=self._crawler.spider)  # type: ignore[call-arg]
             )
 
+        cookies_mode = session_config.cookie_mode(request)
+        _init_responses: list = []
+
+        async def _tracking_download(init_request: Request) -> Response:
+            response = await download(init_request)
+            _init_responses.append(response)
+            return response
+
         try:
-            result = await session_config.init_session(session_id, request, download)
+            result = await session_config.init_session(
+                session_id, request, _tracking_download
+            )
         except _SessionInitParamError as e:
             self._inc_stat("init/param-error", pool)
             if e.message:
@@ -1072,6 +1113,10 @@ class _SessionManager:
             return False
         outcome = "passed" if result else "failed"
         self._inc_stat(f"init/check-{outcome}", pool)
+        if cookies_mode and result and _init_responses:
+            self._cookie_jar[session_id] = _init_responses[-1].raw_api_response.get(
+                "responseCookies", []
+            )
         return result
 
     async def _create_session(self, request: Request, pool: str) -> str:
@@ -1164,6 +1209,19 @@ class _SessionManager:
         """
         return request.meta.get(SESSION_INIT_META_KEY, False)
 
+    def _merge_cookies(self, session_id: str, new_cookies: list) -> None:
+        if not new_cookies:
+            return
+        merged = {
+            (c["name"], c.get("domain", ""), c.get("path", "/")): c
+            for c in self._cookie_jar.get(session_id, [])
+        }
+        for cookie in new_cookies:
+            merged[
+                cookie["name"], cookie.get("domain", ""), cookie.get("path", "/")
+            ] = cookie
+        self._cookie_jar[session_id] = list(merged.values())
+
     def _start_session_refresh(self, session_id: str, request: Request, pool: str):
         try:
             self._pools[pool].remove(session_id)
@@ -1172,6 +1230,7 @@ class _SessionManager:
             # not refresh the session again.
             pass
         else:
+            self._cookie_jar.pop(session_id, None)
             if not self._closing:
                 task = create_task(self._create_session(request, pool))
                 self._init_tasks.add(task)
@@ -1222,6 +1281,18 @@ class _SessionManager:
                 outcome = "passed" if passed else "failed"
                 self._inc_stat(f"use/check-{outcome}", pool)
                 if passed:
+                    if session_config.cookie_mode(request):
+                        session_id = get_request_session_id(request)
+                        if session_id is None:
+                            raise RuntimeError(
+                                f"The cookie session ID is missing from the "
+                                f"{COOKIE_SESSION_ID_META_KEY!r} meta key of "
+                                f"request {request}."
+                            )
+                        new_cookies = getattr(response, "raw_api_response", {}).get(
+                            "responseCookies", []
+                        )
+                        self._merge_cookies(session_id, new_cookies)
                     return True
                 session_id = get_request_session_id(request)
                 if session_id is not None:
@@ -1249,11 +1320,19 @@ class _SessionManager:
                 self._crawler.stats.inc_value("scrapy-zyte-api/sessions/use/disabled")
                 return None
             session_id = await self._next(request)
+            cookies_mode = session_config.cookie_mode(request)
             # Note: If there is a session set already (e.g. a request being
             # retried), it is overridden.
-            request.meta.setdefault("zyte_api_provider", {})["session"] = {
-                "id": session_id
-            }
+            if cookies_mode:
+                request.meta[COOKIE_SESSION_ID_META_KEY] = session_id
+                cookies = self._cookie_jar.get(session_id, [])
+                provider = request.meta.setdefault("zyte_api_provider", {})
+                provider["requestCookies"] = cookies
+                provider["responseCookies"] = True
+            else:
+                request.meta.setdefault("zyte_api_provider", {})["session"] = {
+                    "id": session_id
+                }
             if (
                 "zyte_api" in request.meta
                 or request.meta.get("zyte_api_automap", None) is False
@@ -1268,7 +1347,11 @@ class _SessionManager:
             request.meta.setdefault(meta_key, {})
             if not isinstance(request.meta[meta_key], dict):
                 request.meta[meta_key] = {}
-            request.meta[meta_key]["session"] = {"id": session_id}
+            if cookies_mode:
+                request.meta[meta_key]["requestCookies"] = cookies
+                request.meta[meta_key]["responseCookies"] = True
+            else:
+                request.meta[meta_key]["session"] = {"id": session_id}
             request.meta.setdefault("dont_merge_cookies", True)
             # Mark this request as having a session assigned already, so that
             # if a later downloader middleware process_request call returns a
