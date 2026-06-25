@@ -457,6 +457,60 @@ async def test_param_parser_is_proxy_bound_auto_no_headers():
 
 
 # ----------------------------------------------------------------------------
+# _ParamParser._meta_key
+# ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("meta", "settings_kwargs", "headers", "expected"),
+    [
+        # Raw zyte_api parameters take precedence over automatic mapping.
+        ({"zyte_api": {"browserHtml": True}}, {}, {}, "zyte_api"),
+        ({"zyte_api": True}, {}, {}, "zyte_api"),
+        ({"zyte_api": {}}, {}, {}, "zyte_api"),
+        # zyte_api set to False (or a deprecated falsy value) is not raw.
+        ({"zyte_api": False}, {}, {}, None),
+        ({"zyte_api": None}, {}, {}, None),
+        # Explicit automatic mapping.
+        ({"zyte_api_automap": {"browserHtml": True}}, {}, {}, "zyte_api_automap"),
+        ({"zyte_api_automap": True}, {}, {}, "zyte_api_automap"),
+        # An explicit automap opt-out means the request does not use Zyte API.
+        ({"zyte_api_automap": False}, {}, {}, None),
+        # No Zyte API metadata and no opt-in: not routed through Zyte API.
+        ({}, {}, {}, None),
+        # Transparent mode opts bare requests into automatic mapping, …
+        ({}, {"ZYTE_API_TRANSPARENT_MODE": True}, {}, "zyte_api_automap"),
+        # … but an explicit automap opt-out still wins.
+        ({"zyte_api_automap": False}, {"ZYTE_API_TRANSPARENT_MODE": True}, {}, None),
+        # The zyte_api_transport metadata key opts bare requests into automap, …
+        ({"zyte_api_transport": "auto"}, {}, {}, "zyte_api_automap"),
+        # … and here too the explicit automap opt-out wins.
+        ({"zyte_api_transport": "auto", "zyte_api_automap": False}, {}, {}, None),
+        # Proxy-mode headers opt bare requests into automatic mapping when header
+        # transport is enabled, and do not when it is disabled.
+        (
+            {},
+            {"ZYTE_API_HEADER_TRANSPORT_ENABLED": True},
+            {b"Zyte-Device": b"mobile"},
+            "zyte_api_automap",
+        ),
+        (
+            {},
+            {"ZYTE_API_HEADER_TRANSPORT_ENABLED": False},
+            {b"Zyte-Device": b"mobile"},
+            None,
+        ),
+    ],
+)
+@deferred_f_from_coro_f
+async def test_param_parser_meta_key(meta, settings_kwargs, headers, expected):
+    crawler = await get_crawler(settings_kwargs)
+    parser = _ParamParser(crawler)
+    request = Request("https://example.com", meta=meta, headers=headers)
+    assert parser._meta_key(request) == expected
+
+
+# ----------------------------------------------------------------------------
 # _ParamParser.parse: proxy header pass-through (final / force_http)
 # ----------------------------------------------------------------------------
 

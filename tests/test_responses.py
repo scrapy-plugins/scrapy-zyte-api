@@ -10,6 +10,7 @@ from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
 
+from scrapy_zyte_api._cookies import _get_cookie_domain, _process_cookies
 from scrapy_zyte_api.responses import (
     _API_RESPONSE,
     ZyteAPIJsonResponse,
@@ -340,6 +341,51 @@ def test_response_cookie_header(fields, cls, keep):
     )
 
 
+def test_response_cookie_to_header_value_samesite():
+    """_response_cookie_to_header_value appends SameSite when present."""
+    result = ZyteAPIMixin._response_cookie_to_header_value(
+        {"name": "foo", "value": "bar", "sameSite": "Strict"}
+    )
+    assert result == "foo=bar; SameSite=Strict"
+
+
+def test_text_from_api_response_no_body():
+    """ZyteAPITextResponse.from_api_response with neither browserHtml nor
+    httpResponseBody produces an empty body (branch 148->151).
+    """
+    api_response = {
+        "url": "https://example.com",
+        "product": {"name": "shoes"},
+    }
+    resp = ZyteAPITextResponse.from_api_response(api_response)
+    assert resp.body == b""
+    assert resp.url == "https://example.com"
+
+
+def test_process_cookies_httponly_samesite():
+    """_process_cookies stores httpOnly and sameSite in cookie.rest."""
+    api_response = {
+        "url": "https://example.com",
+        "experimental": {
+            "responseCookies": [
+                {
+                    "name": "sess",
+                    "value": "abc",
+                    "httpOnly": True,
+                    "sameSite": "Lax",
+                }
+            ]
+        },
+    }
+    request = Request("https://example.com")
+    jar = CookieJar()
+    cookie_jars: dict = {None: jar}
+    _process_cookies(api_response, request, cookie_jars)
+    cookies = list(jar.jar)
+    assert len(cookies) == 1
+    assert cookies[0]._rest == {"httpOnly": True, "sameSite": "Lax"}
+
+
 def test__process_response_no_body():
     """The _process_response() function should handle missing 'browserHtml' or
     'httpResponseBody'.
@@ -509,12 +555,12 @@ def test__process_response_non_text():
     css/xpath selectors.
     """
     api_response: _API_RESPONSE = {
-        "url": "https://example.com/sprite.gif",
-        "httpResponseBody": "",
+        "url": "https://example.com/file.bin",
+        "httpResponseBody": b64encode(b"\x00\x01\x02\x03").decode(),
         "httpResponseHeaders": [
             {
                 "name": "Content-Type",
-                "value": "image/gif",
+                "value": "application/octet-stream",
             }
         ],
     }
@@ -654,3 +700,8 @@ def test_json_from_api_response():
     assert resp.raw_api_response == api_response
     assert resp.flags == ["zyte-api"]
     assert json.loads(resp.text) == {"status": "ok", "count": 42}
+
+
+def test_get_cookie_domain_no_domain():
+    with pytest.raises(ValueError, match="no domain"):
+        _get_cookie_domain({}, "data:text/html,hello")

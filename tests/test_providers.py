@@ -1744,3 +1744,75 @@ async def test_multiple_types(mockserver):
             "pageNumber": 0,
         }
     )
+
+
+@deferred_f_from_coro_f
+async def test_provider_actions_unannotated(mockserver, caplog):
+    @attrs.define
+    class ActionProductPage(BasePage):
+        product: Product
+        actions: Actions  # Not annotated → should raise
+
+    class ActionZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: ActionProductPage):  # type: ignore[override]
+            pass
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, *_ = await _crawl_single_item(ActionZyteAPISpider, HtmlResource, settings)
+    assert item is None
+    assert "Actions dependencies must be annotated" in caplog.text
+
+
+@deferred_f_from_coro_f
+async def test_provider_extractfrom_no_match(mockserver):
+    """An annotated item whose metadata has no ExtractFrom value falls through
+    the inner loop without breaking."""
+
+    @attrs.define
+    class AnnotatedProductPage(BasePage):
+        # True is not an ExtractFrom value, so the inner loop finds no match.
+        product: Annotated[Product, True]
+
+    class AnnotatedSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: AnnotatedProductPage):  # type: ignore[override]
+            yield {"product": page.product}
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, url, _ = await _crawl_single_item(AnnotatedSpider, HtmlResource, settings)
+    assert item["product"] == Product.from_dict(
+        {
+            "url": url,
+            "name": "Product name",
+            "price": "10",
+            "currency": "USD",
+        }
+    )
+
+
+@deferred_f_from_coro_f
+async def test_provider_actions_empty(mockserver):
+    """When actions([]) is used, the API response has no 'actions' key,
+    so actions_result is set to None."""
+
+    @attrs.define
+    class EmptyActionsPage(BasePage):
+        product: Product
+        actions: Annotated[Actions, actions([])]
+
+    class EmptyActionsSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: EmptyActionsPage):  # type: ignore[override]
+            yield {"product": page.product, "actions": page.actions}
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, *_ = await _crawl_single_item(EmptyActionsSpider, HtmlResource, settings)
+    assert isinstance(item["product"], Product)
+    assert item["actions"] == Actions(None)

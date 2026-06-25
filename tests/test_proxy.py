@@ -71,6 +71,7 @@ def _reset_conflict_warnings():
         ("justname=", {"name": "justname", "value": ""}),
         # An unparseable Expires is suppressed rather than failing the parse.
         ("foo=bar; Expires=not-a-date", {"name": "foo", "value": "bar"}),
+        ("foo=bar; Priority=High", {"name": "foo", "value": "bar"}),
     ],
 )
 def test_parse_set_cookie(header, expected):
@@ -452,6 +453,23 @@ def test_proxy_headers_exceed_limit_large_cookie():
     assert _proxy_headers_exceed_limit(request, api_params) is True
 
 
+def test_estimate_proxy_header_section_size_non_zyte_and_zyte_client():
+    request = Request(
+        "https://example.com",
+        headers={
+            b"User-Agent": b"ignored",
+            b"Zyte-Client": b"my-agent",
+        },
+    )
+    api_params = {"url": "https://example.com", "httpResponseBody": True}
+    estimate = _estimate_proxy_header_section_size(request, api_params)
+    assert estimate > 0
+    proxy_request = _build_proxy_request(
+        "http://proxy:8011", "KEY", request, api_params
+    )
+    assert proxy_request.headers[b"Zyte-Client"] == b"my-agent"
+
+
 # ----------------------------------------------------------------------------
 # _build_proxy_request
 # ----------------------------------------------------------------------------
@@ -643,6 +661,47 @@ def test_build_proxy_request_conflict_warning_once(caplog):
             )
             _build_proxy_request("http://proxy:8011", "KEY", request, params)
     assert caplog.text.count("'device' is defined twice") == 1
+
+
+def test_build_proxy_request_override_headers_warns_once(caplog):
+    params = {
+        "url": "https://example.com",
+        "customHttpRequestHeaders": [{"name": "User-Agent", "value": "UA"}],
+    }
+    with caplog.at_level("WARNING"):
+        for _ in range(2):
+            request = Request(
+                "https://example.com",
+                headers={b"Zyte-Override-Headers": b"Accept"},
+            )
+            _build_proxy_request("http://proxy:8011", "KEY", request, params)
+    assert caplog.text.count("overrides the value") == 1
+
+
+def test_build_proxy_request_session_id_conflict(caplog):
+    params = {
+        "url": "https://example.com",
+        "session": {"id": "sess-abc"},
+    }
+    request = Request(
+        "https://example.com",
+        headers={b"Zyte-Session-Id": b"user-sess"},
+    )
+    with caplog.at_level("WARNING"):
+        proxy_request = _build_proxy_request(
+            "http://proxy:8011", "KEY", request, params
+        )
+    assert "'session' is defined twice" in caplog.text
+    assert proxy_request.headers[b"Zyte-Session-Id"] == b"user-sess"
+
+
+def test_build_proxy_request_no_user_agent():
+    request = Request("https://example.com")
+    params = {"url": "https://example.com"}
+    proxy_request = _build_proxy_request(
+        "http://proxy:8011", "KEY", request, params, user_agent=None
+    )
+    assert b"Zyte-Client" not in proxy_request.headers
 
 
 # ----------------------------------------------------------------------------

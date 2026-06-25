@@ -1467,6 +1467,22 @@ class _ParamParser:
             and _transport_is_explicit(request, self._settings)
         )
 
+    def _meta_key(self, request):
+        """Return the ``request.meta`` key (``"zyte_api"`` or
+        ``"zyte_api_automap"``) through which *request* is routed to Zyte API,
+        or ``None`` if the request does not go through Zyte API."""
+        raw = request.meta.get("zyte_api", False)
+        if raw is not False and (raw or raw == {}):
+            return "zyte_api"
+        automap_default_enabled = (
+            self._transparent_mode
+            or "zyte_api_transport" in request.meta
+            or (self._header_transport_enabled() and _has_proxy_mode_headers(request))
+        )
+        if request.meta.get("zyte_api_automap", automap_default_enabled) is not False:
+            return "zyte_api_automap"
+        return None
+
     def parse(self, request, *, final=False, force_http=False):
         """Compute the Zyte API parameters for *request*.
 

@@ -1,7 +1,9 @@
 import pytest
 from scrapy import Request, Spider
 from scrapy.utils.defer import deferred_f_from_coro_f
+from scrapy.utils.test import get_crawler as scrapy_get_crawler
 
+from scrapy_zyte_api import SessionConfig
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
@@ -82,3 +84,23 @@ async def test_checker_location(postal_code, url, close_reason, stats, mockserve
 
     assert crawler.spider.close_reason == close_reason
     assert_session_stats(crawler, stats)
+
+
+def test_session_config_check_non_setlocation_action_first():
+    crawler = scrapy_get_crawler(settings_dict={})
+    config = SessionConfig(crawler)
+
+    request = Request(
+        "https://example.com",
+        meta={"zyte_api_session_location": {"postalCode": "10001"}},
+    )
+
+    class MockResponse:
+        raw_api_response = {
+            "actions": [
+                {"action": "click", "status": "success"},
+                {"action": "setLocation", "status": "success"},
+            ]
+        }
+
+    assert config.check(MockResponse(), request) is True

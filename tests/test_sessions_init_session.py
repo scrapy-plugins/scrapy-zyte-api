@@ -172,3 +172,249 @@ async def test_init_session_failure(mockserver, behavior, expected_stat):
     assert_session_stats(crawler, {"example.com": {expected_stat: 1}})
 
     session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_init_session_download_automap(mockserver):
+    """When init_session calls download with a zyte_api_automap request, the
+    session ID is injected into zyte_api_automap (not zyte_api)."""
+    results = []
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        async def init_session(self, session_id, request, download):
+            r = await download(
+                Request(
+                    "https://example.com",
+                    meta={"zyte_api_automap": {"browserHtml": True}},
+                )
+            )
+            results.append(
+                {
+                    "zyte_api_not_added": "zyte_api" not in r.request.meta,
+                    "session_id_matches": r.raw_api_response["session"]["id"]
+                    == session_id,
+                    "session_in_automap": r.request.meta.get("zyte_api_automap", {})
+                    .get("session", {})
+                    .get("id")
+                    == session_id,
+                }
+            )
+            return True
+
+    settings = {
+        **SESSION_SETTINGS,
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert results == [
+        {
+            "zyte_api_not_added": True,
+            "session_id_matches": True,
+            "session_in_automap": True,
+        }
+    ]
+    assert_session_stats(crawler, {"example.com": (1, 1)})
+
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_init_session_download_session_preset(mockserver):
+    """When init_session calls download with 'session' already set in the
+    request, the session id is preserved."""
+    results = []
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        async def init_session(self, session_id, request, download):
+            r = await download(
+                Request(
+                    "https://example.com",
+                    meta={
+                        "zyte_api": {"browserHtml": True, "session": {"id": "pre-set"}}
+                    },
+                )
+            )
+            results.append(r.request.meta["zyte_api"].get("session", {}).get("id"))
+            return True
+
+    settings = {
+        **SESSION_SETTINGS,
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert results == ["pre-set"]
+    assert_session_stats(crawler, {"example.com": (1, 1)})
+
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_init_session_download_session_extra_keys(mockserver):
+    """When init_session calls download with a 'session' dict that does not set
+    'id', the session id is injected while preserving the other session keys."""
+    results = []
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        async def init_session(self, session_id, request, download):
+            r = await download(
+                Request(
+                    "https://example.com",
+                    meta={
+                        "zyte_api": {
+                            "browserHtml": True,
+                            "session": {"extraKey": "value"},
+                        }
+                    },
+                )
+            )
+            session = r.request.meta["zyte_api"]["session"]
+            results.append(
+                {
+                    "id_matches": session.get("id") == session_id,
+                    "extra_key_preserved": session.get("extraKey") == "value",
+                    "echoed": r.raw_api_response["session"] == session,
+                }
+            )
+            return True
+
+    settings = {
+        **SESSION_SETTINGS,
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert results == [
+        {"id_matches": True, "extra_key_preserved": True, "echoed": True}
+    ]
+    assert_session_stats(crawler, {"example.com": (1, 1)})
+
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_init_session_download_automap_session_none(mockserver):
+    """When init_session calls download with session=None in zyte_api_automap,
+    session injection is suppressed for that request."""
+    results = []
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        async def init_session(self, session_id, request, download):
+            r = await download(
+                Request(
+                    "https://example.com",
+                    meta={"zyte_api_automap": {"browserHtml": True, "session": None}},
+                )
+            )
+            results.append("session" not in r.raw_api_response)
+            return True
+
+    settings = {
+        **SESSION_SETTINGS,
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert results == [True]
+    assert_session_stats(crawler, {"example.com": (1, 1)})
+
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
+@pytest.mark.parametrize("transparent_mode", [False, True])
+@deferred_f_from_coro_f
+async def test_init_session_download_bare_request(mockserver, transparent_mode):
+    """A bare init request (no explicit Zyte API metadata) always goes through
+    Zyte API: the session ID is injected into zyte_api_automap (not zyte_api),
+    regardless of whether transparent mode is enabled."""
+    results = []
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        async def init_session(self, session_id, request, download):
+            r = await download(Request("https://example.com"))
+            results.append(
+                {
+                    "zyte_api_not_added": "zyte_api" not in r.request.meta,
+                    "session_id_matches": r.raw_api_response["session"]["id"]
+                    == session_id,
+                    "session_in_automap": r.request.meta.get("zyte_api_automap", {})
+                    .get("session", {})
+                    .get("id")
+                    == session_id,
+                }
+            )
+            return True
+
+    settings = {
+        **SESSION_SETTINGS,
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_TRANSPARENT_MODE": transparent_mode,
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert results == [
+        {
+            "zyte_api_not_added": True,
+            "session_id_matches": True,
+            "session_in_automap": True,
+        }
+    ]
+    assert_session_stats(crawler, {"example.com": (1, 1)})
+
+    session_config_registry.__init__()  # type: ignore[misc]
