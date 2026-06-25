@@ -1283,11 +1283,16 @@ class _SessionManager:
                 if passed:
                     if session_config.cookie_mode(request):
                         session_id = get_request_session_id(request)
-                        if session_id is not None:
-                            new_cookies = getattr(response, "raw_api_response", {}).get(
-                                "responseCookies", []
+                        if session_id is None:
+                            raise RuntimeError(
+                                f"The cookie session ID is missing from the "
+                                f"{COOKIE_SESSION_ID_META_KEY!r} meta key of "
+                                f"request {request}."
                             )
-                            self._merge_cookies(session_id, new_cookies)
+                        new_cookies = getattr(response, "raw_api_response", {}).get(
+                            "responseCookies", []
+                        )
+                        self._merge_cookies(session_id, new_cookies)
                     return True
                 session_id = get_request_session_id(request)
                 if session_id is not None:

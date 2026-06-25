@@ -20,7 +20,7 @@ from scrapy_zyte_api._session import (
 )
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import SESSION_SETTINGS, UNSET, get_crawler
+from . import SESSION_SETTINGS, SETTINGS, UNSET, get_crawler
 from .helpers import assert_session_stats
 
 COOKIE_SESSION_SETTINGS = {
@@ -559,3 +559,43 @@ async def test_cookie_jar_unchanged_when_use_response_has_no_cookies(mockserver)
     # jar started empty), and _merge_cookies returned early on the empty use
     # response without raising an error or modifying the jar.
     assert jar_after_use == []
+
+
+@deferred_f_from_coro_f
+async def test_check_cookie_mode_session_id_none(mockserver, caplog):
+    """A downloader middleware at a higher priority than
+    ScrapyZyteAPISessionDownloaderMiddleware (667) that removes
+    COOKIE_SESSION_ID_META_KEY from the request meta in process_response
+    causes a RuntimeError."""
+
+    class CookieKeyStripperMiddleware:
+        @classmethod
+        def from_crawler(cls, crawler):
+            return cls()
+
+        def process_response(self, request, response, spider=None):
+            request.meta.pop(COOKIE_SESSION_ID_META_KEY, None)
+            return response
+
+    settings = {
+        **COOKIE_SESSION_SETTINGS,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "DOWNLOADER_MIDDLEWARES": {
+            **SETTINGS["DOWNLOADER_MIDDLEWARES"],
+            CookieKeyStripperMiddleware: 668,
+        },
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    caplog.clear()
+    caplog.set_level("ERROR")
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert COOKIE_SESSION_ID_META_KEY in caplog.text
