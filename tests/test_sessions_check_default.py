@@ -109,3 +109,25 @@ def test_session_config_check_non_setlocation_action_first():
         }
 
     assert config.check(cast("Response", MockResponse()), request) is True
+
+
+def test_session_config_check_location_without_setlocation_action():
+    """When a location is set but the response has no ``setLocation`` action,
+    the default check passes (neither the unsupported-location nor the
+    success-status code paths apply)."""
+    crawler = scrapy_get_crawler(settings_dict={})
+    config = SessionConfig(crawler)
+
+    request = Request(
+        "https://example.com",
+        meta={"zyte_api_session_location": {"postalCode": "10001"}},
+    )
+
+    class MockResponse:
+        raw_api_response = {
+            "actions": [
+                {"action": "click", "status": "success"},
+            ]
+        }
+
+    assert config.check(cast("Response", MockResponse()), request) is True
