@@ -383,6 +383,7 @@ def test_process_cookies_httponly_samesite():
     _process_cookies(api_response, request, cookie_jars)
     cookies = list(jar.jar)
     assert len(cookies) == 1
+    assert hasattr(cookies[0], "_rest")
     assert cookies[0]._rest == {"httpOnly": True, "sameSite": "Lax"}
 
 

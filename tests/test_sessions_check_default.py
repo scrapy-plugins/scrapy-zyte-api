@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, cast
+
 import pytest
 from scrapy import Request, Spider
 from scrapy.utils.defer import deferred_f_from_coro_f
@@ -8,6 +10,9 @@ from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, get_crawler
 from .helpers import assert_session_stats
+
+if TYPE_CHECKING:
+    from scrapy.http import Response
 
 
 @pytest.mark.parametrize(
@@ -103,4 +108,4 @@ def test_session_config_check_non_setlocation_action_first():
             ]
         }
 
-    assert config.check(MockResponse(), request) is True
+    assert config.check(cast("Response", MockResponse()), request) is True
