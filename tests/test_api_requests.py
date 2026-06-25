@@ -23,7 +23,11 @@ from zyte_api import RequestError
 
 import scrapy_zyte_api._params as params_module
 from scrapy_zyte_api._cookies import _get_cookie_jar
-from scrapy_zyte_api._params import ANY_VALUE, _ParamParser
+from scrapy_zyte_api._params import (
+    ANY_VALUE,
+    _iter_ban_sensitive_headers_in_params,
+    _ParamParser,
+)
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.responses import _process_response
 from scrapy_zyte_api.utils import (
@@ -4358,3 +4362,23 @@ async def test_unneeded_params(meta, expected, warnings, caplog):
             assert warning in caplog.text
     else:
         assert not caplog.records
+
+
+def test_iter_ban_sensitive_headers_empty_name():
+    api_params = {
+        "customHttpRequestHeaders": [
+            {"value": "no-name-here"},
+            {"name": "User-Agent", "value": "ua"},
+        ]
+    }
+    result = list(_iter_ban_sensitive_headers_in_params(api_params))
+    assert result == [b"user-agent"]
+
+
+def test_iter_ban_sensitive_headers_already_seen():
+    api_params = {
+        "customHttpRequestHeaders": [{"name": "Accept", "value": "text/html"}],
+        "requestHeaders": {"accept": "text/html"},
+    }
+    result = list(_iter_ban_sensitive_headers_in_params(api_params))
+    assert result == [b"accept"]

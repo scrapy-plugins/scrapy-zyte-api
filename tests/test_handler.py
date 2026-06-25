@@ -21,6 +21,7 @@ from zyte_api.constants import API_URL
 from scrapy_zyte_api.handler import (
     ScrapyZyteAPIDownloadHandler,
     _body_max_size_exceeded,
+    _truncate,
 )
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
@@ -570,6 +571,33 @@ def test_log_request_truncate_negative(enabled):
         ValueError, match=r"ZYTE_API_LOG_REQUESTS_TRUNCATE setting \(-1\) is invalid"
     ):
         _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
+
+
+def test_truncate_non_str_values():
+    obj = {"int_val": 42, "bool_val": True, "list": [1, True, None]}
+    _truncate(obj, 10)
+    assert obj == {"int_val": 42, "bool_val": True, "list": [1, True, None]}
+
+
+@deferred_f_from_coro_f
+async def test_engine_started_cookie_middleware_not_found(mockserver):
+    settings: SETTINGS_T = {
+        **SETTINGS,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "COOKIES_ENABLED": True,
+        "DOWNLOADER_MIDDLEWARES": {
+            **SETTINGS["DOWNLOADER_MIDDLEWARES"],
+            "scrapy.downloadermiddlewares.cookies.CookiesMiddleware": None,
+        },
+    }
+    crawler = await get_crawler_zyte_api(
+        settings, setup_engine=True, start_handler=False
+    )
+    handler = get_download_handler(crawler, "https")
+    with pytest.raises(
+        RuntimeError, match="Could not find a configured downloader middleware"
+    ):
+        await handler.engine_started()
 
 
 @pytest.mark.parametrize("enabled", [True, False, None])
