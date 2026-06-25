@@ -366,6 +366,58 @@ async def test_init_session_download_automap_session_none(mockserver):
     session_config_registry.__init__()  # type: ignore[misc]
 
 
+@deferred_f_from_coro_f
+async def test_init_session_download_outside_zyte_api(mockserver):
+    """When init_session calls download with a request that goes outside Zyte
+    API (``zyte_api_automap=False``), no session ID is injected: the request
+    keeps ``zyte_api_automap=False`` and gains no ``zyte_api`` metadata."""
+    results = []
+
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        async def init_session(self, session_id, request, download):
+            r = await download(
+                Request(
+                    mockserver.urljoin("/"),
+                    meta={"zyte_api_automap": False},
+                )
+            )
+            results.append(
+                {
+                    "automap_still_false": r.request.meta.get("zyte_api_automap")
+                    is False,
+                    "no_zyte_api_key": "zyte_api" not in r.request.meta,
+                }
+            )
+            return True
+
+    settings = {
+        **SESSION_SETTINGS,
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+    }
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert results == [
+        {
+            "automap_still_false": True,
+            "no_zyte_api_key": True,
+        }
+    ]
+    assert_session_stats(crawler, {"example.com": (1, 1)})
+
+    session_config_registry.__init__()  # type: ignore[misc]
+
+
 @pytest.mark.parametrize("transparent_mode", [False, True])
 @deferred_f_from_coro_f
 async def test_init_session_download_bare_request(mockserver, transparent_mode):
