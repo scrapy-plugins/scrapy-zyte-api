@@ -561,6 +561,16 @@ async def test_cookie_jar_unchanged_when_use_response_has_no_cookies(mockserver)
     assert jar_after_use == []
 
 
+class _CookieKeyStripperMiddleware:
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls()
+
+    def process_response(self, request, response, spider=None):
+        request.meta.pop(COOKIE_SESSION_ID_META_KEY, None)
+        return response
+
+
 @deferred_f_from_coro_f
 async def test_check_cookie_mode_session_id_none(mockserver, caplog):
     """A downloader middleware at a higher priority than
@@ -568,21 +578,12 @@ async def test_check_cookie_mode_session_id_none(mockserver, caplog):
     COOKIE_SESSION_ID_META_KEY from the request meta in process_response
     causes a RuntimeError."""
 
-    class CookieKeyStripperMiddleware:
-        @classmethod
-        def from_crawler(cls, crawler):
-            return cls()
-
-        def process_response(self, request, response, spider=None):
-            request.meta.pop(COOKIE_SESSION_ID_META_KEY, None)
-            return response
-
     settings = {
         **COOKIE_SESSION_SETTINGS,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "DOWNLOADER_MIDDLEWARES": {
             **SETTINGS["DOWNLOADER_MIDDLEWARES"],
-            CookieKeyStripperMiddleware: 668,
+            "tests.test_sessions_cookie_mode._CookieKeyStripperMiddleware": 668,
         },
     }
 
