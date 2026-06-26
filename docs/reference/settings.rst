@@ -319,6 +319,63 @@ reason.
 Note that requests with error responses that cannot be retried or exceed their
 retry limit also count here.
 
+.. setting:: ZYTE_API_TRANSPORT
+
+ZYTE_API_TRANSPORT
+==================
+
+Default: ``"auto"``
+
+Controls which transport is used for :ref:`automap <automap>` requests.
+Accepted values are ``"auto"``, ``"proxy"``, and ``"http"``. See
+:ref:`request-transport`.
+
+This setting is **ignored** for :ref:`manual <manual>` requests
+(:reqmeta:`zyte_api`). Use :reqmeta:`zyte_api_transport` to set the transport
+for a manual request.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, leaving
+    this setting unset is treated as if proxy mode were disabled: eligible
+    requests are sent through the HTTP API and a warning is logged. Set this
+    setting (or :reqmeta:`zyte_api_transport`) to ``"auto"`` or ``"proxy"`` to
+    opt into proxy mode, or to ``"http"`` to silence the warning.
+
+.. setting:: ZYTE_API_HEADER_TRANSPORT_ENABLED
+
+ZYTE_API_HEADER_TRANSPORT_ENABLED
+=================================
+
+Default: ``True``, unless scrapy-zyte-smartproxy is enabled (see below), in
+which case ``False``.
+
+Controls whether the presence of ``Zyte-*`` (:ref:`proxy mode <zapi-proxy>`)
+headers in :attr:`Request.headers <scrapy.http.Request.headers>` automatically
+enables :ref:`automap <automap>` and routes the request through Zyte API
+:ref:`proxy mode <proxy-transport>` (see :ref:`request-transport`).
+
+When ``True``, a request that carries ``Zyte-*`` headers is automatically sent
+through Zyte API in proxy mode, even if it does not set :reqmeta:`zyte_api`,
+:reqmeta:`zyte_api_automap` or :reqmeta:`zyte_api_transport`.
+
+When ``False``, ``Zyte-*`` headers are left untouched and do not, on their own,
+cause a request to be sent through Zyte API. You can still opt a request into
+Zyte API explicitly through :reqmeta:`zyte_api`, :reqmeta:`zyte_api_automap` or
+:reqmeta:`zyte_api_transport`.
+
+The default value is conditional on whether scrapy-zyte-smartproxy is enabled
+for the project: if its `ZYTE_SMARTPROXY_ENABLED
+<https://scrapy-zyte-smartproxy.readthedocs.io/en/latest/settings.html>`_
+setting is ``True`` or its ``zyte_smartproxy_enabled`` spider attribute is set
+to a true value, this setting defaults to ``False`` (so that ``Zyte-*`` headers
+can be intended for scrapy-zyte-smartproxy); otherwise it defaults to ``True``.
+Setting this value explicitly overrides that automatic default.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, a
+    request that is eligible for proxy mode only because it carries ``Zyte-*``
+    headers (i.e. when this setting is left unset and thus defaults to ``True``)
+    is sent through the Zyte API HTTP API instead, and a warning is logged. Set
+    this setting to ``True`` to use proxy mode for such requests, or to
+    ``False`` to ignore those headers; either value silences the warning.
 
 .. setting:: ZYTE_API_PRESERVE_DELAY
 
@@ -344,6 +401,26 @@ If you have :setting:`AUTOTHROTTLE_ENABLED <scrapy:AUTOTHROTTLE_ENABLED>`
 enabled, and you want it to also work on Zyte API requests, set this setting to
 ``True``.
 
+.. setting:: ZYTE_API_PROVIDER_TRANSPORT
+
+ZYTE_API_PROVIDER_TRANSPORT
+===========================
+
+Default: ``"auto"``
+
+Controls which transport is used for provider-generated requests (see
+:ref:`scrapy-poet <scrapy-poet>` and :ref:`request-transport-provider`).
+Accepted values are ``"auto"``, ``"proxy"``, and ``"http"``.
+
+Per-request, use the :reqmeta:`zyte_api_provider_transport` request metadata
+key on the originating request.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, leaving
+    this setting unset is treated as if proxy mode were disabled: eligible
+    provider requests are sent through the HTTP API and a warning is logged.
+    Set this setting (or :reqmeta:`zyte_api_provider_transport`) to ``"auto"``
+    or ``"proxy"`` to opt into proxy mode, or to ``"http"`` to silence the
+    warning.
 
 .. setting:: ZYTE_API_PROVIDER_PARAMS
 
@@ -366,6 +443,17 @@ For example:
         ],
     }
 
+.. setting:: ZYTE_API_PROXY_URL
+
+ZYTE_API_PROXY_URL
+==================
+
+Default: ``"http://api.zyte.com:8011"``
+
+URL of the Zyte API proxy endpoint.
+
+Change this to ``"https://api.zyte.com:8014"`` if you want your connection to
+the Zyte API proxy to :ref:`use HTTPS <zapi-proxy-https>`.
 
 .. setting:: ZYTE_API_REFERRER_POLICY
 
@@ -793,6 +881,32 @@ Default: ``False``
 
 Whether to split :ref:`session stats <session-stats>` by pool (``True``) or
 aggregate them across pools (``False``, default).
+
+
+.. setting:: ZYTE_API_SESSION_TRANSPORT
+
+ZYTE_API_SESSION_TRANSPORT
+==========================
+
+Default: ``"auto"``
+
+Controls which :ref:`transport <request-transport>` is used for :ref:`session
+initialization <session-init>` requests (see :ref:`request-transport-session`).
+Accepted values are ``"auto"``, ``"proxy"``, and ``"http"``.
+
+This is independent of :setting:`ZYTE_API_TRANSPORT`, which controls the
+transport of the requests that *use* a session: a session is identified only by
+its id, so it can be initialized through one transport and used through another.
+
+Per-request, use the :reqmeta:`zyte_api_session_transport` request metadata key
+on the request that triggers session initialization.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, leaving
+    this setting unset is treated as if proxy mode were disabled: eligible
+    session initialization requests are sent through the HTTP API and a warning
+    is logged. Set this setting (or :reqmeta:`zyte_api_session_transport`) to
+    ``"auto"`` or ``"proxy"`` to opt into proxy mode, or to ``"http"`` to
+    silence the warning.
 
 
 .. setting:: ZYTE_API_SKIP_HEADERS

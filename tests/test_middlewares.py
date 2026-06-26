@@ -4,6 +4,7 @@ from unittest import SkipTest
 import pytest
 from packaging.version import Version
 from scrapy import Request, Spider
+from scrapy.exceptions import ScrapyDeprecationWarning
 from scrapy.http.response import Response
 from scrapy.item import Item
 from scrapy.utils.defer import deferred_f_from_coro_f
@@ -551,3 +552,13 @@ async def test_start_requests_items():
     assert crawler.stats is not None
     assert crawler.stats.get_value("finish_reason") == "finished"
     assert "log_count/ERROR" not in crawler.stats.get_stats()
+
+
+@deferred_f_from_coro_f
+async def test_slot_request_deprecated_spider_arg():
+    crawler = get_crawler(settings_dict=SETTINGS)
+    await maybe_deferred_to_future(crawler.crawl("a"))
+    middleware = _build_from_crawler(ScrapyZyteAPIDownloaderMiddleware, crawler)
+    request = Request("https://example.com", meta={"zyte_api": {}})
+    with pytest.warns(ScrapyDeprecationWarning, match="deprecated"):
+        middleware.slot_request(request, spider=crawler.spider)

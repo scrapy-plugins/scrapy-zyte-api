@@ -23,7 +23,11 @@ from zyte_api import RequestError
 
 import scrapy_zyte_api._params as params_module
 from scrapy_zyte_api._cookies import _get_cookie_jar
-from scrapy_zyte_api._params import ANY_VALUE, _ParamParser
+from scrapy_zyte_api._params import (
+    ANY_VALUE,
+    _iter_ban_sensitive_headers_in_params,
+    _ParamParser,
+)
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.responses import _process_response
 from scrapy_zyte_api.utils import (
@@ -466,15 +470,13 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
     async with mockserver.make_handler() as handler:
         handler._param_parser = mock.Mock()
         handler._param_parser.parse = mock.Mock(return_value=output)
-        handler._download_request = mock.AsyncMock(side_effect=RuntimeError)
+        handler._download_via_http_api = mock.AsyncMock(side_effect=RuntimeError)
         handler._fallback_handler = mock.Mock()
-        handler._fallback_handler.download_request = mock.AsyncMock(
-            side_effect=RuntimeError
-        )
+        handler._fallback_handler.download_request = mock.Mock(side_effect=RuntimeError)
         with pytest.raises(RuntimeError):
             await download_request(handler, request)
     if uses_zyte_api:
-        handler._download_request.assert_called()
+        handler._download_via_http_api.assert_called()
     else:
         handler._fallback_handler.download_request.assert_called()
 
@@ -1192,10 +1194,13 @@ UNSAFE_HEADER_HANDLING_SCENARIOS: list[dict[str, Any]] = [
             ("Browser-Html", " false ", {}),
             ("Browser-Html", "true", {"browserHtml": True}),
             ("Browser-Html", "1", {"browserHtml": True}),
+            ("Browser-Html", "0", {}),
             ("Cookie-Management", "auto", {}),
             ("Cookie-Management", "discard", {"cookieManagement": "discard"}),
             ("Device", "mobile", {"device": "mobile"}),
             ("Disable-Follow-Redirect", "true", {"followRedirect": False}),
+            ("Disable-Follow-Redirect", "1", {"followRedirect": False}),
+            ("Disable-Follow-Redirect", "0", {}),
             ("Geolocation", "US", {"geolocation": "US"}),
             ("IPType", "residential", {"ipType": "residential"}),
             ("Override-Headers", "Accept,User-Agent", {}),
@@ -1204,6 +1209,9 @@ UNSAFE_HEADER_HANDLING_SCENARIOS: list[dict[str, Any]] = [
                 "0cf3ef3d-a3c5-4c51-b967-53e5dea2c7c6",
                 {"session": {"id": "0cf3ef3d-a3c5-4c51-b967-53e5dea2c7c6"}},
             ),
+            ("Tags", '{"a": "b"}', {"tags": {"a": "b"}}),
+            ("Tags", "{}", {}),
+            ("Tags", "{not-json", {}),
         )
     ),
     # Headers specific to Smart Proxy Manager
@@ -4360,3 +4368,23 @@ async def test_unneeded_params(meta, expected, warnings, caplog):
             assert warning in caplog.text
     else:
         assert not caplog.records
+
+
+def test_iter_ban_sensitive_headers_empty_name():
+    api_params = {
+        "customHttpRequestHeaders": [
+            {"value": "no-name-here"},
+            {"name": "User-Agent", "value": "ua"},
+        ]
+    }
+    result = list(_iter_ban_sensitive_headers_in_params(api_params))
+    assert result == [b"user-agent"]
+
+
+def test_iter_ban_sensitive_headers_already_seen():
+    api_params = {
+        "customHttpRequestHeaders": [{"name": "Accept", "value": "text/html"}],
+        "requestHeaders": {"accept": "text/html"},
+    }
+    result = list(_iter_ban_sensitive_headers_in_params(api_params))
+    assert result == [b"accept"]

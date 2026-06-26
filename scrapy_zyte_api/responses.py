@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from scrapy.http.cookies import CookieJar
 
 from scrapy_zyte_api._cookies import _process_cookies
+from scrapy_zyte_api._proxy import _ZyteAPIProxyMixin
 from scrapy_zyte_api.utils import (
     _RESPONSE_HAS_ATTRIBUTES,
     _RESPONSE_HAS_IP_ADDRESS,
@@ -167,20 +168,36 @@ class ZyteAPIXmlResponse(ZyteAPIMixin, XmlResponse):
     pass
 
 
+class ZyteAPIResponse(ZyteAPIMixin, Response):
+    pass
+
+
+class ZyteAPIProxyTextResponse(_ZyteAPIProxyMixin, ZyteAPITextResponse):
+    pass
+
+
+class ZyteAPIProxyXmlResponse(_ZyteAPIProxyMixin, ZyteAPIXmlResponse):
+    pass
+
+
+class ZyteAPIProxyResponse(_ZyteAPIProxyMixin, ZyteAPIResponse):
+    pass
+
+
 try:
     from scrapy.http import JsonResponse as _JsonResponse
 
     class ZyteAPIJsonResponse(ZyteAPIMixin, _JsonResponse):
         pass
 
+    class ZyteAPIProxyJsonResponse(_ZyteAPIProxyMixin, ZyteAPIJsonResponse):
+        pass
+
     _SCRAPY_JSON_CLS: type | None = _JsonResponse
 except ImportError:
     ZyteAPIJsonResponse = None  # type: ignore[assignment, misc]
+    ZyteAPIProxyJsonResponse = None  # type: ignore[assignment, misc]
     _SCRAPY_JSON_CLS = None
-
-
-class ZyteAPIResponse(ZyteAPIMixin, Response):
-    pass
 
 
 _IMMUTABLE_JSON: TypeAlias = None | str | int | float | bool
@@ -194,6 +211,15 @@ _SCRAPY_TO_ZYTE_RESPONSE: dict[type[TextResponse], type[ZyteAPIMixin]] = {
 }
 if _SCRAPY_JSON_CLS is not None and ZyteAPIJsonResponse is not None:
     _SCRAPY_TO_ZYTE_RESPONSE[_SCRAPY_JSON_CLS] = ZyteAPIJsonResponse
+
+# Scrapy response type -> proxy mode Zyte API response class, most specific
+# first. A response matching none of these falls back to ZyteAPIProxyResponse.
+_PROXY_RESPONSE_CLASSES: list[tuple[type, type[_ZyteAPIProxyMixin]]] = [
+    (HtmlResponse, ZyteAPIProxyTextResponse),
+    (XmlResponse, ZyteAPIProxyXmlResponse),
+]
+if _SCRAPY_JSON_CLS is not None and ZyteAPIProxyJsonResponse is not None:
+    _PROXY_RESPONSE_CLASSES.append((_SCRAPY_JSON_CLS, ZyteAPIProxyJsonResponse))
 
 
 def _process_response(
@@ -241,3 +267,24 @@ def _process_response(
             return zyte_cls.from_api_response(api_response, request=request)
 
     return ZyteAPIResponse.from_api_response(api_response, request=request)
+
+
+def _process_proxy_response(
+    response: Response, request: Request, proxy_request: Request, api_params: dict
+) -> (
+    ZyteAPIProxyTextResponse
+    | ZyteAPIProxyXmlResponse
+    | ZyteAPIProxyJsonResponse
+    | ZyteAPIProxyResponse
+):
+    proxy_cls: type[_ZyteAPIProxyMixin] = ZyteAPIProxyResponse
+    for scrapy_cls, candidate in _PROXY_RESPONSE_CLASSES:
+        if isinstance(response, scrapy_cls):
+            proxy_cls = candidate
+            break
+    return proxy_cls.from_proxy_response(
+        response,
+        request=request,
+        proxy_request=proxy_request,
+        api_params=api_params,
+    )

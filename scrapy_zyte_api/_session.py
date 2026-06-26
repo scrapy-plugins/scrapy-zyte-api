@@ -24,6 +24,8 @@ from zyte_api import AggressiveRetryFactory, RequestError, RetryFactory, stop_on
 from zyte_api import aggressive_retrying as _aggressive_retrying
 from zyte_api import zyte_api_retrying as _zyte_api_retrying
 
+from ._params import _ParamParser
+from ._request_transport import _resolve_configured_transport
 from .utils import (  # type: ignore[attr-defined]
     _DOWNLOAD_NEEDS_SPIDER,
     _build_from_crawler,
@@ -75,6 +77,21 @@ def is_session_init_request(request):
     """Return ``True`` if the request is a :ref:`session initialization request
     <session-init>` or ``False`` otherwise."""
     return request.meta.get(SESSION_INIT_META_KEY, False) is True
+
+
+def _set_session_id(session: Any, session_id: str, *, override: bool) -> dict:
+    """Return a copy of the *session* dict (or a new dict if *session* is not a
+    dict) with the session ID set, preserving any other keys it defines.
+
+    If *override* is ``True``, *session_id* replaces any session ID already set;
+    otherwise an existing session ID is preserved.
+    """
+    session = dict(session) if isinstance(session, dict) else {}
+    if override:
+        session["id"] = session_id
+    else:
+        session.setdefault("id", session_id)
+    return session
 
 
 class SessionRetryFactory(RetryFactory):
@@ -560,9 +577,9 @@ class SessionConfig:
         ``False`` is returned, or an exception is raised, the session manager
         discards the session ID and retries initialization from scratch.
 
-        Override this method to initialize a session using a chain of
-        requests. Call *download* for each request in the chain; *download*
-        returns the corresponding :class:`~scrapy.http.Response`. Example:
+        Override this method to initialize a session using a chain of requests.
+        Call *download* for each request in the chain; *download* returns the
+        corresponding :class:`~scrapy.http.Response`. Example:
 
         .. code-block:: python
 
@@ -600,14 +617,28 @@ class SessionConfig:
         -   :data:`SESSION_INIT_META_KEY` in the request :attr:`meta
             <scrapy.http.Request.meta>` (always; cannot be overridden).
 
-        -   The session ID as ``zyte_api["session"]["id"]``. To skip session
-            injection for a specific request (e.g. a preliminary request that
-            must not carry the session), set ``"session": None`` in the
-            request's ``zyte_api`` metadata.
+        -   ``dont_merge_cookies: True`` in the request meta. To override this,
+            set ``dont_merge_cookies`` explicitly in the request meta before
+            passing the request to *download*.
 
-        -   ``dont_merge_cookies: True`` in the request meta. To override
-            this, set ``dont_merge_cookies`` explicitly in the request meta
-            before passing the request to *download*.
+        -   The session ID into the request's Zyte API metadata.
+
+            Session initialization requests go through Zyte API by default, and
+            the session ID is injected into the same metadata key through which
+            the request reaches Zyte API: ``zyte_api["session"]["id"]`` for
+            requests that use the :reqmeta:`zyte_api` metadata key, or
+            ``zyte_api_automap["session"]["id"]`` for requests that go through
+            :ref:`automatic request parameter mapping <automap>` instead
+            (including otherwise-bare requests, which *download* routes through
+            automatic mapping).
+
+            To inject no session into a specific Zyte API request (e.g. a
+            preliminary request that must not carry the session), set
+            ``"session": None`` in the relevant Zyte API metadata of the
+            request.
+
+            To send a request outside Zyte API, set :reqmeta:`zyte_api_automap`
+            to ``False``, in which case no session is injected.
 
         The default implementation calls :meth:`params` to build a single
         initialization request, downloads it via *download*, and checks the
@@ -858,12 +889,6 @@ class _SessionManager:
             self._max_bad_inits[pool] = pool_max_bad_inits
         self._bad_inits: dict[str, int] = defaultdict(int)
 
-        # Transparent mode, needed to determine whether to set the session
-        # using ``zyte_api`` or ``zyte_api_automap``.
-        self._transparent_mode: bool = settings.getbool(
-            "ZYTE_API_TRANSPARENT_MODE", False
-        )
-
         # Each pool contains the IDs of sessions that have not expired yet.
         #
         # While the initial sessions of a pool have not all been started, for
@@ -955,6 +980,7 @@ class _SessionManager:
         assert self._crawler.engine
         self._download_async = getattr(self._crawler.engine, "download_async", None)
         self._download = None if self._download_async else self._crawler.engine.download
+        self._param_parser = _ParamParser(self._crawler, cookies_enabled=False)
 
     def _handle_spider_closed(self):
         self._closing = True
@@ -1028,22 +1054,44 @@ class _SessionManager:
         assert self._crawler.engine
         session_config = self._get_session_config(request)
 
+        # Session initialization requests are usually manual (``zyte_api``)
+        # requests, which would otherwise default to the HTTP API transport and
+        # ignore the ZYTE_API_TRANSPORT setting. Their transport is instead
+        # controlled by a dedicated setting and request metadata key, mirroring
+        # the scrapy-poet provider transport, so that the session can be
+        # initialized through proxy mode independently of the transport of the
+        # request that triggered the initialization.
+        session_transport, session_transport_explicit = _resolve_configured_transport(
+            meta_value=request.meta.get("zyte_api_session_transport"),
+            setting_value=self._crawler.settings.get("ZYTE_API_SESSION_TRANSPORT"),
+            meta_source="the zyte_api_session_transport request.meta key",
+            setting_source="the ZYTE_API_SESSION_TRANSPORT setting",
+        )
+
         async def download(init_request: Request) -> Response:
             meta = {**init_request.meta}
             meta[SESSION_INIT_META_KEY] = True
             meta.setdefault("dont_merge_cookies", True)
             meta.setdefault("zyte_api_retry_policy", self._session_retry_policy)
-            if "zyte_api" in meta:
-                zyte_api = {**meta["zyte_api"]}
-                if "session" not in zyte_api:
-                    zyte_api["session"] = {"id": session_id}
-                elif zyte_api["session"] is None:
-                    del zyte_api["session"]
-                meta["zyte_api"] = zyte_api
+            meta.setdefault("zyte_api_transport", session_transport)
+            meta.setdefault("_zyte_api_transport_explicit", session_transport_explicit)
             if init_request.callback is None:
                 init_request = init_request.replace(meta=meta, callback=NO_CALLBACK)
             else:
                 init_request = init_request.replace(meta=meta)
+            meta_key = self._param_parser._meta_key(init_request)
+            if meta_key is not None:
+                meta_value = init_request.meta.get(meta_key)
+                meta_value = (
+                    {} if not isinstance(meta_value, dict) else dict(meta_value)
+                )
+                if "session" in meta_value and meta_value["session"] is None:
+                    del meta_value["session"]
+                else:
+                    meta_value["session"] = _set_session_id(
+                        meta_value.get("session"), session_id, override=False
+                    )
+                init_request.meta[meta_key] = meta_value
             if self._download_async is not None:  # Scrapy >= 2.14
                 return await self._download_async(init_request)
             assert self._download
@@ -1321,7 +1369,7 @@ class _SessionManager:
                 return None
             session_id = await self._next(request)
             cookies_mode = session_config.cookie_mode(request)
-            # Note: If there is a session set already (e.g. a request being
+            # Note: If there is a session ID set already (e.g. a request being
             # retried), it is overridden.
             if cookies_mode:
                 request.meta[COOKIE_SESSION_ID_META_KEY] = session_id
@@ -1330,20 +1378,11 @@ class _SessionManager:
                 provider["requestCookies"] = cookies
                 provider["responseCookies"] = True
             else:
-                request.meta.setdefault("zyte_api_provider", {})["session"] = {
-                    "id": session_id
-                }
-            if (
-                "zyte_api" in request.meta
-                or request.meta.get("zyte_api_automap", None) is False
-                or (
-                    "zyte_api_automap" not in request.meta
-                    and self._transparent_mode is False
+                provider = request.meta.setdefault("zyte_api_provider", {})
+                provider["session"] = _set_session_id(
+                    provider.get("session"), session_id, override=True
                 )
-            ):
-                meta_key = "zyte_api"
-            else:
-                meta_key = "zyte_api_automap"
+            meta_key = self._param_parser._meta_key(request) or "zyte_api"
             request.meta.setdefault(meta_key, {})
             if not isinstance(request.meta[meta_key], dict):
                 request.meta[meta_key] = {}
@@ -1351,7 +1390,9 @@ class _SessionManager:
                 request.meta[meta_key]["requestCookies"] = cookies
                 request.meta[meta_key]["responseCookies"] = True
             else:
-                request.meta[meta_key]["session"] = {"id": session_id}
+                request.meta[meta_key]["session"] = _set_session_id(
+                    request.meta[meta_key].get("session"), session_id, override=True
+                )
             request.meta.setdefault("dont_merge_cookies", True)
             # Mark this request as having a session assigned already, so that
             # if a later downloader middleware process_request call returns a
