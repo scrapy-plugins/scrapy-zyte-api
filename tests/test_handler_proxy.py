@@ -88,6 +88,19 @@ async def test_dispatch_proxy_transport_success(mockserver):
 
 
 @deferred_f_from_coro_f
+async def test_attempt_via_proxy_success_status_is_200(mockserver):
+    # A successful proxy response (no Zyte-Error-Type header) is counted as a
+    # Zyte API 200 in the status_codes stat, regardless of the target website's
+    # status code, matching how the HTTP API reports it.
+    async with mockserver.make_handler(PROXY_SETTINGS) as handler:
+        _patch_fallback(handler, response=_proxy_target_response(status=404))
+        proxy_request = Request(mockserver.urljoin("/"))
+        await handler._attempt_via_proxy(proxy_request)
+    assert handler._proxy_agg_stats.status_codes[200] == 1
+    assert handler._proxy_agg_stats.status_codes[404] == 0
+
+
+@deferred_f_from_coro_f
 async def test_proxy_zyte_client_default(mockserver):
     # The proxy request carries Zyte-Client filled with the HTTP API User-Agent.
     async with mockserver.make_handler(PROXY_SETTINGS) as handler:

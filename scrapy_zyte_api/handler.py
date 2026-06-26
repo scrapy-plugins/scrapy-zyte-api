@@ -533,7 +533,13 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 proxy.n_errors += 1
             proxy.api_error_types[error.parsed.type] += 1
             raise
-        proxy.status_codes[response.status] += 1
+        # The status_codes stat tracks the Zyte API status, not the target
+        # website's. A proxy response without a Zyte-Error-Type header means the
+        # Zyte API call succeeded, which is a 200 regardless of the target
+        # status (response.status); the HTTP API reports it the same way. Error
+        # responses are counted above, using the status aligned with the HTTP
+        # API (_PROXY_STATUS_MAP).
+        proxy.status_codes[200] += 1
         proxy.time_total_stats.push(time.time() - start_time)
         return response
 
