@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.35.0 (unreleased)
+0.35.0 (2026-06-26)
 -------------------
 
 -   Added :meth:`SessionConfig.init_session()
