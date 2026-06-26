@@ -1,6 +1,90 @@
 Changes
 =======
 
+0.35.0 (unreleased)
+-------------------
+
+-   Added :meth:`SessionConfig.init_session()
+    <scrapy_zyte_api.SessionConfig.init_session>`, which allows initializing a
+    :ref:`plugin-managed session <session>` with a chain of multiple requests.
+
+-   Added support for :ref:`cookie sessions <cookie-sessions>`, where
+    :ref:`plugin-managed sessions <session>` are kept by managing cookies on
+    the client side instead of relying on Zyte API session IDs, allowing
+    sessions to outlive the Zyte API session time limit.
+
+    Enable them with the new :setting:`ZYTE_API_SESSION_COOKIE_MODE` setting,
+    the new :reqmeta:`zyte_api_session_cookie_mode` request metadata key, or
+    the new :meth:`SessionConfig.cookie_mode()
+    <scrapy_zyte_api.SessionConfig.cookie_mode>` method.
+
+-   Added support for :ref:`capturing network responses <network-capture>`
+    during browser rendering through page objects, with the new
+    :class:`~scrapy_zyte_api.NetworkCapture` and
+    :class:`~scrapy_zyte_api.CapturedResponse` page inputs and the new
+    :func:`~scrapy_zyte_api.network_capture` annotation.
+
+-   :ref:`Plugin-managed sessions <session>` are now kept across redirects and
+    meta refreshes instead of being treated as new requests.
+
+    This is implemented through a new downloader middleware,
+    :class:`~scrapy_zyte_api.ScrapyZyteAPISessionResetterDownloaderMiddleware`,
+    enabled by default by the :ref:`add-on <config-addon>`.
+
+-   The response class is now chosen based on the response content type:
+    :class:`~scrapy_zyte_api.responses.ZyteAPITextResponse` is now used only
+    for HTML responses, while the new
+    :class:`~scrapy_zyte_api.responses.ZyteAPIXmlResponse` and
+    :class:`~scrapy_zyte_api.responses.ZyteAPIJsonResponse` classes are used
+    for XML and JSON responses, respectively.
+
+    Previously, XML responses were parsed as HTML, which lowercases tag and
+    attribute names, so case-sensitive XPath expressions (e.g.
+    ``//Error/Code/text()``) did not work. They now do.
+
+-   Added the :setting:`ZYTE_API_SESSION_RETRY_POLICY` setting, along with the
+    :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` and
+    :data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY` retry policies, so
+    that errors like 520 and 521 in :ref:`session <session>` requests are
+    handled by the session management code instead of being retried by the Zyte
+    API client.
+
+-   :ref:`Session initialization <session>` now retries after a delay, set
+    through the new :setting:`ZYTE_API_SESSION_CREATION_RETRY_DELAY` setting
+    (60 seconds by default), when the server reports a transient error, such as
+    going over the session limit or a session creation error, instead of
+    counting those toward :setting:`ZYTE_API_SESSION_MAX_BAD_INITS`.
+
+-   A failed :http:`action <request:actions>` during :ref:`session
+    initialization <session>` now invalidates the session by default. Use the
+    new :setting:`ZYTE_API_SESSION_INIT_ACTION_FAILURE_INVALIDATES_SESSION`
+    setting to disable this.
+
+-   :ref:`Plugin-managed sessions <session>` now stop cleanly when the spider
+    closes: in-progress session initialization is cancelled and requests
+    waiting for a session are dropped, instead of continuing to create sessions
+    or waiting out the session reuse delay during shutdown.
+
+-   Cookies that exceed the Zyte API size limits are now dropped, with a
+    warning, instead of triggering a Zyte API error. The new
+    :setting:`ZYTE_API_MAX_COOKIE_BYTES`,
+    :setting:`ZYTE_API_MAX_COOKIE_NAME_LENGTH`, and
+    :setting:`ZYTE_API_MAX_COOKIE_VALUE_LENGTH` settings control the limits.
+
+-   A warning is now logged when the same ``sessionContext`` is used with
+    different ``sessionContextParameters`` values, which usually indicates a
+    mistake.
+
+-   Zyte API responses that change the request URL (redirects and meta
+    refreshes) are now logged at the debug level.
+
+-   Improved error reporting when :meth:`SessionConfig.params()
+    <scrapy_zyte_api.SessionConfig.params>` returns a non-dict value.
+
+-   Documentation improvements, including a new :ref:`redirect handling
+    <redirect>` page and a new :ref:`stats reference <stats>` documenting all
+    stats.
+
 0.34.0 (2026-05-14)
 -------------------
 
