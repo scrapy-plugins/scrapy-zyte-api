@@ -9,7 +9,7 @@ from base64 import b64encode
 from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
 from scrapy import Request
@@ -23,6 +23,7 @@ from . import SETTINGS, download_request, make_handler
 
 if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
+    from twisted.internet.interfaces import IReactorTime
 
     from scrapy_zyte_api.responses import _API_RESPONSE
 
@@ -62,8 +63,7 @@ class LeafResource(Resource):
             d.addErrback(lambda _: None)
             d.cancel()
 
-        # Typing issues: https://github.com/twisted/twisted/issues/9909
-        d: Deferred = deferLater(reactor, delay, f, *a, **kw)  # type: ignore[arg-type]
+        d: Deferred = deferLater(cast("IReactorTime", reactor), delay, f, *a, **kw)
         request.notifyFinish().addErrback(_cancelrequest)
         return d
 
@@ -422,14 +422,12 @@ def main():
     module_name, name = args.resource.rsplit(".", 1)
     sys.path.append(".")
     resource = getattr(import_module(module_name), name)()
-    # Typing issue: https://github.com/twisted/twisted/issues/9909
     http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[attr-defined]
 
     def print_listening():
         host = http_port.getHost()
         print(f"Mock server {resource} running at http://{host.host}:{host.port}")
 
-    # Typing issue: https://github.com/twisted/twisted/issues/9909
     reactor.callWhenRunning(print_listening)  # type: ignore[attr-defined]
     reactor.run()  # type: ignore[attr-defined]
 
