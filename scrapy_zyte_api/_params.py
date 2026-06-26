@@ -1226,6 +1226,22 @@ def _get_automap_params(
     return params
 
 
+def _automap_default_enabled(
+    request: Request,
+    *,
+    transparent_mode: bool,
+    header_transport_enabled: bool,
+) -> bool:
+    """Whether *request* opts into :ref:`automatic request parameter mapping
+    <automap>` by default (i.e. without an explicit :reqmeta:`zyte_api_automap`
+    metadata key)."""
+    return (
+        transparent_mode
+        or "zyte_api_transport" in request.meta
+        or (header_transport_enabled and _has_proxy_mode_headers(request))
+    )
+
+
 def _get_api_params(
     request: Request,
     *,
@@ -1253,9 +1269,11 @@ def _get_api_params(
     if api_params is None:
         api_params = _get_automap_params(
             request,
-            default_enabled=transparent_mode
-            or "zyte_api_transport" in request.meta
-            or (header_transport_enabled and _has_proxy_mode_headers(request)),
+            default_enabled=_automap_default_enabled(
+                request,
+                transparent_mode=transparent_mode,
+                header_transport_enabled=header_transport_enabled,
+            ),
             default_params=automap_params,
             skip_headers=skip_headers,
             browser_headers=browser_headers,
@@ -1466,10 +1484,10 @@ class _ParamParser:
         raw = request.meta.get("zyte_api", False)
         if raw is not False and (raw or raw == {}):
             return "zyte_api"
-        automap_default_enabled = (
-            self._transparent_mode
-            or "zyte_api_transport" in request.meta
-            or (self._header_transport_enabled() and _has_proxy_mode_headers(request))
+        automap_default_enabled = _automap_default_enabled(
+            request,
+            transparent_mode=self._transparent_mode,
+            header_transport_enabled=self._header_transport_enabled(),
         )
         if request.meta.get("zyte_api_automap", automap_default_enabled) is not False:
             return "zyte_api_automap"

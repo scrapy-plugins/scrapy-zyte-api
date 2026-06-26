@@ -571,8 +571,18 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         http = self._client.agg_stats
         proxy = self._proxy_agg_stats
 
+        # Mirror python-zyte-api's AggStats n_* counters, summing in the proxy
+        # mode equivalents. This is coupled to AggStats' attribute names: a
+        # future non-counter n_* int field would be summed in here too.
+        # n_processed is handled separately below (proxy mode has no equivalent
+        # counter; it is derived from final outcomes), so it is skipped here to
+        # avoid writing the stat twice.
         for field, val in vars(http).items():
-            if not field.startswith("n_") or not isinstance(val, int):
+            if (
+                not field.startswith("n_")
+                or field == "n_processed"
+                or not isinstance(val, int)
+            ):
                 continue
             stat_key = field[2:]  # strip "n_" prefix
             proxy_val = getattr(proxy, field, None)
