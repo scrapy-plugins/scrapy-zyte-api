@@ -240,6 +240,48 @@ on every Zyte API request:
     ZYTE_API_AUTOMAP_PARAMS = {"browserHtml": True}
     ZYTE_API_PROVIDER_PARAMS = {"browserHtml": True}
 
+.. _session-check-redirects:
+
+Session checks and redirects
+----------------------------
+
+By default, redirects and meta-refreshes reuse the same session as the original
+request.
+
+If a redirect response itself indicates that the session has expired, override
+:meth:`~scrapy_zyte_api.SessionConfig.check` to return ``False`` for that
+response. The request will then be retried with a fresh session, bypassing the
+redirect entirely:
+
+.. code-block:: python
+
+    from scrapy_zyte_api import SessionConfig, session_config
+
+
+    @session_config(["example.com"])
+    class ExampleSessionConfig(SessionConfig):
+        def check(self, response, request):
+            if response.status in {301, 302, 303, 307, 308}:
+                location = response.headers.get("Location", b"").decode()
+                if "expired" in location:
+                    return False
+            return True
+
+.. note::
+
+    The session behavior across redirects relies on
+    :class:`~scrapy_zyte_api.ScrapyZyteAPISessionResetterDownloaderMiddleware`
+    being placed after all retry middlewares and before all redirect and
+    meta-refresh middlewares. If you use custom redirect, meta-refresh, retry
+    or similar downloader middlewares, or assign non-default priorities to the
+    built-in ones, adjust the priority of
+    :class:`~scrapy_zyte_api.ScrapyZyteAPISessionResetterDownloaderMiddleware`
+    accordingly. With default Scrapy middleware priorities, priority 565
+    (between
+    :class:`~scrapy.downloadermiddlewares.redirect.MetaRefreshMiddleware` at
+    580 and :class:`~scrapy.downloadermiddlewares.retry.RetryMiddleware` at
+    550) is correct.
+
 
 .. _session-pools:
 

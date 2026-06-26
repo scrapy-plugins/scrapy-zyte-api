@@ -7,6 +7,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPIRefererSpiderMiddleware,
     ScrapyZyteAPISessionDownloaderMiddleware,
+    ScrapyZyteAPISessionResetterDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
 
@@ -74,6 +75,12 @@ class Addon:
         )
         settings["DOWNLOAD_HANDLERS"]["https"] = (
             "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler"
+        )
+        _setdefault(
+            settings,
+            "DOWNLOADER_MIDDLEWARES",
+            ScrapyZyteAPISessionResetterDownloaderMiddleware,
+            565,
         )
         _setdefault(
             settings, "DOWNLOADER_MIDDLEWARES", ScrapyZyteAPIDownloaderMiddleware, 633
