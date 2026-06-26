@@ -21,10 +21,8 @@ from ._proxy import (
     ProxyModeError,
     _build_proxy_request,
     _check_for_proxy_error,
-    _get_proxy_incompatible_params,
     _get_unknown_proxy_mode_headers,
     _has_proxy_mode_headers,
-    _proxy_uses_browser_rendering,
 )
 from ._request_transport import _resolve_transport
 from .responses import (
@@ -261,29 +259,25 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         if api_params is None:
             return await self._download_via_fallback(request, spider)
 
-        assigned_transport, effective_transport, experimental = _resolve_transport(
+        transport = _resolve_transport(
             request,
             api_params,
             self._crawler.settings,
             self._auth_type(),
             self._param_parser._header_transport_enabled(),
         )
-        if experimental == "header":
+        if transport.experimental == "header":
             self._stats.inc_value(
                 "scrapy-zyte-api/request/transport/proxy/experimental/header"
             )
             self._warn_experimental_header_transport()
-        elif experimental == "transport":
+        elif transport.experimental == "transport":
             self._stats.inc_value(
                 "scrapy-zyte-api/request/transport/proxy/experimental"
             )
             self._warn_experimental_proxy()
-        if effective_transport == "proxy":
-            browser_rendering = _proxy_uses_browser_rendering(request, api_params)
-            incompatible = _get_proxy_incompatible_params(
-                api_params, browser_rendering=browser_rendering
-            )
-            if incompatible:
+        if transport.effective == "proxy":
+            if transport.incompatible:
                 # Only reachable when proxy mode was explicitly forced, or when
                 # an unknown Zyte-* header kept an "auto" request in proxy mode
                 # (its effect cannot be reproduced through the HTTP API). Either
@@ -291,7 +285,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 # downgrade; _resolve_transport already let eligible "auto"
                 # requests fall back to the HTTP API.
                 raise self._proxy_incompatible_error(
-                    request, incompatible, assigned_transport
+                    request, transport.incompatible, transport.assigned
                 )
             self._stats.inc_value("scrapy-zyte-api/request/transport/proxy")
             return await self._download_via_proxy_mode(api_params, request)
@@ -299,7 +293,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         # An "auto" request that resolved to the HTTP API despite carrying
         # Zyte-* headers was parsed as proxy-bound (its headers left untouched);
         # re-parse forcing HTTP API semantics so those headers map to params.
-        if assigned_transport == "auto" and _has_proxy_mode_headers(request):
+        if transport.assigned == "auto" and _has_proxy_mode_headers(request):
             api_params = self._param_parser.parse(request, final=True, force_http=True)
         self._stats.inc_value("scrapy-zyte-api/request/transport/http")
         return await self._download_via_http_api(api_params, request)

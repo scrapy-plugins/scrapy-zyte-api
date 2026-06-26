@@ -174,6 +174,9 @@ def test_incompatible_params(params, incompatible):
         ({}, {"browserHtml": True}, True),
         ({b"Zyte-Browser-Html": b"true"}, {}, True),
         ({b"Zyte-Browser-Html": b"True"}, {}, True),
+        ({b"Zyte-Browser-Html": b"1"}, {}, True),
+        ({b"Zyte-Browser-Html": b" 1 "}, {}, True),
+        ({b"Zyte-Browser-Html": b"0"}, {}, False),
         ({b"Zyte-Browser-Html": b"false"}, {}, False),
         ({b"Zyte-Browser-Html": b""}, {}, False),
         ({b"Zyte-Device": b"mobile"}, {}, False),
@@ -883,6 +886,28 @@ def test_proxy_response_uses_browser_html_no_proxy_request():
     raw = HtmlResponse("https://example.com", body=b"<html></html>", encoding="utf-8")
     response = ZyteAPIProxyTextResponse.from_proxy_response(raw)
     assert response._uses_browser_html() is False
+
+
+@pytest.mark.parametrize(
+    ("header_value", "expected"),
+    [
+        (b"true", True),
+        (b"True", True),
+        (b"1", True),
+        (b"0", False),
+        (b"false", False),
+        (b"", False),
+    ],
+)
+def test_proxy_response_uses_browser_html_header_values(header_value, expected):
+    proxy_request = Request(
+        "https://example.com", headers={b"Zyte-Browser-Html": header_value}
+    )
+    raw = HtmlResponse("https://example.com", body=b"<html></html>", encoding="utf-8")
+    response = ZyteAPIProxyTextResponse.from_proxy_response(
+        raw, proxy_request=proxy_request
+    )
+    assert response._uses_browser_html() is expected
 
 
 def test_proxy_response_raw_api_response_cached():

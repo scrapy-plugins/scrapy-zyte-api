@@ -18,9 +18,12 @@ from scrapy.settings.default_settings import USER_AGENT
 from scrapy.utils.python import to_bytes, to_unicode
 
 from ._cookies import _get_all_cookies
-from ._proxy import _has_proxy_mode_headers
+from ._proxy import (
+    _PROXY_HEADER_BY_LOWER,
+    _has_proxy_mode_headers,
+    _zyte_browser_html_header_enabled,
+)
 from ._request_transport import _get_assigned_transport, _transport_is_explicit
-from ._utils import str_to_bool
 
 logger = getLogger(__name__)
 
@@ -337,10 +340,6 @@ def _may_use_browser(api_params: dict[str, Any]) -> bool:
     )
 
 
-def session_id_to_session(session_id):
-    return {"id": session_id}
-
-
 def _is_safe_header(
     k, v, /, *, api_params, request, proxy_bound=False, proxy_mode=False
 ):
@@ -368,89 +367,95 @@ def _is_safe_header(
             if not proxy_bound:
                 logger.warning(message)
 
-        for proxy_header_suffix, zapi_request_param, processor in (
-            (b"browser-html", "browserHtml", str_to_bool),
-            (b"cookie-management", "cookieManagement", str.strip),
-            (b"device", "device", str.strip),
-            (
-                b"disable-follow-redirect",
-                "followRedirect",
-                lambda v: not str_to_bool(v),
-            ),
-            (b"geolocation", "geolocation", str.strip),
-            (b"iptype", "ipType", str.strip),
-            (b"jobid", "jobId", str.strip),
-            (b"session-id", "session", session_id_to_session),
-        ):
-            if lowercase_k == b"zyte-" + proxy_header_suffix:
-                if zapi_request_param in api_params:
+        # The Zyte-* ⇆ HTTP API parameter mapping is driven by the shared
+        # _PROXY_HEADER_PARAMS table (see scrapy_zyte_api._proxy). Headers
+        # without an HTTP API mapping (from_header is None, e.g. Zyte-Tags) and
+        # the control headers Zyte-Client / Zyte-Override-Headers fall through to
+        # the branch below.
+        descriptor = _PROXY_HEADER_BY_LOWER.get(lowercase_k)
+        if descriptor is not None and descriptor.from_header is not None:
+            zapi_request_param = descriptor.param
+            if zapi_request_param in api_params:
+                _warn(
+                    f"Request {request} defines header {decoded_k}. "
+                    f"This header has been dropped, the HTTP API of "
+                    f"Zyte API does not support proxy mode headers, "
+                    f"and the matching HTTP API request parameter, "
+                    f"{zapi_request_param!r}, has already been "
+                    f"defined on the request "
+                    f"(as {api_params[zapi_request_param]!r})."
+                )
+            else:
+                try:
+                    processed_value = descriptor.from_header(decoded_v)
+                except ValueError:
+                    # e.g. Zyte-Tags with a malformed JSON value. Drop it with a
+                    # warning instead of letting the exception propagate, like
+                    # any other header that cannot be mapped.
                     _warn(
                         f"Request {request} defines header {decoded_k}. "
                         f"This header has been dropped, the HTTP API of "
                         f"Zyte API does not support proxy mode headers, "
-                        f"and the matching HTTP API request parameter, "
-                        f"{zapi_request_param!r}, has already been "
-                        f"defined on the request "
-                        f"(as {api_params[zapi_request_param]!r})."
+                        f"and its value ({decoded_v!r}) could not be parsed "
+                        f"into the matching HTTP API request parameter, "
+                        f"{zapi_request_param!r}."
                     )
-                else:
-                    processed_value = processor(decoded_v)
-                    if processed_value != _DEFAULT_API_PARAMS[zapi_request_param]:
-                        api_params[zapi_request_param] = processed_value
-                        if decoded_v == processed_value:
-                            _warn(
-                                f"Request {request} defines header "
-                                f"{decoded_k}. This header has been dropped, "
-                                f"the HTTP API of Zyte API does not support "
-                                f"proxy mode headers, and its value "
-                                f"({decoded_v!r}) has been assigned to the "
-                                f"matching HTTP API request parameter, "
-                                f"{zapi_request_param!r}."
-                            )
-                        else:
-                            _warn(
-                                f"Request {request} defines header "
-                                f"{decoded_k}. This header has been dropped, "
-                                f"the HTTP API of Zyte API does not support "
-                                f"proxy mode headers, and its value "
-                                f"({decoded_v!r}) has been converted into "
-                                f"{processed_value!r} and assigned to the "
-                                f"matching HTTP API request parameter, "
-                                f"{zapi_request_param!r}."
-                            )
+                    return False
+                if processed_value != _DEFAULT_API_PARAMS[zapi_request_param]:
+                    api_params[zapi_request_param] = processed_value
+                    if decoded_v == processed_value:
+                        _warn(
+                            f"Request {request} defines header "
+                            f"{decoded_k}. This header has been dropped, "
+                            f"the HTTP API of Zyte API does not support "
+                            f"proxy mode headers, and its value "
+                            f"({decoded_v!r}) has been assigned to the "
+                            f"matching HTTP API request parameter, "
+                            f"{zapi_request_param!r}."
+                        )
                     else:
                         _warn(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support proxy mode headers, "
-                            f"and its value ({decoded_v!r}) matches the "
-                            f"default value of the matching HTTP API request "
-                            f"parameter, {zapi_request_param!r}."
+                            f"Request {request} defines header "
+                            f"{decoded_k}. This header has been dropped, "
+                            f"the HTTP API of Zyte API does not support "
+                            f"proxy mode headers, and its value "
+                            f"({decoded_v!r}) has been converted into "
+                            f"{processed_value!r} and assigned to the "
+                            f"matching HTTP API request parameter, "
+                            f"{zapi_request_param!r}."
                         )
-                break
+                else:
+                    _warn(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support proxy mode headers, "
+                        f"and its value ({decoded_v!r}) matches the "
+                        f"default value of the matching HTTP API request "
+                        f"parameter, {zapi_request_param!r}."
+                    )
+        elif lowercase_k == b"zyte-client":
+            _warn(
+                f"Request {request} defines header {decoded_k}. This header "
+                f"has been dropped, the HTTP API of Zyte API does not support "
+                f"proxy mode headers. The HTTP API uses a client-level "
+                f"User-Agent that cannot be overridden per request; set the "
+                f"_ZYTE_API_USER_AGENT setting to customize it for the whole "
+                f"crawl."
+            )
+        elif lowercase_k == b"zyte-override-headers":
+            _warn(
+                f"Request {request} defines header {decoded_k}. This "
+                f"header has been dropped, the HTTP API of Zyte API "
+                f"does not support proxy mode headers, and this "
+                f"specific header is not necessary when using the "
+                f"HTTP API."
+            )
         else:
-            if lowercase_k == b"zyte-client":
-                _warn(
-                    f"Request {request} defines header {decoded_k}. This "
-                    f"header has been dropped, the HTTP API of Zyte API "
-                    f"does not support proxy mode headers, and "
-                    f"scrapy-zyte-api automatically fills the User-Agent "
-                    f"header, making this proxy mode header unnecessary."
-                )
-            elif lowercase_k == b"zyte-override-headers":
-                _warn(
-                    f"Request {request} defines header {decoded_k}. This "
-                    f"header has been dropped, the HTTP API of Zyte API "
-                    f"does not support proxy mode headers, and this "
-                    f"specific header is not necessary when using the "
-                    f"HTTP API."
-                )
-            else:
-                _warn(
-                    f"Request {request} defines header {decoded_k}. This "
-                    f"header has been dropped, the HTTP API of Zyte API "
-                    f"does not support proxy mode headers."
-                )
+            _warn(
+                f"Request {request} defines header {decoded_k}. This "
+                f"header has been dropped, the HTTP API of Zyte API "
+                f"does not support proxy mode headers."
+            )
     else:
         assert lowercase_k.startswith(b"x-crawlera-")
         for spm_header_suffix, zapi_request_param in (
@@ -796,19 +801,6 @@ def _set_request_headers_from_request(
         api_params.pop("requestHeaders")
 
 
-def proxy_mode_browser_html_enabled(request: Request) -> bool:
-    for k, v in request.headers.items():
-        if not v:
-            continue
-        lowercase_k = k.strip().lower()
-        if lowercase_k != b"zyte-browser-html":
-            continue
-        joined_v = b",".join(v)
-        decoded_v = joined_v.decode()
-        return str_to_bool(decoded_v)
-    return False
-
-
 def _set_http_response_body_from_request(
     *,
     api_params: dict[str, Any],
@@ -816,7 +808,7 @@ def _set_http_response_body_from_request(
 ):
     if not any(
         api_params.get(k) for k in _BROWSER_OR_EXTRACT_KEYS
-    ) and not proxy_mode_browser_html_enabled(request):
+    ) and not _zyte_browser_html_header_enabled(request):
         api_params.setdefault("httpResponseBody", True)
     elif api_params.get("httpResponseBody") is False:
         logger.warning(

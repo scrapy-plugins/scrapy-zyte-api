@@ -1194,10 +1194,13 @@ UNSAFE_HEADER_HANDLING_SCENARIOS: list[dict[str, Any]] = [
             ("Browser-Html", " false ", {}),
             ("Browser-Html", "true", {"browserHtml": True}),
             ("Browser-Html", "1", {"browserHtml": True}),
+            ("Browser-Html", "0", {}),
             ("Cookie-Management", "auto", {}),
             ("Cookie-Management", "discard", {"cookieManagement": "discard"}),
             ("Device", "mobile", {"device": "mobile"}),
             ("Disable-Follow-Redirect", "true", {"followRedirect": False}),
+            ("Disable-Follow-Redirect", "1", {"followRedirect": False}),
+            ("Disable-Follow-Redirect", "0", {}),
             ("Geolocation", "US", {"geolocation": "US"}),
             ("IPType", "residential", {"ipType": "residential"}),
             ("Override-Headers", "Accept,User-Agent", {}),
@@ -1206,6 +1209,9 @@ UNSAFE_HEADER_HANDLING_SCENARIOS: list[dict[str, Any]] = [
                 "0cf3ef3d-a3c5-4c51-b967-53e5dea2c7c6",
                 {"session": {"id": "0cf3ef3d-a3c5-4c51-b967-53e5dea2c7c6"}},
             ),
+            ("Tags", '{"a": "b"}', {"tags": {"a": "b"}}),
+            ("Tags", "{}", {}),
+            ("Tags", "{not-json", {}),
         )
     ),
     # Headers specific to Smart Proxy Manager

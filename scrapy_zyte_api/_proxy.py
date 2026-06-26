@@ -4,6 +4,7 @@ import json
 import logging
 from base64 import b64decode, b64encode
 from collections import Counter
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from zyte_api import RequestError
@@ -14,6 +15,8 @@ from scrapy_zyte_api._utils import str_to_bool
 from scrapy_zyte_api.utils import USER_AGENT
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from scrapy import Request
     from scrapy.http import Headers, Response
 
@@ -68,16 +71,94 @@ _PROTECTED_HEADERS = {
     b"user-agent": "User-Agent",
 }
 
+
+@dataclass(frozen=True)
+class _ProxyHeaderParam:
+    """Single source of truth tying a Zyte API proxy mode ``Zyte-*`` header to
+    its matching HTTP API request parameter and the conversions between them.
+    """
+
+    header: str
+    param: str
+    to_header: Callable[[dict[str, Any]], str | None]
+    from_header: Callable[[str], Any] | None = None
+
+    @property
+    def header_lower(self) -> bytes:
+        return self.header.lower().encode()
+
+
+def _session_to_header(api_params: dict[str, Any]) -> str | None:
+    session = api_params.get("session")
+    if isinstance(session, dict) and session.get("id"):
+        return session["id"]
+    return None
+
+
+_PROXY_HEADER_PARAMS: tuple[_ProxyHeaderParam, ...] = (
+    _ProxyHeaderParam(
+        "Zyte-Browser-Html",
+        "browserHtml",
+        lambda p: "true" if p.get("browserHtml") else None,
+        from_header=str_to_bool,
+    ),
+    _ProxyHeaderParam(
+        "Zyte-Cookie-Management",
+        "cookieManagement",
+        lambda p: v if (v := p.get("cookieManagement")) and v != "auto" else None,
+        from_header=str.strip,
+    ),
+    _ProxyHeaderParam(
+        "Zyte-Device",
+        "device",
+        lambda p: v if (v := p.get("device")) and v != "desktop" else None,
+        from_header=str.strip,
+    ),
+    _ProxyHeaderParam(
+        "Zyte-Disable-Follow-Redirect",
+        "followRedirect",
+        lambda p: "true" if p.get("followRedirect") is False else None,
+        from_header=lambda v: not str_to_bool(v),
+    ),
+    _ProxyHeaderParam(
+        "Zyte-Geolocation",
+        "geolocation",
+        lambda p: p.get("geolocation") or None,
+        from_header=str.strip,
+    ),
+    _ProxyHeaderParam(
+        "Zyte-IPType",
+        "ipType",
+        lambda p: p.get("ipType") or None,
+        from_header=str.strip,
+    ),
+    _ProxyHeaderParam(
+        "Zyte-JobId",
+        "jobId",
+        lambda p: p.get("jobId") or None,
+        from_header=str.strip,
+    ),
+    _ProxyHeaderParam(
+        "Zyte-Session-ID",
+        "session",
+        _session_to_header,
+        from_header=lambda value: {"id": value},
+    ),
+    _ProxyHeaderParam(
+        "Zyte-Tags",
+        "tags",
+        lambda p: (
+            json.dumps(p["tags"], separators=(",", ":")) if p.get("tags") else None
+        ),
+        from_header=json.loads,
+    ),
+)
+
+_PROXY_HEADER_BY_LOWER: dict[bytes, _ProxyHeaderParam] = {
+    d.header_lower: d for d in _PROXY_HEADER_PARAMS
+}
 _ZYTE_HEADER_TO_PARAM: dict[bytes, str] = {
-    b"zyte-browser-html": "browserHtml",
-    b"zyte-cookie-management": "cookieManagement",
-    b"zyte-device": "device",
-    b"zyte-disable-follow-redirect": "followRedirect",
-    b"zyte-geolocation": "geolocation",
-    b"zyte-iptype": "ipType",
-    b"zyte-jobid": "jobId",
-    b"zyte-session-id": "session",
-    b"zyte-tags": "tags",
+    d.header_lower: d.param for d in _PROXY_HEADER_PARAMS
 }
 
 _KNOWN_PROXY_HEADERS = set(_ZYTE_HEADER_TO_PARAM) | {
@@ -136,25 +217,11 @@ def _get_proxy_incompatible_params(
 
 
 def _get_raw_param_value(api_params: dict[str, Any], header_lower: bytes) -> Any:
-    if header_lower == b"zyte-browser-html":
-        return api_params.get("browserHtml")
-    if header_lower == b"zyte-cookie-management":
-        return api_params.get("cookieManagement")
-    if header_lower == b"zyte-device":
-        return api_params.get("device")
-    if header_lower == b"zyte-disable-follow-redirect":
-        return api_params.get("followRedirect")
-    if header_lower == b"zyte-geolocation":
-        return api_params.get("geolocation")
-    if header_lower == b"zyte-iptype":
-        return api_params.get("ipType")
-    if header_lower == b"zyte-jobid":
-        return api_params.get("jobId")
     if header_lower == b"zyte-session-id":
-        return (api_params.get("session") or {}).get("id")
-    if header_lower == b"zyte-tags":
-        return api_params.get("tags")
-    return None
+        session = api_params.get("session")
+        return session.get("id") if isinstance(session, dict) else None
+    param = _ZYTE_HEADER_TO_PARAM.get(header_lower)
+    return api_params.get(param) if param else None
 
 
 def _param_is_set(api_params: dict[str, Any], header_lower: bytes) -> bool:
@@ -171,21 +238,25 @@ def _param_is_set(api_params: dict[str, Any], header_lower: bytes) -> bool:
     return _ZYTE_HEADER_TO_PARAM[header_lower] in api_params
 
 
-def _build_proxy_request(
-    proxy_url: str,
-    api_key: str,
+def _collect_proxy_headers(
     request: Request,
     api_params: dict[str, Any],
     *,
     user_agent: str | None = USER_AGENT,
-) -> Request:
-    # The headers sent to the target are derived from the computed Zyte API
-    # parameters (e.g. customHttpRequestHeaders, requestHeaders), exactly as
-    # they would be sent through the HTTP API. The raw Request.headers are not
-    # forwarded as-is: in automap mode they have already been mapped into those
-    # parameters (with Scrapy/middleware default headers stripped), and in
-    # manual mode they are not part of the request definition. This keeps both
-    # transports consistent and prevents leaking default headers to the target.
+    warn: bool = True,
+) -> tuple[dict[str, str], str | None, bytes | None]:
+    """Assemble the proxy mode request headers (plus method and body) for
+    *request*, returning ``(headers, method, body)``.
+
+    The headers start from those derived from *api_params*
+    (:func:`_params_to_proxy_headers`) and are extended with the ``Zyte-*``
+    control headers passed through from ``Request.headers`` and the automatic
+    ``Zyte-Client`` header. This is shared by :func:`_build_proxy_request`,
+    which sends the request, and :func:`_estimate_proxy_header_section_size`,
+    which only measures it, so the estimate cannot drift from what is sent. Set
+    *warn* to ``False`` to suppress the conflict/override warnings, leaving the
+    estimation path free of side effects.
+    """
     proxy_headers, proxy_method, proxy_body = _params_to_proxy_headers(api_params)
 
     param_lower_to_key = {k.lower(): k for k in proxy_headers}
@@ -216,7 +287,7 @@ def _build_proxy_request(
         if lower == b"zyte-override-headers" and lower_str in param_lower_to_key:
             # A user-supplied Zyte-Override-Headers request header overrides the
             # value auto-generated from protected custom headers.
-            if lower not in _warned_conflict_headers:
+            if warn and lower not in _warned_conflict_headers:
                 _warned_conflict_headers.add(lower)
                 auto = proxy_headers[param_lower_to_key[lower_str]]
                 logger.warning(
@@ -230,7 +301,8 @@ def _build_proxy_request(
             proxy_headers[param_lower_to_key[lower_str]] = header_val
             continue
         if (
-            lower in _ZYTE_HEADER_TO_PARAM
+            warn
+            and lower in _ZYTE_HEADER_TO_PARAM
             and _param_is_set(api_params, lower)
             and lower not in _warned_conflict_headers
         ):
@@ -254,6 +326,28 @@ def _build_proxy_request(
             proxy_headers["Zyte-Client"] = user_zyte_client
     elif user_agent:
         proxy_headers["Zyte-Client"] = user_agent
+
+    return proxy_headers, proxy_method, proxy_body
+
+
+def _build_proxy_request(
+    proxy_url: str,
+    api_key: str,
+    request: Request,
+    api_params: dict[str, Any],
+    *,
+    user_agent: str | None = USER_AGENT,
+) -> Request:
+    # The headers sent to the target are derived from the computed Zyte API
+    # parameters (e.g. customHttpRequestHeaders, requestHeaders), exactly as
+    # they would be sent through the HTTP API. The raw Request.headers are not
+    # forwarded as-is: in automap mode they have already been mapped into those
+    # parameters (with Scrapy/middleware default headers stripped), and in
+    # manual mode they are not part of the request definition. This keeps both
+    # transports consistent and prevents leaking default headers to the target.
+    proxy_headers, proxy_method, proxy_body = _collect_proxy_headers(
+        request, api_params, user_agent=user_agent
+    )
 
     proxy_auth = b64encode(f"{api_key}:".encode()).decode()
 
@@ -326,6 +420,13 @@ class ProxyAggStats:
         self.api_error_types: Counter[str | None] = Counter()
 
 
+def _zyte_browser_html_header_enabled(request: Request) -> bool:
+    """Whether *request* carries a truthy ``Zyte-Browser-Html`` proxy header,
+    interpreted with the same semantics as the Zyte API proxy server (see
+    :func:`scrapy_zyte_api._utils.str_to_bool`)."""
+    return str_to_bool((request.headers.get(b"Zyte-Browser-Html") or b"").decode())
+
+
 def _proxy_uses_browser_rendering(request: Request, params: dict[str, Any]) -> bool:
     """Whether *request* invokes browser rendering in proxy mode, either through
     the ``browserHtml`` parameter or the ``Zyte-Browser-Html`` proxy header
@@ -333,10 +434,7 @@ def _proxy_uses_browser_rendering(request: Request, params: dict[str, Any]) -> b
     parameter)."""
     if params.get("browserHtml"):
         return True
-    value = request.headers.get(b"Zyte-Browser-Html")
-    if not value:
-        return False
-    return str_to_bool(value.decode())
+    return _zyte_browser_html_header_enabled(request)
 
 
 def _is_proxy_mode_compatible(
@@ -360,34 +458,10 @@ def _params_to_proxy_headers(
     method: str | None = None
     body: bytes | None = None
 
-    if params.get("browserHtml"):
-        headers["Zyte-Browser-Html"] = "true"
-
-    if (cm := params.get("cookieManagement")) and cm != "auto":
-        headers["Zyte-Cookie-Management"] = cm
-
-    device = params.get("device", "desktop")
-    if device and device != "desktop":
-        headers["Zyte-Device"] = device
-
-    if params.get("followRedirect") is False:
-        headers["Zyte-Disable-Follow-Redirect"] = "true"
-
-    if geo := params.get("geolocation"):
-        headers["Zyte-Geolocation"] = geo
-
-    if ip_type := params.get("ipType"):
-        headers["Zyte-IPType"] = ip_type
-
-    if job_id := params.get("jobId"):
-        headers["Zyte-JobId"] = job_id
-
-    session = params.get("session") or {}
-    if isinstance(session, dict) and "id" in session:
-        headers["Zyte-Session-ID"] = session["id"]
-
-    if tags := params.get("tags"):
-        headers["Zyte-Tags"] = json.dumps(tags, separators=(",", ":"))
+    for descriptor in _PROXY_HEADER_PARAMS:
+        value = descriptor.to_header(params)
+        if value is not None:
+            headers[descriptor.header] = value
 
     request_headers = params.get("requestHeaders") or {}
     if referer := request_headers.get("referer"):
@@ -448,27 +522,15 @@ def _estimate_proxy_header_section_size(
     """Estimate, in bytes, the request header section that proxy mode would emit
     for *request*, as counted by the Zyte API proxy's HTTP decoder.
 
-    This mirrors the headers assembled by :func:`_build_proxy_request` but
-    without its warning side effects, so it is safe to call during transport
-    resolution. Headers it does not model are accounted for by
+    It reuses the exact header assembly of :func:`_build_proxy_request` (via
+    :func:`_collect_proxy_headers`) but suppresses its warning side effects, so
+    it is safe to call during transport resolution and cannot drift from what
+    is actually sent. Headers it does not model are accounted for by
     :data:`_PROXY_HEADER_SECTION_RESERVE`.
     """
-    headers, _, _ = _params_to_proxy_headers(api_params)
-    user_set_zyte_client = False
-    for header_bytes in request.headers:
-        lower = header_bytes.strip().lower()
-        if not lower.startswith(b"zyte-"):
-            continue
-        if lower == b"zyte-client":
-            user_set_zyte_client = True
-            values = request.headers.getlist(header_bytes)
-            headers["Zyte-Client"] = values[-1].decode() if values else ""
-            continue
-        headers[header_bytes.decode()] = (
-            request.headers.get(header_bytes) or b""
-        ).decode()
-    if not user_set_zyte_client and user_agent:
-        headers["Zyte-Client"] = user_agent
+    headers, _, _ = _collect_proxy_headers(
+        request, api_params, user_agent=user_agent, warn=False
+    )
     return sum(
         len(name.encode()) + len(str(value).encode()) + _PROXY_HEADER_LINE_OVERHEAD
         for name, value in headers.items()
@@ -578,6 +640,4 @@ class _ZyteAPIProxyMixin:
     def _uses_browser_html(self) -> bool:
         if self._proxy_request is None:
             return False
-        return (
-            self._proxy_request.headers.get(b"Zyte-Browser-Html") or b""
-        ).decode().lower() == "true"
+        return _zyte_browser_html_header_enabled(self._proxy_request)

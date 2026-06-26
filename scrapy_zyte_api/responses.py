@@ -212,6 +212,15 @@ _SCRAPY_TO_ZYTE_RESPONSE: dict[type[TextResponse], type[ZyteAPIMixin]] = {
 if _SCRAPY_JSON_CLS is not None and ZyteAPIJsonResponse is not None:
     _SCRAPY_TO_ZYTE_RESPONSE[_SCRAPY_JSON_CLS] = ZyteAPIJsonResponse
 
+# Scrapy response type -> proxy mode Zyte API response class, most specific
+# first. A response matching none of these falls back to ZyteAPIProxyResponse.
+_PROXY_RESPONSE_CLASSES: list[tuple[type, type[_ZyteAPIProxyMixin]]] = [
+    (HtmlResponse, ZyteAPIProxyTextResponse),
+    (XmlResponse, ZyteAPIProxyXmlResponse),
+]
+if _SCRAPY_JSON_CLS is not None and ZyteAPIProxyJsonResponse is not None:
+    _PROXY_RESPONSE_CLASSES.append((_SCRAPY_JSON_CLS, ZyteAPIProxyJsonResponse))
+
 
 def _process_response(
     api_response: _API_RESPONSE,
@@ -268,28 +277,12 @@ def _process_proxy_response(
     | ZyteAPIProxyJsonResponse
     | ZyteAPIProxyResponse
 ):
-    if isinstance(response, HtmlResponse):
-        return ZyteAPIProxyTextResponse.from_proxy_response(
-            response,
-            request=request,
-            proxy_request=proxy_request,
-            api_params=api_params,
-        )
-    if isinstance(response, XmlResponse):
-        return ZyteAPIProxyXmlResponse.from_proxy_response(
-            response,
-            request=request,
-            proxy_request=proxy_request,
-            api_params=api_params,
-        )
-    if _SCRAPY_JSON_CLS is not None and isinstance(response, _SCRAPY_JSON_CLS):
-        return ZyteAPIProxyJsonResponse.from_proxy_response(
-            response,
-            request=request,
-            proxy_request=proxy_request,
-            api_params=api_params,
-        )
-    return ZyteAPIProxyResponse.from_proxy_response(
+    proxy_cls: type[_ZyteAPIProxyMixin] = ZyteAPIProxyResponse
+    for scrapy_cls, candidate in _PROXY_RESPONSE_CLASSES:
+        if isinstance(response, scrapy_cls):
+            proxy_cls = candidate
+            break
+    return proxy_cls.from_proxy_response(
         response,
         request=request,
         proxy_request=proxy_request,

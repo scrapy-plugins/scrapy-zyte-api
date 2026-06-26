@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from ._proxy import (
+    _get_proxy_incompatible_params,
     _get_unknown_proxy_mode_headers,
     _has_proxy_mode_headers,
-    _is_proxy_mode_compatible,
     _proxy_headers_exceed_limit,
     _proxy_uses_browser_rendering,
 )
@@ -16,6 +16,13 @@ if TYPE_CHECKING:
     from scrapy.settings import Settings
 
 _VALID_TRANSPORTS = ("auto", "http", "proxy")
+
+
+class _TransportResolution(NamedTuple):
+    assigned: str
+    effective: str
+    experimental: str | None
+    incompatible: list[str]
 
 
 def _validate_transport(transport: str, *, source: str) -> str:
@@ -105,15 +112,32 @@ def _transport_is_explicit(request: Request, settings: Settings) -> bool:
 
 
 def _resolve_auto_transport(
-    request: Request, api_params: dict[str, Any], auth_type: str
+    request: Request,
+    api_params: dict[str, Any],
+    auth_type: str,
+    *,
+    browser_rendering: bool | None = None,
+    incompatible: list[str] | None = None,
+    unknown_headers: list[str] | None = None,
 ) -> str:
+    """Resolve the effective transport of an ``"auto"`` request.
+
+    *browser_rendering*, *incompatible* and *unknown_headers* let a caller pass
+    in values it has already computed (see :func:`_resolve_transport`) to avoid
+    recomputing them; any left as ``None`` is computed on demand.
+    """
     if auth_type != "zyte":
         return "http"
-    browser_rendering = _proxy_uses_browser_rendering(request, api_params)
-    if _is_proxy_mode_compatible(api_params, browser_rendering=browser_rendering):
-        if _proxy_headers_exceed_limit(request, api_params) and not (
-            _get_unknown_proxy_mode_headers(request)
-        ):
+    if incompatible is None:
+        if browser_rendering is None:
+            browser_rendering = _proxy_uses_browser_rendering(request, api_params)
+        incompatible = _get_proxy_incompatible_params(
+            api_params, browser_rendering=browser_rendering
+        )
+    if unknown_headers is None:
+        unknown_headers = _get_unknown_proxy_mode_headers(request)
+    if not incompatible:
+        if _proxy_headers_exceed_limit(request, api_params) and not unknown_headers:
             return "http"
         return "proxy"
     # The parameters are not proxy-compatible. Only proxy mode could honor any
@@ -124,7 +148,7 @@ def _resolve_auto_transport(
     # silently dropping the header. (Whether Zyte-* headers route the request
     # through Zyte API in the first place is decided earlier, when automap is
     # enabled; see ZYTE_API_HEADER_TRANSPORT_ENABLED.)
-    if _get_unknown_proxy_mode_headers(request):
+    if unknown_headers:
         return "proxy"
     return "http"
 
@@ -158,36 +182,46 @@ def _resolve_transport(
     settings: Settings,
     auth_type: str,
     header_transport_enabled: bool,
-) -> tuple[str, str, str | None]:
-    """Returns (assigned_transport, effective_transport, experimental).
+) -> _TransportResolution:
+    """Resolve how *request* should be downloaded.
 
-    assigned_transport is "auto", "proxy", or "http".
+    ``assigned`` is "auto", "proxy", or "http".
 
-    effective_transport is "proxy" or "http" — "auto" is resolved based on
-    request data.
+    ``effective`` is "proxy" or "http" — "auto" is resolved based on request
+    data.
 
-    experimental indicates that the request would use proxy mode if the feature
-    were enabled by default, but is being sent through the HTTP API instead
-    because proxy mode is :ref:`experimental <experimental-proxy>` and the
-    transport was not explicitly configured. It is ``None`` when no such
+    ``experimental`` indicates that the request would use proxy mode if the
+    feature were enabled by default, but is being sent through the HTTP API
+    instead because proxy mode is :ref:`experimental <experimental-proxy>` and
+    the transport was not explicitly configured. It is ``None`` when no such
     fallback happens, ``"header"`` when the request is eligible specifically
-    because it carries ``Zyte-*`` headers (see :func:`_header_is_decisive`), and
-    ``"transport"`` otherwise.
+    because it carries ``Zyte-*`` headers (see :func:`_header_is_decisive`),
+    and ``"transport"`` otherwise.
+
+    ``incompatible`` lists the proxy-incompatible parameters; it is computed
+    here (once) so the handler can reuse it, and is only meaningful when
+    ``effective`` is "proxy".
     """
     assigned_transport = _get_assigned_transport(request, settings)
-    if assigned_transport != "auto":
-        # "http" and "proxy" are only ever assigned explicitly (the default is
-        # "auto" for automap and "http" — never proxy — for manual requests),
-        # so no experimental gating applies here.
-        return assigned_transport, assigned_transport, None
-    effective_transport = _resolve_auto_transport(request, api_params, auth_type)
+    if assigned_transport == "http":
+        return _TransportResolution("http", "http", None, [])
+    browser_rendering = _proxy_uses_browser_rendering(request, api_params)
+    incompatible = _get_proxy_incompatible_params(
+        api_params, browser_rendering=browser_rendering
+    )
+    if assigned_transport == "proxy":
+        return _TransportResolution("proxy", "proxy", None, incompatible)
+    unknown_headers = _get_unknown_proxy_mode_headers(request)
+    effective_transport = _resolve_auto_transport(
+        request,
+        api_params,
+        auth_type,
+        browser_rendering=browser_rendering,
+        incompatible=incompatible,
+        unknown_headers=unknown_headers,
+    )
     if effective_transport == "proxy" and not _transport_is_explicit(request, settings):
-        # Experimental gating: proxy mode is opt-in for now, so suppress it and
-        # fall back to the HTTP API, signaling that a warning should be emitted.
-        # The warning differs depending on whether the request is eligible
-        # because of its Zyte-* headers (see ZYTE_API_HEADER_TRANSPORT_ENABLED)
-        # or for other reasons (see ZYTE_API_TRANSPORT).
         if _header_is_decisive(request, settings, header_transport_enabled):
-            return "auto", "http", "header"
-        return "auto", "http", "transport"
-    return "auto", effective_transport, None
+            return _TransportResolution("auto", "http", "header", incompatible)
+        return _TransportResolution("auto", "http", "transport", incompatible)
+    return _TransportResolution("auto", effective_transport, None, incompatible)

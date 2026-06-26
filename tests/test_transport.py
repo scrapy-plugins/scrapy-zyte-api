@@ -312,51 +312,59 @@ def resolve(request, api_params, *, auth="zyte", header_enabled=True, **kw):
 
 def test_resolve_transport_explicit_proxy():
     request = Request("https://example.com", meta={"zyte_api_transport": "proxy"})
-    assert resolve(request, COMPATIBLE_PARAMS) == ("proxy", "proxy", None)
+    assert resolve(request, COMPATIBLE_PARAMS) == ("proxy", "proxy", None, [])
 
 
 def test_resolve_transport_explicit_http():
     request = Request("https://example.com", meta={"zyte_api_transport": "http"})
-    assert resolve(request, COMPATIBLE_PARAMS) == ("http", "http", None)
+    # Explicit http short-circuits before computing proxy incompatibility.
+    assert resolve(request, COMPATIBLE_PARAMS) == ("http", "http", None, [])
 
 
 def test_resolve_transport_auto_compatible_explicit():
     request = Request("https://example.com", meta={"zyte_api_transport": "auto"})
-    assert resolve(request, COMPATIBLE_PARAMS) == ("auto", "proxy", None)
+    assert resolve(request, COMPATIBLE_PARAMS) == ("auto", "proxy", None, [])
 
 
 def test_resolve_transport_auto_compatible_not_explicit():
     # Eligible, but experimental gating sends it through HTTP with a warning.
     request = Request("https://example.com", meta={"zyte_api_automap": True})
-    assert resolve(request, COMPATIBLE_PARAMS) == ("auto", "http", "transport")
+    assert resolve(request, COMPATIBLE_PARAMS) == ("auto", "http", "transport", [])
 
 
 def test_resolve_transport_auto_header_decisive_not_explicit():
     request = Request("https://example.com", headers={b"Zyte-Device": b"mobile"})
-    assert resolve(request, COMPATIBLE_PARAMS) == ("auto", "http", "header")
+    assert resolve(request, COMPATIBLE_PARAMS) == ("auto", "http", "header", [])
 
 
 def test_resolve_transport_auto_incompatible():
     request = Request("https://example.com", meta={"zyte_api_automap": True})
-    assert resolve(request, INCOMPATIBLE_PARAMS) == ("auto", "http", None)
+    # Incompatible params are surfaced for the handler even when the request
+    # falls back to the HTTP API.
+    assert resolve(request, INCOMPATIBLE_PARAMS) == ("auto", "http", None, ["product"])
 
 
 def test_resolve_transport_non_zyte_auth():
     request = Request("https://example.com", meta={"zyte_api_automap": True})
-    assert resolve(request, COMPATIBLE_PARAMS, auth="apikey") == ("auto", "http", None)
+    assert resolve(request, COMPATIBLE_PARAMS, auth="apikey") == (
+        "auto",
+        "http",
+        None,
+        [],
+    )
 
 
 def test_resolve_transport_auto_large_headers_explicit():
     # Explicit auto + proxy-compatible + oversized headers -> HTTP API, no
     # experimental fallback (it is not "eligible for proxy", just too big for it).
     request = Request("https://example.com", meta={"zyte_api_transport": "auto"})
-    assert resolve(request, LARGE_HEADER_PARAMS) == ("auto", "http", None)
+    assert resolve(request, LARGE_HEADER_PARAMS) == ("auto", "http", None, [])
 
 
 def test_resolve_transport_explicit_proxy_large_headers():
     # Forced proxy mode is left to fail (431) rather than silently downgraded.
     request = Request("https://example.com", meta={"zyte_api_transport": "proxy"})
-    assert resolve(request, LARGE_HEADER_PARAMS) == ("proxy", "proxy", None)
+    assert resolve(request, LARGE_HEADER_PARAMS) == ("proxy", "proxy", None, [])
 
 
 def test_resolve_transport_unknown_header_stays_proxy():
@@ -366,8 +374,8 @@ def test_resolve_transport_unknown_header_stays_proxy():
         meta={"zyte_api_transport": "auto"},
     )
     # Explicit auto + unknown header + incompatible params -> proxy (hard error
-    # surfaces later in the handler).
-    assert resolve(request, INCOMPATIBLE_PARAMS) == ("auto", "proxy", None)
+    # surfaces later in the handler), with the incompatible params carried along.
+    assert resolve(request, INCOMPATIBLE_PARAMS) == ("auto", "proxy", None, ["product"])
 
 
 # ----------------------------------------------------------------------------
