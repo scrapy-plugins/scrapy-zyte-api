@@ -116,21 +116,19 @@ def _resolve_auto_transport(
     api_params: dict[str, Any],
     auth_type: str,
     *,
-    browser_rendering: bool | None = None,
     incompatible: list[str] | None = None,
     unknown_headers: list[str] | None = None,
 ) -> str:
     """Resolve the effective transport of an ``"auto"`` request.
 
-    *browser_rendering*, *incompatible* and *unknown_headers* let a caller pass
-    in values it has already computed (see :func:`_resolve_transport`) to avoid
-    recomputing them; any left as ``None`` is computed on demand.
+    *incompatible* and *unknown_headers* let a caller pass in values it has
+    already computed (see :func:`_resolve_transport`) to avoid recomputing them;
+    any left as ``None`` is computed on demand.
     """
     if auth_type != "zyte":
         return "http"
     if incompatible is None:
-        if browser_rendering is None:
-            browser_rendering = _proxy_uses_browser_rendering(request, api_params)
+        browser_rendering = _proxy_uses_browser_rendering(request, api_params)
         incompatible = _get_proxy_incompatible_params(
             api_params, browser_rendering=browser_rendering
         )
@@ -216,7 +214,6 @@ def _resolve_transport(
         request,
         api_params,
         auth_type,
-        browser_rendering=browser_rendering,
         incompatible=incompatible,
         unknown_headers=unknown_headers,
     )
