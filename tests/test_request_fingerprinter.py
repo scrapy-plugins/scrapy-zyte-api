@@ -965,6 +965,7 @@ async def test_provider_fingerprint_used_when_regular_fingerprint_is_missing():
     assert fingerprinter.fingerprint(request) == b"provider"
 
 
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
 @deferred_f_from_coro_f
 async def test_provider_request_fingerprint_uses_provided_plan_data():
     crawler = await get_crawler()
