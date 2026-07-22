@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from typing import Annotated
 
@@ -58,6 +58,7 @@ from scrapy_zyte_api.providers import (
     ZyteApiProvider,
     _build_zyte_api_provider_meta,
     _get_zyte_api_provider_params,
+    _set_in_provider_meta_cache,
 )
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
@@ -609,6 +610,56 @@ def test_provider_meta_unknown_request_param_accepted():
     assert _get_zyte_api_provider_params(request, DummyCrawler()) == {  # type: ignore[arg-type]
         "slot": 1,
     }
+
+
+def test_provider_meta_none_request_param():
+    class DummyCrawler:
+        settings = _DummySettings()
+
+    request = Request("https://example.com", meta={"zyte_api_provider": None})
+    assert _get_zyte_api_provider_params(request, DummyCrawler()) == {}  # type: ignore[arg-type]
+
+
+def test_provider_meta_invalid_request_param():
+    class DummyCrawler:
+        settings = _DummySettings()
+
+    request = Request(
+        "https://example.com", meta={"zyte_api_provider": ["not", "a", "dict"]}
+    )
+    with pytest.raises(ValueError, match="only dictionaries are supported"):
+        _get_zyte_api_provider_params(request, DummyCrawler())  # type: ignore[arg-type]
+
+
+def test_provider_meta_annotated_item_without_extract_from():
+    class DummyCrawler:
+        settings = _DummySettings()
+
+    request = Request("https://example.com")
+    meta, html_requested = _build_zyte_api_provider_meta(
+        {Annotated[Product, "unrelated-metadata"]},  # type: ignore[arg-type]
+        request,
+        DummyCrawler(),  # type: ignore[arg-type]
+    )
+
+    assert meta == {"product": True}
+    assert html_requested is False
+
+
+def test_set_in_provider_meta_cache_disabled():
+    cache: OrderedDict = OrderedDict()
+    _set_in_provider_meta_cache(cache, ("key",), {"a": 1}, False, max_size=0)
+    assert len(cache) == 0
+
+
+def test_set_in_provider_meta_cache_eviction():
+    cache: OrderedDict = OrderedDict()
+    _set_in_provider_meta_cache(cache, ("a",), {"n": 1}, False, max_size=2)
+    _set_in_provider_meta_cache(cache, ("b",), {"n": 2}, False, max_size=2)
+    _set_in_provider_meta_cache(cache, ("c",), {"n": 3}, False, max_size=2)
+
+    # The oldest entry is evicted once the cache exceeds its maximum size.
+    assert list(cache.keys()) == [("b",), ("c",)]
 
 
 @pytest.mark.skipif(

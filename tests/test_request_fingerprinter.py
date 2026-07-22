@@ -12,6 +12,7 @@ if Version(SCRAPY_VERSION) < Version("2.7"):
 from scrapy import Request, Spider
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
+from scrapy_zyte_api._request_fingerprinter import _ProviderPlanData
 from scrapy_zyte_api.utils import _build_from_crawler  # type: ignore[attr-defined]
 
 from . import SETTINGS, get_crawler
@@ -962,6 +963,30 @@ async def test_provider_fingerprint_used_when_regular_fingerprint_is_missing():
     fingerprinter._get_regular_request_fingerprint = lambda request: None
 
     assert fingerprinter.fingerprint(request) == b"provider"
+
+
+@deferred_f_from_coro_f
+async def test_provider_request_fingerprint_uses_provided_plan_data():
+    crawler = await get_crawler()
+    request = Request("https://example.com")
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
+    fingerprinter._fallback_fingerprinter_is_poets = True
+
+    def _unexpected_plan_data(request):
+        raise AssertionError(
+            "provider plan data must not be recomputed when it is provided"
+        )
+
+    fingerprinter._get_provider_plan_data = _unexpected_plan_data
+
+    provider_plan_data = _ProviderPlanData(
+        is_provider_only=True,
+        to_provide=None,
+        http_response_available=False,
+    )
+    assert fingerprinter._get_provider_request_fingerprint(
+        request, provider_plan_data=provider_plan_data
+    ) == (None, True)
 
 
 @deferred_f_from_coro_f
