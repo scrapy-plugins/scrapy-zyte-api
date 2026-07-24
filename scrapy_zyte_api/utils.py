@@ -29,6 +29,7 @@ _SCRAPY_2_10_0 = Version("2.10.0")
 _SCRAPY_2_12_0 = Version("2.12.0")
 _SCRAPY_2_13_0 = Version("2.13.0")
 _SCRAPY_2_14_0 = Version("2.14.0")
+_SCRAPY_2_15_0 = Version("2.15.0")
 
 # Need to install an asyncio reactor before download handler imports to work
 # around:
@@ -49,6 +50,7 @@ _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_7_0
 _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _PROCESS_START_REQUIRES_SPIDER = _SCRAPY_VERSION < _SCRAPY_2_14_0
 _RAW_CLASS_SETTING_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_4_0
+_REACTORLESS_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_15_0
 _REQUEST_ERROR_HAS_QUERY = _PYTHON_ZYTE_API_VERSION >= _PYTHON_ZYTE_API_0_5_2
 _RESPONSE_HAS_ATTRIBUTES = _SCRAPY_VERSION >= _SCRAPY_2_6_0
 _RESPONSE_HAS_IP_ADDRESS = _SCRAPY_VERSION >= _SCRAPY_2_1_0
@@ -150,6 +152,18 @@ def _schedule_coro(coro: Coroutine[Any, Any, Any]) -> None:
         return
     loop = asyncio.get_event_loop()
     loop.create_task(coro)  # noqa: RUF006
+
+
+def _reactor_enabled(settings) -> bool:
+    """Return whether Scrapy is meant to run with a Twisted reactor installed.
+
+    ``TWISTED_REACTOR_ENABLED`` was introduced in Scrapy 2.15 to support running
+    without a Twisted reactor (see :func:`scrapy.utils.reactorless.is_reactorless`).
+    On earlier versions the setting does not exist and a reactor is always used.
+    """
+    if not _REACTORLESS_SUPPORT:
+        return True
+    return settings.getbool("TWISTED_REACTOR_ENABLED", True)
 
 
 def _close_spider(crawler, reason):

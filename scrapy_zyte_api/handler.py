@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 from scrapy import Spider, signals
 from scrapy.exceptions import NotConfigured
+from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import load_object
-from scrapy.utils.reactor import verify_installed_reactor
 
 if TYPE_CHECKING:
     from scrapy.crawler import Crawler
@@ -35,6 +35,7 @@ from .utils import (  # type: ignore[attr-defined]
     USER_AGENT,
     _build_from_crawler,
     _close_spider,
+    _reactor_enabled,
 )
 
 if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
@@ -115,9 +116,13 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             crawler.zyte_api_client = client  # type: ignore[attr-defined]
         self._client: AsyncZyteAPI = crawler.zyte_api_client  # type: ignore[attr-defined]
         self._log_auth()
-        verify_installed_reactor(
-            "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
-        )
+        self._reactor_enabled = _reactor_enabled(settings)
+        if self._reactor_enabled:
+            from scrapy.utils.reactor import verify_installed_reactor  # noqa: PLC0415
+
+            verify_installed_reactor(
+                "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+            )
         self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
         self._cookie_jars = None
         self._cookie_mw_cls = load_object(
@@ -212,6 +217,16 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         dhcls = load_object(path)
         return _build_from_crawler(dhcls, self._crawler)
 
+    def _get_fallback_handler(self, request: Request) -> Any:
+        """Return the download handler to use for *request* when it is not sent
+        through Zyte API."""
+        return self._fallback_handler
+
+    def _iter_fallback_handlers(self):
+        """Yield every fallback download handler in use, for closing."""
+        if self._fallback_handler is not None:
+            yield self._fallback_handler
+
     if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:  # Scrapy < 2.14
 
         def download_request(
@@ -220,9 +235,10 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             api_params = self._param_parser.parse(request)
             if api_params is not None:
                 return deferred_from_coro(self._download_request(api_params, request))
-            assert self._fallback_handler
+            fallback_handler = self._get_fallback_handler(request)
+            assert fallback_handler
             return deferred_from_coro(
-                self._fallback_handler.download_request(request, spider)
+                fallback_handler.download_request(request, spider)
             )
     else:
 
@@ -230,8 +246,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             api_params = self._param_parser.parse(request)
             if api_params is not None:
                 return await self._download_request(api_params, request)
-            assert self._fallback_handler
-            return await self._fallback_handler.download_request(request)
+            fallback_handler = self._get_fallback_handler(request)
+            assert fallback_handler
+            return await fallback_handler.download_request(request)
 
     def _update_stats(self, api_params):
         prefix = "scrapy-zyte-api"
@@ -375,8 +392,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
         def close(self) -> Deferred:
             async def _close():
-                if self._fallback_handler and hasattr(self._fallback_handler, "close"):
-                    await self._fallback_handler.close()
+                for handler in self._iter_fallback_handlers():
+                    if hasattr(handler, "close"):
+                        await handler.close()
                 await self._close()
 
             return ensureDeferred(_close())
@@ -384,8 +402,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     else:
 
         async def close(self) -> None:  # type: ignore[misc]
-            if self._fallback_handler and hasattr(self._fallback_handler, "close"):
-                await self._fallback_handler.close()
+            for handler in self._iter_fallback_handlers():
+                if hasattr(handler, "close"):
+                    await handler.close()
             await self._close()
 
     async def _close(self) -> None:
@@ -400,9 +419,38 @@ class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
         client: AsyncZyteAPI | None = None,
     ):
         super().__init__(settings, crawler, client)
-        self._fallback_handler = self._create_handler(
+        # This handler is registered for both http and https, but Scrapy does
+        # not tell a download handler which scheme it serves, so we cannot map
+        # it to a single, scheme-specific ZYTE_API_FALLBACK_*_HANDLER setting.
+        # Instead, we resolve the fallback handler per request, based on its
+        # scheme, honoring the corresponding setting when set and using a
+        # sensible default otherwise. Handlers are built lazily, on first use,
+        # to avoid building handlers for schemes that are never used.
+        #
+        # The default Twisted-based HTTP/1.1 handler cannot be used without a
+        # reactor; fall back to the asyncio-based httpx handler instead.
+        default = (
             "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
+            if self._reactor_enabled
+            else "scrapy.core.downloader.handlers._httpx.HttpxDownloadHandler"
         )
+        self._fallback_handler_paths = {
+            "http": settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER") or default,
+            "https": settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER") or default,
+        }
+        self._fallback_handlers_by_scheme: dict[str, Any] = {}
+
+    def _get_fallback_handler(self, request: Request) -> Any:
+        scheme = urlparse_cached(request).scheme
+        if scheme not in self._fallback_handlers_by_scheme:
+            path = self._fallback_handler_paths.get(
+                scheme, self._fallback_handler_paths["https"]
+            )
+            self._fallback_handlers_by_scheme[scheme] = self._create_handler(path)
+        return self._fallback_handlers_by_scheme[scheme]
+
+    def _iter_fallback_handlers(self):
+        yield from self._fallback_handlers_by_scheme.values()
 
 
 class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):

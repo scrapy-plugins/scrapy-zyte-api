@@ -6,7 +6,6 @@ from packaging.version import Version
 from scrapy import Request, Spider
 from scrapy.http.response import Response
 from scrapy.item import Item
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api import (
@@ -24,7 +23,7 @@ from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     maybe_deferred_to_future,
 )
 
-from . import SETTINGS, process_request
+from . import SETTINGS, deferred_f_from_coro_f, process_request
 from .mockserver import DelayedResource, MockServer
 
 

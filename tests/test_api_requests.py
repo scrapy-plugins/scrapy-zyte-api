@@ -17,7 +17,6 @@ from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
-from scrapy.utils.defer import deferred_f_from_coro_f
 from twisted.internet.defer import Deferred, succeed
 from zyte_api import RequestError
 
@@ -37,6 +36,7 @@ from . import (
     SETTINGS,
     SETTINGS_T,
     UNSET,
+    deferred_f_from_coro_f,
     download_request,
     get_crawler,
     get_download_handler,
@@ -467,16 +467,15 @@ async def test_param_parser_output_side_effects(output, uses_zyte_api, mockserve
         handler._param_parser = mock.Mock()
         handler._param_parser.parse = mock.Mock(return_value=output)
         handler._download_request = mock.AsyncMock(side_effect=RuntimeError)
-        handler._fallback_handler = mock.Mock()
-        handler._fallback_handler.download_request = mock.AsyncMock(
-            side_effect=RuntimeError
-        )
+        fallback_handler = mock.Mock()
+        fallback_handler.download_request = mock.AsyncMock(side_effect=RuntimeError)
+        handler._get_fallback_handler = mock.Mock(return_value=fallback_handler)
         with pytest.raises(RuntimeError):
             await download_request(handler, request)
     if uses_zyte_api:
         handler._download_request.assert_called()
     else:
-        handler._fallback_handler.download_request.assert_called()
+        fallback_handler.download_request.assert_called()
 
 
 DEFAULT_AUTOMAP_PARAMS: dict[str, Any] = {

@@ -1,13 +1,12 @@
 import pytest
 from scrapy import Request, Spider
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.httpobj import urlparse_cached
 
 from scrapy_zyte_api import SessionConfig, session_config
 from scrapy_zyte_api._session import session_config_registry
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import UNSET, get_crawler
+from . import UNSET, deferred_f_from_coro_f, get_crawler
 from .helpers import assert_session_stats
 
 

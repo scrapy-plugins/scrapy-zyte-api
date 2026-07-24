@@ -5,12 +5,16 @@ from asyncio import create_task, sleep
 import pytest
 from scrapy import Request, Spider, signals
 from scrapy.exceptions import CloseSpider, IgnoreRequest
-from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api import ScrapyZyteAPISessionDownloaderMiddleware
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import SESSION_SETTINGS, get_crawler, get_downloader_middleware
+from . import (
+    SESSION_SETTINGS,
+    deferred_f_from_coro_f,
+    get_crawler,
+    get_downloader_middleware,
+)
 
 
 @deferred_f_from_coro_f

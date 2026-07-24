@@ -2,10 +2,11 @@ from copy import deepcopy
 
 import pytest
 from scrapy import Spider, signals
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT, maybe_deferred_to_future
+
+from . import deferred_f_from_coro_f
 
 try:
     import scrapy.addons  # noqa: F401
