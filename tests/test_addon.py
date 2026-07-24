@@ -12,6 +12,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPIRefererSpiderMiddleware,
     ScrapyZyteAPISessionDownloaderMiddleware,
+    ScrapyZyteAPISessionResetterDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
 from scrapy_zyte_api.addon import _setdefault
@@ -177,6 +178,7 @@ def _test_setting_changes(initial_settings, expected_settings):
 FALLBACK_HANDLER = "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
 BASE_EXPECTED = {
     "DOWNLOADER_MIDDLEWARES": {
+        ScrapyZyteAPISessionResetterDownloaderMiddleware: 565,
         ScrapyZyteAPIDownloaderMiddleware: 633,
         ScrapyZyteAPISessionDownloaderMiddleware: 667,
     },
@@ -219,6 +221,7 @@ if TWISTED_REACTOR != "twisted.internet.asyncioreactor.AsyncioSelectorReactor":
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
                     "builtins.str": 123,
+                    ScrapyZyteAPISessionResetterDownloaderMiddleware: 565,
                     ScrapyZyteAPIDownloaderMiddleware: 633,
                     ScrapyZyteAPISessionDownloaderMiddleware: 667,
                 },
@@ -233,8 +236,9 @@ if TWISTED_REACTOR != "twisted.internet.asyncioreactor.AsyncioSelectorReactor":
             {
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
-                    ScrapyZyteAPIDownloaderMiddleware: 999,
+                    ScrapyZyteAPISessionResetterDownloaderMiddleware: 565,
                     ScrapyZyteAPISessionDownloaderMiddleware: 667,
+                    ScrapyZyteAPIDownloaderMiddleware: 999,
                 },
             },
         ),
@@ -247,8 +251,9 @@ if TWISTED_REACTOR != "twisted.internet.asyncioreactor.AsyncioSelectorReactor":
             {
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": {
-                    "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 999,
+                    ScrapyZyteAPISessionResetterDownloaderMiddleware: 565,
                     ScrapyZyteAPISessionDownloaderMiddleware: 667,
+                    "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 999,
                 },
             },
         ),
@@ -259,6 +264,7 @@ def test_no_poet_setting_changes(initial_settings, expected_settings):
 
 
 EXPECTED_DOWNLOADER_MIDDLEWARES = {
+    ScrapyZyteAPISessionResetterDownloaderMiddleware: 565,
     ScrapyZyteAPIDownloaderMiddleware: 633,
     ScrapyZyteAPISessionDownloaderMiddleware: 667,
 }

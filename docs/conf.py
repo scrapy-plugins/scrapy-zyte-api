@@ -4,7 +4,7 @@ from pathlib import Path
 project = "scrapy-zyte-api"
 project_copyright = "2023, Zyte Group Ltd"
 author = "Zyte Group Ltd"
-release = "0.34.0"
+release = "0.35.0"
 
 sys.path.insert(0, str(Path(__file__).parent.absolute()))  # _ext
 extensions = [

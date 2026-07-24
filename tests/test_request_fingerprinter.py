@@ -1,3 +1,4 @@
+import hashlib
 from copy import copy
 
 import pytest
@@ -11,6 +12,7 @@ if Version(SCRAPY_VERSION) < Version("2.7"):
 from scrapy import Request, Spider
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
+from scrapy_zyte_api._request_fingerprinter import _ProviderPlanData
 from scrapy_zyte_api.utils import _build_from_crawler  # type: ignore[attr-defined]
 
 from . import SETTINGS, get_crawler
@@ -690,6 +692,302 @@ async def test_deps():
     assert page_request_transparent_fp == page_raw_request_transparent_fp
     assert page_request_transparent_fp == page_auto_request_default_fp
     assert page_request_transparent_fp == page_auto_request_transparent_fp
+
+
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@deferred_f_from_coro_f
+async def test_zyte_api_provider_meta_affects_fingerprint():
+    from scrapy_poet import DummyResponse  # noqa: PLC0415
+    from zyte_common_items import JobPostingNavigation  # noqa: PLC0415
+
+    class ProviderMetaSpider(Spider):
+        name = "provider_meta"
+
+        def __init__(self, *args, **kwargs):
+            self.browser_request = Request(
+                "https://example.com",
+                callback=self.parse,  # type: ignore[arg-type]
+                meta={
+                    "zyte_api_provider": {
+                        "jobPostingNavigationOptions": {"extractFrom": "browserHtml"},
+                    },
+                },
+            )
+            self.http_request = Request(
+                "https://example.com",
+                callback=self.parse,  # type: ignore[arg-type]
+                meta={
+                    "zyte_api_provider": {
+                        "jobPostingNavigationOptions": {
+                            "extractFrom": "httpResponseBody"
+                        },
+                    },
+                },
+            )
+
+        async def parse(self, response: DummyResponse, item: JobPostingNavigation):  # type: ignore[override]
+            pass
+
+    crawler = await get_crawler(spider_cls=ProviderMetaSpider)
+    fingerprinter = crawler.request_fingerprinter
+
+    browser_fingerprint = fingerprinter.fingerprint(crawler.spider.browser_request)
+    http_fingerprint = fingerprinter.fingerprint(crawler.spider.http_request)
+
+    assert browser_fingerprint != http_fingerprint
+
+
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@deferred_f_from_coro_f
+async def test_unknown_zyte_api_provider_meta_does_not_affect_fingerprint():
+    from scrapy_poet import DummyResponse  # noqa: PLC0415
+    from zyte_common_items import JobPostingNavigation  # noqa: PLC0415
+
+    class ProviderMetaSpider(Spider):
+        name = "provider_meta"
+
+        def __init__(self, *args, **kwargs):
+            self.request_a = Request(
+                "https://example.com",
+                callback=self.parse,  # type: ignore[arg-type]
+                meta={
+                    "zyte_api_provider": {
+                        "unknown": "a",
+                    },
+                },
+            )
+            self.request_b = Request(
+                "https://example.com",
+                callback=self.parse,  # type: ignore[arg-type]
+                meta={
+                    "zyte_api_provider": {
+                        "unknown": "b",
+                    },
+                },
+            )
+
+        async def parse(self, response: DummyResponse, item: JobPostingNavigation):  # type: ignore[override]
+            pass
+
+    crawler = await get_crawler(spider_cls=ProviderMetaSpider)
+    fingerprinter = crawler.request_fingerprinter
+
+    fingerprint_a = fingerprinter.fingerprint(crawler.spider.request_a)
+    fingerprint_b = fingerprinter.fingerprint(crawler.spider.request_b)
+
+    assert fingerprint_a == fingerprint_b
+
+
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@deferred_f_from_coro_f
+async def test_non_fingerprint_zyte_api_provider_meta_does_not_affect_fingerprint():
+    from scrapy_poet import DummyResponse  # noqa: PLC0415
+    from zyte_common_items import JobPostingNavigation  # noqa: PLC0415
+
+    class ProviderMetaSpider(Spider):
+        name = "provider_meta"
+
+        def __init__(self, *args, **kwargs):
+            self.request_a = Request(
+                "https://example.com",
+                callback=self.parse,  # type: ignore[arg-type]
+                meta={
+                    "zyte_api_provider": {
+                        "requestHeaders": {"referer": "a"},
+                    },
+                },
+            )
+            self.request_b = Request(
+                "https://example.com",
+                callback=self.parse,  # type: ignore[arg-type]
+                meta={
+                    "zyte_api_provider": {
+                        "requestHeaders": {"referer": "b"},
+                    },
+                },
+            )
+
+        async def parse(self, response: DummyResponse, item: JobPostingNavigation):  # type: ignore[override]
+            pass
+
+    crawler = await get_crawler(spider_cls=ProviderMetaSpider)
+    fingerprinter = crawler.request_fingerprinter
+
+    fingerprint_a = fingerprinter.fingerprint(crawler.spider.request_a)
+    fingerprint_b = fingerprinter.fingerprint(crawler.spider.request_b)
+
+    assert fingerprint_a == fingerprint_b
+
+
+@deferred_f_from_coro_f
+async def test_provider_fingerprint_combined_with_regular():
+    crawler = await get_crawler()
+    request = Request("https://example.com")
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
+    fingerprinter._fallback_fingerprinter_is_poets = False
+    fingerprinter._get_provider_request_fingerprint = (
+        lambda request, provider_plan_data=None: (b"provider", False)
+    )
+    fingerprinter._get_regular_request_fingerprint = lambda request: b"regular"
+
+    expected_fingerprint = hashlib.sha1(
+        b"regular" + b"provider", usedforsecurity=False
+    ).digest()
+    assert fingerprinter.fingerprint(request) == expected_fingerprint
+
+
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@deferred_f_from_coro_f
+async def test_provider_only_request_with_non_poet_fallback():
+    from scrapy_poet import DummyResponse  # noqa: PLC0415
+
+    class CustomFallbackFingerprinter:
+        def fingerprint(self, request):
+            return b"fallback"
+
+    class DummyResponseSpider(Spider):
+        name = "dummy_response"
+
+        def __init__(self, *args, **kwargs):
+            self.untyped_request = Request(
+                "https://example.com",
+                callback=self.parse_untyped,
+                meta={"zyte_api_automap": True},
+            )
+            self.dummy_response_request = Request(
+                "https://example.com",
+                callback=self.parse_dummy_response,  # type: ignore[arg-type]
+                meta={"zyte_api_automap": True},
+            )
+
+        async def parse_untyped(self, response):
+            pass
+
+        async def parse_dummy_response(self, response: DummyResponse):
+            pass
+
+    default_crawler = await get_crawler(
+        {"ZYTE_API_TRANSPARENT_MODE": True}, spider_cls=DummyResponseSpider
+    )
+    default_fingerprinter = _build_from_crawler(
+        ScrapyZyteAPIRequestFingerprinter, default_crawler
+    )
+
+    non_poet_fallback_crawler = await get_crawler(
+        {
+            "ZYTE_API_TRANSPARENT_MODE": True,
+            "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS": (
+                CustomFallbackFingerprinter
+            ),
+        },
+        spider_cls=DummyResponseSpider,
+    )
+    non_poet_fallback_fingerprinter = _build_from_crawler(
+        ScrapyZyteAPIRequestFingerprinter, non_poet_fallback_crawler
+    )
+
+    default_untyped_fingerprint = default_fingerprinter.fingerprint(
+        default_crawler.spider.untyped_request
+    )
+    default_dummy_response_fingerprint = default_fingerprinter.fingerprint(
+        default_crawler.spider.dummy_response_request
+    )
+
+    non_poet_untyped_fingerprint = non_poet_fallback_fingerprinter.fingerprint(
+        non_poet_fallback_crawler.spider.untyped_request
+    )
+    non_poet_dummy_response_fingerprint = non_poet_fallback_fingerprinter.fingerprint(
+        non_poet_fallback_crawler.spider.dummy_response_request
+    )
+
+    assert (
+        default_fingerprinter._is_provider_only_request(
+            default_crawler.spider.untyped_request
+        )
+        is False
+    )
+    assert (
+        default_fingerprinter._is_provider_only_request(
+            default_crawler.spider.dummy_response_request
+        )
+        is True
+    )
+    assert (
+        non_poet_fallback_fingerprinter._is_provider_only_request(
+            non_poet_fallback_crawler.spider.untyped_request
+        )
+        is False
+    )
+    assert (
+        non_poet_fallback_fingerprinter._is_provider_only_request(
+            non_poet_fallback_crawler.spider.dummy_response_request
+        )
+        is False
+    )
+
+    # scrapy-poet does not include DummyResponse annotation changes in
+    # dependency fingerprinting, so these requests hash the same.
+    assert default_untyped_fingerprint == default_dummy_response_fingerprint
+    assert non_poet_untyped_fingerprint == non_poet_dummy_response_fingerprint
+
+
+@deferred_f_from_coro_f
+async def test_provider_only_request_uses_provider_fingerprint():
+    crawler = await get_crawler()
+    request = Request("https://example.com")
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
+    fingerprinter._fallback_fingerprinter_is_poets = False
+    fingerprinter._get_provider_request_fingerprint = (
+        lambda request, provider_plan_data=None: (b"provider", True)
+    )
+
+    def _unexpected_regular_fingerprint(request):
+        raise AssertionError(
+            "regular request fingerprint must not be computed "
+            "for provider-only requests"
+        )
+
+    fingerprinter._get_regular_request_fingerprint = _unexpected_regular_fingerprint
+    assert fingerprinter.fingerprint(request) == b"provider"
+
+
+@deferred_f_from_coro_f
+async def test_provider_fingerprint_used_when_regular_fingerprint_is_missing():
+    crawler = await get_crawler()
+    request = Request("https://example.com")
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
+    fingerprinter._fallback_fingerprinter_is_poets = False
+    fingerprinter._get_provider_request_fingerprint = (
+        lambda request, provider_plan_data=None: (b"provider", False)
+    )
+    fingerprinter._get_regular_request_fingerprint = lambda request: None
+
+    assert fingerprinter.fingerprint(request) == b"provider"
+
+
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@deferred_f_from_coro_f
+async def test_provider_request_fingerprint_uses_provided_plan_data():
+    crawler = await get_crawler()
+    request = Request("https://example.com")
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
+    fingerprinter._fallback_fingerprinter_is_poets = True
+
+    def _unexpected_plan_data(request):
+        raise AssertionError(
+            "provider plan data must not be recomputed when it is provided"
+        )
+
+    fingerprinter._get_provider_plan_data = _unexpected_plan_data
+
+    provider_plan_data = _ProviderPlanData(
+        is_provider_only=True,
+        to_provide=None,
+        http_response_available=False,
+    )
+    assert fingerprinter._get_provider_request_fingerprint(
+        request, provider_plan_data=provider_plan_data
+    ) == (None, True)
 
 
 @deferred_f_from_coro_f
