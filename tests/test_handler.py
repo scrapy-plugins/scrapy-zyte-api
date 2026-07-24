@@ -24,7 +24,9 @@ from scrapy_zyte_api.handler import (
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _POET_ADDON_SUPPORT,
+    _REACTORLESS_SUPPORT,
     _X402_SUPPORT,
     USER_AGENT,
     _build_from_crawler,
@@ -32,6 +34,7 @@ from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
 )
 
 from . import (
+    _HTTPX_HANDLER,
     _REACTORLESS,
     DEFAULT_CLIENT_CONCURRENCY,
     SETTINGS,
@@ -738,6 +741,59 @@ async def test_fallback_setting_custom():
     # HTTPS was not overridden, so it keeps the default.
     https_fallback = handler._get_fallback_handler(Request("https://example.com"))
     assert isinstance(https_fallback, _EXPECTED_FALLBACK_HANDLER)
+
+
+class _NoCloseFallbackHandler:
+    """A fallback download handler that does not define a close() method."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def download_request(self, *args, **kwargs):
+        return None
+
+
+@deferred_f_from_coro_f
+async def test_close_fallback_without_close():
+    """Closing the handler closes fallback handlers that define close() and
+    skips those that do not."""
+    settings = {
+        **SETTINGS,
+        "COOKIES_ENABLED": False,
+        "ZYTE_API_FALLBACK_HTTP_HANDLER": "tests.test_handler._NoCloseFallbackHandler",
+    }
+    crawler = await get_crawler_zyte_api(settings=settings, start_handler=True)
+    handler = get_download_handler(crawler, "https")
+    assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
+    # Build both fallback handlers so that both are closed below: the http one
+    # lacks close(), while the https one (the default) defines it.
+    http_fallback = handler._get_fallback_handler(Request("http://example.com"))
+    https_fallback = handler._get_fallback_handler(Request("https://example.com"))
+    assert not hasattr(http_fallback, "close")
+    assert hasattr(https_fallback, "close")
+    result = handler.close()
+    if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+        await maybe_deferred_to_future(result)
+    else:
+        await result
+
+
+@pytest.mark.skipif(
+    not _REACTORLESS_SUPPORT,
+    reason="TWISTED_REACTOR_ENABLED requires Scrapy >= 2.15",
+)
+@deferred_f_from_coro_f
+async def test_reactorless():
+    """Without a Twisted reactor (TWISTED_REACTOR_ENABLED=False) the handler
+    does not verify the installed reactor and falls back to the asyncio-based
+    httpx handler."""
+    crawler = get_crawler()
+    settings = Settings({**SETTINGS, "TWISTED_REACTOR_ENABLED": False})
+    settings["TWISTED_REACTOR"] = None
+    handler = ScrapyZyteAPIDownloadHandler(settings, crawler)
+    assert handler._reactor_enabled is False
+    assert handler._fallback_handler_paths["http"] == _HTTPX_HANDLER
+    assert handler._fallback_handler_paths["https"] == _HTTPX_HANDLER
 
 
 @pytest.mark.parametrize(

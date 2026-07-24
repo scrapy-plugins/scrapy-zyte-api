@@ -2,6 +2,7 @@ import pytest
 from scrapy import Request, Spider
 from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.http.response import Response
+from scrapy.settings import SETTINGS_PRIORITIES, Settings
 from scrapy.settings.default_settings import TWISTED_REACTOR
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred, succeed
@@ -13,10 +14,12 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISessionResetterDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
+from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
 from scrapy_zyte_api.utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _POET_ADDON_SUPPORT,
+    _REACTORLESS_SUPPORT,
 )
 
 from . import (
@@ -127,6 +130,29 @@ async def test_addon_fallback_explicit():
     handler = get_download_handler(crawler, "http")
     assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
     assert isinstance(handler._fallback_handler, DummyDownloadHandler)
+
+
+@pytest.mark.skipif(
+    not _REACTORLESS_SUPPORT,
+    reason="TWISTED_REACTOR_ENABLED requires Scrapy >= 2.15",
+)
+def test_addon_reactorless():
+    """The add-on forces the asyncio reactor only when a Twisted reactor is in
+    use; with TWISTED_REACTOR_ENABLED=False it must leave TWISTED_REACTOR
+    untouched."""
+    base = {
+        "DOWNLOAD_HANDLERS": {
+            "http": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
+            "https": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
+        },
+    }
+    enabled = Settings(base)
+    Addon().update_settings(enabled)
+    assert enabled.getpriority("TWISTED_REACTOR") == SETTINGS_PRIORITIES["addon"]
+
+    disabled = Settings({**base, "TWISTED_REACTOR_ENABLED": False})
+    Addon().update_settings(disabled)
+    assert disabled.getpriority("TWISTED_REACTOR") != SETTINGS_PRIORITIES["addon"]
 
 
 @deferred_f_from_coro_f
