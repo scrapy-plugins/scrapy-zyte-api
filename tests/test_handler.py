@@ -600,8 +600,7 @@ async def test_trust_env(enabled):
 def test_user_agent_for_build_client(user_agent, expected):
     settings: Settings = Settings(
         {
-            # see https://github.com/python/mypy/issues/16557#issuecomment-1831213673
-            **SETTINGS,  # type: ignore[dict-item]
+            **SETTINGS,
             "_ZYTE_API_USER_AGENT": user_agent,
         }
     )

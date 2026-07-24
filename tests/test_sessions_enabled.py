@@ -28,6 +28,7 @@ from .helpers import assert_session_stats
 @deferred_f_from_coro_f
 async def test_enabled(setting, meta, outcome, mockserver):
     settings = {
+        "RETRY_TIMES": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_STATS_PER_POOL": True,
     }

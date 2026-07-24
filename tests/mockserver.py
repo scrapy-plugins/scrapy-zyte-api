@@ -9,7 +9,7 @@ from base64 import b64encode
 from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
 from scrapy import Request
@@ -23,6 +23,7 @@ from . import SETTINGS, download_request, make_handler
 
 if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
+    from twisted.internet.interfaces import IReactorTime
 
     from scrapy_zyte_api.responses import _API_RESPONSE
 
@@ -62,8 +63,7 @@ class LeafResource(Resource):
             d.addErrback(lambda _: None)
             d.cancel()
 
-        # Typing issues: https://github.com/twisted/twisted/issues/9909
-        d: Deferred = deferLater(reactor, delay, f, *a, **kw)  # type: ignore[arg-type]
+        d: Deferred = deferLater(cast("IReactorTime", reactor), delay, f, *a, **kw)
         request.notifyFinish().addErrback(_cancelrequest)
         return d
 
@@ -140,6 +140,23 @@ class DefaultResource(Resource):
             }
             return json.dumps(response_data).encode()
 
+        if "session-redirect" in domain:
+            response_data["httpResponseHeaders"] = [
+                {"name": "Location", "value": "https://example.com/"}
+            ]
+            response_data["statusCode"] = 302
+            if "session" in request_data:
+                response_data["session"] = request_data["session"]
+            return json.dumps(response_data).encode()
+
+        if "session-meta-refresh" in domain:
+            response_data["browserHtml"] = (
+                '<meta http-equiv="refresh" content="0; url=https://example.com/">'
+            )
+            if "session" in request_data:
+                response_data["session"] = request_data["session"]
+            return json.dumps(response_data).encode()
+
         html = "<html><body>Hello<h1>World!</h1></body></html>"
         if "browserHtml" in request_data:
             if "httpResponseBody" in request_data:
@@ -175,6 +192,28 @@ class DefaultResource(Resource):
                     request.setResponseCode(500)
                     return b""
             response_data["session"] = request_data["session"]
+
+        if request_data.get("responseCookies") and not domain.startswith(
+            "no-response-cookies"
+        ):
+            cookies = [
+                {
+                    "name": "test_cookie",
+                    "value": "test_value",
+                    "domain": domain,
+                    "path": "/",
+                }
+            ]
+            if request_data.get("requestCookies") is not None:
+                cookies.append(
+                    {
+                        "name": "extra_cookie",
+                        "value": "extra_value",
+                        "domain": domain,
+                        "path": "/",
+                    }
+                )
+            response_data["responseCookies"] = cookies  # type: ignore[assignment]
 
         if "httpResponseBody" in request_data:
             headers = request_data.get("customHttpRequestHeaders", [])
@@ -298,6 +337,9 @@ class DefaultResource(Resource):
                     "pageNumber": 0,
                 }
 
+        if "session-retry" in domain:
+            response_data["statusCode"] = 500
+
         return json.dumps(response_data).encode()
 
 
@@ -380,14 +422,12 @@ def main():
     module_name, name = args.resource.rsplit(".", 1)
     sys.path.append(".")
     resource = getattr(import_module(module_name), name)()
-    # Typing issue: https://github.com/twisted/twisted/issues/9909
     http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[attr-defined]
 
     def print_listening():
         host = http_port.getHost()
         print(f"Mock server {resource} running at http://{host.host}:{host.port}")
 
-    # Typing issue: https://github.com/twisted/twisted/issues/9909
     reactor.callWhenRunning(print_listening)  # type: ignore[attr-defined]
     reactor.run()  # type: ignore[attr-defined]
 
