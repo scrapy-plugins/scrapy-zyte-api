@@ -7,7 +7,6 @@ import pytest
 from aiohttp.client_exceptions import ServerConnectionError
 from scrapy import Request, Spider, signals
 from scrapy.http import Response
-from scrapy.utils.defer import deferred_f_from_coro_f
 from zyte_api import RequestError
 
 from scrapy_zyte_api import (
@@ -17,7 +16,7 @@ from scrapy_zyte_api import (
 from scrapy_zyte_api._session import SESSION_INIT_META_KEY
 from scrapy_zyte_api.utils import _REQUEST_ERROR_HAS_QUERY, maybe_deferred_to_future
 
-from . import SESSION_SETTINGS, get_crawler
+from . import SESSION_SETTINGS, deferred_f_from_coro_f, get_crawler
 from .helpers import assert_session_stats
 
 

@@ -9,10 +9,8 @@ pytest.importorskip("scrapy_poet")
 import attrs
 from scrapy import Request, Spider
 from scrapy.statscollectors import MemoryStatsCollector
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy_poet import DummyResponse
 from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
-from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.internet.protocol import Protocol
 from twisted.web.client import Agent
@@ -62,8 +60,20 @@ from scrapy_zyte_api.providers import (
 )
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import SETTINGS
+from . import _REACTORLESS, SETTINGS, deferred_f_from_coro_f
 from .mockserver import get_ephemeral_port
+
+if not _REACTORLESS:
+    # Importing the reactor is forbidden when running without one; these
+    # imports are only used by tests that are skipped in that mode.
+    from twisted.internet import reactor
+
+# Some tests fetch a URL through a Twisted Agent to inspect the mock server,
+# which is not possible without a reactor.
+requires_reactor = pytest.mark.skipif(
+    _REACTORLESS,
+    reason="Uses a Twisted Agent to fetch a URL, which requires a reactor.",
+)
 
 PROVIDER_PARAMS = {"geolocation": "IE"}
 
@@ -184,6 +194,7 @@ class MyPage(ItemPage[MyItem]):
         return str(self.response.url)
 
 
+@requires_reactor
 @deferred_f_from_coro_f
 async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):
@@ -216,6 +227,7 @@ async def test_itemprovider_requests_direct_dependencies(fresh_mockserver):
     assert "product" in item
 
 
+@requires_reactor
 @deferred_f_from_coro_f
 async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):
@@ -243,6 +255,7 @@ async def test_itemprovider_requests_indirect_dependencies(fresh_mockserver):
     assert "product" in item
 
 
+@requires_reactor
 @deferred_f_from_coro_f
 async def test_itemprovider_requests_indirect_dependencies_workaround(fresh_mockserver):
     class ItemDepSpider(ZyteAPISpider):

@@ -4,7 +4,6 @@ from typing import Any
 
 import pytest
 from scrapy import Request, Spider, signals
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.httpobj import urlparse_cached
 
 from scrapy_zyte_api import (
@@ -20,7 +19,7 @@ from scrapy_zyte_api._session import (
 )
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import SESSION_SETTINGS, SETTINGS, UNSET, get_crawler
+from . import SESSION_SETTINGS, SETTINGS, UNSET, deferred_f_from_coro_f, get_crawler
 from .helpers import assert_session_stats
 
 COOKIE_SESSION_SETTINGS = {

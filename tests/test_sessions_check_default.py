@@ -2,13 +2,12 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 from scrapy import Request, Spider
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.test import get_crawler as scrapy_get_crawler
 
 from scrapy_zyte_api import SessionConfig
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import SESSION_SETTINGS, get_crawler
+from . import SESSION_SETTINGS, deferred_f_from_coro_f, get_crawler
 from .helpers import assert_session_stats
 
 if TYPE_CHECKING:

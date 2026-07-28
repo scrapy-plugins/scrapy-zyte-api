@@ -4,7 +4,8 @@ from copy import copy
 import pytest
 from packaging.version import Version
 from scrapy import __version__ as SCRAPY_VERSION
-from scrapy.utils.defer import deferred_f_from_coro_f
+
+from . import deferred_f_from_coro_f
 
 if Version(SCRAPY_VERSION) < Version("2.7"):
     pytest.skip("Skipping tests for Scrapy ≥ 2.7", allow_module_level=True)

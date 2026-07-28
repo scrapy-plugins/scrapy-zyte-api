@@ -11,7 +11,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 
-from .utils import _POET_ADDON_SUPPORT
+from .utils import _POET_ADDON_SUPPORT, _reactor_enabled
 
 
 def _setdefault(settings, setting, cls, pos):
@@ -95,11 +95,12 @@ class Addon:
         _setdefault(
             settings, "SPIDER_MIDDLEWARES", ScrapyZyteAPIRefererSpiderMiddleware, 1000
         )
-        settings.set(
-            "TWISTED_REACTOR",
-            "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
-            "addon",
-        )
+        if _reactor_enabled(settings):
+            settings.set(
+                "TWISTED_REACTOR",
+                "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+                "addon",
+            )
         settings.set("ZYTE_API_TRANSPARENT_MODE", True, "addon")
 
         try:

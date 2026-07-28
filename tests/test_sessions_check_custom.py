@@ -2,14 +2,13 @@ import pytest
 from scrapy import Request, Spider
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.misc import load_object
 
 from scrapy_zyte_api import SessionConfig, session_config
 from scrapy_zyte_api._session import SESSION_INIT_META_KEY, session_config_registry
 from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT, maybe_deferred_to_future
 
-from . import SESSION_SETTINGS, get_crawler
+from . import SESSION_SETTINGS, deferred_f_from_coro_f, get_crawler
 from .helpers import assert_session_stats
 
 mod = "tests.test_sessions_check_custom."

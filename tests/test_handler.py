@@ -13,7 +13,6 @@ from scrapy import Request, Spider
 from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy.utils.test import get_crawler
 from zyte_api import RetryFactory
 from zyte_api.constants import API_URL
@@ -26,7 +25,9 @@ from scrapy_zyte_api.handler import (
 from scrapy_zyte_api.responses import ZyteAPITextResponse
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _POET_ADDON_SUPPORT,
+    _REACTORLESS_SUPPORT,
     _X402_SUPPORT,
     USER_AGENT,
     _build_from_crawler,
@@ -34,10 +35,13 @@ from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
 )
 
 from . import (
+    _HTTPX_HANDLER,
+    _REACTORLESS,
     DEFAULT_CLIENT_CONCURRENCY,
     SETTINGS,
     SETTINGS_T,
     UNSET,
+    deferred_f_from_coro_f,
     download_request,
     get_download_handler,
     make_handler,
@@ -50,6 +54,14 @@ try:
     from zyte_api import AsyncZyteAPI
 except ImportError:
     from zyte_api.aio.client import AsyncClient as AsyncZyteAPI
+
+_EXPECTED_FALLBACK_HANDLER: type
+if _REACTORLESS:
+    from scrapy.core.downloader.handlers._httpx import HttpxDownloadHandler
+
+    _EXPECTED_FALLBACK_HANDLER = HttpxDownloadHandler
+else:
+    _EXPECTED_FALLBACK_HANDLER = HTTP11DownloadHandler
 
 
 @pytest.mark.parametrize(
@@ -79,6 +91,7 @@ assert ETH_KEY_2 != ETH_KEY
 HAS_X402 = importlib.util.find_spec("x402") is not None and _X402_SUPPORT
 
 
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     ("scenario", "expected"),
     [
@@ -162,7 +175,9 @@ HAS_X402 = importlib.util.find_spec("x402") is not None and _X402_SUPPORT
         ),
     ],
 )
-def test_auth(scenario: dict[str, Any], expected: type[Exception] | dict[str, str]):
+async def test_auth(
+    scenario: dict[str, Any], expected: type[Exception] | dict[str, str]
+):
     env = scenario.get("env", {})
     settings: SETTINGS_T = scenario.get("settings", {})
     with set_env(**env):
@@ -192,6 +207,7 @@ def test_auth(scenario: dict[str, Any], expected: type[Exception] | dict[str, st
         assert handler._client.api_url == "https://api-x402.zyte.com/v1/"
 
 
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
     ("setting", "expected"),
     [
@@ -217,7 +233,7 @@ def test_auth(scenario: dict[str, Any], expected: type[Exception] | dict[str, st
         ),
     ],
 )
-def test_api_url(setting, expected):
+async def test_api_url(setting, expected):
     settings: SETTINGS_T = {"ZYTE_API_KEY": "a"}
     if setting is not UNSET:
         settings["ZYTE_API_URL"] = setting
@@ -226,7 +242,8 @@ def test_api_url(setting, expected):
     assert handler._client.api_url == expected
 
 
-def test_custom_client():
+@deferred_f_from_coro_f
+async def test_custom_client():
     client = AsyncZyteAPI(api_key="a", api_url="b")
     crawler = get_crawler()
     handler = ScrapyZyteAPIDownloadHandler(crawler.settings, crawler, client)
@@ -432,7 +449,8 @@ async def test_stats(mockserver):
             assert value > 0.0
 
 
-def test_single_client():
+@deferred_f_from_coro_f
+async def test_single_client():
     """Make sure that the same Zyte API client is used by both download
     handlers."""
     crawler = get_crawler(settings_dict=SETTINGS)
@@ -716,12 +734,98 @@ async def test_suspended_account_callback():
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
 
 
+class _DummyFallbackHandler:
+    lazy = False
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def download_request(self, *args, **kwargs):
+        return None
+
+    async def close(self):
+        pass
+
+
 @deferred_f_from_coro_f
 async def test_fallback_setting():
     crawler = await get_crawler_zyte_api(settings=SETTINGS)
     handler = get_download_handler(crawler, "https")
     assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
-    assert isinstance(handler._fallback_handler, HTTP11DownloadHandler)
+    for scheme in ("http", "https"):
+        fallback = handler._get_fallback_handler(Request(f"{scheme}://example.com"))
+        assert isinstance(fallback, _EXPECTED_FALLBACK_HANDLER)
+
+
+@deferred_f_from_coro_f
+async def test_fallback_setting_custom():
+    """ScrapyZyteAPIDownloadHandler honors the per-scheme fallback settings,
+    resolving the handler based on the request scheme."""
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_FALLBACK_HTTP_HANDLER": "tests.test_handler._DummyFallbackHandler",
+    }
+    crawler = await get_crawler_zyte_api(settings=settings)
+    handler = get_download_handler(crawler, "https")
+    assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
+    http_fallback = handler._get_fallback_handler(Request("http://example.com"))
+    assert isinstance(http_fallback, _DummyFallbackHandler)
+    # HTTPS was not overridden, so it keeps the default.
+    https_fallback = handler._get_fallback_handler(Request("https://example.com"))
+    assert isinstance(https_fallback, _EXPECTED_FALLBACK_HANDLER)
+
+
+class _NoCloseFallbackHandler:
+    """A fallback download handler that does not define a close() method."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def download_request(self, *args, **kwargs):
+        return None
+
+
+@deferred_f_from_coro_f
+async def test_close_fallback_without_close():
+    """Closing the handler closes fallback handlers that define close() and
+    skips those that do not."""
+    settings = {
+        **SETTINGS,
+        "COOKIES_ENABLED": False,
+        "ZYTE_API_FALLBACK_HTTP_HANDLER": "tests.test_handler._NoCloseFallbackHandler",
+    }
+    crawler = await get_crawler_zyte_api(settings=settings, start_handler=True)
+    handler = get_download_handler(crawler, "https")
+    assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
+    # Build both fallback handlers so that both are closed below: the http one
+    # lacks close(), while the https one (the default) defines it.
+    http_fallback = handler._get_fallback_handler(Request("http://example.com"))
+    https_fallback = handler._get_fallback_handler(Request("https://example.com"))
+    assert not hasattr(http_fallback, "close")
+    assert hasattr(https_fallback, "close")
+    result = handler.close()
+    if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+        await maybe_deferred_to_future(result)
+    else:
+        await result
+
+
+@pytest.mark.skipif(
+    not _REACTORLESS_SUPPORT,
+    reason="TWISTED_REACTOR_ENABLED requires Scrapy >= 2.15",
+)
+@deferred_f_from_coro_f
+async def test_reactorless():
+    """Without a Twisted reactor (TWISTED_REACTOR_ENABLED=False) the handler
+    does not verify the installed reactor and falls back to the asyncio-based
+    httpx handler."""
+    crawler = get_crawler()
+    settings = Settings({**SETTINGS, "TWISTED_REACTOR_ENABLED": False})
+    settings["TWISTED_REACTOR"] = None
+    handler = ScrapyZyteAPIDownloadHandler(settings, crawler)
+    assert handler._reactor_enabled is False
+    assert handler._fallback_handler_paths["http"] == _HTTPX_HANDLER
+    assert handler._fallback_handler_paths["https"] == _HTTPX_HANDLER
 
 
 @pytest.mark.parametrize(
