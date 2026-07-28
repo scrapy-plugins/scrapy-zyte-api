@@ -2,7 +2,6 @@ import logging
 
 import pytest
 from scrapy import Request, Spider, signals
-from scrapy.downloadermiddlewares.retry import get_retry_request
 from scrapy.http.response import Response
 
 from scrapy_zyte_api import (
@@ -12,15 +11,15 @@ from scrapy_zyte_api import (
     session_config_registry,
 )
 from scrapy_zyte_api._session import PoolError
-from scrapy_zyte_api.utils import _GET_COMPONENT_SUPPORT, maybe_deferred_to_future
+from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import SESSION_SETTINGS, deferred_f_from_coro_f, get_crawler
-from .helpers import assert_session_stats
-
-pytestmark = pytest.mark.skipif(
-    not _GET_COMPONENT_SUPPORT,
-    reason="Discarding sessions from user code requires Scrapy 2.12 or higher",
+from . import (
+    SESSION_SETTINGS,
+    deferred_f_from_coro_f,
+    get_crawler,
+    get_downloader_middleware,
 )
+from .helpers import assert_session_stats
 
 SETTINGS = {
     **SESSION_SETTINGS,
@@ -59,9 +58,21 @@ async def crawl(mockserver, spider_cls, settings=None):
 
 
 def get_session_middleware(spider):
-    return spider.crawler.get_downloader_middleware(
-        ScrapyZyteAPISessionDownloaderMiddleware
+    return get_downloader_middleware(
+        spider.crawler, ScrapyZyteAPISessionDownloaderMiddleware
     )
+
+
+def retry(response):
+    """Return a request to retry *response*.
+
+    :func:`~scrapy.downloadermiddlewares.retry.get_retry_request`, which is
+    what user code is expected to use, requires Scrapy 2.5+, while these tests
+    also run on earlier versions.
+    """
+    request = response.request.replace(dont_filter=True)
+    request.meta["retry_times"] = response.request.meta.get("retry_times", 0) + 1
+    return request
 
 
 @deferred_f_from_coro_f
@@ -77,7 +88,7 @@ async def test_response(mockserver):
             if "retry_times" in response.request.meta:
                 return
             get_session_middleware(self).discard_session(response)
-            yield get_retry_request(response.request, spider=self, reason="test")
+            yield retry(response)
 
     crawler, tracker = await crawl(mockserver, TestSpider)
 
@@ -118,6 +129,35 @@ async def test_request(mockserver):
             "example.com": {
                 "init/check-passed": 2,
                 "use/check-passed": 1,
+                "use/discarded": 1,
+            }
+        },
+    )
+
+
+@deferred_f_from_coro_f
+async def test_already_discarded(mockserver):
+    """Discarding a session that has already been discarded, e.g. by a
+    concurrent request, does nothing."""
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            middleware = get_session_middleware(self)
+            middleware.discard_session(response)
+            middleware.discard_session(response)
+
+    crawler, _ = await crawl(mockserver, TestSpider)
+
+    assert_session_stats(
+        crawler,
+        {
+            "example.com": {
+                "init/check-passed": 2,
+                "use/check-passed": 1,
+                # The second call is a no-op.
                 "use/discarded": 1,
             }
         },

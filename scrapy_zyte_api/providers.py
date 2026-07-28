@@ -54,7 +54,11 @@ from scrapy_zyte_api._session import (
     ScrapyZyteAPISessionDownloaderMiddleware,
     Session,
 )
-from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
+from scrapy_zyte_api.utils import (
+    _ENGINE_HAS_DOWNLOAD_ASYNC,
+    _get_downloader_middleware,
+    maybe_deferred_to_future,
+)
 
 _PROVIDER_META_CACHE_MAX_SIZE = 1024
 _provider_meta_caches: WeakKeyDictionary = WeakKeyDictionary()
@@ -550,7 +554,7 @@ class ZyteApiSessionProvider(PageObjectInputProvider):
     def __call__(
         self, to_provide: Set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
-        middleware = crawler.get_downloader_middleware(
-            ScrapyZyteAPISessionDownloaderMiddleware
+        middleware = _get_downloader_middleware(
+            crawler, ScrapyZyteAPISessionDownloaderMiddleware
         )
         return [Session(middleware=middleware, request=request)]

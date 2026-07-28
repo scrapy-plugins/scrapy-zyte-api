@@ -11,7 +11,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 
-from .utils import _GET_COMPONENT_SUPPORT, _POET_ADDON_SUPPORT, _reactor_enabled
+from .utils import _POET_ADDON_SUPPORT, _reactor_enabled
 
 
 def _setdefault(settings, setting, cls, pos):
@@ -119,7 +119,4 @@ class Addon:
                 )
 
             _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiProvider, 1100)
-            if _GET_COMPONENT_SUPPORT:
-                _setdefault(
-                    settings, "SCRAPY_POET_PROVIDERS", ZyteApiSessionProvider, 1101
-                )
+            _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiSessionProvider, 1101)

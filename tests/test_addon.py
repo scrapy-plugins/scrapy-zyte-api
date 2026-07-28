@@ -20,7 +20,6 @@ from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
 from scrapy_zyte_api.utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
-    _GET_COMPONENT_SUPPORT,
     _POET_ADDON_SUPPORT,
     _REACTORLESS_SUPPORT,
 )
@@ -52,9 +51,10 @@ except ImportError:
     POET = False
     InjectionMiddleware = None  # type: ignore[assignment,misc]
     ZyteApiProvider: type | None = None
+    ZyteApiSessionProvider: type | None = None
 else:
     POET = True
-    from scrapy_zyte_api.providers import ZyteApiProvider
+    from scrapy_zyte_api.providers import ZyteApiProvider, ZyteApiSessionProvider
 
 _crawler = get_crawler()
 BASELINE_SETTINGS = _crawler.settings.copy_to_dict()
@@ -327,10 +327,7 @@ if not _POET_ADDON_SUPPORT:
 EXPECTED_POET_PROVIDERS: dict[Any, int] = {}
 if POET:
     EXPECTED_POET_PROVIDERS[ZyteApiProvider] = 1100
-    if _GET_COMPONENT_SUPPORT:
-        from scrapy_zyte_api.providers import ZyteApiSessionProvider
-
-        EXPECTED_POET_PROVIDERS[ZyteApiSessionProvider] = 1101
+    EXPECTED_POET_PROVIDERS[ZyteApiSessionProvider] = 1101
 
 _SESSIONS_BASE_EXPECTED = dict(BASE_EXPECTED)
 if POET:

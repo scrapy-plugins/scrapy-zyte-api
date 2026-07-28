@@ -287,8 +287,6 @@ redirect entirely:
 Discarding sessions
 ===================
 
-.. note:: Requires Scrapy 2.12+.
-
 :ref:`Session validity checks <session-check>` run before your spider callbacks
 and page objects see a response. Sometimes, though, you only find out that a
 session is no longer good while parsing, e.g. because an expected field is
@@ -325,6 +323,16 @@ method:
                 )
                 middleware.discard_session(response)
                 yield get_retry_request(response.request, spider=self, reason="no_price")
+
+.. note:: :meth:`Crawler.get_downloader_middleware()
+    <scrapy.crawler.Crawler.get_downloader_middleware>` requires Scrapy 2.12+.
+    On earlier versions, find the middleware yourself:
+
+    .. code-block:: python
+
+        for middleware in self.crawler.engine.downloader.middleware.middlewares:
+            if isinstance(middleware, ScrapyZyteAPISessionDownloaderMiddleware):
+                break
 
 .. _session-discard-page-object:
 
