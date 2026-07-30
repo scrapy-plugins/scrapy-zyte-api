@@ -109,13 +109,11 @@ def _get_or_build_zyte_api_provider_meta(
     crawler: Crawler,
     *,
     provider_params,
-    meta_params=None,
+    meta_params,
     screenshot_requested=None,
     http_response_available: bool = False,
     for_fingerprint: bool = False,
 ) -> tuple[dict, bool]:
-    if meta_params is None:
-        meta_params = _get_zyte_api_meta_params(request)
     cache = _get_provider_meta_cache(crawler)
     key = _build_provider_meta_cache_key(
         to_provide,
