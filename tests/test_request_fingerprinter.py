@@ -820,6 +820,67 @@ async def test_non_fingerprint_zyte_api_provider_meta_does_not_affect_fingerprin
     assert fingerprint_a == fingerprint_b
 
 
+@pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@pytest.mark.parametrize(
+    ("params_a", "params_b", "same_fingerprint"),
+    [
+        # A parameter that changes the fingerprint.
+        ({"device": "desktop"}, {"device": "mobile"}, False),
+        # A parameter that does not change the fingerprint.
+        ({"ipType": "residential"}, {"ipType": "datacenter"}, True),
+        # An unknown parameter.
+        ({"unknown": "a"}, {"unknown": "b"}, True),
+    ],
+)
+@deferred_f_from_coro_f
+async def test_zyte_api_params_dependency_fingerprint(
+    params_a, params_b, same_fingerprint
+):
+    from typing import Annotated  # noqa: PLC0415
+
+    from scrapy_poet import DummyResponse  # noqa: PLC0415
+    from zyte_common_items import JobPostingNavigation  # noqa: PLC0415
+
+    from scrapy_zyte_api import ZyteApiParams, zyte_api_params  # noqa: PLC0415
+
+    class ParamsSpider(Spider):
+        name = "params"
+
+        def __init__(self, *args, **kwargs):
+            self.request_a = Request(
+                "https://example.com",
+                callback=self.parse_a,  # type: ignore[arg-type]
+            )
+            self.request_b = Request(
+                "https://example.com",
+                callback=self.parse_b,  # type: ignore[arg-type]
+            )
+
+        async def parse_a(
+            self,
+            response: DummyResponse,
+            item: JobPostingNavigation,
+            params: Annotated[ZyteApiParams, zyte_api_params(params_a)],
+        ):
+            pass
+
+        async def parse_b(
+            self,
+            response: DummyResponse,
+            item: JobPostingNavigation,
+            params: Annotated[ZyteApiParams, zyte_api_params(params_b)],
+        ):
+            pass
+
+    crawler = await get_crawler(spider_cls=ParamsSpider)
+    fingerprinter = crawler.request_fingerprinter
+
+    fingerprint_a = fingerprinter.fingerprint(crawler.spider.request_a)
+    fingerprint_b = fingerprinter.fingerprint(crawler.spider.request_b)
+
+    assert (fingerprint_a == fingerprint_b) is same_fingerprint
+
+
 @deferred_f_from_coro_f
 async def test_provider_fingerprint_combined_with_regular():
     crawler = await get_crawler()

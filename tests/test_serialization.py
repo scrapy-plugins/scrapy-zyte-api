@@ -1,6 +1,6 @@
 import pytest
 
-from scrapy_zyte_api._page_inputs import Actions, Geolocation, Screenshot
+from scrapy_zyte_api._page_inputs import Actions, Geolocation, Screenshot, ZyteApiParams
 
 
 @pytest.mark.parametrize(
@@ -9,6 +9,7 @@ from scrapy_zyte_api._page_inputs import Actions, Geolocation, Screenshot
         {"cls": Actions, "kwargs": {"results": [{"action": "click", "id": "x"}]}},
         {"cls": Geolocation, "kwargs": {}},
         {"cls": Screenshot, "kwargs": {"body": b"PNGDATA"}},
+        {"cls": ZyteApiParams, "kwargs": {"params": {"product": True}}},
     ],
 )
 def test(case):
