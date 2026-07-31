@@ -35,12 +35,16 @@ _SCRAPY_2_13_0 = Version("2.13.0")
 _SCRAPY_2_14_0 = Version("2.14.0")
 _SCRAPY_2_15_0 = Version("2.15.0")
 
-# Need to install an asyncio reactor before download handler imports to work
-# around:
-# https://github.com/scrapy/scrapy/commit/0946eb335a285e1f210ba1185a564699f53b17d8
-# Fixed in:
-# https://github.com/scrapy/scrapy/commit/e4bdd1cb958b7d89b86ea66f0af1cec2d91a6d44
-_NEEDS_EARLY_REACTOR = _SCRAPY_2_4_0 <= _SCRAPY_VERSION < _SCRAPY_2_6_0
+if _SCRAPY_2_4_0 <= _SCRAPY_VERSION < _SCRAPY_2_6_0:
+    # On these Scrapy versions the import of
+    # scrapy.downloadermiddlewares.retry below reaches
+    # scrapy.core.downloader.webclient, which installs the default reactor, so
+    # the asyncio reactor must be installed before it.
+    # https://github.com/scrapy/scrapy/commit/0946eb335a285e1f210ba1185a564699f53b17d8
+    # https://github.com/scrapy/scrapy/commit/e4bdd1cb958b7d89b86ea66f0af1cec2d91a6d44
+    from scrapy.utils.reactor import install_reactor
+
+    install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
 _ADDON_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_10_0
 _ASYNC_START_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_13_0
