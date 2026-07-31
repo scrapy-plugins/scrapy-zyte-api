@@ -1,32 +1,54 @@
+from __future__ import annotations
+
 import json
 import logging
+import time
 from copy import deepcopy
-from typing import Any, Generator, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from scrapy import Spider, signals
-from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
-from scrapy.http import Request
-from scrapy.settings import Settings
-from scrapy.utils.defer import deferred_from_coro
-from scrapy.utils.misc import create_instance, load_object
-from scrapy.utils.reactor import verify_installed_reactor
-from twisted.internet.defer import Deferred, inlineCallbacks
+from scrapy.utils.httpobj import urlparse_cached
+from scrapy.utils.misc import load_object
+
+if TYPE_CHECKING:
+    from scrapy.crawler import Crawler
+    from scrapy.http import Request
+    from scrapy.http.response import Response
+    from scrapy.settings import Settings
+from twisted.internet.defer import ensureDeferred
 from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
-from zyte_api.constants import API_URL
 
 from ._params import _ParamParser
-from .responses import ZyteAPIResponse, ZyteAPITextResponse, _process_response
-from .utils import USER_AGENT
+from .responses import (
+    ZyteAPIJsonResponse,
+    ZyteAPIResponse,
+    ZyteAPITextResponse,
+    ZyteAPIXmlResponse,
+    _process_response,
+)
+from .utils import (  # type: ignore[attr-defined]
+    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
+    _X402_SUPPORT,
+    USER_AGENT,
+    _build_from_crawler,
+    _close_spider,
+    _reactor_enabled,
+)
+
+if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+    from scrapy.utils.defer import deferred_from_coro
+    from twisted.internet.defer import Deferred
 
 logger = logging.getLogger(__name__)
 
 
 def _body_max_size_exceeded(
     body_size: int,
-    warnsize: Optional[int],
-    maxsize: Optional[int],
+    warnsize: int | None,
+    maxsize: int | None,
     request_url: str,
 ) -> bool:
     if warnsize and body_size > warnsize:
@@ -76,7 +98,10 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     lazy = False
 
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+        self,
+        settings: Settings,
+        crawler: Crawler,
+        client: AsyncZyteAPI | None = None,
     ):
         if not settings.getbool("ZYTE_API_ENABLED", True):
             raise NotConfigured(
@@ -90,10 +115,14 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             # https://github.com/scrapy-plugins/scrapy-zyte-api/issues/58
             crawler.zyte_api_client = client  # type: ignore[attr-defined]
         self._client: AsyncZyteAPI = crawler.zyte_api_client  # type: ignore[attr-defined]
-        logger.info("Using a Zyte API key starting with %r", self._client.api_key[:7])
-        verify_installed_reactor(
-            "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
-        )
+        self._log_auth()
+        self._reactor_enabled = _reactor_enabled(settings)
+        if self._reactor_enabled:
+            from scrapy.utils.reactor import verify_installed_reactor  # noqa: PLC0415
+
+            verify_installed_reactor(
+                "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
+            )
         self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
         self._cookie_jars = None
         self._cookie_mw_cls = load_object(
@@ -122,9 +151,26 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         self._fallback_handler = None
         self._trust_env = settings.getbool("ZYTE_API_USE_ENV_PROXY")
 
+        self._autothrottle_is_enabled = settings.getbool("AUTOTHROTTLE_ENABLED")
+
     @classmethod
     def from_crawler(cls, crawler):
         return cls(crawler.settings, crawler)
+
+    def _log_auth(self):
+        if _X402_SUPPORT:
+            auth_type = (
+                "a Zyte API key"
+                if self._client.auth.type == "zyte"
+                else "an Ethereum private key"
+            )
+            logger.info(
+                f"Using {auth_type} starting with {self._client.auth.key[:7]!r}"
+            )
+        else:
+            logger.info(
+                f"Using a Zyte API key starting with {self._client.api_key[:7]!r}"
+            )
 
     async def engine_started(self):
         self._session = self._client.session(trust_env=self._trust_env)
@@ -146,40 +192,63 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     @staticmethod
     def _build_client(settings):
+        kwargs = {}
+        if api_key := settings.get("ZYTE_API_KEY"):
+            kwargs["api_key"] = api_key
+        if _X402_SUPPORT and (eth_key := settings.get("ZYTE_API_ETH_KEY")):
+            kwargs["eth_key"] = eth_key
+        if api_url := settings.get("ZYTE_API_URL"):
+            kwargs["api_url"] = api_url
         try:
             return AsyncZyteAPI(
-                # To allow users to have a key defined in Scrapy settings and
-                # in a environment variable, and be able to cause the
-                # environment variable to be used instead of the setting by
-                # overriding the setting on the command-line to be an empty
-                # string, we do not support setting empty string keys through
-                # settings.
-                api_key=settings.get("ZYTE_API_KEY") or None,
-                api_url=settings.get("ZYTE_API_URL") or API_URL,
                 n_conn=settings.getint("CONCURRENT_REQUESTS"),
-                user_agent=settings.get("_ZYTE_API_USER_AGENT", default=USER_AGENT),
+                user_agent=settings.get("_ZYTE_API_USER_AGENT", USER_AGENT),
+                **kwargs,
             )
-        except NoApiKey:
-            logger.warning(
-                "'ZYTE_API_KEY' must be set in the spider settings or env var "
-                "in order for ScrapyZyteAPIDownloadHandler to work."
+        except NoApiKey as ex:
+            message = (
+                "No authentication data provided. See "
+                "https://scrapy-zyte-api.readthedocs.io/en/latest/setup.html#auth"
             )
-            raise NotConfigured(
-                "Your Zyte API key is not set. Set ZYTE_API_KEY to your API key."
-            )
+            logger.warning(message)
+            raise NotConfigured(message) from ex
 
     def _create_handler(self, path: Any) -> Any:
         dhcls = load_object(path)
-        return create_instance(dhcls, settings=None, crawler=self._crawler)
+        return _build_from_crawler(dhcls, self._crawler)
 
-    def download_request(self, request: Request, spider: Spider) -> Deferred:
-        api_params = self._param_parser.parse(request)
-        if api_params is not None:
+    def _get_fallback_handler(self, request: Request) -> Any:
+        """Return the download handler to use for *request* when it is not sent
+        through Zyte API."""
+        return self._fallback_handler
+
+    def _iter_fallback_handlers(self):
+        """Yield every fallback download handler in use, for closing."""
+        if self._fallback_handler is not None:
+            yield self._fallback_handler
+
+    if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:  # Scrapy < 2.14
+
+        def download_request(
+            self, request: Request, spider: Spider
+        ) -> Deferred[Response | None]:
+            api_params = self._param_parser.parse(request)
+            if api_params is not None:
+                return deferred_from_coro(self._download_request(api_params, request))
+            fallback_handler = self._get_fallback_handler(request)
+            assert fallback_handler
             return deferred_from_coro(
-                self._download_request(api_params, request, spider)
+                fallback_handler.download_request(request, spider)
             )
-        assert self._fallback_handler
-        return self._fallback_handler.download_request(request, spider)
+    else:
+
+        async def download_request(self, request: Request) -> Response | None:  # type: ignore[misc]
+            api_params = self._param_parser.parse(request)
+            if api_params is not None:
+                return await self._download_request(api_params, request)
+            fallback_handler = self._get_fallback_handler(request)
+            assert fallback_handler
+            return await fallback_handler.download_request(request)
 
     def _update_stats(self, api_params):
         prefix = "scrapy-zyte-api"
@@ -220,9 +289,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
 
         for error_type, count in self._client.agg_stats.api_error_types.items():
-            error_type = error_type or "/<empty>"
+            error_type = error_type or "/<empty>"  # noqa: PLW2901
             if not error_type.startswith("/"):
-                error_type = f"/{error_type}"
+                error_type = f"/{error_type}"  # noqa: PLW2901
             self._stats.set_value(f"{prefix}/error_types{error_type}", count)
 
         for counter in (
@@ -233,8 +302,14 @@ class _ScrapyZyteAPIBaseDownloadHandler:
                 self._stats.set_value(f"{prefix}/{counter}/{key}", value)
 
     async def _download_request(
-        self, api_params: dict, request: Request, spider: Spider
-    ) -> Optional[Union[ZyteAPITextResponse, ZyteAPIResponse]]:
+        self, api_params: dict, request: Request
+    ) -> (
+        ZyteAPITextResponse
+        | ZyteAPIXmlResponse
+        | ZyteAPIJsonResponse
+        | ZyteAPIResponse
+        | None
+    ):
         # Define url by default
         retrying = request.meta.get("zyte_api_retry_policy")
         if retrying:
@@ -243,6 +318,8 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         else:
             retrying = self._retry_policy
         self._log_request(api_params)
+
+        start_time = time.time()
 
         try:
             api_response = await self._session.get(api_params, retrying=retrying)
@@ -255,6 +332,16 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
             raise
         finally:
+            # If AutoThrottle is enabled, and autothrottle_dont_adjust_delay is
+            # not set or not supported, we do not set download_latency, as it
+            # would cause AutoThrottle to adjust the download delay of the
+            # request slot, and we do not want AutoThrottle to do that for Zyte
+            # API slots since Zyte API already handles throtling.
+            if not self._autothrottle_is_enabled or (
+                _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT
+                and request.meta.get("autothrottle_dont_adjust_delay", False)
+            ):
+                request.meta["download_latency"] = time.time() - start_time
             self._update_stats(api_params)
 
         response = _process_response(
@@ -285,7 +372,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             (403, "/auth/account-suspended", "zyte_api_suspended_account"),
         ):
             if error.status == status and error.parsed.type == error_type:
-                self._crawler.engine.close_spider(self._crawler.spider, close_reason)
+                _close_spider(self._crawler, close_reason)
                 return
 
     def _log_request(self, params):
@@ -301,41 +388,98 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         _truncate(params, self._truncate_limit)
         return params
 
-    @inlineCallbacks
-    def close(self) -> Generator:
-        if self._fallback_handler:
-            yield self._fallback_handler.close()
-        yield deferred_from_coro(self._close())
+    if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
 
-    async def _close(self) -> None:  # NOQA
+        def close(self) -> Deferred:
+            async def _close():
+                for handler in self._iter_fallback_handlers():
+                    if hasattr(handler, "close"):
+                        await handler.close()
+                await self._close()
+
+            return ensureDeferred(_close())
+
+    else:
+
+        async def close(self) -> None:  # type: ignore[misc]
+            for handler in self._iter_fallback_handlers():
+                if hasattr(handler, "close"):
+                    await handler.close()
+            await self._close()
+
+    async def _close(self) -> None:
         await self._session.close()
 
 
 class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+        self,
+        settings: Settings,
+        crawler: Crawler,
+        client: AsyncZyteAPI | None = None,
     ):
         super().__init__(settings, crawler, client)
-        self._fallback_handler = self._create_handler(
-            "scrapy.core.downloader.handlers.http.HTTPDownloadHandler"
+        # This handler is registered for both http and https, but Scrapy does
+        # not tell a download handler which scheme it serves, so we cannot map
+        # it to a single, scheme-specific ZYTE_API_FALLBACK_*_HANDLER setting.
+        # Instead, we resolve the fallback handler per request, based on its
+        # scheme, honoring the corresponding setting when set and using a
+        # sensible default otherwise. Handlers are built lazily, on first use,
+        # to avoid building handlers for schemes that are never used.
+        #
+        # The default Twisted-based HTTP/1.1 handler cannot be used without a
+        # reactor; fall back to the asyncio-based httpx handler instead.
+        default = (
+            "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
+            if self._reactor_enabled
+            else "scrapy.core.downloader.handlers._httpx.HttpxDownloadHandler"
         )
+        self._fallback_handler_paths = {
+            "http": settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER") or default,
+            "https": settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER") or default,
+        }
+        self._fallback_handlers_by_scheme: dict[str, Any] = {}
+
+    def _get_fallback_handler(self, request: Request) -> Any:
+        scheme = urlparse_cached(request).scheme
+        if scheme not in self._fallback_handlers_by_scheme:
+            path = self._fallback_handler_paths.get(
+                scheme, self._fallback_handler_paths["https"]
+            )
+            self._fallback_handlers_by_scheme[scheme] = self._create_handler(path)
+        return self._fallback_handlers_by_scheme[scheme]
+
+    def _iter_fallback_handlers(self):
+        yield from self._fallback_handlers_by_scheme.values()
 
 
 class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+        self,
+        settings: Settings,
+        crawler: Crawler,
+        client: AsyncZyteAPI | None = None,
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
-            settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER")
+            settings.get(
+                "ZYTE_API_FALLBACK_HTTP_HANDLER",
+                settings.getwithbase("DOWNLOAD_HANDLERS")["http"],
+            )
         )
 
 
 class ScrapyZyteAPIHTTPSDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
     def __init__(
-        self, settings: Settings, crawler: Crawler, client: AsyncZyteAPI = None
+        self,
+        settings: Settings,
+        crawler: Crawler,
+        client: AsyncZyteAPI | None = None,
     ):
         super().__init__(settings, crawler, client)
         self._fallback_handler = self._create_handler(
-            settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER")
+            settings.get(
+                "ZYTE_API_FALLBACK_HTTPS_HANDLER",
+                settings.getwithbase("DOWNLOAD_HANDLERS")["https"],
+            )
         )

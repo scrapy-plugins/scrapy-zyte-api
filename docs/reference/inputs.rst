@@ -40,6 +40,8 @@ Inputs
 
 -   :class:`zyte_common_items.ProductNavigation`
 
+-   :class:`zyte_common_items.Serp`
+
 Additional inputs and input annotations are also provided:
 
 Built-in inputs
@@ -48,7 +50,13 @@ Built-in inputs
 .. autoclass:: scrapy_zyte_api.Actions
     :members:
 
+.. autoclass:: scrapy_zyte_api.CapturedResponse
+    :members:
+
 .. autoclass:: scrapy_zyte_api.Geolocation
+    :members:
+
+.. autoclass:: scrapy_zyte_api.NetworkCapture
     :members:
 
 .. autoclass:: scrapy_zyte_api.Screenshot
@@ -64,3 +72,5 @@ Built-in input annotations
 .. autofunction:: scrapy_zyte_api.actions
 
 .. autofunction:: scrapy_zyte_api.custom_attrs
+
+.. autofunction:: scrapy_zyte_api.network_capture

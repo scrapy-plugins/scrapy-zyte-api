@@ -17,6 +17,9 @@ in all requests:
 -   :setting:`ZYTE_API_DEFAULT_PARAMS`, for :ref:`manual request parameters
     <manual>`.
 
+-   :setting:`ZYTE_API_PROVIDER_PARAMS`, for :ref:`dependency injection
+    <scrapy-poet>`.
+
 For example, if you set :setting:`ZYTE_API_DEFAULT_PARAMS` to
 ``{"geolocation": "US"}`` and :reqmeta:`zyte_api` to ``{"browserHtml": True}``,
 ``{"url: "…", "geolocation": "US", "browserHtml": True}`` is sent to Zyte API.

@@ -88,6 +88,18 @@ string.
 See :ref:`retry`.
 
 
+.. reqmeta:: zyte_api_session_cookie_mode
+
+zyte_api_session_cookie_mode
+============================
+
+Default: :setting:`ZYTE_API_SESSION_COOKIE_MODE`
+
+Overrides :setting:`ZYTE_API_SESSION_COOKIE_MODE` for a given request.
+
+.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.cookie_mode`
+
+
 .. reqmeta:: zyte_api_session_enabled
 
 zyte_api_session_enabled
@@ -95,8 +107,8 @@ zyte_api_session_enabled
 
 Default: :setting:`ZYTE_API_SESSION_ENABLED`
 
-Whether to use :ref:`scrapy-zyte-api session management <session>` for the
-request (``True``) or not (``False``).
+Whether to send the request with a :ref:`plugin-managed session <session>`
+(``True``) or not (``False``).
 
 .. seealso:: :meth:`scrapy_zyte_api.SessionConfig.enabled`
 
@@ -141,7 +153,7 @@ zyte_api_session_pool
 
 Default: ``""``
 
-Determines the ID of the session pool to assign to the request, overriding the
-:ref:`default pool assignment logic <session-pools>`.
+If not falsy, it determines the default pool ID and options for the request.
 
-.. seealso:: :meth:`scrapy_zyte_api.SessionConfig.pool`
+It supports the same values as the return value of
+:meth:`scrapy_zyte_api.SessionConfig.pool`.

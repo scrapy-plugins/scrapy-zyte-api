@@ -1,116 +1,24 @@
 from logging import getLogger
-from typing import Optional, Union, cast
+from warnings import warn
 
 from scrapy import Request, Spider
-from scrapy.exceptions import IgnoreRequest
+from scrapy.exceptions import IgnoreRequest, ScrapyDeprecationWarning
 from scrapy.http import Response
 from scrapy.utils.python import global_object_name
 from zyte_api import RequestError
 
 from ._params import _ParamParser
 from .exceptions import ActionError
-from .responses import ZyteAPIResponse, ZyteAPITextResponse
-
-try:
-    from scrapy.downloadermiddlewares.retry import get_retry_request
-except ImportError:
-    # Backport get_retry_request for Scrapy < 2.5.0
-
-    from logging import Logger
-    from typing import Type
-
-    from scrapy.downloadermiddlewares.retry import (  # type: ignore[attr-defined] # isort: skip
-        logger as retry_logger,
-    )
-
-    def get_retry_request(
-        request: Request,
-        *,
-        spider: Spider,
-        reason: Union[str, Exception, Type[Exception]] = "unspecified",
-        max_retry_times: Optional[int] = None,
-        priority_adjust: Optional[int] = None,
-        logger: Logger = retry_logger,
-        stats_base_key: str = "retry",
-    ) -> Optional[Request]:
-        """
-        Returns a new :class:`~scrapy.Request` object to retry the specified
-        request, or ``None`` if retries of the specified request have been
-        exhausted.
-
-        For example, in a :class:`~scrapy.Spider` callback, you could use it as
-        follows::
-
-            def parse(self, response):
-                if not response.text:
-                    new_request_or_none = get_retry_request(
-                        response.request,
-                        spider=self,
-                        reason='empty',
-                    )
-                    return new_request_or_none
-
-        *spider* is the :class:`~scrapy.Spider` instance which is asking for the
-        retry request. It is used to access the :ref:`settings <topics-settings>`
-        and :ref:`stats <topics-stats>`, and to provide extra logging context (see
-        :func:`logging.debug`).
-
-        *reason* is a string or an :class:`Exception` object that indicates the
-        reason why the request needs to be retried. It is used to name retry stats.
-
-        *max_retry_times* is a number that determines the maximum number of times
-        that *request* can be retried. If not specified or ``None``, the number is
-        read from the :reqmeta:`max_retry_times` meta key of the request. If the
-        :reqmeta:`max_retry_times` meta key is not defined or ``None``, the number
-        is read from the :setting:`RETRY_TIMES` setting.
-
-        *priority_adjust* is a number that determines how the priority of the new
-        request changes in relation to *request*. If not specified, the number is
-        read from the :setting:`RETRY_PRIORITY_ADJUST` setting.
-
-        *logger* is the logging.Logger object to be used when logging messages
-
-        *stats_base_key* is a string to be used as the base key for the
-        retry-related job stats
-        """
-        settings = spider.crawler.settings
-        assert spider.crawler.stats
-        stats = spider.crawler.stats
-        retry_times = request.meta.get("retry_times", 0) + 1
-        if max_retry_times is None:
-            max_retry_times = request.meta.get("max_retry_times")
-            if max_retry_times is None:
-                max_retry_times = settings.getint("RETRY_TIMES")
-        if retry_times <= max_retry_times:
-            logger.debug(
-                "Retrying %(request)s (failed %(retry_times)d times): %(reason)s",
-                {"request": request, "retry_times": retry_times, "reason": reason},
-                extra={"spider": spider},
-            )
-            new_request: Request = request.copy()
-            new_request.meta["retry_times"] = retry_times
-            new_request.dont_filter = True
-            if priority_adjust is None:
-                priority_adjust = settings.getint("RETRY_PRIORITY_ADJUST")
-            new_request.priority = request.priority + priority_adjust
-
-            if callable(reason):
-                reason = reason()
-            if isinstance(reason, Exception):
-                reason = global_object_name(reason.__class__)
-
-            stats.inc_value(f"{stats_base_key}/count")
-            stats.inc_value(f"{stats_base_key}/reason_count/{reason}")
-            return new_request
-        stats.inc_value(f"{stats_base_key}/max_reached")
-        logger.error(
-            "Gave up retrying %(request)s (failed %(retry_times)d times): "
-            "%(reason)s",
-            {"request": request, "retry_times": retry_times, "reason": reason},
-            extra={"spider": spider},
-        )
-        return None
-
+from .responses import ZyteAPIMixin
+from .utils import (  # type: ignore[attr-defined]
+    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _GET_SLOT_NEEDS_SPIDER,
+    _LOG_DEFERRED_IS_DEPRECATED,
+    _close_spider,
+    _get_retry_request,
+    _schedule_coro,
+    maybe_deferred_to_future,
+)
 
 logger = getLogger(__name__)
 _start_requests_processed = object()
@@ -131,20 +39,36 @@ class _BaseMiddleware:
             not crawler.settings.getbool("AUTOTHROTTLE_ENABLED"),
         )
 
-    def slot_request(self, request, spider, force=False):
+    def slot_request(
+        self, request: Request, spider: Spider | None = None, force: bool = False
+    ):
+        if spider is not None:
+            warn(
+                f"Passing a 'spider' argument to "
+                f"{global_object_name(self.__class__)}.slot_request() is "
+                f"deprecated and the argument will be removed in a future "
+                f"scrapy-zyte-api version.",
+                category=ScrapyDeprecationWarning,
+                stacklevel=2,
+            )
+
         if not force and self._param_parser.parse(request) is None:
             return
+
+        if _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT:
+            request.meta.setdefault("autothrottle_dont_adjust_delay", True)
 
         downloader = self._crawler.engine.downloader
         try:
             slot_id = downloader.get_slot_key(request)
         except AttributeError:  # Scrapy < 2.12
-            slot_id = downloader._get_slot_key(request, spider)
+            slot_id = downloader._get_slot_key(request, self._crawler.spider)
         if not isinstance(slot_id, str) or not slot_id.startswith(self._slot_prefix):
             slot_id = f"{self._slot_prefix}{slot_id}"
             request.meta["download_slot"] = slot_id
         if not self._preserve_delay:
-            _, slot = downloader._get_slot(request, spider)
+            args = (self._crawler.spider,) if _GET_SLOT_NEEDS_SPIDER else ()
+            _, slot = downloader._get_slot(request, *args)
             slot.delay = 0
 
 
@@ -173,6 +97,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         crawler.signals.connect(
             self._start_requests_processed, signal=_start_requests_processed
         )
+        self._crawler = crawler
 
     def _load_action_error_handling(self):
         value = self._crawler.settings.get("ZYTE_API_ACTION_ERROR_HANDLING", "pass")
@@ -190,14 +115,14 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         spm_mw_classes = []
 
         try:
-            from scrapy_crawlera import CrawleraMiddleware
+            from scrapy_crawlera import CrawleraMiddleware  # noqa: PLC0415
         except ImportError:
             pass
         else:
             spm_mw_classes.append(CrawleraMiddleware)
 
         try:
-            from scrapy_zyte_smartproxy import ZyteSmartProxyMiddleware
+            from scrapy_zyte_smartproxy import ZyteSmartProxyMiddleware  # noqa: PLC0415
         except ImportError:
             pass
         else:
@@ -209,7 +134,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
                 return middleware
         return None
 
-    def _check_spm_conflict(self, spider):
+    def _check_spm_conflict(self):
         checked = getattr(self, "_checked_spm_conflict", False)
         if checked:
             return
@@ -217,7 +142,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         settings = self._crawler.settings
         in_transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         spm_mw = self._get_spm_mw()
-        spm_is_enabled = spm_mw and spm_mw.is_enabled(spider)
+        spm_is_enabled = spm_mw and spm_mw.is_enabled(self._crawler.spider)
         if not in_transparent_mode or not spm_is_enabled:
             return
         logger.error(
@@ -234,35 +159,67 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             "request.meta to set dont_proxy to True and zyte_api_automap "
             "either to True or to a dictionary of extra request fields."
         )
-        from twisted.internet import reactor
-        from twisted.internet.interfaces import IReactorCore
-
-        reactor = cast(IReactorCore, reactor)
-        reactor.callLater(
-            0, self._crawler.engine.close_spider, spider, "plugin_conflict"
-        )
+        _close_spider(self._crawler, "plugin_conflict")
 
     def _start_requests_processed(self, count):
         self._total_start_request_count = count
         self._maybe_close()
 
-    def process_request(self, request, spider):
-        self._check_spm_conflict(spider)
+    def process_request(self, request: Request, spider: Spider | None = None):
+        self._check_spm_conflict()
 
         if self._param_parser.parse(request) is None:
             return
 
         self._request_count += 1
         if self._max_requests and self._request_count > self._max_requests:
-            self._crawler.engine.close_spider(spider, "closespider_max_zapi_requests")
+            _close_spider(self._crawler, "closespider_max_zapi_requests")
             raise IgnoreRequest(
                 f"The request {request} is skipped as {self._max_requests} max "
                 f"Zyte API requests have been reached."
             )
 
-        self.slot_request(request, spider, force=True)
+        self.slot_request(request, force=True)
 
-    def process_exception(self, request, exception, spider):
+    def process_response(
+        self, request: Request, response: Response, spider: Spider | None = None
+    ) -> Request | Response:
+        if not isinstance(response, ZyteAPIMixin):
+            return response
+
+        if response.url != request.url:
+            logger.debug(
+                f"Redirecting to {response} from {request}",
+                extra={"spider": spider},
+            )
+
+        assert response.raw_api_response is not None
+        action_error = any(
+            "error" in action for action in response.raw_api_response.get("actions", [])
+        )
+        if not action_error:
+            return response
+
+        if not self._retry_action_errors or request.meta.get("dont_retry", False):
+            return self._handle_action_error(response)
+
+        return self._retry(request, reason="action-error") or self._handle_action_error(
+            response
+        )
+
+    def _retry(self, request: Request, *, reason: str) -> Request | None:
+        assert self._crawler.spider
+        return _get_retry_request(
+            request,
+            reason=reason,
+            spider=self._crawler.spider,
+            max_retry_times=request.meta.get("max_retry_times", self._max_retry_times),
+            priority_adjust=request.meta.get("priority_adjust", self._priority_adjust),
+        )
+
+    def process_exception(
+        self, request: Request, exception: Exception, spider: Spider | None = None
+    ):
         if (
             not request.meta.get("is_start_request")
             or not isinstance(exception, RequestError)
@@ -282,92 +239,111 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             "Stopping the spider, all start requests failed because they "
             "were pointing to a domain forbidden by Zyte API."
         )
-        self._crawler.engine.close_spider(
-            self._crawler.spider, "failed_forbidden_domain"
-        )
+        _close_spider(self._crawler, "failed_forbidden_domain")
 
     def _handle_action_error(self, response):
         if self._action_error_handling == "pass":
             return response
-        elif self._action_error_handling == "ignore":
+        if self._action_error_handling == "ignore":
             raise IgnoreRequest
-        else:
-            assert self._action_error_handling == "err"
-            raise ActionError(response)
-
-    def process_response(
-        self, request: Request, response: Response, spider: Spider
-    ) -> Union[Request, Response]:
-        if not isinstance(response, (ZyteAPIResponse, ZyteAPITextResponse)):
-            return response
-
-        assert response.raw_api_response is not None
-        action_error = any(
-            "error" in action for action in response.raw_api_response.get("actions", [])
-        )
-        if not action_error:
-            return response
-
-        if not self._retry_action_errors or request.meta.get("dont_retry", False):
-            return self._handle_action_error(response)
-
-        return self._retry(
-            request, reason="action-error", spider=spider
-        ) or self._handle_action_error(response)
-
-    def _retry(
-        self,
-        request: Request,
-        *,
-        reason: str,
-        spider: Spider,
-    ) -> Optional[Request]:
-        max_retry_times = request.meta.get("max_retry_times", self._max_retry_times)
-        priority_adjust = request.meta.get("priority_adjust", self._priority_adjust)
-        return get_retry_request(
-            request,
-            reason=reason,
-            spider=spider,
-            max_retry_times=max_retry_times,
-            priority_adjust=priority_adjust,
-        )
+        assert self._action_error_handling == "err"
+        raise ActionError(response)
 
 
 class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
     def __init__(self, crawler):
         super().__init__(crawler)
-        self._send_signal = crawler.signals.send_catch_log
+        if _LOG_DEFERRED_IS_DEPRECATED:
+            self._send_signal = crawler.signals.send_catch_log_async
+        else:
+
+            async def _send_signal(signal, **kwargs):
+                await maybe_deferred_to_future(
+                    crawler.signals.send_catch_log_deferred(signal, **kwargs)
+                )
+
+            self._send_signal = _send_signal
 
     @staticmethod
     def _get_header_set(request):
         return {header.strip().lower() for header in request.headers}
 
-    def process_start_requests(self, start_requests, spider):
+    async def process_start(self, start, spider: Spider | None = None):
         # Mark start requests and reports to the downloader middleware the
         # number of them once all have been processed.
         count = 0
-        for request in start_requests:
-            request.meta["is_start_request"] = True
-            self._process_output_request(request, spider)
-            yield request
-            count += 1
-        self._send_signal(_start_requests_processed, count=count)
+        async for item_or_request in start:
+            if isinstance(item_or_request, Request):
+                count += 1
+                item_or_request.meta["is_start_request"] = True
+                self._process_output_request(item_or_request)
+            yield item_or_request
+        await self._send_signal(_start_requests_processed, count=count)
 
-    def _process_output_request(self, request, spider):
-        request.meta["_pre_mw_headers"] = self._get_header_set(request)
-        self.slot_request(request, spider)
+    def process_start_requests(self, start_requests, spider: Spider):
+        count = 0
+        for item_or_request in start_requests:
+            if isinstance(item_or_request, Request):
+                count += 1
+                item_or_request.meta["is_start_request"] = True
+                self._process_output_request(item_or_request)
+            yield item_or_request
+        _schedule_coro(self._send_signal(_start_requests_processed, count=count))
 
-    def _process_output_item_or_request(self, item_or_request, spider):
+    def _process_output_request(self, request: Request):
+        if "_pre_mw_headers" not in request.meta:
+            request.meta["_pre_mw_headers"] = self._get_header_set(request)
+        self.slot_request(request)
+
+    def _process_output_item_or_request(self, item_or_request):
         if not isinstance(item_or_request, Request):
             return
-        self._process_output_request(item_or_request, spider)
+        self._process_output_request(item_or_request)
 
-    def process_spider_output(self, response, result, spider):
+    def process_spider_output(self, response, result, spider: Spider | None = None):
         for item_or_request in result:
-            self._process_output_item_or_request(item_or_request, spider)
+            self._process_output_item_or_request(item_or_request)
             yield item_or_request
 
-    async def process_spider_output_async(self, response, result, spider):
+    async def process_spider_output_async(
+        self, response, result, spider: Spider | None = None
+    ):
         async for item_or_request in result:
-            self._process_output_item_or_request(item_or_request, spider)
+            self._process_output_item_or_request(item_or_request)
             yield item_or_request
+
+
+class ScrapyZyteAPIRefererSpiderMiddleware:
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
+    def __init__(self, crawler):
+        self._default_policy = crawler.settings.get(
+            "ZYTE_API_REFERRER_POLICY", "no-referrer"
+        )
+        self._param_parser = _ParamParser(crawler, cookies_enabled=False)
+
+    def process_spider_output(self, response, result, spider: Spider | None = None):
+        for item_or_request in result:
+            self._process_output_item_or_request(item_or_request)
+            yield item_or_request
+
+    async def process_spider_output_async(
+        self, response, result, spider: Spider | None = None
+    ):
+        async for item_or_request in result:
+            self._process_output_item_or_request(item_or_request)
+            yield item_or_request
+
+    def _process_output_item_or_request(self, item_or_request):
+        if not isinstance(item_or_request, Request):
+            return
+        self._process_output_request(item_or_request)
+
+    def _process_output_request(self, request: Request):
+        if self._is_zyte_api_request(request):
+            request.meta.setdefault("referrer_policy", self._default_policy)
+
+    def _is_zyte_api_request(self, request):
+        return self._param_parser.parse(request) is not None

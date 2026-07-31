@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import importlib.util
 import json
 import re
 from copy import deepcopy
@@ -6,15 +9,12 @@ from typing import Any
 from unittest import mock
 
 import pytest
-from pytest_twisted import ensureDeferred
 from scrapy import Request, Spider
-from scrapy.core.downloader.handlers.http import HTTPDownloadHandler
+from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
-from scrapy.utils.misc import create_instance
 from scrapy.utils.test import get_crawler
-from zyte_api.aio.client import AsyncClient
-from zyte_api.aio.retry import RetryFactory
+from zyte_api import RetryFactory
 from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import (
@@ -22,127 +22,194 @@ from scrapy_zyte_api.handler import (
     _body_max_size_exceeded,
 )
 from scrapy_zyte_api.responses import ZyteAPITextResponse
-from scrapy_zyte_api.utils import USER_AGENT
+from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+    _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
+    _POET_ADDON_SUPPORT,
+    _REACTORLESS_SUPPORT,
+    _X402_SUPPORT,
+    USER_AGENT,
+    _build_from_crawler,
+    maybe_deferred_to_future,
+)
 
-from . import DEFAULT_CLIENT_CONCURRENCY, SETTINGS, SETTINGS_T, UNSET
+from . import (
+    _HTTPX_HANDLER,
+    _REACTORLESS,
+    DEFAULT_CLIENT_CONCURRENCY,
+    SETTINGS,
+    SETTINGS_T,
+    UNSET,
+    deferred_f_from_coro_f,
+    download_request,
+    get_download_handler,
+    make_handler,
+    set_env,
+)
 from . import get_crawler as get_crawler_zyte_api
-from . import get_download_handler, make_handler, set_env
 from .mockserver import MockServer
+
+try:
+    from zyte_api import AsyncZyteAPI
+except ImportError:
+    from zyte_api.aio.client import AsyncClient as AsyncZyteAPI
+
+_EXPECTED_FALLBACK_HANDLER: type
+if _REACTORLESS:
+    from scrapy.core.downloader.handlers._httpx import HttpxDownloadHandler
+
+    _EXPECTED_FALLBACK_HANDLER = HttpxDownloadHandler
+else:
+    _EXPECTED_FALLBACK_HANDLER = HTTP11DownloadHandler
 
 
 @pytest.mark.parametrize(
     "concurrency",
-    (
+    [
         1,
         DEFAULT_CLIENT_CONCURRENCY,
         DEFAULT_CLIENT_CONCURRENCY + 1,
-    ),
+    ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_concurrency_configuration(concurrency):
     settings: SETTINGS_T = {
         **SETTINGS,
         "CONCURRENT_REQUESTS": concurrency,
     }
-    crawler = await get_crawler_zyte_api(settings=settings)
+    crawler = await get_crawler_zyte_api(settings=settings, start_handler=True)
     handler = get_download_handler(crawler, "https")
     assert handler._client.n_conn == concurrency
     assert handler._session._session.connector.limit == concurrency
+    await handler._close()
 
 
+ETH_KEY = "c85ef7d79691fe79573b1a7064c5232332f53bb1b44a08f1a737f57a68a4706e"
+ETH_KEY_2 = ETH_KEY[-1] + ETH_KEY[:-1]
+assert ETH_KEY_2 != ETH_KEY
+HAS_X402 = importlib.util.find_spec("x402") is not None and _X402_SUPPORT
+
+
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
-    "env_var,setting,expected",
-    (
+    ("scenario", "expected"),
+    [
         (
-            UNSET,
-            UNSET,
+            {},
             NotConfigured,
         ),
         (
-            "",
-            UNSET,
-            "",
+            {"env": {"ZYTE_API_KEY": ""}},
+            NotConfigured if _X402_SUPPORT else {"key_type": "zyte", "key": ""},
         ),
         (
-            "a",
-            UNSET,
-            "a",
+            {"env": {"ZYTE_API_KEY": "a"}},
+            {"key_type": "zyte", "key": "a"},
         ),
         (
-            UNSET,
-            None,
+            {"settings": {"ZYTE_API_KEY": None}},
             NotConfigured,
         ),
         (
-            "",
-            None,
-            "",
+            {"env": {"ZYTE_API_KEY": ""}, "settings": {"ZYTE_API_KEY": None}},
+            NotConfigured if _X402_SUPPORT else {"key_type": "zyte", "key": ""},
         ),
         (
-            "a",
-            None,
-            "a",
+            {"env": {"ZYTE_API_KEY": "a"}, "settings": {"ZYTE_API_KEY": None}},
+            {"key_type": "zyte", "key": "a"},
         ),
         (
-            UNSET,
-            "",
+            {"settings": {"ZYTE_API_KEY": ""}},
             NotConfigured,
         ),
         (
-            "",
-            "",
-            "",
+            {"env": {"ZYTE_API_KEY": ""}, "settings": {"ZYTE_API_KEY": ""}},
+            NotConfigured if _X402_SUPPORT else {"key_type": "zyte", "key": ""},
         ),
         (
-            "a",
-            "",
-            "a",
+            {"env": {"ZYTE_API_KEY": "a"}, "settings": {"ZYTE_API_KEY": ""}},
+            {"key_type": "zyte", "key": "a"},
         ),
         (
-            UNSET,
-            "b",
-            "b",
+            {"settings": {"ZYTE_API_KEY": "b"}},
+            {"key_type": "zyte", "key": "b"},
         ),
         (
-            "",
-            "b",
-            "b",
+            {"env": {"ZYTE_API_KEY": ""}, "settings": {"ZYTE_API_KEY": "b"}},
+            {"key_type": "zyte", "key": "b"},
         ),
         (
-            "a",
-            "b",
-            "b",
+            {"env": {"ZYTE_API_KEY": "a"}, "settings": {"ZYTE_API_KEY": "b"}},
+            {"key_type": "zyte", "key": "b"},
         ),
-    ),
+        (
+            {
+                "env": {"ZYTE_API_KEY": "a", "ZYTE_API_ETH_KEY": ETH_KEY},
+                "settings": {"ZYTE_API_KEY": "b", "ZYTE_API_ETH_KEY": ETH_KEY_2},
+            },
+            {"key_type": "zyte", "key": "b"},
+        ),
+        (
+            {
+                "env": {"ZYTE_API_KEY": "a", "ZYTE_API_ETH_KEY": ETH_KEY},
+                "settings": {"ZYTE_API_ETH_KEY": ETH_KEY_2},
+            },
+            {"key_type": "eth", "key": ETH_KEY_2}
+            if HAS_X402
+            else ModuleNotFoundError
+            if _X402_SUPPORT
+            else {"key_type": "zyte", "key": "a"},
+        ),
+        (
+            {"env": {"ZYTE_API_KEY": "a", "ZYTE_API_ETH_KEY": ETH_KEY}},
+            {"key_type": "zyte", "key": "a"},
+        ),
+        (
+            {"env": {"ZYTE_API_ETH_KEY": ETH_KEY}},
+            {"key_type": "eth", "key": ETH_KEY}
+            if HAS_X402
+            else ModuleNotFoundError
+            if _X402_SUPPORT
+            else NotConfigured,
+        ),
+    ],
 )
-def test_api_key(env_var, setting, expected):
-    env = {}
-    if env_var is not UNSET:
-        env["ZYTE_API_KEY"] = env_var
-    settings: SETTINGS_T = {}
-    if setting is not UNSET:
-        settings["ZYTE_API_KEY"] = setting
+async def test_auth(
+    scenario: dict[str, Any], expected: type[Exception] | dict[str, str]
+):
+    env = scenario.get("env", {})
+    settings: SETTINGS_T = scenario.get("settings", {})
     with set_env(**env):
         crawler = get_crawler(settings_dict=settings)
 
         def build_hander():
-            return create_instance(
-                ScrapyZyteAPIDownloadHandler,
-                settings=None,
-                crawler=crawler,
-            )
+            return _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
 
         if isclass(expected) and issubclass(expected, Exception):
             with pytest.raises(expected):
                 handler = build_hander()
+            return
+
+        handler = build_hander()
+
+    assert isinstance(expected, dict)
+    if expected["key_type"] == "zyte":
+        if _X402_SUPPORT:
+            assert handler._client.auth.key == expected["key"]
+            assert handler._client.api_url == "https://api.zyte.com/v1/"
         else:
-            handler = build_hander()
-            assert handler._client.api_key == expected
+            assert handler._client.api_key == expected["key"]
+    else:
+        assert expected["key_type"] == "eth"
+        assert HAS_X402
+        assert handler._client.auth.key == expected["key"]
+        assert handler._client.api_url == "https://api-x402.zyte.com/v1/"
 
 
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
-    "setting,expected",
-    (
+    ("setting", "expected"),
+    [
         (
             UNSET,
             API_URL,
@@ -163,27 +230,24 @@ def test_api_key(env_var, setting, expected):
             "https://api.example.com",
             "https://api.example.com",
         ),
-    ),
+    ],
 )
-def test_api_url(setting, expected):
+async def test_api_url(setting, expected):
     settings: SETTINGS_T = {"ZYTE_API_KEY": "a"}
     if setting is not UNSET:
         settings["ZYTE_API_URL"] = setting
     crawler = get_crawler(settings_dict=settings)
-    handler = create_instance(
-        ScrapyZyteAPIDownloadHandler,
-        settings=None,
-        crawler=crawler,
-    )
+    handler = _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
     assert handler._client.api_url == expected
 
 
-def test_custom_client():
-    client = AsyncClient(api_key="a", api_url="b")
+@deferred_f_from_coro_f
+async def test_custom_client():
+    client = AsyncZyteAPI(api_key="a", api_url="b")
     crawler = get_crawler()
     handler = ScrapyZyteAPIDownloadHandler(crawler.settings, crawler, client)
     assert handler._client == client
-    assert handler._client != AsyncClient(api_key="a", api_url="b")
+    assert handler._client != AsyncZyteAPI(api_key="a", api_url="b")
 
 
 RETRY_POLICY_A = RetryFactory().build()
@@ -191,9 +255,9 @@ RETRY_POLICY_B = RetryFactory().build()
 assert RETRY_POLICY_A != RETRY_POLICY_B
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
-    "settings,meta,expected",
+    ("settings", "meta", "expected"),
     [
         ({}, {}, None),
         (
@@ -228,12 +292,13 @@ async def test_retry_policy(
     async with make_handler(settings) as handler:
         req = Request("https://example.com", meta=meta)
         unmocked_session = handler._session
+        await unmocked_session.close()
         handler._session = mock.AsyncMock(unmocked_session)
         handler._session.get.return_value = {
             "browserHtml": "",
             "url": "",
         }
-        await handler.download_request(req, None)
+        await download_request(handler, req)
 
         # What we're interested in is the Request call in the API
         request_call = [c for c in handler._session.mock_calls if "get(" in str(c)]
@@ -245,7 +310,83 @@ async def test_retry_policy(
         assert actual == expected
 
 
-@ensureDeferred
+@pytest.mark.parametrize(
+    ("settings", "meta", "is_set"),
+    [
+        ({}, {"zyte_api": {"foo": "bar"}}, True),
+        (
+            {},
+            {"autothrottle_dont_adjust_delay": True, "zyte_api": {"foo": "bar"}},
+            True,
+        ),
+        (
+            {},
+            {"autothrottle_dont_adjust_delay": False, "zyte_api": {"foo": "bar"}},
+            True,
+        ),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"zyte_api": {"foo": "bar"}},
+            _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+        ),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"autothrottle_dont_adjust_delay": True, "zyte_api": {"foo": "bar"}},
+            _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+        ),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"autothrottle_dont_adjust_delay": False, "zyte_api": {"foo": "bar"}},
+            False,
+        ),
+        # Non-Zyte-API request, which uses the default Scrapy download handler,
+        # and hence always has download latency set.
+        ({}, {}, True),
+        ({}, {"autothrottle_dont_adjust_delay": True}, True),
+        ({}, {"autothrottle_dont_adjust_delay": False}, True),
+        ({"AUTOTHROTTLE_ENABLED": True}, {}, True),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"autothrottle_dont_adjust_delay": True},
+            True,
+        ),
+        (
+            {"AUTOTHROTTLE_ENABLED": True},
+            {"autothrottle_dont_adjust_delay": False},
+            True,
+        ),
+    ],
+)
+@deferred_f_from_coro_f
+async def test_download_latency(settings, meta, is_set, mockserver):
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+
+    requests = []
+
+    class TestSpider(Spider):
+        name = "test"
+
+        async def start(self):
+            yield Request(mockserver.urljoin("/"), meta=meta)
+
+        def start_requests(self):
+            yield Request(mockserver.urljoin("/"), meta=meta)
+
+        def parse(self, response):
+            requests.append(response.request)
+
+    crawler = await get_crawler_zyte_api(settings, TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl(spidercls=TestSpider))
+    assert requests
+    request = requests[0]
+    if is_set:
+        assert isinstance(request.meta["download_latency"], float)
+        assert request.meta["download_latency"] > 0.0
+    else:
+        assert "download_latency" not in request.meta
+
+
+@deferred_f_from_coro_f
 async def test_stats(mockserver):
     async with make_handler({}, mockserver.urljoin("/")) as handler:
         scrapy_stats = handler._stats
@@ -255,7 +396,7 @@ async def test_stats(mockserver):
             "zyte_api": {"a": "...", "b": {"b0": "..."}, "experimental": {"c0": "..."}}
         }
         request = Request("https://example.com", meta=meta)
-        await handler.download_request(request, None)
+        await download_request(handler, request)
 
         assert set(scrapy_stats.get_stats()) == {
             f"scrapy-zyte-api/{stat}"
@@ -303,7 +444,8 @@ async def test_stats(mockserver):
             assert value > 0.0
 
 
-def test_single_client():
+@deferred_f_from_coro_f
+async def test_single_client():
     """Make sure that the same Zyte API client is used by both download
     handlers."""
     crawler = get_crawler(settings_dict=SETTINGS)
@@ -318,9 +460,9 @@ def test_single_client():
     assert handler1._client is handler2._client
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
-    "settings,enabled",
+    ("settings", "enabled"),
     [
         ({}, False),
         ({"ZYTE_API_LOG_REQUESTS": False}, False),
@@ -336,16 +478,16 @@ async def test_log_request_toggle(
         meta = {"zyte_api": {"foo": "bar"}}
         request = Request("https://example.com", meta=meta)
         with mock.patch("scrapy_zyte_api.handler.logger") as logger:
-            await handler.download_request(request, None)
+            await download_request(handler, request)
         if enabled:
             logger.debug.assert_called()
         else:
             logger.debug.assert_not_called()
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
-    "settings,short_str,long_str,truncated_str",
+    ("settings", "short_str", "long_str", "truncated_str"),
     [
         ({}, "a" * 64, "a" * 65, "a" * 63 + "..."),
         ({"ZYTE_API_LOG_REQUESTS_TRUNCATE": 0}, "a" * 64, "a" * 65, "a" * 65),
@@ -406,13 +548,14 @@ async def test_log_request_truncate(
         meta = {"zyte_api": input_params}
         request = Request("https://example.com", meta=meta)
         unmocked_session = handler._session
+        await unmocked_session.close()
         handler._session = mock.AsyncMock(unmocked_session)
         handler._session.get.return_value = {
             "browserHtml": "",
             "url": "",
         }
         with mock.patch("scrapy_zyte_api.handler.logger") as logger:
-            await handler.download_request(request, None)
+            await download_request(handler, request)
 
         # Check that the logged params are truncated.
         logged_message = logger.debug.call_args[0][0]
@@ -437,16 +580,14 @@ def test_log_request_truncate_negative(enabled):
         "ZYTE_API_LOG_REQUESTS_TRUNCATE": -1,
     }
     crawler = get_crawler(settings_dict=settings)
-    with pytest.raises(ValueError):
-        create_instance(
-            ScrapyZyteAPIDownloadHandler,
-            settings=None,
-            crawler=crawler,
-        )
+    with pytest.raises(
+        ValueError, match=r"ZYTE_API_LOG_REQUESTS_TRUNCATE setting \(-1\) is invalid"
+    ):
+        _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
 
 
 @pytest.mark.parametrize("enabled", [True, False, None])
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_trust_env(enabled):
     settings: SETTINGS_T = {
         **SETTINGS,
@@ -455,14 +596,15 @@ async def test_trust_env(enabled):
         settings["ZYTE_API_USE_ENV_PROXY"] = enabled
     else:
         enabled = False
-    crawler = await get_crawler_zyte_api(settings=settings)
+    crawler = await get_crawler_zyte_api(settings=settings, start_handler=True)
     handler = get_download_handler(crawler, "https")
     assert handler._session._session._trust_env == enabled
+    await handler._close()
 
 
 @pytest.mark.parametrize(
-    "user_agent,expected",
-    (
+    ("user_agent", "expected"),
+    [
         (
             None,
             USER_AGENT,
@@ -471,13 +613,12 @@ async def test_trust_env(enabled):
             "zyte-crawlers/0.0.1",
             "zyte-crawlers/0.0.1",
         ),
-    ),
+    ],
 )
 def test_user_agent_for_build_client(user_agent, expected):
     settings: Settings = Settings(
         {
-            # see https://github.com/python/mypy/issues/16557#issuecomment-1831213673
-            **SETTINGS,  # type: ignore[dict-item]
+            **SETTINGS,
             "_ZYTE_API_USER_AGENT": user_agent,
         }
     )
@@ -485,7 +626,7 @@ def test_user_agent_for_build_client(user_agent, expected):
     assert client.user_agent == expected
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_bad_key():
     class TestSpider(Spider):
         name = "test"
@@ -502,7 +643,7 @@ async def test_bad_key():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "zyte_api_bad_key"
@@ -513,7 +654,7 @@ async def test_bad_key():
 # case of follow-up responses suddenly giving such an error.
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_suspended_account_start_urls():
     class TestSpider(Spider):
         name = "test"
@@ -530,13 +671,13 @@ async def test_suspended_account_start_urls():
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_suspended_account_callback():
     class TestSpider(Spider):
         name = "test"
@@ -549,26 +690,114 @@ async def test_suspended_account_callback():
         "ZYTE_API_TRANSPARENT_MODE": True,
         **SETTINGS,
     }
+    if _POET_ADDON_SUPPORT:
+        settings["ADDONS"] = {"scrapy_poet.Addon": 300}
 
     with MockServer() as server:
         settings["ZYTE_API_URL"] = server.urljoin("/")
         crawler = get_crawler(TestSpider, settings_dict=settings)
-        await crawler.crawl()
+        await maybe_deferred_to_future(crawler.crawl())
 
     assert crawler.stats
     assert crawler.stats.get_value("finish_reason") == "zyte_api_suspended_account"
 
 
-@ensureDeferred
+class _DummyFallbackHandler:
+    lazy = False
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def download_request(self, *args, **kwargs):
+        return None
+
+    async def close(self):
+        pass
+
+
+@deferred_f_from_coro_f
 async def test_fallback_setting():
     crawler = await get_crawler_zyte_api(settings=SETTINGS)
     handler = get_download_handler(crawler, "https")
     assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
-    assert isinstance(handler._fallback_handler, HTTPDownloadHandler)
+    for scheme in ("http", "https"):
+        fallback = handler._get_fallback_handler(Request(f"{scheme}://example.com"))
+        assert isinstance(fallback, _EXPECTED_FALLBACK_HANDLER)
+
+
+@deferred_f_from_coro_f
+async def test_fallback_setting_custom():
+    """ScrapyZyteAPIDownloadHandler honors the per-scheme fallback settings,
+    resolving the handler based on the request scheme."""
+    settings = {
+        **SETTINGS,
+        "ZYTE_API_FALLBACK_HTTP_HANDLER": "tests.test_handler._DummyFallbackHandler",
+    }
+    crawler = await get_crawler_zyte_api(settings=settings)
+    handler = get_download_handler(crawler, "https")
+    assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
+    http_fallback = handler._get_fallback_handler(Request("http://example.com"))
+    assert isinstance(http_fallback, _DummyFallbackHandler)
+    # HTTPS was not overridden, so it keeps the default.
+    https_fallback = handler._get_fallback_handler(Request("https://example.com"))
+    assert isinstance(https_fallback, _EXPECTED_FALLBACK_HANDLER)
+
+
+class _NoCloseFallbackHandler:
+    """A fallback download handler that does not define a close() method."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def download_request(self, *args, **kwargs):
+        return None
+
+
+@deferred_f_from_coro_f
+async def test_close_fallback_without_close():
+    """Closing the handler closes fallback handlers that define close() and
+    skips those that do not."""
+    settings = {
+        **SETTINGS,
+        "COOKIES_ENABLED": False,
+        "ZYTE_API_FALLBACK_HTTP_HANDLER": "tests.test_handler._NoCloseFallbackHandler",
+    }
+    crawler = await get_crawler_zyte_api(settings=settings, start_handler=True)
+    handler = get_download_handler(crawler, "https")
+    assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
+    # Build both fallback handlers so that both are closed below: the http one
+    # lacks close(), while the https one (the default) defines it.
+    http_fallback = handler._get_fallback_handler(Request("http://example.com"))
+    https_fallback = handler._get_fallback_handler(Request("https://example.com"))
+    assert not hasattr(http_fallback, "close")
+    assert hasattr(https_fallback, "close")
+    result = handler.close()
+    if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:
+        await maybe_deferred_to_future(result)
+    else:
+        await result
+
+
+@pytest.mark.skipif(
+    not _REACTORLESS_SUPPORT,
+    reason="TWISTED_REACTOR_ENABLED requires Scrapy >= 2.15",
+)
+@deferred_f_from_coro_f
+async def test_reactorless():
+    """Without a Twisted reactor (TWISTED_REACTOR_ENABLED=False) the handler
+    does not verify the installed reactor and falls back to the asyncio-based
+    httpx handler."""
+    crawler = get_crawler()
+    settings = Settings({**SETTINGS, "TWISTED_REACTOR_ENABLED": False})
+    settings["TWISTED_REACTOR"] = None
+    handler = ScrapyZyteAPIDownloadHandler(settings, crawler)
+    assert handler._reactor_enabled is False
+    assert handler._fallback_handler_paths["http"] == _HTTPX_HANDLER
+    assert handler._fallback_handler_paths["https"] == _HTTPX_HANDLER
 
 
 @pytest.mark.parametrize(
-    "body_size, warnsize, maxsize, expected_result, expected_warnings",
+    ("body_size", "warnsize", "maxsize", "expected_result", "expected_warnings"),
     [
         # Warning only (exceeds warnsize but not maxsize)
         (
@@ -610,16 +839,16 @@ def test_body_max_size_exceeded(
 
     if expected_warnings:
         for call, expected_warning in zip(
-            logger.warning.call_args_list, expected_warnings
+            logger.warning.call_args_list, expected_warnings, strict=True
         ):
             assert call[0][0] == expected_warning
     else:
         logger.warning.assert_not_called()
 
 
-@ensureDeferred
+@deferred_f_from_coro_f
 @pytest.mark.parametrize(
-    "body_size, warnsize, maxsize, expect_null",
+    ("body_size", "warnsize", "maxsize", "expect_null"),
     [
         (500, None, None, False),  # No limits, should return response
         (
@@ -643,23 +872,26 @@ async def test_download_request_limits(
 ):
     settings: SETTINGS_T = {"DOWNLOAD_WARNSIZE": warnsize, "DOWNLOAD_MAXSIZE": maxsize}
     async with make_handler(settings, mockserver.urljoin("/")) as handler:
+        await handler._session.close()
         handler._session = mock.AsyncMock()
         handler._session.get.return_value = mock.Mock(body=b"x" * body_size)
 
         mock_api_response = mock.Mock(body=b"x" * body_size)
 
         # Patch the `from_api_response` method of ZyteAPITextResponse only for the test
-        with mock.patch.object(
-            ZyteAPITextResponse, "from_api_response", return_value=mock_api_response
-        ):
-            with mock.patch(
+        with (
+            mock.patch.object(
+                ZyteAPITextResponse, "from_api_response", return_value=mock_api_response
+            ),
+            mock.patch(
                 "scrapy_zyte_api.responses._process_response",
                 return_value=mock_api_response,
-            ):
-                request = Request("https://example.com")
-                result = await handler._download_request({}, request, None)
+            ),
+        ):
+            request = Request("https://example.com")
+            result = await handler._download_request({}, request)
 
-                if expect_null:
-                    assert result is None
-                else:
-                    assert result is not None
+            if expect_null:
+                assert result is None
+            else:
+                assert result is not None

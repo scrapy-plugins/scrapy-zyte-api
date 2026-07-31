@@ -1,6 +1,9 @@
-from typing import Union
+from __future__ import annotations
 
-from .responses import ZyteAPIResponse, ZyteAPITextResponse
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .responses import ZyteAPIResponse, ZyteAPITextResponse
 
 
 class ActionError(ValueError):
@@ -14,4 +17,4 @@ class ActionError(ValueError):
         #: You can inspect the outcome of actions in the ``"actions"`` key of
         #: :attr:`response.raw_api_response
         #: <scrapy_zyte_api.responses.ZyteAPITextResponse.raw_api_response>`.
-        self.response: Union[ZyteAPIResponse, ZyteAPITextResponse] = response
+        self.response: ZyteAPIResponse | ZyteAPITextResponse = response

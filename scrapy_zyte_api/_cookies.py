@@ -1,12 +1,12 @@
 from http.cookiejar import Cookie
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 from scrapy.http import Request
 from scrapy.http.cookies import CookieJar
 
 
-def _get_cookie_jar(request: Request, cookie_jars: Dict[Any, CookieJar]) -> CookieJar:
+def _get_cookie_jar(request: Request, cookie_jars: dict[Any, CookieJar]) -> CookieJar:
     jar_id = request.meta.get("cookiejar")
     return cookie_jars[jar_id]
 
@@ -24,9 +24,9 @@ def _get_cookie_domain(cookie, url):
 
 
 def _process_cookies(
-    api_response: Dict[str, Any],
+    api_response: dict[str, Any],
     request: Request,
-    cookie_jars: Optional[Dict[Any, CookieJar]],
+    cookie_jars: dict[Any, CookieJar] | None,
 ):
     if not cookie_jars:
         return
@@ -64,7 +64,7 @@ def _process_cookies(
 
 
 def _get_all_cookies(
-    request: Request, cookie_jars: Dict[Any, CookieJar]
-) -> List[Cookie]:
+    request: Request, cookie_jars: dict[Any, CookieJar]
+) -> list[Cookie]:
     cookie_jar = _get_cookie_jar(request, cookie_jars)
     return list(cookie_jar.jar)
