@@ -1,11 +1,12 @@
 from copy import deepcopy
 
 import pytest
-from pytest_twisted import ensureDeferred
 from scrapy import Spider, signals
 from scrapy.utils.test import get_crawler
 
-from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT
+from scrapy_zyte_api.utils import _POET_ADDON_SUPPORT, maybe_deferred_to_future
+
+from . import deferred_f_from_coro_f
 
 try:
     import scrapy.addons  # noqa: F401
@@ -19,13 +20,13 @@ else:
 
 @pytest.mark.parametrize(
     ("settings", "meta", "headers", "expected"),
-    (
+    [
         # Default behavior of non-Zyte-API, transparent/automap, and manual
         # Zyte API requests.
         ({}, {}, {}, True),
         (SETTINGS, {"zyte_api_automap": False}, {}, True),
         (SETTINGS, {"zyte_api_automap": True}, {}, False),
-        (SETTINGS, {}, {}, False if ADDON_SUPPORT else True),
+        (SETTINGS, {}, {}, not ADDON_SUPPORT),
         (
             SETTINGS,
             {"zyte_api": {"httpResponseBody": True, "httpResponseHeaders": True}},
@@ -261,9 +262,9 @@ else:
             {},
             "https://example.com",
         ),
-    ),
+    ],
 )
-@ensureDeferred
+@deferred_f_from_coro_f
 async def test_main(settings, meta, headers, expected, mockserver):
     items = []
     settings = deepcopy(settings)
@@ -293,7 +294,7 @@ async def test_main(settings, meta, headers, expected, mockserver):
 
     crawler = get_crawler(settings_dict=settings, spidercls=TestSpider)
     crawler.signals.connect(track_items, signal=signals.item_scraped)
-    await crawler.crawl()
+    await maybe_deferred_to_future(crawler.crawl())
 
     assert len(items) == 1
     item = items[0]

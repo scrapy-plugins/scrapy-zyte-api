@@ -1,5 +1,6 @@
+from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Dict, FrozenSet, Iterable, List, Optional, Tuple, TypedDict
+from typing import Any, TypedDict
 
 
 class ExtractFrom(str, Enum):
@@ -11,55 +12,55 @@ class ExtractFrom(str, Enum):
     See :ref:`annotations`.
     """
 
-    httpResponseBody: str = "httpResponseBody"
-    browserHtml: str = "browserHtml"
+    httpResponseBody = "httpResponseBody"
+    browserHtml = "browserHtml"
 
 
 class _Selector(TypedDict, total=False):
     type: str
     value: str
-    state: Optional[str]
+    state: str | None
 
 
 class Action(TypedDict, total=False):
     action: str
-    address: Optional[dict]
-    args: Optional[dict]
-    button: Optional[str]
-    delay: Optional[float]
-    id: Optional[str]
-    key: Optional[str]
-    keyword: Optional[str]
-    left: Optional[int]
-    maxPageHeight: Optional[int]
-    maxScrollCount: Optional[int]
-    maxScrollDelay: Optional[float]
-    onError: Optional[str]
-    options: Optional[dict]
-    selector: Optional[_Selector]
-    source: Optional[str]
-    text: Optional[str]
-    timeout: Optional[float]
-    top: Optional[int]
-    url: Optional[str]
-    urlMatchingOptions: Optional[str]
-    urlPattern: Optional[str]
-    values: Optional[List[str]]
-    waitForNavigationTimeout: Optional[float]
-    waitUntil: Optional[str]
+    address: dict | None
+    args: dict | None
+    button: str | None
+    delay: float | None
+    id: str | None
+    key: str | None
+    keyword: str | None
+    left: int | None
+    maxPageHeight: int | None
+    maxScrollCount: int | None
+    maxScrollDelay: float | None
+    onError: str | None
+    options: dict | None
+    selector: _Selector | None
+    source: str | None
+    text: str | None
+    timeout: float | None
+    top: int | None
+    url: str | None
+    urlMatchingOptions: str | None
+    urlPattern: str | None
+    values: list[str] | None
+    waitForNavigationTimeout: float | None
+    waitUntil: str | None
 
 
-class _ActionResult(TypedDict, total=False):
+class _ActionResult(TypedDict, total=False):  # noqa: PYI049
     action: str
     elapsedTime: float
     status: str
-    error: Optional[str]
+    error: str | None
 
 
 def make_hashable(obj: Any) -> Any:
     """Converts input into hashable form, to use in ``Annotated``."""
     if isinstance(obj, (tuple, list)):
-        return tuple((make_hashable(e) for e in obj))
+        return tuple(make_hashable(e) for e in obj)
 
     if isinstance(obj, dict):
         return frozenset((make_hashable(k), make_hashable(v)) for k, v in obj.items())
@@ -78,15 +79,33 @@ def _from_hashable(obj: Any) -> Any:
     return obj
 
 
-def actions(value: Iterable[Action]) -> Tuple[Any, ...]:
+def actions(value: Iterable[Action]) -> tuple[Any, ...]:
     """Convert an iterable of :class:`~scrapy_zyte_api.Action` dicts into a hashable value."""
     # both lists and dicts are not hashable and we need dep types to be hashable
     return tuple(make_hashable(action) for action in value)
 
 
+class NetworkCaptureFilter(TypedDict, total=False):
+    """A filter for :func:`~scrapy_zyte_api.network_capture`.
+
+    See :ref:`network-capture`.
+    """
+
+    filterType: str
+    value: str
+    matchType: str
+    httpResponseBody: bool
+
+
+def network_capture(filters: Iterable[NetworkCaptureFilter]) -> tuple[Any, ...]:
+    """Convert an iterable of :class:`~scrapy_zyte_api.NetworkCaptureFilter` dicts into a hashable value."""
+    return tuple(make_hashable(f) for f in filters)
+
+
 def custom_attrs(
-    input: Dict[str, Any], options: Optional[Dict[str, Any]] = None
-) -> Tuple[FrozenSet[Any], Optional[FrozenSet[Any]]]:
+    input: dict[str, Any],  # noqa: A002
+    options: dict[str, Any] | None = None,
+) -> tuple[frozenset[Any], frozenset[Any] | None]:
     input_wrapped = make_hashable(input)
     options_wrapped = make_hashable(options) if options else None
     return input_wrapped, options_wrapped

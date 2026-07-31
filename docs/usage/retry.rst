@@ -45,6 +45,24 @@ by adding :class:`zyte_api.RequestError` to the :setting:`RETRY_EXCEPTIONS
 <scrapy:RETRY_EXCEPTIONS>` setting. But you are better off :ref:`relying on the
 default retry policy or defining a custom retry policy <retry-policy>` instead.
 
+If you need to handle :class:`zyte_api.RequestError` in a spider errback and
+retry the request, use
+:func:`~scrapy.downloadermiddlewares.retry.get_retry_request`:
+
+.. code-block:: python
+
+    from scrapy.downloadermiddlewares.retry import get_retry_request
+    from zyte_api import RequestError
+
+
+    def errback(self, failure):
+        if failure.check(RequestError):
+            return get_retry_request(
+                failure.request,
+                spider=self,
+                reason=failure.value,
+            )
+
 .. _retry-policy:
 
 Retry policy

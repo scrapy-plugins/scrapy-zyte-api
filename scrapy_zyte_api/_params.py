@@ -1,8 +1,11 @@
 from base64 import b64decode, b64encode
+from collections import OrderedDict
+from collections.abc import Iterable, Mapping
 from copy import copy
+from json import dumps as json_dumps
 from logging import getLogger
 from os import environ
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple, Union
+from typing import Any
 from warnings import warn
 
 from scrapy import Request
@@ -12,12 +15,14 @@ from scrapy.downloadermiddlewares.httpcompression import (
 )
 from scrapy.http.cookies import CookieJar
 from scrapy.settings.default_settings import USER_AGENT
+from scrapy.utils.python import to_bytes, to_unicode
 
 from ._cookies import _get_all_cookies
 
 logger = getLogger(__name__)
 
 _NoDefault = object()
+_MAX_SESSION_CONTEXT_TRACKING = 128
 
 # Map of all known root Zyte API request params and how they need to be
 # handled. Sorted by appearance in
@@ -70,7 +75,7 @@ _NoDefault = object()
 # purposes, i.e. 2 requests with a different value for that field but otherwise
 # identical should be treated as different requests, not as duplicate requests.
 #
-_REQUEST_PARAMS: Dict[str, Dict[str, Any]] = {
+_REQUEST_PARAMS: dict[str, dict[str, Any]] = {
     "url": {
         "default": _NoDefault,
     },
@@ -270,10 +275,50 @@ _DEFAULT_API_PARAMS = {
 
 ANY_VALUE = object()
 ANY_VALUE_T = Any
-SKIP_HEADER_T = Dict[bytes, Union[ANY_VALUE_T, str]]
+SKIP_HEADER_T = dict[bytes, ANY_VALUE_T | str]
+
+_BAN_SENSITIVE_HEADERS = {
+    b"accept": "Accept",
+    b"accept-encoding": "Accept-Encoding",
+    b"accept-language": "Accept-Language",
+    b"cookie": "Cookie",
+    b"user-agent": "User-Agent",
+}
+_BAN_SENSITIVE_REQUEST_HEADER_KEYS = {
+    header.replace(b"-", b"").decode(): header for header in _BAN_SENSITIVE_HEADERS
+}
 
 
-def _may_use_browser(api_params: Dict[str, Any]) -> bool:
+def _cookie_bytes(name: str, value: str, domain: str, path: str | None = None) -> int:
+    total = len(name) + 1 + len(value) + 9 + len(domain)
+    if path is not None:
+        total += 7 + len(path)
+    return total
+
+
+def _iter_ban_sensitive_headers_in_params(
+    api_params: dict[str, Any],
+) -> Iterable[bytes]:
+    seen = set()
+    for header in api_params.get("customHttpRequestHeaders") or []:
+        header_name = header.get("name")
+        if not header_name:
+            continue
+        lowercase_header: bytes | None = to_bytes(header_name).strip().lower()
+        if lowercase_header in _BAN_SENSITIVE_HEADERS and lowercase_header not in seen:
+            seen.add(lowercase_header)
+            yield lowercase_header
+
+    for key in api_params.get("requestHeaders") or {}:
+        lowercase_header = _BAN_SENSITIVE_REQUEST_HEADER_KEYS.get(key.lower())
+        if not lowercase_header:
+            continue
+        if lowercase_header in _BAN_SENSITIVE_HEADERS and lowercase_header not in seen:
+            seen.add(lowercase_header)
+            yield lowercase_header
+
+
+def _may_use_browser(api_params: dict[str, Any]) -> bool:
     """Return ``False`` if *api_params* indicate with certainty that browser
     rendering will not be used, or ``True`` otherwise."""
     for key in _BROWSER_KEYS:
@@ -284,17 +329,266 @@ def _may_use_browser(api_params: Dict[str, Any]) -> bool:
         return True
     if "httpResponseBody" in extract_froms:
         return False
-    if api_params.get("httpResponseBody", _DEFAULT_API_PARAMS["httpResponseBody"]):
-        return False
-    return True
+    return not api_params.get(
+        "httpResponseBody", _DEFAULT_API_PARAMS["httpResponseBody"]
+    )
+
+
+def session_id_to_session(session_id):
+    return {"id": session_id}
+
+
+def str_to_bool(value):
+    return value.strip().lower() not in ("", "false")
+
+
+def _is_safe_header(k, v, /, *, api_params, request):
+    k = k.strip()
+    lowercase_k = to_bytes(k.lower())
+    if not (lowercase_k.startswith((b"zyte-", b"x-crawlera-"))):
+        return True
+
+    decoded_k = to_unicode(k)
+    decoded_v = to_unicode(v)
+
+    if lowercase_k.startswith(b"zyte-"):
+        for proxy_header_suffix, zapi_request_param, processor in (
+            (b"browser-html", "browserHtml", str_to_bool),
+            (b"cookie-management", "cookieManagement", str.strip),
+            (b"device", "device", str.strip),
+            (
+                b"disable-follow-redirect",
+                "followRedirect",
+                lambda v: not str_to_bool(v),
+            ),
+            (b"geolocation", "geolocation", str.strip),
+            (b"iptype", "ipType", str.strip),
+            (b"jobid", "jobId", str.strip),
+            (b"session-id", "session", session_id_to_session),
+        ):
+            if lowercase_k == b"zyte-" + proxy_header_suffix:
+                if zapi_request_param in api_params:
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support proxy mode headers, "
+                        f"and the matching HTTP API request parameter, "
+                        f"{zapi_request_param!r}, has already been "
+                        f"defined on the request "
+                        f"(as {api_params[zapi_request_param]!r})."
+                    )
+                else:
+                    processed_value = processor(decoded_v)
+                    if processed_value != _DEFAULT_API_PARAMS[zapi_request_param]:
+                        api_params[zapi_request_param] = processed_value
+                        if decoded_v == processed_value:
+                            logger.warning(
+                                f"Request {request} defines header "
+                                f"{decoded_k}. This header has been dropped, "
+                                f"the HTTP API of Zyte API does not support "
+                                f"proxy mode headers, and its value "
+                                f"({decoded_v!r}) has been assigned to the "
+                                f"matching HTTP API request parameter, "
+                                f"{zapi_request_param!r}."
+                            )
+                        else:
+                            logger.warning(
+                                f"Request {request} defines header "
+                                f"{decoded_k}. This header has been dropped, "
+                                f"the HTTP API of Zyte API does not support "
+                                f"proxy mode headers, and its value "
+                                f"({decoded_v!r}) has been converted into "
+                                f"{processed_value!r} and assigned to the "
+                                f"matching HTTP API request parameter, "
+                                f"{zapi_request_param!r}."
+                            )
+                    else:
+                        logger.warning(
+                            f"Request {request} defines header {decoded_k}. "
+                            f"This header has been dropped, the HTTP API of "
+                            f"Zyte API does not support proxy mode headers, "
+                            f"and its value ({decoded_v!r}) matches the "
+                            f"default value of the matching HTTP API request "
+                            f"parameter, {zapi_request_param!r}."
+                        )
+                break
+        else:
+            if lowercase_k == b"zyte-client":
+                logger.warning(
+                    f"Request {request} defines header {decoded_k}. This "
+                    f"header has been dropped, the HTTP API of Zyte API "
+                    f"does not support proxy mode headers, and "
+                    f"scrapy-zyte-api automatically fills the User-Agent "
+                    f"header, making this proxy mode header unnecessary."
+                )
+            elif lowercase_k == b"zyte-override-headers":
+                logger.warning(
+                    f"Request {request} defines header {decoded_k}. This "
+                    f"header has been dropped, the HTTP API of Zyte API "
+                    f"does not support proxy mode headers, and this "
+                    f"specific header is not necessary when using the "
+                    f"HTTP API."
+                )
+            else:
+                logger.warning(
+                    f"Request {request} defines header {decoded_k}. This "
+                    f"header has been dropped, the HTTP API of Zyte API "
+                    f"does not support proxy mode headers."
+                )
+    else:
+        assert lowercase_k.startswith(b"x-crawlera-")
+        for spm_header_suffix, zapi_request_param in (
+            (b"region", "geolocation"),
+            (b"jobid", "jobId"),
+        ):
+            if lowercase_k == b"x-crawlera-" + spm_header_suffix:
+                if zapi_request_param in api_params:
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and the matching Zyte API "
+                        f"request parameter, {zapi_request_param!r}, has "
+                        f"already been defined on the request (as "
+                        f"{api_params[zapi_request_param]!r})."
+                    )
+                else:
+                    api_params[zapi_request_param] = decoded_v
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and its value ({decoded_v!r}) "
+                        f"has been assigned to the matching Zyte API "
+                        f"request parameter, {zapi_request_param!r}."
+                    )
+                break
+        else:
+            if lowercase_k == b"x-crawlera-profile":
+                zapi_request_param = "device"
+                if zapi_request_param in api_params:
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and the matching Zyte API "
+                        f"request parameter, {zapi_request_param!r}, has "
+                        f"already been defined on the request."
+                    )
+                elif decoded_v == "mobile":
+                    api_params[zapi_request_param] = decoded_v
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and its value ({decoded_v!r}) "
+                        f"has been assigned to the matching Zyte API "
+                        f"request parameter, {zapi_request_param!r}."
+                    )
+                elif decoded_v == "desktop":
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and its value ({decoded_v!r}) "
+                        f"is the default value of the matching Zyte API "
+                        f"request parameter, {zapi_request_param!r}."
+                    )
+                else:
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and its value ({decoded_v!r}) "
+                        f"cannot be mapped to the matching Zyte API "
+                        f"request parameter, {zapi_request_param!r}."
+                    )
+            elif lowercase_k == b"x-crawlera-cookies":
+                zapi_request_param = "cookieManagement"
+                if zapi_request_param in api_params:
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and the matching Zyte API "
+                        f"request parameter, {zapi_request_param!r}, has "
+                        f"already been defined on the request."
+                    )
+                elif decoded_v == "discard":
+                    api_params[zapi_request_param] = decoded_v
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and its value ({decoded_v!r}) "
+                        f"has been assigned to the matching Zyte API "
+                        f"request parameter, {zapi_request_param!r}."
+                    )
+                elif decoded_v == "enable":
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and its value ({decoded_v!r}) "
+                        f"does not require mapping to a Zyte API request "
+                        f"parameter. To achieve the same behavior with "
+                        f"Zyte API, do not set request cookies. You can "
+                        f"disable cookies setting the COOKIES_ENABLED "
+                        f"setting to False or setting the "
+                        f"dont_merge_cookies Request.meta key to True."
+                    )
+                elif decoded_v == "disable":
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and its value ({decoded_v!r}) "
+                        f"does not require mapping to a Zyte API request "
+                        f"parameter, because it is the default behavior "
+                        f"of Zyte API."
+                    )
+                else:
+                    logger.warning(
+                        f"Request {request} defines header {decoded_k}. "
+                        f"This header has been dropped, the HTTP API of "
+                        f"Zyte API does not support Zyte Smart Proxy "
+                        f"Manager headers, and its value ({decoded_v!r}) "
+                        f"cannot be mapped to a Zyte API request "
+                        f"parameter."
+                    )
+            else:
+                logger.warning(
+                    f"Request {request} defines header {decoded_k}. This "
+                    f"header has been dropped, the HTTP API of Zyte API "
+                    f"does not support Zyte Smart Proxy Manager headers."
+                )
+    return False
+
+
+def _process_manual_custom_http_request_headers(
+    api_params: dict[str, Any],
+    request: Request,
+) -> None:
+    headers = [
+        header_dict
+        for header_dict in api_params.pop("customHttpRequestHeaders")
+        if _is_safe_header(
+            header_dict["name"],
+            header_dict["value"],
+            api_params=api_params,
+            request=request,
+        )
+    ]
+    if headers:
+        api_params["customHttpRequestHeaders"] = headers
 
 
 def _iter_headers(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
     header_parameter: str,
-) -> Iterable[Tuple[bytes, bytes, bytes]]:
+) -> Iterable[tuple[bytes, bytes, bytes]]:
     headers = api_params.get(header_parameter)
     if headers not in (None, True):
         logger.warning(
@@ -302,149 +596,22 @@ def _iter_headers(
             f"parameter, overriding Request.headers. Use Request.headers "
             f"instead."
         )
+        if header_parameter == "customHttpRequestHeaders":
+            _process_manual_custom_http_request_headers(api_params, request)
         return
     if not request.headers:
         return
-    for k, v in request.headers.items():
-        if not v:
+    for k, vs in request.headers.items():
+        if not vs:
             continue
-        decoded_k = k.decode()
-        lowercase_k = k.strip().lower()
-        joined_v = b",".join(v)
-        decoded_v = joined_v.decode()
-
-        if lowercase_k.startswith(b"x-crawlera-"):
-            for spm_header_suffix, zapi_request_param in (
-                (b"region", "geolocation"),
-                (b"jobid", "jobId"),
-            ):
-                if lowercase_k == b"x-crawlera-" + spm_header_suffix:
-                    if zapi_request_param in api_params:
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and the matching Zyte API "
-                            f"request parameter, {zapi_request_param!r}, has "
-                            f"already been defined on the request."
-                        )
-                    else:
-                        api_params[zapi_request_param] = decoded_v
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and its value ({decoded_v!r}) "
-                            f"has been assigned to the matching Zyte API "
-                            f"request parameter, {zapi_request_param!r}."
-                        )
-                    break
-            else:
-                if lowercase_k == b"x-crawlera-profile":
-                    zapi_request_param = "device"
-                    if header_parameter == "requestHeaders":
-                        # Browser request, no support for the device param.
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers."
-                        )
-                    elif zapi_request_param in api_params:
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and the matching Zyte API "
-                            f"request parameter, {zapi_request_param!r}, has "
-                            f"already been defined on the request."
-                        )
-                    elif decoded_v in ("desktop", "mobile"):
-                        api_params[zapi_request_param] = decoded_v
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and its value ({decoded_v!r}) "
-                            f"has been assigned to the matching Zyte API "
-                            f"request parameter, {zapi_request_param!r}."
-                        )
-                    else:
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and its value ({decoded_v!r}) "
-                            f"cannot be mapped to the matching Zyte API "
-                            f"request parameter, {zapi_request_param!r}."
-                        )
-                elif lowercase_k == b"x-crawlera-cookies":
-                    zapi_request_param = "cookieManagement"
-                    if zapi_request_param in api_params:
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and the matching Zyte API "
-                            f"request parameter, {zapi_request_param!r}, has "
-                            f"already been defined on the request."
-                        )
-                    elif decoded_v == "discard":
-                        api_params[zapi_request_param] = decoded_v
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and its value ({decoded_v!r}) "
-                            f"has been assigned to the matching Zyte API "
-                            f"request parameter, {zapi_request_param!r}."
-                        )
-                    elif decoded_v == "enable":
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and its value ({decoded_v!r}) "
-                            f"does not require mapping to a Zyte API request "
-                            f"parameter. To achieve the same behavior with "
-                            f"Zyte API, do not set request cookies. You can "
-                            f"disable cookies setting the COOKIES_ENABLED "
-                            f"setting to False or setting the "
-                            f"dont_merge_cookies Request.meta key to True."
-                        )
-                    elif decoded_v == "disable":
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and its value ({decoded_v!r}) "
-                            f"does not require mapping to a Zyte API request "
-                            f"parameter, because it is the default behavior "
-                            f"of Zyte API."
-                        )
-                    else:
-                        logger.warning(
-                            f"Request {request} defines header {decoded_k}. "
-                            f"This header has been dropped, the HTTP API of "
-                            f"Zyte API does not support Zyte Smart Proxy "
-                            f"Manager headers, and its value ({decoded_v!r}) "
-                            f"cannot be mapped to a Zyte API request "
-                            f"parameter."
-                        )
-                else:
-                    logger.warning(
-                        f"Request {request} defines header {decoded_k}. This "
-                        f"header has been dropped, the HTTP API of Zyte API "
-                        f"does not support Zyte Smart Proxy Manager headers."
-                    )
-            continue
-
-        yield k, lowercase_k, joined_v
+        v = b",".join(vs)
+        if _is_safe_header(k, v, api_params=api_params, request=request):
+            yield k, k.strip().lower(), v
 
 
 def _map_custom_http_request_headers(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
     skip_headers: SKIP_HEADER_T,
 ):
@@ -463,9 +630,9 @@ def _map_custom_http_request_headers(
 
 def _map_request_headers(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
-    browser_headers: Dict[bytes, str],
+    browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
 ):
     request_headers = {}
@@ -491,7 +658,7 @@ def _map_request_headers(
 
 def _warn_about_request_headers(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
     skip_headers: SKIP_HEADER_T,
 ):
@@ -511,7 +678,7 @@ def _warn_about_request_headers(
         )
 
 
-def _get_extract_from(api_params: Dict[str, Any], extract_type: str) -> Union[str, Any]:
+def _get_extract_from(api_params: dict[str, Any], extract_type: str) -> str | Any:
     options = api_params.get(f"{extract_type}Options", {})
     default_extract_from = _REQUEST_PARAMS[extract_type].get(
         "default_extract_from", _NoDefault
@@ -519,7 +686,7 @@ def _get_extract_from(api_params: Dict[str, Any], extract_type: str) -> Union[st
     return options.get("extractFrom", default_extract_from)
 
 
-def _get_extract_froms(api_params: Dict[str, Any]) -> Set[str]:
+def _get_extract_froms(api_params: dict[str, Any]) -> set[str]:
     result = set()
     for key in _EXTRACT_KEYS:
         if not api_params.get(key, False):
@@ -530,10 +697,10 @@ def _get_extract_froms(api_params: Dict[str, Any]) -> Set[str]:
 
 def _set_request_headers_from_request(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
     skip_headers: SKIP_HEADER_T,
-    browser_headers: Dict[bytes, str],
+    browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
 ):
     """Updates *api_params*, in place, based on *request*."""
@@ -580,12 +747,27 @@ def _set_request_headers_from_request(
         api_params.pop("requestHeaders")
 
 
+def proxy_mode_browser_html_enabled(request: Request) -> bool:
+    for k, v in request.headers.items():
+        if not v:
+            continue
+        lowercase_k = k.strip().lower()
+        if lowercase_k != b"zyte-browser-html":
+            continue
+        joined_v = b",".join(v)
+        decoded_v = joined_v.decode()
+        return str_to_bool(decoded_v)
+    return False
+
+
 def _set_http_response_body_from_request(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
 ):
-    if not any(api_params.get(k) for k in _BROWSER_OR_EXTRACT_KEYS):
+    if not any(
+        api_params.get(k) for k in _BROWSER_OR_EXTRACT_KEYS
+    ) and not proxy_mode_browser_html_enabled(request):
         api_params.setdefault("httpResponseBody", True)
     elif api_params.get("httpResponseBody") is False:
         logger.warning(
@@ -599,15 +781,15 @@ def _set_http_response_body_from_request(
 
 def _set_http_response_headers_from_request(
     *,
-    api_params: Dict[str, Any],
-    default_params: Dict[str, Any],
-    meta_params: Dict[str, Any],
+    api_params: dict[str, Any],
+    default_params: dict[str, Any],
+    meta_params: dict[str, Any],
 ):
     if api_params.get("httpResponseBody"):
         api_params.setdefault("httpResponseHeaders", True)
     elif (
         api_params.get("httpResponseHeaders") is False
-        and not default_params.get("httpResponseHeaders") is False
+        and default_params.get("httpResponseHeaders") is not False
     ):
         logger.warning(
             "You do not need to set httpResponseHeaders to False if "
@@ -664,7 +846,7 @@ def _handle_experimental_unnamespacing(api_params, request, experimental, field)
 
 def _set_http_response_cookies_from_request(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     experimental: bool,
     request: Request,
 ):
@@ -687,7 +869,15 @@ def _set_http_response_cookies_from_request(
         api_params["experimental"].setdefault("responseCookies", True)
 
 
-def _get_output_cookies(request, cookie_jars, max_cookies, field):
+def _get_output_cookies(
+    request,
+    cookie_jars,
+    max_cookies,
+    max_cookie_name_length,
+    max_cookie_value_length,
+    max_cookie_bytes,
+    field,
+):
     output_cookies = []
     input_cookies = _get_all_cookies(request, cookie_jars)
     input_cookie_count = len(input_cookies)
@@ -705,23 +895,66 @@ def _get_output_cookies(request, cookie_jars, max_cookies, field):
         )
         input_cookies = input_cookies[:max_cookies]
     for input_cookie in input_cookies:
-        output_cookie = {
-            "name": input_cookie.name,
-            "value": input_cookie.value,
-            "domain": input_cookie.domain,
-        }
-        if input_cookie.path_specified:
-            output_cookie["path"] = input_cookie.path
+        name = input_cookie.name
+        value = input_cookie.value or ""
+        domain = input_cookie.domain
+        path = input_cookie.path if input_cookie.path_specified else None
+        if len(name) > max_cookie_name_length:
+            logger.warning(
+                f"Request {request!r} has a cookie with a name of "
+                f"{len(name)} characters, which exceeds the limit of "
+                f"{max_cookie_name_length} characters (see the "
+                f"ZYTE_API_MAX_COOKIE_NAME_LENGTH setting), so the cookie "
+                f"has been dropped. To silence this warning, set the request "
+                f"cookies manually through the {field} Zyte API parameter "
+                f"instead. Alternatively, if Zyte API starts supporting "
+                f"longer cookie names, update the "
+                f"ZYTE_API_MAX_COOKIE_NAME_LENGTH setting accordingly."
+            )
+            continue
+        if len(value) > max_cookie_value_length:
+            logger.warning(
+                f"Request {request!r} has a cookie named {name!r} whose "
+                f"value length ({len(value)} characters) exceeds the limit "
+                f"of {max_cookie_value_length} characters (see the "
+                f"ZYTE_API_MAX_COOKIE_VALUE_LENGTH setting), so the cookie "
+                f"has been dropped. To silence this warning, set the request "
+                f"cookies manually through the {field} Zyte API parameter "
+                f"instead. Alternatively, if Zyte API starts supporting "
+                f"longer cookie values, update the "
+                f"ZYTE_API_MAX_COOKIE_VALUE_LENGTH setting accordingly."
+            )
+            continue
+        size = _cookie_bytes(name, value, domain, path)
+        if size > max_cookie_bytes:
+            logger.warning(
+                f"Request {request!r} has a cookie named {name!r} whose "
+                f"serialized size ({size} bytes) exceeds the limit of "
+                f"{max_cookie_bytes} bytes (see the ZYTE_API_MAX_COOKIE_BYTES "
+                f"setting), so the cookie has been dropped. To silence this "
+                f"warning, set the request cookies manually through the "
+                f"{field} Zyte API parameter instead. "
+                f"Alternatively, if Zyte API starts supporting larger "
+                f"cookies, update the ZYTE_API_MAX_COOKIE_BYTES setting "
+                f"accordingly."
+            )
+            continue
+        output_cookie = {"name": name, "value": value, "domain": domain}
+        if path is not None:
+            output_cookie["path"] = path
         output_cookies.append(output_cookie)
     return output_cookies
 
 
 def _set_http_request_cookies_from_request(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
-    cookie_jars: Dict[Any, CookieJar],
+    cookie_jars: dict[Any, CookieJar],
     max_cookies: int,
+    max_cookie_name_length: int,
+    max_cookie_value_length: int,
+    max_cookie_bytes: int,
     experimental: bool,
 ):
     if "requestCookies" in api_params:
@@ -766,23 +999,26 @@ def _set_http_request_cookies_from_request(
                 )
         return
 
-    if not experimental:
-        output_cookies = _get_output_cookies(
-            request, cookie_jars, max_cookies, "requestCookies"
-        )
-        if output_cookies:
+    field = "requestCookies" if not experimental else "experimental.requestCookies"
+    output_cookies = _get_output_cookies(
+        request,
+        cookie_jars,
+        max_cookies,
+        max_cookie_name_length,
+        max_cookie_value_length,
+        max_cookie_bytes,
+        field,
+    )
+    if output_cookies:
+        if not experimental:
             api_params["requestCookies"] = output_cookies
-    else:
-        output_cookies = _get_output_cookies(
-            request, cookie_jars, max_cookies, "experimental.requestCookies"
-        )
-        if output_cookies:
+        else:
             api_params.setdefault("experimental", {})["requestCookies"] = output_cookies
 
 
 def _set_http_request_method_from_request(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
 ):
     method = api_params.get("httpRequestMethod")
@@ -804,7 +1040,7 @@ def _set_http_request_method_from_request(
 
 def _set_http_request_body_from_request(
     *,
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
 ):
     body = api_params.get("httpRequestBody")
@@ -830,11 +1066,11 @@ _Undefined = object()
 
 def _unset_unneeded_api_params(
     *,
-    api_params: Dict[str, Any],
-    default_params: Dict[str, Any],
+    api_params: dict[str, Any],
+    default_params: dict[str, Any],
     request: Request,
 ):
-    experimental_had_content = bool(api_params.get("experimental", None))
+    experimental_had_content = bool(api_params.get("experimental"))
     for param, default_value in _DEFAULT_API_PARAMS.items():
         value = api_params.get(param, _Undefined)
         if value is _Undefined or value != default_value:
@@ -851,19 +1087,22 @@ def _unset_unneeded_api_params(
 
 
 def _update_api_params_from_request(
-    api_params: Dict[str, Any],
+    api_params: dict[str, Any],
     request: Request,
     *,
-    default_params: Dict[str, Any],
-    meta_params: Dict[str, Any],
+    default_params: dict[str, Any],
+    meta_params: dict[str, Any],
     skip_headers: SKIP_HEADER_T,
-    browser_headers: Dict[bytes, str],
+    browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
     cookies_enabled: bool,
-    cookie_jars: Optional[Dict[Any, CookieJar]],
+    cookie_jars: dict[Any, CookieJar] | None,
     max_cookies: int,
+    max_cookie_name_length: int,
+    max_cookie_value_length: int,
+    max_cookie_bytes: int,
     experimental_cookies: bool,
-    unreported_deprecated_experimental_fields: Set[str],
+    unreported_deprecated_experimental_fields: set[str],
 ):
     for field in ("responseCookies", "requestCookies", "cookieManagement"):
         if (
@@ -910,6 +1149,9 @@ def _update_api_params_from_request(
                 request=request,
                 cookie_jars=cookie_jars,
                 max_cookies=max_cookies,
+                max_cookie_name_length=max_cookie_name_length,
+                max_cookie_value_length=max_cookie_value_length,
+                max_cookie_bytes=max_cookie_bytes,
                 experimental=experimental_cookies,
             )
     _unset_unneeded_api_params(
@@ -919,30 +1161,29 @@ def _update_api_params_from_request(
 
 
 def _copy_meta_params_as_dict(
-    meta_params: Dict[str, Any],
+    meta_params: dict[str, Any],
     *,
     param: str,
     request: Request,
 ):
     if meta_params is True:
         return {}
-    elif not isinstance(meta_params, Mapping):
+    if not isinstance(meta_params, Mapping):
         raise ValueError(
             f"'{param}' parameters in the request meta should be provided as "
             f"a dictionary, got {type(meta_params)} instead in {request}."
         )
-    else:
-        return copy(meta_params)
+    return copy(meta_params)
 
 
 def _merge_params(
     *,
-    default_params: Dict[str, Any],
-    meta_params: Dict[str, Any],
+    default_params: dict[str, Any],
+    meta_params: dict[str, Any],
     param: str,
     setting: str,
     request: Request,
-    context: Optional[List[str]] = None,
+    context: list[str] | None = None,
 ):
     params = copy(default_params)
     meta_params = copy(meta_params)
@@ -955,7 +1196,7 @@ def _merge_params(
                 param=param,
                 setting=setting,
                 request=request,
-                context=context + [k],
+                context=[*context, k],
             )
         if meta_params[k] not in (None, {}):
             continue
@@ -963,7 +1204,7 @@ def _merge_params(
         if k in params:
             params.pop(k)
         else:
-            qual_param = ".".join(context + [k])
+            qual_param = ".".join([*context, k])
             logger.warning(
                 f"In request {request} {param!r} parameter {qual_param} is "
                 f"None, which is a value reserved to unset parameters defined "
@@ -977,7 +1218,7 @@ def _merge_params(
 def _get_raw_params(
     request: Request,
     *,
-    default_params: Dict[str, Any],
+    default_params: dict[str, Any],
 ):
     meta_params = request.meta.get("zyte_api", False)
     if meta_params is False:
@@ -988,6 +1229,7 @@ def _get_raw_params(
             f"Setting the zyte_api request metadata key to "
             f"{meta_params!r} is deprecated. Use False instead.",
             DeprecationWarning,
+            stacklevel=1,
         )
         return None
 
@@ -1010,15 +1252,18 @@ def _get_automap_params(
     request: Request,
     *,
     default_enabled: bool,
-    default_params: Dict[str, Any],
+    default_params: dict[str, Any],
     skip_headers: SKIP_HEADER_T,
-    browser_headers: Dict[bytes, str],
+    browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
     cookies_enabled: bool,
-    cookie_jars: Optional[Dict[Any, CookieJar]],
+    cookie_jars: dict[Any, CookieJar] | None,
     max_cookies: int,
+    max_cookie_name_length: int,
+    max_cookie_value_length: int,
+    max_cookie_bytes: int,
     experimental_cookies: bool,
-    unreported_deprecated_experimental_fields: Set[str],
+    unreported_deprecated_experimental_fields: set[str],
 ):
     meta_params = request.meta.get("zyte_api_automap", default_enabled)
     if meta_params is False:
@@ -1049,6 +1294,9 @@ def _get_automap_params(
         cookies_enabled=cookies_enabled,
         cookie_jars=cookie_jars,
         max_cookies=max_cookies,
+        max_cookie_name_length=max_cookie_name_length,
+        max_cookie_value_length=max_cookie_value_length,
+        max_cookie_bytes=max_cookie_bytes,
         experimental_cookies=experimental_cookies,
         unreported_deprecated_experimental_fields=unreported_deprecated_experimental_fields,
     )
@@ -1059,19 +1307,22 @@ def _get_automap_params(
 def _get_api_params(
     request: Request,
     *,
-    default_params: Dict[str, Any],
+    default_params: dict[str, Any],
     transparent_mode: bool,
-    automap_params: Dict[str, Any],
+    automap_params: dict[str, Any],
     skip_headers: SKIP_HEADER_T,
-    browser_headers: Dict[bytes, str],
+    browser_headers: dict[bytes, str],
     browser_ignore_headers: SKIP_HEADER_T,
-    job_id: Optional[str],
+    job_id: str | None,
     cookies_enabled: bool,
-    cookie_jars: Optional[Dict[Any, CookieJar]],
+    cookie_jars: dict[Any, CookieJar] | None,
     max_cookies: int,
+    max_cookie_name_length: int,
+    max_cookie_value_length: int,
+    max_cookie_bytes: int,
     experimental_cookies: bool,
-    unreported_deprecated_experimental_fields: Set[str],
-) -> Optional[dict]:
+    unreported_deprecated_experimental_fields: set[str],
+) -> dict | None:
     """Returns a dictionary of API parameters that must be sent to Zyte API for
     the specified request, or None if the request should not be sent through
     Zyte API."""
@@ -1087,6 +1338,9 @@ def _get_api_params(
             cookies_enabled=cookies_enabled,
             cookie_jars=cookie_jars,
             max_cookies=max_cookies,
+            max_cookie_name_length=max_cookie_name_length,
+            max_cookie_value_length=max_cookie_value_length,
+            max_cookie_bytes=max_cookie_bytes,
             experimental_cookies=experimental_cookies,
             unreported_deprecated_experimental_fields=unreported_deprecated_experimental_fields,
         )
@@ -1098,6 +1352,8 @@ def _get_api_params(
             f"automatically-mapped parameters."
         )
     else:
+        if "customHttpRequestHeaders" in api_params:
+            _process_manual_custom_http_request_headers(api_params, request)
         if (
             api_params
             and unreported_deprecated_experimental_fields
@@ -1118,7 +1374,6 @@ def _get_api_params(
         api_params["jobId"] = job_id
 
     api_params["url"] = request.url
-
     return api_params
 
 
@@ -1180,7 +1435,7 @@ def _load_mw_skip_headers(crawler):
     return mw_skip_headers
 
 
-def _load_browser_headers(settings) -> Dict[bytes, str]:
+def _load_browser_headers(settings) -> dict[bytes, str]:
     browser_headers = settings.getdict(
         "ZYTE_API_BROWSER_HEADERS",
         {"Referer": "referer"},
@@ -1198,6 +1453,11 @@ class _ParamParser:
         self._transparent_mode = settings.getbool("ZYTE_API_TRANSPARENT_MODE", False)
         self._http_skip_headers = _load_http_skip_headers(settings)
         self._mw_skip_headers = _load_mw_skip_headers(crawler)
+        self._warn_on_ban_sensitive_headers = settings.getbool(
+            "ZYTE_API_WARN_ON_BAN_SENSITIVE_HEADERS",
+            True,
+        )
+        self._warned_ban_sensitive_headers: set[bytes] = set()
         self._experimental_cookies = settings.getbool(
             "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"
         )
@@ -1230,7 +1490,13 @@ class _ParamParser:
                     "parsing responses.",
                 )
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 100)
-        self._crawler = crawler
+        self._max_cookie_name_length = settings.getint(
+            "ZYTE_API_MAX_COOKIE_NAME_LENGTH", 4085
+        )
+        self._max_cookie_value_length = settings.getint(
+            "ZYTE_API_MAX_COOKIE_VALUE_LENGTH", 4085
+        )
+        self._max_cookie_bytes = settings.getint("ZYTE_API_MAX_COOKIE_BYTES", 4097)
         self._cookie_jars = None
         if not self._experimental_cookies:
             self._unreported_deprecated_experimental_fields = {
@@ -1240,12 +1506,13 @@ class _ParamParser:
             }
         else:
             self._unreported_deprecated_experimental_fields = set()
+        self._session_context_params: OrderedDict[str, Any] = OrderedDict()
+        self._warned_session_contexts: set[str] = set()
 
     def _request_skip_headers(self, request):
         result = dict(self._mw_skip_headers)
         for name in request.meta.get("_pre_mw_headers", set()):
-            if name in result:
-                del result[name]
+            result.pop(name, None)
         return result
 
     def parse(self, request):
@@ -1265,7 +1532,61 @@ class _ParamParser:
             cookies_enabled=cookies_enabled,
             cookie_jars=self._cookie_jars,
             max_cookies=self._max_cookies,
+            max_cookie_name_length=self._max_cookie_name_length,
+            max_cookie_value_length=self._max_cookie_value_length,
+            max_cookie_bytes=self._max_cookie_bytes,
             experimental_cookies=self._experimental_cookies,
             unreported_deprecated_experimental_fields=self._unreported_deprecated_experimental_fields,
         )
+        if params and self._warn_on_ban_sensitive_headers:
+            self._warn_about_ban_sensitive_headers(request, params)
+        if params:
+            self._warn_about_session_context_params(params)
         return params
+
+    def _warn_about_ban_sensitive_headers(
+        self,
+        request: Request,
+        params: dict[str, Any],
+    ) -> None:
+        for lowercase_header in _iter_ban_sensitive_headers_in_params(params):
+            if lowercase_header in self._warned_ban_sensitive_headers:
+                continue
+            self._warned_ban_sensitive_headers.add(lowercase_header)
+            display_name = _BAN_SENSITIVE_HEADERS[lowercase_header]
+            logger.warning(
+                f"Request {request} sends ban-sensitive header {display_name} "
+                f"to Zyte API. User-defined values can negatively impact ban "
+                "avoidance effectiveness. If unintended, remove it where it "
+                "is defined (for example in Request.headers, USER_AGENT, or "
+                "DEFAULT_REQUEST_HEADERS). If intentional, set "
+                "ZYTE_API_WARN_ON_BAN_SENSITIVE_HEADERS to False to silence "
+                "this warning.",
+            )
+
+    def _warn_about_session_context_params(self, params: dict) -> None:
+        session_context = params.get("sessionContext")
+        if not session_context:
+            return
+        context_key = json_dumps(session_context, sort_keys=True)
+        if context_key in self._warned_session_contexts:
+            return
+        current = params.get("sessionContextParameters", {})
+        if context_key not in self._session_context_params:
+            if len(self._session_context_params) >= _MAX_SESSION_CONTEXT_TRACKING:
+                self._session_context_params.popitem(last=False)
+            self._session_context_params[context_key] = current
+        elif self._session_context_params[context_key] != current:
+            self._warned_session_contexts.add(context_key)
+            del self._session_context_params[context_key]
+            logger.warning(
+                f"sessionContext {session_context!r} was used with "
+                f"sessionContextParameters {current!r}, but a different "
+                f"sessionContextParameters value was used previously for the "
+                f"same sessionContext. For a given sessionContext value, "
+                f"sessionContextParameters should always be the same "
+                f"throughout a crawl. See https://docs.zyte.com/zyte-api/"
+                f"usage/features.html#server-managed-sessions"
+            )
+        else:
+            self._session_context_params.move_to_end(context_key)

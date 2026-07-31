@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 import socket
@@ -7,29 +9,31 @@ from base64 import b64encode
 from contextlib import asynccontextmanager
 from importlib import import_module
 from subprocess import PIPE, Popen
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
-from pytest_twisted import ensureDeferred
 from scrapy import Request
-from twisted.internet import reactor
-from twisted.internet.defer import Deferred
 from twisted.internet.task import deferLater
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET, Site
 
-from scrapy_zyte_api._annotations import _ActionResult
-from scrapy_zyte_api.responses import _API_RESPONSE
+from scrapy_zyte_api._annotations import ExtractFrom, _ActionResult
 
-from . import SETTINGS, make_handler
+from . import SETTINGS, download_request, make_handler
+
+if TYPE_CHECKING:
+    from twisted.internet.defer import Deferred
+    from twisted.internet.interfaces import IReactorTime
+
+    from scrapy_zyte_api.responses import _API_RESPONSE
 
 
 # https://github.com/scrapy/scrapy/blob/02b97f98e74a994ad3e4d74e7ed55207e508a576/tests/mockserver.py#L27C1-L33C19
-def getarg(request, name, default=None, type=None):
+def getarg(request, name, default=None, type_=None):
     if name in request.args:
         value = request.args[name][0]
-        if type is not None:
-            value = type(value)
+        if type_ is not None:
+            value = type_(value)
         return value
     return default
 
@@ -40,12 +44,11 @@ def get_ephemeral_port():
     return s.getsockname()[1]
 
 
-@ensureDeferred
 async def produce_request_response(mockserver, meta, settings=None):
     settings = settings if settings is not None else {**SETTINGS}
     async with mockserver.make_handler(settings) as handler:
         req = Request(mockserver.urljoin("/"), meta=meta)
-        resp = await handler.download_request(req, None)
+        resp = await download_request(handler, req)
         return req, resp
 
 
@@ -53,13 +56,14 @@ class LeafResource(Resource):
     isLeaf = True
 
     def deferRequest(self, request, delay, f, *a, **kw):
+        from twisted.internet import reactor  # noqa: PLC0415
+
         def _cancelrequest(_):
             # silence CancelledError
             d.addErrback(lambda _: None)
             d.cancel()
 
-        # Typing issues: https://github.com/twisted/twisted/issues/9909
-        d: Deferred = deferLater(reactor, delay, f, *a, **kw)  # type: ignore[arg-type]
+        d: Deferred = deferLater(cast("IReactorTime", reactor), delay, f, *a, **kw)
         request.notifyFinish().addErrback(_cancelrequest)
         return d
 
@@ -136,6 +140,23 @@ class DefaultResource(Resource):
             }
             return json.dumps(response_data).encode()
 
+        if "session-redirect" in domain:
+            response_data["httpResponseHeaders"] = [
+                {"name": "Location", "value": "https://example.com/"}
+            ]
+            response_data["statusCode"] = 302
+            if "session" in request_data:
+                response_data["session"] = request_data["session"]
+            return json.dumps(response_data).encode()
+
+        if "session-meta-refresh" in domain:
+            response_data["browserHtml"] = (
+                '<meta http-equiv="refresh" content="0; url=https://example.com/">'
+            )
+            if "session" in request_data:
+                response_data["session"] = request_data["session"]
+            return json.dumps(response_data).encode()
+
         html = "<html><body>Hello<h1>World!</h1></body></html>"
         if "browserHtml" in request_data:
             if "httpResponseBody" in request_data:
@@ -172,6 +193,28 @@ class DefaultResource(Resource):
                     return b""
             response_data["session"] = request_data["session"]
 
+        if request_data.get("responseCookies") and not domain.startswith(
+            "no-response-cookies"
+        ):
+            cookies = [
+                {
+                    "name": "test_cookie",
+                    "value": "test_value",
+                    "domain": domain,
+                    "path": "/",
+                }
+            ]
+            if request_data.get("requestCookies") is not None:
+                cookies.append(
+                    {
+                        "name": "extra_cookie",
+                        "value": "extra_value",
+                        "domain": domain,
+                        "path": "/",
+                    }
+                )
+            response_data["responseCookies"] = cookies  # type: ignore[assignment]
+
         if "httpResponseBody" in request_data:
             headers = request_data.get("customHttpRequestHeaders", [])
             for header in headers:
@@ -197,10 +240,7 @@ class DefaultResource(Resource):
                     break
             else:
                 headers = request_data.get("requestHeaders", {})
-                if "referer" in headers:
-                    referer = headers["referer"]
-                else:
-                    referer = None
+                referer = headers.get("referer")
             if referer is not None:
                 assert isinstance(response_data["httpResponseHeaders"], list)
                 response_data["httpResponseHeaders"].append(
@@ -209,14 +249,17 @@ class DefaultResource(Resource):
 
         actions = request_data.get("actions")
         if actions:
-            results: List[_ActionResult] = []
+            results: list[_ActionResult] = []
+            stopped = False
             for action in actions:
                 result: _ActionResult = {
                     "action": action["action"],
                     "elapsedTime": 1.0,
                     "status": "success",
                 }
-                if action["action"] == "setLocation":
+                if stopped:
+                    result["status"] = "notExecuted"
+                elif action["action"] == "setLocation":
                     if domain.startswith("postal-code-10001"):
                         try:
                             postal_code = action["address"]["postalCode"]
@@ -225,11 +268,38 @@ class DefaultResource(Resource):
                         if postal_code != "10001":
                             result["status"] = "returned"
                             result["error"] = "Action setLocation failed"
+                            stopped = True
                     elif domain.startswith("no-location-support"):
                         result["status"] = "returned"
                         result["error"] = "Action setLocation not supported on …"
+                        stopped = True
+                elif domain.startswith("failing-action"):
+                    if action.get("onError") == "continue":
+                        result["status"] = "continued"
+                    else:
+                        result["status"] = "returned"
+                        stopped = True
+                    result["error"] = f"Action {action['action']} failed"
                 results.append(result)
             response_data["actions"] = results  # type: ignore[assignment]
+
+        network_capture_filters = request_data.get("networkCapture")
+        if network_capture_filters:
+            captured = []
+            for f in network_capture_filters:
+                entry: dict = {
+                    "url": f"https://api.example.com/data?filter={f.get('value', '')}",
+                    "statusCode": 200,
+                    "headers": {"content-type": "application/json"},
+                    "filter": f,
+                    "interceptionStatus": "success",
+                }
+                if f.get("httpResponseBody"):
+                    entry["httpResponseBody"] = b64encode(
+                        b'{"captured": true}'
+                    ).decode()
+                captured.append(entry)
+            response_data["networkCapture"] = captured  # type: ignore[assignment]
 
         if request_data.get("product") is True:
             response_data["product"] = {
@@ -241,16 +311,13 @@ class DefaultResource(Resource):
             assert isinstance(response_data["product"], dict)
             assert isinstance(response_data["product"]["name"], str)
             extract_from = request_data.get("productOptions", {}).get("extractFrom")
-            if extract_from:
-                from scrapy_zyte_api.providers import ExtractFrom
-
-                if extract_from == ExtractFrom.httpResponseBody:
-                    response_data["product"]["name"] += " (from httpResponseBody)"
+            if extract_from == ExtractFrom.httpResponseBody:
+                response_data["product"]["name"] += " (from httpResponseBody)"
 
             if "geolocation" in request_data:
-                response_data["product"][
-                    "name"
-                ] += f" (country {request_data['geolocation']})"
+                response_data["product"]["name"] += (
+                    f" (country {request_data['geolocation']})"
+                )
 
             if "customAttributes" in request_data:
                 response_data["customAttributes"] = {
@@ -269,6 +336,9 @@ class DefaultResource(Resource):
                     "name": "Product navigation",
                     "pageNumber": 0,
                 }
+
+        if "session-retry" in domain:
+            response_data["statusCode"] = 500
 
         return json.dumps(response_data).encode()
 
@@ -303,11 +373,11 @@ class DelayedResource(LeafResource):
 class MockServer:
     def __init__(self, resource=None, port=None):
         resource = resource or DefaultResource
-        self.resource = "{}.{}".format(resource.__module__, resource.__name__)
+        self.resource = f"{resource.__module__}.{resource.__name__}"
         self.proc = None
         self.host = socket.gethostbyname(socket.gethostname())
         self.port = port or get_ephemeral_port()
-        self.root_url = "http://%s:%d" % (self.host, self.port)
+        self.root_url = f"http://{self.host}:{self.port}"
 
     def __enter__(self):
         self.proc = Popen(
@@ -336,13 +406,15 @@ class MockServer:
         return self.root_url + path
 
     @asynccontextmanager
-    async def make_handler(self, settings: Optional[Dict] = None):
+    async def make_handler(self, settings: dict | None = None):
         settings = settings or {}
         async with make_handler(settings, self.urljoin("/")) as handler:
             yield handler
 
 
 def main():
+    from twisted.internet import reactor  # noqa: PLC0415
+
     parser = argparse.ArgumentParser()
     parser.add_argument("resource")
     parser.add_argument("--port", type=int)
@@ -350,18 +422,12 @@ def main():
     module_name, name = args.resource.rsplit(".", 1)
     sys.path.append(".")
     resource = getattr(import_module(module_name), name)()
-    # Typing issue: https://github.com/twisted/twisted/issues/9909
     http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[attr-defined]
 
     def print_listening():
         host = http_port.getHost()
-        print(
-            "Mock server {} running at http://{}:{}".format(
-                resource, host.host, host.port
-            )
-        )
+        print(f"Mock server {resource} running at http://{host.host}:{host.port}")
 
-    # Typing issue: https://github.com/twisted/twisted/issues/9909
     reactor.callWhenRunning(print_listening)  # type: ignore[attr-defined]
     reactor.run()  # type: ignore[attr-defined]
 

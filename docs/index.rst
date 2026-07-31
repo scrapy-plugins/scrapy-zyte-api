@@ -24,10 +24,10 @@ either :ref:`globally <transparent>` or :ref:`per request <automap>`, or
    usage/manual
    usage/automap
    usage/default
+   usage/redirect
    usage/retry
    usage/scrapy-poet
    usage/session
-   usage/stats
    usage/fingerprint
    usage/proxy
    usage/referer
@@ -41,6 +41,7 @@ either :ref:`globally <transparent>` or :ref:`per request <automap>`, or
    reference/settings
    reference/meta
    reference/inputs
+   reference/stats
    reference/fingerprint-params
 
 .. toctree::

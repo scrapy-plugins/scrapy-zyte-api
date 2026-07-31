@@ -1,7 +1,8 @@
+import json
 from base64 import b64encode
 from collections import defaultdict
 from functools import partial
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 import pytest
 from scrapy import Request
@@ -11,8 +12,11 @@ from scrapy.http.cookies import CookieJar
 
 from scrapy_zyte_api.responses import (
     _API_RESPONSE,
+    ZyteAPIJsonResponse,
+    ZyteAPIMixin,
     ZyteAPIResponse,
     ZyteAPITextResponse,
+    ZyteAPIXmlResponse,
 )
 from scrapy_zyte_api.responses import _process_response as _unwrapped_process_response
 from scrapy_zyte_api.utils import _RESPONSE_HAS_IP_ADDRESS, _RESPONSE_HAS_PROTOCOL
@@ -104,7 +108,7 @@ EXPECTED_BODY = PAGE_CONTENT.encode("utf-8")
 
 
 @pytest.mark.parametrize(
-    "api_response,cls",
+    ("api_response", "cls"),
     [
         (raw_api_response_browser, ZyteAPITextResponse),
         (raw_api_response_body, ZyteAPIResponse),
@@ -128,7 +132,7 @@ def test_init(api_response, cls):
 
 
 @pytest.mark.parametrize(
-    "api_response,cls,content_length",
+    ("api_response", "cls", "content_length"),
     [
         (raw_api_response_browser, ZyteAPITextResponse, 44),
         (raw_api_response_body, ZyteAPIResponse, 44),
@@ -158,7 +162,7 @@ def test_text_from_api_response(api_response, cls, content_length):
 
 
 @pytest.mark.parametrize(
-    "api_response,cls",
+    ("api_response", "cls"),
     [
         (raw_api_response_browser, ZyteAPITextResponse),
         (raw_api_response_body, ZyteAPIResponse),
@@ -183,7 +187,9 @@ def test_response_replace(api_response, cls):
     }
 
     # Attempting to replace the raw_api_response value would raise an error
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match="Replacing the value of 'raw_api_response' isn't allowed"
+    ):
         orig_response.replace(raw_api_response=new_raw_api_response)
 
 
@@ -216,7 +222,7 @@ def format_to_httpResponseBody(body, encoding="utf-8"):
 
 
 @pytest.mark.parametrize(
-    "api_response,cls",
+    ("api_response", "cls"),
     [
         (raw_api_response_browser, ZyteAPITextResponse),
         (raw_api_response_body, ZyteAPIResponse),
@@ -253,19 +259,19 @@ INPUT_COOKIES_SIMPLE = [{"name": "c", "value": "d"}]
 
 
 @pytest.mark.parametrize(
-    "fields,cls,keep",
+    ("fields", "cls", "keep"),
     [
         # Only keep the Set-Cookie header if experimental.responseCookies is
         # not received.
         *(
             (
                 {
-                    **cast(Dict[Any, Any], output_fields),
+                    **cast("dict[Any, Any]", output_fields),
                     "httpResponseHeaders": [
                         {"name": "Content-Type", "value": "text/html"},
                         {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
                     ],
-                    **cookie_fields,  # type: ignore[dict-item]
+                    **cookie_fields,
                 },
                 response_cls,
                 keep,
@@ -337,7 +343,7 @@ def test__process_response_no_body():
         "product": {"name": "shoes"},
     }
 
-    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
+    resp = _process_response(api_response, Request(cast("str", api_response["url"])))
 
     assert isinstance(resp, Response)
     assert resp.body == b""
@@ -394,7 +400,7 @@ def test__process_response_body_only_infer_encoding():
 
 
 @pytest.mark.parametrize(
-    "encoding,content_type",
+    ("encoding", "content_type"),
     [
         ("utf-8", "text/html; charset=UTF-8"),
         ("gb18030", "text/html; charset=gb2312"),
@@ -419,7 +425,7 @@ def test__process_response_body_and_headers(encoding, content_type):
 
 
 @pytest.mark.parametrize(
-    "body,expected,actual_encoding,inferred_encoding",
+    ("body", "expected", "actual_encoding", "inferred_encoding"),
     [
         ("<html><body>plain</body></html>", "plain", "cp1252", "cp1252"),
         (
@@ -506,7 +512,7 @@ def test__process_response_non_text():
             }
         ],
     }
-    resp = _process_response(api_response, Request(cast(str, api_response["url"])))
+    resp = _process_response(api_response, Request(cast("str", api_response["url"])))
 
     assert isinstance(resp, Response)
     with pytest.raises(NotSupported):
@@ -548,7 +554,7 @@ def test__process_response_browserhtml(api_response):
     ],
 )
 @pytest.mark.parametrize(
-    "kwargs,expected_status_code",
+    ("kwargs", "expected_status_code"),
     [
         ({}, 200),
         ({"statusCode": 200}, 200),
@@ -607,3 +613,83 @@ def test_cookies(api_response, caplog):
     # Do not warn about the deprecated experimental.responseCookies response
     # parameter, we already warn about it when found among request parameters.
     assert not caplog.text
+
+
+XML_BODY = b'<?xml version="1.0"?><Error><Code>NoSuchKey</Code></Error>'
+JSON_BODY = b'{"status": "ok", "count": 42}'
+
+
+_SCRAPY_JSON_RESPONSE_MARK = pytest.mark.skipif(
+    ZyteAPIJsonResponse is None, reason="Scrapy < 2.12"
+)
+
+
+@pytest.mark.parametrize(
+    ("content_type", "body", "expected_cls"),
+    [
+        ("text/xml", XML_BODY, ZyteAPIXmlResponse),
+        ("application/xml", XML_BODY, ZyteAPIXmlResponse),
+        ("application/rss+xml", XML_BODY, ZyteAPIXmlResponse),
+        pytest.param(
+            "application/json",
+            JSON_BODY,
+            ZyteAPIJsonResponse,
+            marks=_SCRAPY_JSON_RESPONSE_MARK,
+        ),
+        pytest.param(
+            "application/x-json",
+            JSON_BODY,
+            ZyteAPIJsonResponse,
+            marks=_SCRAPY_JSON_RESPONSE_MARK,
+        ),
+    ],
+)
+def test__process_response_xml_json(content_type, body, expected_cls):
+    api_response: _API_RESPONSE = {
+        "url": "https://example.com",
+        "httpResponseBody": b64encode(body).decode(),
+        "httpResponseHeaders": [{"name": "Content-Type", "value": content_type}],
+        "statusCode": 200,
+    }
+    resp = _process_response(api_response, Request(cast("str", api_response["url"])))
+    assert expected_cls is not None
+    assert isinstance(resp, expected_cls)
+    assert isinstance(resp, ZyteAPIMixin)
+    assert resp.body == body
+    assert resp.raw_api_response == api_response
+    assert resp.flags == ["zyte-api"]
+
+
+def test_xml_from_api_response():
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": b64encode(XML_BODY).decode(),
+        "httpResponseHeaders": [{"name": "Content-Type", "value": "text/xml"}],
+        "statusCode": 200,
+    }
+    resp = ZyteAPIXmlResponse.from_api_response(api_response)
+    assert resp.url == "https://example.com"
+    assert resp.status == 200
+    assert resp.body == XML_BODY
+    assert resp.raw_api_response == api_response
+    assert resp.flags == ["zyte-api"]
+    assert resp.xpath("//Error/Code/text()").get() == "NoSuchKey"
+    assert resp.xpath("//error/code/text()").get() is None
+
+
+@_SCRAPY_JSON_RESPONSE_MARK
+def test_json_from_api_response():
+    assert ZyteAPIJsonResponse is not None
+    api_response = {
+        "url": "https://example.com",
+        "httpResponseBody": b64encode(JSON_BODY).decode(),
+        "httpResponseHeaders": [{"name": "Content-Type", "value": "application/json"}],
+        "statusCode": 200,
+    }
+    resp = ZyteAPIJsonResponse.from_api_response(api_response)
+    assert resp.url == "https://example.com"
+    assert resp.status == 200
+    assert resp.body == JSON_BODY
+    assert resp.raw_api_response == api_response
+    assert resp.flags == ["zyte-api"]
+    assert json.loads(resp.text) == {"status": "ok", "count": 42}

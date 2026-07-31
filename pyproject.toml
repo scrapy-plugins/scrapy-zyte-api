@@ -1,8 +1,54 @@
-[tool.black]
-target-version = ["py39", "py310", "py311", "py312", "py313"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scrapy-zyte-api"
+version = "0.35.0"
+description = "Client library to process URLs through Zyte API"
+authors = [{name = "Zyte Group Ltd", email = "info@zyte.com"}]
+license = "BSD-3-Clause"
+readme = "README.rst"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.10"
+# Sync with [min] @ tox.ini
+dependencies = [
+    "packaging>=20.0",
+    "scrapy>=2.0.1",
+    "typing_extensions>=4.1.0",
+    "zyte-api>=0.6.0",
+]
+
+[project.optional-dependencies]
+# Sync with [testenv:min-provider] @ tox.ini
+provider = [
+    "andi>=0.6.0",
+    "scrapy-poet>=0.22.3",
+    "web-poet>=0.17.0",
+    "zyte-common-items>=0.27.0",
+]
+x402 = [
+    "zyte-api[x402]>=0.8.0",
+    "x402<2.0.0",
+]
+
+[project.urls]
+source = "https://github.com/scrapy-plugins/scrapy-zyte-api"
+docs = "https://scrapy-zyte-api.readthedocs.io/en/latest/"
 
 [tool.bumpversion]
-current_version = "0.28.0"
+current_version = "0.35.0"
 commit = true
 tag = true
 tag_name = "{new_version}"
@@ -17,20 +63,55 @@ regex = true
 filename = "docs/conf.py"
 
 [[tool.bumpversion.files]]
+filename = "pyproject.toml"
+parse = "version\\s*=\\s*['\"](?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
+
+[[tool.bumpversion.files]]
 filename = "scrapy_zyte_api/__version__.py"
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[tool.coverage.run]
+branch = true
+include = [
+    "scrapy_zyte_api/*",
+]
+omit = [
+    "tests/*",
+]
+disable_warnings = [
+    "include-ignored",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/docs",
+    "/scrapy_zyte_api",
+    "/tests",
+    "/CHANGES.rst",
+    "/tox.ini",
+]
 
 [tool.mypy]
 check_untyped_defs = true
-ignore_missing_imports = true
-no_warn_no_return = true
+implicit_reexport = false
+warn_no_return = false
+warn_unused_ignores = true
 files = [
     "scrapy_zyte_api",
     "tests"
 ]
+
+[[tool.mypy.overrides]]
+module = [
+    "pytest_twisted",
+    "scrapy_crawlera",
+    "scrapy_zyte_smartproxy",
+]
+ignore_missing_imports = true
+
+# to be fixed
+[[tool.mypy.overrides]]
+module = "scrapy_poet.*"
+implicit_reexport = true
 
 [tool.pytest.ini_options]
 junit_family = "xunit2"
@@ -40,5 +121,154 @@ testpaths = [
 ]
 minversion = "6.0"
 filterwarnings = [
-    "ignore::DeprecationWarning:twisted.web.http",
+    "ignore::DeprecationWarning:twisted\\.web\\.http",
+    "ignore::DeprecationWarning:scrapy\\.core\\.downloader\\.contextfactory",  # https://github.com/scrapy/scrapy/issues/3288
+
+    # scrapy-poet warnings for Scrapy 2.14:
+    "ignore:CollectorPipeline\\.:scrapy.exceptions.ScrapyDeprecationWarning",
+    "ignore:DownloaderStatsMiddleware\\.:scrapy.exceptions.ScrapyDeprecationWarning",
+    "ignore:.*?InjectionMiddleware\\.:scrapy.exceptions.ScrapyDeprecationWarning",
+    "ignore:RetryMiddleware\\.process_spider_exception\\(\\):scrapy.exceptions.ScrapyDeprecationWarning",
+    "ignore::scrapy.exceptions.ScrapyDeprecationWarning:scrapy_poet",
 ]
+
+[tool.ruff.lint]
+extend-select = [
+    # flake8-builtins
+    "A",
+    # flake8-async
+    "ASYNC",
+    # flake8-bugbear
+    "B",
+    # flake8-comprehensions
+    "C4",
+    # flake8-commas
+    "COM",
+    # pydocstyle
+    "D",
+    # flake8-future-annotations
+    "FA",
+    # flynt
+    "FLY",
+    # refurb
+    "FURB",
+    # isort
+    "I",
+    # flake8-implicit-str-concat
+    "ISC",
+    # flake8-logging
+    "LOG",
+    # Perflint
+    "PERF",
+    # pygrep-hooks
+    "PGH",
+    # flake8-pie
+    "PIE",
+    # pylint
+    "PL",
+    # flake8-pytest-style
+    "PT",
+    # flake8-use-pathlib
+    "PTH",
+    # flake8-pyi
+    "PYI",
+    # flake8-quotes
+    "Q",
+    # flake8-return
+    "RET",
+    # flake8-raise
+    "RSE",
+    # Ruff-specific rules
+    "RUF",
+    # flake8-bandit
+    "S",
+    # flake8-simplify
+    "SIM",
+    # flake8-slots
+    "SLOT",
+    # flake8-debugger
+    "T10",
+    # flake8-type-checking
+    "TC",
+    # pyupgrade
+    "UP",
+    # pycodestyle warnings
+    "W",
+    # flake8-2020
+    "YTT",
+]
+ignore = [
+    # Trailing comma missing
+    "COM812",
+    # Missing docstring in public module
+    "D100",
+    # Missing docstring in public class
+    "D101",
+    # Missing docstring in public method
+    "D102",
+    # Missing docstring in public function
+    "D103",
+    # Missing docstring in public package
+    "D104",
+    # Missing docstring in magic method
+    "D105",
+    # Missing docstring in public nested class
+    "D106",
+    # Missing docstring in __init__
+    "D107",
+    # One-line docstring should fit on one line with quotes
+    "D200",
+    # No blank lines allowed after function docstring
+    "D202",
+    # 1 blank line required between summary line and description
+    "D205",
+    # Multi-line docstring closing quotes should be on a separate line
+    "D209",
+    # First line should end with a period
+    "D400",
+    # First line should be in imperative mood; try rephrasing
+    "D401",
+    # First line should not be the function's "signature"
+    "D402",
+    # First word of the first line should be properly capitalized
+    "D403",
+    # No blank lines allowed between a section header and its content
+    "D412",
+    # `try`-`except` within a loop incurs performance overhead
+    "PERF203",
+    # Too many return statements
+    "PLR0911",
+    # Too many branches
+    "PLR0912",
+    # Too many arguments in function definition
+    "PLR0913",
+    # Too many statements
+    "PLR0915",
+    # Magic value used in comparison
+    "PLR2004",
+    # String contains ambiguous {}.
+    "RUF001",
+    # Docstring contains ambiguous {}.
+    "RUF002",
+    # Comment contains ambiguous {}.
+    "RUF003",
+    # Mutable class attributes should be annotated with `typing.ClassVar`
+    "RUF012",
+    # Use of `assert` detected
+    "S101",
+]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+
+[tool.ruff.lint.per-file-ignores]
+# we need to use typing.Set[] over modern alternatives with web-poet<0.19.0 && Python<3.11
+# see https://github.com/scrapinghub/web-poet/pull/219
+"scrapy_zyte_api/providers.py" = ["UP006", "UP035"]
+"tests/**" = ["S"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.sphinx-scrapy]
+python-version = "3.13"  # Keep in sync with .github/workflows/test.yml.

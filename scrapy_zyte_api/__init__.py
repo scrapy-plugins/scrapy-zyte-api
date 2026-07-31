@@ -5,13 +5,21 @@ if _NEEDS_EARLY_REACTOR:
 
     install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
-from ._annotations import ExtractFrom, actions, custom_attrs
+# Register web-poet serializers
+from . import _serialization  # noqa: F401
+from ._annotations import ExtractFrom, actions, custom_attrs, network_capture
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPIRefererSpiderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
-from ._page_inputs import Actions, Geolocation, Screenshot
+from ._page_inputs import (
+    Actions,
+    CapturedResponse,
+    Geolocation,
+    NetworkCapture,
+    Screenshot,
+)
 from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter
 from ._session import (
     SESSION_AGGRESSIVE_RETRY_POLICY as _SESSION_AGGRESSIVE_RETRY_POLICY,
@@ -20,6 +28,7 @@ from ._session import SESSION_DEFAULT_RETRY_POLICY as _SESSION_DEFAULT_RETRY_POL
 from ._session import (
     LocationSessionConfig,
     ScrapyZyteAPISessionDownloaderMiddleware,
+    ScrapyZyteAPISessionResetterDownloaderMiddleware,
     SessionConfig,
     get_request_session_id,
     is_session_init_request,
@@ -46,3 +55,31 @@ SESSION_AGGRESSIVE_RETRY_POLICY = _SESSION_AGGRESSIVE_RETRY_POLICY
 #: Instance of :class:`web_poet.rules.RulesRegistry` that holds :ref:`session
 #: configs <session-configs>`.
 session_config_registry = _session_config_registry
+
+__all__ = [
+    "SESSION_AGGRESSIVE_RETRY_POLICY",
+    "SESSION_DEFAULT_RETRY_POLICY",
+    "Actions",
+    "Addon",
+    "CapturedResponse",
+    "ExtractFrom",
+    "Geolocation",
+    "LocationSessionConfig",
+    "NetworkCapture",
+    "ScrapyZyteAPIDownloadHandler",
+    "ScrapyZyteAPIDownloaderMiddleware",
+    "ScrapyZyteAPIRefererSpiderMiddleware",
+    "ScrapyZyteAPIRequestFingerprinter",
+    "ScrapyZyteAPISessionDownloaderMiddleware",
+    "ScrapyZyteAPISessionResetterDownloaderMiddleware",
+    "ScrapyZyteAPISpiderMiddleware",
+    "Screenshot",
+    "SessionConfig",
+    "actions",
+    "custom_attrs",
+    "get_request_session_id",
+    "is_session_init_request",
+    "network_capture",
+    "session_config",
+    "session_config_registry",
+]
