@@ -115,13 +115,15 @@ else:
                     api_params.pop("httpRequestText").encode()
                 ).decode()
 
+            # experimental is dropped below, so the deprecated cookie parameter
+            # within it is read out first, to keep fingerprints consistent
+            # regardless of the parameter name space.
+            experimental = api_params.get("experimental", {})
             if (
                 "responseCookies" not in api_params
-                and "responseCookies" in api_params.get("experimental", {})
+                and "responseCookies" in experimental
             ):
-                api_params["responseCookies"] = api_params["experimental"].pop(
-                    "responseCookies"
-                )
+                api_params["responseCookies"] = experimental["responseCookies"]
 
             for key, value in _REQUEST_PARAMS.items():
                 if not value.get("changes_fingerprint", True):

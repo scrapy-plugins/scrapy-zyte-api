@@ -393,6 +393,10 @@ async def test_delay_random(settings, start_requests, mockserver, monkeypatch):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_SESSION_DELAY": base_delay,
+        # fake_sleep below makes every wait instantaneous, so the attempt
+        # budget must be high enough for the session initialization request to
+        # complete within it.
+        "ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS": 10000,
         "ZYTE_API_SESSION_QUEUE_WAIT_TIME": queue_wait_time,
         **settings,
     }

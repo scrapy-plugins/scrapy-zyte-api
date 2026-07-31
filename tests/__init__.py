@@ -137,7 +137,10 @@ SESSION_SETTINGS: SETTINGS_T = {
     "ZYTE_API_SESSION_CREATION_RETRY_DELAY": 0,
     "ZYTE_API_SESSION_DELAY": 0,
     "ZYTE_API_SESSION_ENABLED": True,
-    "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0,
+    # Not 0: with no wait, the ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS budget is
+    # spent on event loop iterations, which session initialization requests do
+    # not have time to complete within.
+    "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0.001,
     "ZYTE_API_SESSION_STATS_PER_POOL": True,
 }
 

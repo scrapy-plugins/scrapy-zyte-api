@@ -607,9 +607,7 @@ def test_cookies(api_response, caplog):
     with caplog.at_level("WARNING"):
         response = _process_response(api_response, Request(api_response["url"]))
     assert response is not None
-    assert response.headers == {
-        **OUTPUT_COOKIE_HEADERS,
-    }
+    assert response.headers == OUTPUT_COOKIE_HEADERS
     # Do not warn about the deprecated experimental.responseCookies response
     # parameter, we already warn about it when found among request parameters.
     assert not caplog.text

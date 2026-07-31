@@ -33,7 +33,7 @@ Automatic mapping
 
     If :http:`request:serp` is enabled, request header mapping is disabled.
 
--   If the :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` is ``True``
+-   If :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` is ``True``
     (default), and :attr:`Request.meta <scrapy.http.Request.meta>` does not set
     :reqmeta:`dont_merge_cookies <scrapy:dont_merge_cookies>` to ``True``:
 

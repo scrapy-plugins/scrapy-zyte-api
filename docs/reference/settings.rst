@@ -136,6 +136,20 @@ Default: ``True``
 Can be set to ``False`` to disable scrapy-zyte-api.
 
 
+.. setting:: ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED
+
+ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED
+=====================================
+
+Default: ``False``
+
+Deprecated. When ``True``, cookie parameters are mapped into the deprecated
+``experimental`` name space, i.e. as ``experimental.requestCookies`` and
+``experimental.responseCookies``.
+
+See :ref:`request-automatic`.
+
+
 .. setting:: ZYTE_API_FALLBACK_HTTP_HANDLER
 
 ZYTE_API_FALLBACK_HTTP_HANDLER

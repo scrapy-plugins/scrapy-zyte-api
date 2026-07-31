@@ -1,7 +1,7 @@
 from base64 import b64decode, b64encode
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping
-from copy import copy
+from copy import copy, deepcopy
 from json import dumps as json_dumps
 from logging import getLogger
 from os import environ
@@ -276,6 +276,13 @@ _DEFAULT_API_PARAMS = {
 ANY_VALUE = object()
 ANY_VALUE_T = Any
 SKIP_HEADER_T = dict[bytes, ANY_VALUE_T | str]
+
+_DEPRECATED_EXPERIMENTAL_FIELDS = (
+    "responseCookies",
+    "requestCookies",
+    "cookieManagement",
+)
+_UNWARNED_EXPERIMENTAL_FIELDS_ATTR = "_zyte_api_unwarned_experimental_fields"
 
 _BAN_SENSITIVE_HEADERS = {
     b"accept": "Accept",
@@ -801,11 +808,19 @@ def _set_http_response_headers_from_request(
         api_params.pop("httpResponseHeaders")
 
 
-def _handle_experimental_unnamespacing(api_params, request, experimental, field):
+def _handle_experimental_unnamespacing(
+    *,
+    api_params: dict[str, Any],
+    request: Request,
+    experimental: bool,
+    field: str,
+    unwarned_experimental_fields: set[str],
+):
     experimental_params = api_params.setdefault("experimental", {})
+    message = None
     if not experimental and field in experimental_params:
         if field in api_params:
-            logger.warning(
+            message = (
                 f"Request {request!r} defines both {field} "
                 f"({api_params[field]}) and "
                 f"experimental.{field} "
@@ -814,7 +829,7 @@ def _handle_experimental_unnamespacing(api_params, request, experimental, field)
             )
             del experimental_params[field]
         else:
-            logger.warning(
+            message = (
                 f"Request {request!r} defines experimental.{field}. "
                 f"experimental.{field} will be removed, and its value "
                 f"will be set as {field}."
@@ -822,7 +837,7 @@ def _handle_experimental_unnamespacing(api_params, request, experimental, field)
             api_params[field] = experimental_params.pop(field)
     elif experimental and field in api_params:
         if field in experimental_params:
-            logger.warning(
+            message = (
                 f"Request {request!r} defines both {field} "
                 f"({api_params[field]}) and "
                 f"experimental.{field} "
@@ -833,13 +848,16 @@ def _handle_experimental_unnamespacing(api_params, request, experimental, field)
                 f"value."
             )
         else:
-            logger.warning(
+            message = (
                 f"Request {request!r} defines {field}. Since the "
                 f"ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting is enabled, "
                 f"{field} will be removed, and its value will be set "
                 f"as experimental.{field}."
             )
         experimental_params[field] = api_params.pop(field)
+    if message and field in unwarned_experimental_fields:
+        unwarned_experimental_fields.discard(field)
+        logger.warning(message)
     if not experimental_params:
         del api_params["experimental"]
 
@@ -870,13 +888,14 @@ def _set_http_response_cookies_from_request(
 
 
 def _get_output_cookies(
-    request,
-    cookie_jars,
-    max_cookies,
-    max_cookie_name_length,
-    max_cookie_value_length,
-    max_cookie_bytes,
-    field,
+    *,
+    request: Request,
+    cookie_jars: dict[Any, CookieJar],
+    max_cookies: int,
+    max_cookie_name_length: int,
+    max_cookie_value_length: int,
+    max_cookie_bytes: int,
+    field: str,
 ):
     output_cookies = []
     input_cookies = _get_all_cookies(request, cookie_jars)
@@ -1001,13 +1020,13 @@ def _set_http_request_cookies_from_request(
 
     field = "requestCookies" if not experimental else "experimental.requestCookies"
     output_cookies = _get_output_cookies(
-        request,
-        cookie_jars,
-        max_cookies,
-        max_cookie_name_length,
-        max_cookie_value_length,
-        max_cookie_bytes,
-        field,
+        request=request,
+        cookie_jars=cookie_jars,
+        max_cookies=max_cookies,
+        max_cookie_name_length=max_cookie_name_length,
+        max_cookie_value_length=max_cookie_value_length,
+        max_cookie_bytes=max_cookie_bytes,
+        field=field,
     )
     if output_cookies:
         if not experimental:
@@ -1070,14 +1089,11 @@ def _unset_unneeded_api_params(
     default_params: dict[str, Any],
     request: Request,
 ):
-    experimental_had_content = bool(api_params.get("experimental"))
     for param, default_value in _DEFAULT_API_PARAMS.items():
         value = api_params.get(param, _Undefined)
         if value is _Undefined or value != default_value:
             continue
-        if (
-            param not in default_params or default_params.get(param) == default_value
-        ) and (param != "experimental" or not experimental_had_content):
+        if param not in default_params or default_params.get(param) == default_value:
             logger.warning(
                 f"Request {request} unnecessarily defines the Zyte API {param!r} "
                 f"parameter with its default value, {default_value!r}. It will "
@@ -1102,14 +1118,14 @@ def _update_api_params_from_request(
     max_cookie_value_length: int,
     max_cookie_bytes: int,
     experimental_cookies: bool,
-    unreported_deprecated_experimental_fields: set[str],
+    unwarned_experimental_fields: set[str],
 ):
-    for field in ("responseCookies", "requestCookies", "cookieManagement"):
+    for field in _DEPRECATED_EXPERIMENTAL_FIELDS:
         if (
-            field in unreported_deprecated_experimental_fields
+            not experimental_cookies
+            and field in unwarned_experimental_fields
             and field in api_params.get("experimental", {})
         ):
-            unreported_deprecated_experimental_fields.remove(field)
             logger.warning(
                 f"Zyte API parameters for request {request} include "
                 f"experimental.{field}, which is deprecated. Please, "
@@ -1118,7 +1134,11 @@ def _update_api_params_from_request(
                 f"on the old parameter."
             )
         _handle_experimental_unnamespacing(
-            api_params, request, experimental_cookies, field
+            api_params=api_params,
+            request=request,
+            experimental=experimental_cookies,
+            field=field,
+            unwarned_experimental_fields=unwarned_experimental_fields,
         )
     _set_http_response_body_from_request(api_params=api_params, request=request)
     _set_http_response_headers_from_request(
@@ -1185,7 +1205,10 @@ def _merge_params(
     request: Request,
     context: list[str] | None = None,
 ):
-    params = copy(default_params)
+    # Nested values are copied as well, because the resulting parameters may be
+    # modified in place later on, and default parameters are shared by all
+    # requests.
+    params = deepcopy(default_params)
     meta_params = copy(meta_params)
     context = context or []
     for k in list(meta_params):
@@ -1263,7 +1286,7 @@ def _get_automap_params(
     max_cookie_value_length: int,
     max_cookie_bytes: int,
     experimental_cookies: bool,
-    unreported_deprecated_experimental_fields: set[str],
+    unwarned_experimental_fields: set[str],
 ):
     meta_params = request.meta.get("zyte_api_automap", default_enabled)
     if meta_params is False:
@@ -1298,7 +1321,7 @@ def _get_automap_params(
         max_cookie_value_length=max_cookie_value_length,
         max_cookie_bytes=max_cookie_bytes,
         experimental_cookies=experimental_cookies,
-        unreported_deprecated_experimental_fields=unreported_deprecated_experimental_fields,
+        unwarned_experimental_fields=unwarned_experimental_fields,
     )
 
     return params
@@ -1321,7 +1344,7 @@ def _get_api_params(
     max_cookie_value_length: int,
     max_cookie_bytes: int,
     experimental_cookies: bool,
-    unreported_deprecated_experimental_fields: set[str],
+    unwarned_experimental_fields: set[str],
 ) -> dict | None:
     """Returns a dictionary of API parameters that must be sent to Zyte API for
     the specified request, or None if the request should not be sent through
@@ -1342,7 +1365,7 @@ def _get_api_params(
             max_cookie_value_length=max_cookie_value_length,
             max_cookie_bytes=max_cookie_bytes,
             experimental_cookies=experimental_cookies,
-            unreported_deprecated_experimental_fields=unreported_deprecated_experimental_fields,
+            unwarned_experimental_fields=unwarned_experimental_fields,
         )
         if api_params is None:
             return None
@@ -1354,21 +1377,18 @@ def _get_api_params(
     else:
         if "customHttpRequestHeaders" in api_params:
             _process_manual_custom_http_request_headers(api_params, request)
-        if (
-            api_params
-            and unreported_deprecated_experimental_fields
-            and "experimental" in api_params
-        ):
-            for field in list(unreported_deprecated_experimental_fields):
-                if field in api_params["experimental"]:
-                    unreported_deprecated_experimental_fields.remove(field)
-                    logger.warning(
-                        f"Zyte API parameters for request {request} include "
-                        f"experimental.{field}, which is deprecated. Please, "
-                        f"replace it with {field}, both in request parameters "
-                        f"and in any response parsing logic that might rely "
-                        f"on the old parameter."
-                    )
+        if not experimental_cookies and unwarned_experimental_fields:
+            for field in api_params.get("experimental", {}).keys() & (
+                unwarned_experimental_fields
+            ):
+                unwarned_experimental_fields.discard(field)
+                logger.warning(
+                    f"Zyte API parameters for request {request} include "
+                    f"experimental.{field}, which is deprecated. Please, "
+                    f"replace it with {field}, both in request parameters "
+                    f"and in any response parsing logic that might rely "
+                    f"on the old parameter."
+                )
 
     if job_id is not None:
         api_params["jobId"] = job_id
@@ -1461,7 +1481,20 @@ class _ParamParser:
         self._experimental_cookies = settings.getbool(
             "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED"
         )
-        if self._experimental_cookies:
+        # A crawler builds several parameter parsers, which must share warning
+        # state so that each warning is only logged once.
+        first_parser = not hasattr(crawler, _UNWARNED_EXPERIMENTAL_FIELDS_ATTR)
+        if first_parser:
+            setattr(
+                crawler,
+                _UNWARNED_EXPERIMENTAL_FIELDS_ATTR,
+                set(_DEPRECATED_EXPERIMENTAL_FIELDS),
+            )
+        self._unwarned_experimental_fields: set[str] = getattr(
+            crawler, _UNWARNED_EXPERIMENTAL_FIELDS_ATTR
+        )
+        warn_about_experimental_cookies = first_parser and self._experimental_cookies
+        if warn_about_experimental_cookies:
             logger.warning(
                 "The deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting "
                 "is set to True. Please, remove the deprecated "
@@ -1474,21 +1507,21 @@ class _ParamParser:
             self._cookies_enabled = cookies_enabled
         else:
             self._cookies_enabled = settings.getbool("COOKIES_ENABLED")
-            if not self._cookies_enabled and self._experimental_cookies:
-                logger.warning(
-                    "The deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED "
-                    "setting is True, but it will have no effect because the "
-                    "COOKIES_ENABLED setting is False. To silence this "
-                    "warning, remove the deprecated "
-                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting. To enable "
-                    "automatic cookie mapping, set COOKIES_ENABLED to True. "
-                    "Please, consider removing the deprecated "
-                    "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting, and "
-                    "removing the experimental name space from the "
-                    "responseCookies and requestCookies parameters in your "
-                    "code (if any), both when building requests and when "
-                    "parsing responses.",
-                )
+        if warn_about_experimental_cookies and not settings.getbool("COOKIES_ENABLED"):
+            logger.warning(
+                "The deprecated ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED "
+                "setting is True, but it will have no effect because the "
+                "COOKIES_ENABLED setting is False. To silence this "
+                "warning, remove the deprecated "
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting. To enable "
+                "automatic cookie mapping, set COOKIES_ENABLED to True. "
+                "Please, consider removing the deprecated "
+                "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED setting, and "
+                "removing the experimental name space from the "
+                "responseCookies and requestCookies parameters in your "
+                "code (if any), both when building requests and when "
+                "parsing responses.",
+            )
         self._max_cookies = settings.getint("ZYTE_API_MAX_COOKIES", 100)
         self._max_cookie_name_length = settings.getint(
             "ZYTE_API_MAX_COOKIE_NAME_LENGTH", 4085
@@ -1498,14 +1531,6 @@ class _ParamParser:
         )
         self._max_cookie_bytes = settings.getint("ZYTE_API_MAX_COOKIE_BYTES", 4097)
         self._cookie_jars = None
-        if not self._experimental_cookies:
-            self._unreported_deprecated_experimental_fields = {
-                "requestCookies",
-                "responseCookies",
-                "cookieManagement",
-            }
-        else:
-            self._unreported_deprecated_experimental_fields = set()
         self._session_context_params: OrderedDict[str, Any] = OrderedDict()
         self._warned_session_contexts: set[str] = set()
 
@@ -1536,7 +1561,7 @@ class _ParamParser:
             max_cookie_value_length=self._max_cookie_value_length,
             max_cookie_bytes=self._max_cookie_bytes,
             experimental_cookies=self._experimental_cookies,
-            unreported_deprecated_experimental_fields=self._unreported_deprecated_experimental_fields,
+            unwarned_experimental_fields=self._unwarned_experimental_fields,
         )
         if params and self._warn_on_ban_sensitive_headers:
             self._warn_about_ban_sensitive_headers(request, params)

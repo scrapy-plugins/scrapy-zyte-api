@@ -1,6 +1,6 @@
 from asyncio import iscoroutine
 from collections import defaultdict
-from copy import copy
+from copy import deepcopy
 from functools import partial
 from http.cookiejar import Cookie
 from inspect import isclass
@@ -746,6 +746,24 @@ async def test_default_params_merging(
             {"a": "b"},
             {"a": None},
         ),
+        # nested, including the deprecated experimental fields, which are
+        # unnamespaced during parsing
+        (
+            {"a": {"b": "c"}},
+            {},
+        ),
+        (
+            {"experimental": {"cookieManagement": "discard"}},
+            {},
+        ),
+        (
+            {"experimental": {"responseCookies": False}},
+            {},
+        ),
+        (
+            {"experimental": {"requestCookies": False}},
+            {},
+        ),
     ],
 )
 @pytest.mark.parametrize(
@@ -763,14 +781,17 @@ async def test_default_params_immutability(setting_key, meta_key, setting, meta)
     """Make sure that the merging of Zyte API parameters from the *arg_key*
     _get_api_params parameter with those from the *meta_key* request metadata
     key does not affect the contents of the setting for later requests."""
-    request = Request(url="https://example.com")
-    request.meta[meta_key] = meta
-    default_params = copy(setting)
+    default_params = deepcopy(setting)
     crawler = await get_crawler({setting_key: setting})
     handler = get_download_handler(crawler, "https")
     param_parser = handler._param_parser
-    param_parser.parse(request)
+    all_params = []
+    for _ in range(2):
+        request = Request(url="https://example.com")
+        request.meta[meta_key] = deepcopy(meta)
+        all_params.append(param_parser.parse(request))
     assert default_params == setting
+    assert all_params[0] == all_params[1]
 
 
 def _assert_log_messages(
@@ -4693,10 +4714,7 @@ async def test_field_deprecation_warnings(field, caplog):
     with caplog.at_level("WARNING"):
         # Only warn once per field.
         param_parser.parse(raw_request)
-    _assert_log_messages(
-        caplog,
-        [f"experimental.{field} will be removed, and its value will be set as {field}"],
-    )
+    _assert_log_messages(caplog, [])
 
 
 @deferred_f_from_coro_f
