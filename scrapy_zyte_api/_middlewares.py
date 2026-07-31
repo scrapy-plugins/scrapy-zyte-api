@@ -9,7 +9,7 @@ from zyte_api import RequestError
 
 from ._params import _ParamParser
 from .exceptions import ActionError
-from .responses import ZyteAPIMixin
+from .responses import ZyteAPIMixin, _has_action_error
 from .utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
     _GET_SLOT_NEEDS_SPIDER,
@@ -193,11 +193,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
                 extra={"spider": spider},
             )
 
-        assert response.raw_api_response is not None
-        action_error = any(
-            "error" in action for action in response.raw_api_response.get("actions", [])
-        )
-        if not action_error:
+        if not _has_action_error(response):
             return response
 
         if not self._retry_action_errors or request.meta.get("dont_retry", False):

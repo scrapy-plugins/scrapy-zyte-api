@@ -73,6 +73,7 @@ SETTINGS: SETTINGS_T = {
         "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 633,
         "scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware": 667,
     },
+    "HTTPCACHE_POLICY": "scrapy_zyte_api.ScrapyZyteAPIHttpCachePolicy",
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "SPIDER_MIDDLEWARES": {
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,

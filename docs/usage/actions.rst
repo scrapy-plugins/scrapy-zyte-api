@@ -12,36 +12,19 @@ You can also use :setting:`ZYTE_API_ACTION_ERROR_HANDLING` to determine how
 such responses are handled when they are not retried or when retries are
 exceeded: treated as a success (default), ignored, or treated as an error.
 
+.. _action-error-caching:
+
 Action error caching
 ====================
 
-If you use
-:class:`~scrapy.downloadermiddlewares.httpcache.HttpCacheMiddleware`, you might
-want to use a custom :setting:`HTTPCACHE_POLICY <scrapy:HTTPCACHE_POLICY>` to
-prevent responses with failed actions (i.e. after exceeding retries) to be
-cached:
+:class:`~scrapy.downloadermiddlewares.httpcache.HttpCacheMiddleware` caches
+responses before scrapy-zyte-api gets to inspect their actions, so responses
+with a failed action are cached regardless of the settings above.
+:ref:`Setting up scrapy-zyte-api <setup>` prevents that through
+:setting:`HTTPCACHE_POLICY <scrapy:HTTPCACHE_POLICY>`:
 
-.. code-block:: python
-    :caption: myproject/extensions.py
+.. autoclass:: scrapy_zyte_api.ScrapyZyteAPIHttpCachePolicy
 
-    from scrapy import Request
-    from scrapy.extensions.httpcache import DummyPolicy
-    from scrapy.http import Response
-    from scrapy_zyte_api.responses import ZyteAPIResponse, ZyteAPITextResponse
-
-
-    class ZyteAPIFailedActionsPolicy(DummyPolicy):
-
-        def should_cache_response(self, response: Response, request: Request):
-            if isinstance(response, (ZyteAPIResponse, ZyteAPITextResponse)) and any(
-                "error" in action for action in response.raw_api_response.get("actions", [])
-            ):
-                return False
-            return super().should_cache_response(response, request)
-
-And enable it in your settings:
-
-.. code-block:: python
-    :caption: myproject/settings.py
-
-    HTTPCACHE_POLICY = "myproject.extensions.ZyteAPIFailedActionsPolicy"
+It extends :class:`~scrapy.extensions.httpcache.DummyPolicy`, the default
+policy. The :ref:`add-on <config-addon>` only sets it if you have not set
+:setting:`HTTPCACHE_POLICY <scrapy:HTTPCACHE_POLICY>` yourself.
