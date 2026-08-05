@@ -1250,10 +1250,9 @@ def _get_explicit_params(
         meta_params = request.meta.get(meta_key, default_enabled)
         if meta_params is False or (not meta_params and meta_params != {}):
             continue
-        if meta_params is True:
-            meta_params = {}
-        elif not isinstance(meta_params, Mapping):
-            return None
+        meta_params = _copy_meta_params_as_dict(
+            meta_params, param=meta_key, request=request
+        )
         return meta_key, {**setting_params, **meta_params}
     return None
 

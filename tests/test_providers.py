@@ -2139,3 +2139,26 @@ async def test_merge_conflicting_param(mockserver):
         "product": True,
     }
     assert item["product"].name == "Product name (country IE)"
+
+
+@deferred_f_from_coro_f
+async def test_merge_non_zyte_api_request(mockserver):
+    """A request that is not sent through Zyte API leaves the Zyte API request
+    of its dependencies alone."""
+
+    class TestSpider(ZyteAPISpider):
+        def parse_(self, response, product: Product):  # type: ignore[override]
+            yield {"body": response.text, "product": product}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_TRANSPARENT_MODE"] = False
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0] == {
+        "url": url,
+        "product": True,
+    }
+    assert item["body"] == ""
+    assert type(item["product"]) is Product
