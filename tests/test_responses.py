@@ -142,6 +142,7 @@ def test_init(api_response, cls):
     [
         (raw_api_response_browser, ZyteAPITextResponse, 44),
         (raw_api_response_body, ZyteAPIResponse, 44),
+        (raw_api_response_body, ZyteAPITextResponse, 44),
         (raw_api_response_mixed, ZyteAPITextResponse, 49),
     ],
 )
