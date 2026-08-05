@@ -1,5 +1,5 @@
 import json
-from base64 import b64encode
+from base64 import b64decode, b64encode
 from collections import defaultdict
 from functools import partial
 from typing import Any, cast
@@ -654,3 +654,37 @@ def test_json_from_api_response():
     assert resp.raw_api_response == api_response
     assert resp.flags == ["zyte-api"]
     assert json.loads(resp.text) == {"status": "ok", "count": 42}
+
+
+@pytest.mark.parametrize(
+    ("content_type", "body", "expected_cls"),
+    [
+        (
+            "text/html",
+            b"<html><body>The cake is a lie!</body></html>",
+            ZyteAPITextResponse,
+        ),
+        ("application/octet-stream", bytes(range(32)), ZyteAPIResponse),
+    ],
+)
+def test__process_response_decodes_body_once(
+    content_type, body, expected_cls, monkeypatch
+):
+    api_response: _API_RESPONSE = {
+        "url": URL,
+        "httpResponseBody": b64encode(body).decode(),
+        "httpResponseHeaders": [{"name": "Content-Type", "value": content_type}],
+        "statusCode": 200,
+    }
+    calls = 0
+
+    def counting_b64decode(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return b64decode(*args, **kwargs)
+
+    monkeypatch.setattr("scrapy_zyte_api.responses.b64decode", counting_b64decode)
+    resp = _process_response(api_response, Request(URL))
+    assert isinstance(resp, expected_cls)
+    assert resp.body == body
+    assert calls == 1
