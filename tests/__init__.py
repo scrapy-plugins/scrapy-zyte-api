@@ -131,7 +131,9 @@ SESSION_SETTINGS: SETTINGS_T = {
     "ZYTE_API_SESSION_CREATION_RETRY_DELAY": 0,
     "ZYTE_API_SESSION_DELAY": 0,
     "ZYTE_API_SESSION_ENABLED": True,
-    "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0,
+    # Not 0: attempts must yield long enough for in-flight requests to return
+    # their session to the queue.
+    "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0.001,
     "ZYTE_API_SESSION_STATS_PER_POOL": True,
 }
 
