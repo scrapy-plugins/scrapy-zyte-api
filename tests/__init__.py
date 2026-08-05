@@ -81,6 +81,8 @@ SETTINGS: SETTINGS_T = {
     "TELNETCONSOLE_ENABLED": False,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
     "ZYTE_API_KEY": _API_KEY,
+    "ZYTE_API_RETRY_POLICY": "tests._retry.POLICY",
+    "ZYTE_API_SESSION_RETRY_POLICY": "tests._retry.SESSION_POLICY",
 }
 if Version(SCRAPY_VERSION) < Version("2.12"):
     SETTINGS["REQUEST_FINGERPRINTER_IMPLEMENTATION"] = (
@@ -117,6 +119,8 @@ SETTINGS_ADDON: SETTINGS_T = {
     },
     "TELNETCONSOLE_ENABLED": False,
     "ZYTE_API_KEY": _API_KEY,
+    "ZYTE_API_RETRY_POLICY": "tests._retry.POLICY",
+    "ZYTE_API_SESSION_RETRY_POLICY": "tests._retry.SESSION_POLICY",
 }
 if _REACTORLESS:
     SETTINGS_ADDON["TWISTED_REACTOR_ENABLED"] = False
