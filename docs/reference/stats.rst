@@ -26,19 +26,37 @@ the ``scrapy-zyte-api`` prefix:
 
 ``scrapy-zyte-api/error_types/{error_type}``
     Number of :ref:`unsuccessful responses <zapi-unsuccessful-responses>` for
-    each error type, where ``{error_type}`` is the ``type`` field from the
-    Zyte API error response.
+    each error type, including retried ones, where ``{error_type}`` is the
+    ``type`` field from the Zyte API error response.
 
 ``scrapy-zyte-api/errors``
     Total number of :ref:`unsuccessful responses <zapi-unsuccessful-responses>`.
 
 ``scrapy-zyte-api/exception_types/{exception_type}``
     Number of exceptions of type ``{exception_type}`` raised during Zyte API
-    request processing.
+    request processing, including retried ones.
+
+``scrapy-zyte-api/fatal_error_types/{error_type}``
+    .. versionadded:: VERSION
+
+    Number of Zyte API requests that failed with each error type after
+    retries.
+
+    Subtract it from ``scrapy-zyte-api/error_types/{error_type}`` to get the
+    number of retries that error type triggered.
 
 ``scrapy-zyte-api/fatal_errors``
     Number of unrecoverable Zyte API errors, such as requests with invalid
     parameters.
+
+``scrapy-zyte-api/fatal_exception_types/{exception_type}``
+    .. versionadded:: VERSION
+
+    Number of Zyte API requests that failed with each exception type after
+    retries.
+
+    Subtract it from ``scrapy-zyte-api/exception_types/{exception_type}`` to
+    get the number of retries that exception type triggered.
 
 ``scrapy-zyte-api/mean_connection_seconds``
     Mean connection time in seconds across all Zyte API requests.

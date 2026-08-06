@@ -87,6 +87,15 @@ def _truncate(obj, limit):
                 _truncate(value, limit)
 
 
+def _normalize_error_type(error_type: str | None) -> str:
+    """Return *error_type* as a stat name suffix, starting with ``/``."""
+    if not error_type:
+        return "/<empty>"
+    if not error_type.startswith("/"):
+        return f"/{error_type}"
+    return error_type
+
+
 def _load_retry_policy(settings):
     policy = settings.get("ZYTE_API_RETRY_POLICY")
     if policy:
@@ -289,10 +298,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             )
 
         for error_type, count in self._client.agg_stats.api_error_types.items():
-            error_type = error_type or "/<empty>"  # noqa: PLW2901
-            if not error_type.startswith("/"):
-                error_type = f"/{error_type}"  # noqa: PLW2901
-            self._stats.set_value(f"{prefix}/error_types{error_type}", count)
+            self._stats.set_value(
+                f"{prefix}/error_types{_normalize_error_type(error_type)}", count
+            )
 
         for counter in (
             "exception_types",
@@ -330,6 +338,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             logger.debug(
                 f"Got an error when processing Zyte API request ({request.url}): {er}"
             )
+            self._stats.inc_value(f"scrapy-zyte-api/fatal_exception_types/{type(er)}")
             raise
         finally:
             # If AutoThrottle is enabled, and autothrottle_dont_adjust_delay is
@@ -363,6 +372,9 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             f"Got Zyte API error (status={error.status}, "
             f"type={error.parsed.type!r}, request_id={error.request_id!r}) "
             f"while processing URL ({request.url}): {detail}"
+        )
+        self._stats.inc_value(
+            f"scrapy-zyte-api/fatal_error_types{_normalize_error_type(error.parsed.type)}"
         )
         assert self._crawler
         assert self._crawler.engine
