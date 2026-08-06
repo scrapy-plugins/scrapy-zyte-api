@@ -666,6 +666,36 @@ async def test_fatal_error_type_stats():
 
 
 @deferred_f_from_coro_f
+async def test_error_type_stat_names():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = [
+            "https://error-type.example/",
+            "https://error-type.example/no-leading-slash",
+        ]
+
+        def parse(self, response):
+            pass
+
+    settings: SETTINGS_T = {
+        "RETRY_ENABLED": False,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await maybe_deferred_to_future(crawler.crawl())
+
+    assert crawler.stats
+    stats = crawler.stats.get_stats()
+    for suffix in ("<empty>", "no-leading-slash"):
+        assert stats[f"scrapy-zyte-api/error_types/{suffix}"] == 1
+        assert stats[f"scrapy-zyte-api/fatal_error_types/{suffix}"] == 1
+
+
+@deferred_f_from_coro_f
 async def test_fatal_exception_type_stats():
     class TestSpider(Spider):
         name = "test"
