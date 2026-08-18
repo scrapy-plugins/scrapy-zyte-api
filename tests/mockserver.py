@@ -22,6 +22,7 @@ from scrapy_zyte_api._annotations import ExtractFrom, _ActionResult
 from . import SETTINGS, download_request, make_handler
 
 if TYPE_CHECKING:
+    from scrapy.http import Response
     from twisted.internet.defer import Deferred
     from twisted.internet.interfaces import IReactorTime
 
@@ -44,7 +45,9 @@ def get_ephemeral_port():
     return s.getsockname()[1]
 
 
-async def produce_request_response(mockserver, meta, settings=None):
+async def produce_request_response(
+    mockserver, meta, settings=None
+) -> tuple[Request, Response]:
     settings = settings if settings is not None else {**SETTINGS}
     async with mockserver.make_handler(settings) as handler:
         req = Request(mockserver.urljoin("/"), meta=meta)
@@ -422,14 +425,14 @@ def main():
     module_name, name = args.resource.rsplit(".", 1)
     sys.path.append(".")
     resource = getattr(import_module(module_name), name)()
-    http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[attr-defined]
+    http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[arg-type]
 
     def print_listening():
-        host = http_port.getHost()
+        host = http_port.getHost()  # type: ignore[misc]
         print(f"Mock server {resource} running at http://{host.host}:{host.port}")
 
-    reactor.callWhenRunning(print_listening)  # type: ignore[attr-defined]
-    reactor.run()  # type: ignore[attr-defined]
+    reactor.callWhenRunning(print_listening)
+    reactor.run()  # type: ignore[misc]
 
 
 if __name__ == "__main__":

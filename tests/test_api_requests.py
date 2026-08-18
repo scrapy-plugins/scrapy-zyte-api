@@ -570,7 +570,7 @@ async def test_transparent_mode_toggling(setting, meta, expected):
     param_parser = handler._param_parser
     func = partial(param_parser.parse, request)
     if isclass(expected):
-        with pytest.raises(expected):
+        with pytest.raises(expected):  # type: ignore[type-var]
             func()
     else:
         api_params = func()
