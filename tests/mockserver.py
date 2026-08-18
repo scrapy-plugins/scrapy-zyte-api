@@ -40,9 +40,9 @@ def getarg(request, name, default=None, type_=None):
 
 
 def get_ephemeral_port():
-    s = socket.socket()
-    s.bind(("", 0))
-    return s.getsockname()[1]
+    with socket.socket() as s:
+        s.bind(("", 0))
+        return s.getsockname()[1]
 
 
 async def produce_request_response(

@@ -121,15 +121,37 @@ testpaths = [
 ]
 minversion = "6.0"
 filterwarnings = [
+    # Envs with pinned old dependencies opt out of this, see tox.ini.
+    "error",
     "ignore::DeprecationWarning:twisted\\.web\\.http",
     "ignore::DeprecationWarning:scrapy\\.core\\.downloader\\.contextfactory",  # https://github.com/scrapy/scrapy/issues/3288
 
-    # scrapy-poet warnings for Scrapy 2.14:
-    "ignore:CollectorPipeline\\.:scrapy.exceptions.ScrapyDeprecationWarning",
-    "ignore:DownloaderStatsMiddleware\\.:scrapy.exceptions.ScrapyDeprecationWarning",
-    "ignore:.*?InjectionMiddleware\\.:scrapy.exceptions.ScrapyDeprecationWarning",
-    "ignore:RetryMiddleware\\.process_spider_exception\\(\\):scrapy.exceptions.ScrapyDeprecationWarning",
-    "ignore::scrapy.exceptions.ScrapyDeprecationWarning:scrapy_poet",
+    # scrapy-poet warnings for Scrapy 2.14. They match on the message, and not
+    # on ScrapyDeprecationWarning, because pytest imports the category that a
+    # filter names with the error filter already in place, and importing Scrapy
+    # emits warnings of its own on the oldest supported dependency versions.
+    "ignore:CollectorPipeline\\.",
+    "ignore:DownloaderStatsMiddleware\\.",
+    "ignore:.*?InjectionMiddleware\\.",
+    "ignore:RetryMiddleware\\.process_spider_exception\\(\\)",
+    "ignore:::scrapy_poet",
+
+    # The scrapy-poet mock server leaks the socket it uses to find a free port
+    # and the pipe it reads the server URL from. They are collected at an
+    # arbitrary point, sometimes while finalizing objects, hence the second
+    # pair of filters, and never from the same module, hence matching on the
+    # object repr rather than on the module.
+    "ignore:unclosed <socket\\.socket:ResourceWarning",
+    "ignore:unclosed file <_io\\.BufferedReader:ResourceWarning",
+    "ignore:.*<socket\\.socket fd=:pytest.PytestUnraisableExceptionWarning",
+    "ignore:.*<_io\\.FileIO name=:pytest.PytestUnraisableExceptionWarning",
+
+    # The scrapy-crawlera and scrapy-zyte-smartproxy middlewares still declare
+    # a spider parameter in their method signatures.
+    "ignore:(Crawlera|ZyteSmartProxy)Middleware\\.",
+
+    # CI runs without coverage pass --no-cov, which pytest-cov reports.
+    "ignore:Coverage disabled via --no-cov switch!",
 ]
 
 [tool.ruff.lint]
