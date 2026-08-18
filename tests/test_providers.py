@@ -10,7 +10,7 @@ import attrs
 from scrapy import Request, Spider
 from scrapy.statscollectors import MemoryStatsCollector
 from scrapy_poet import DummyResponse
-from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
+from scrapy_poet.utils.testing import HtmlResource
 from twisted.internet.defer import Deferred
 from twisted.internet.protocol import Protocol
 from twisted.web.client import Agent
@@ -58,7 +58,10 @@ from scrapy_zyte_api.providers import (
     _get_zyte_api_provider_params,
     _set_in_provider_meta_cache,
 )
-from scrapy_zyte_api.utils import maybe_deferred_to_future
+from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _ensure_awaitable,
+    maybe_deferred_to_future,
+)
 
 from . import _REACTORLESS, SETTINGS, deferred_f_from_coro_f
 from .mockserver import get_ephemeral_port
@@ -78,10 +81,16 @@ requires_reactor = pytest.mark.skipif(
 PROVIDER_PARAMS = {"geolocation": "IE"}
 
 
+try:
+    from scrapy_poet.utils.testing import crawl_single_item_async as crawl_single_item
+except ImportError:  # scrapy-poet < 0.27.0
+    from scrapy_poet.utils.testing import crawl_single_item
+
+
 def _crawl_single_item(
     spider_cls, resource_cls, settings, spider_kwargs=None, port=None
 ):
-    return maybe_deferred_to_future(
+    return _ensure_awaitable(
         crawl_single_item(
             spider_cls, resource_cls, settings, spider_kwargs=spider_kwargs, port=port
         )

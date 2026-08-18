@@ -96,7 +96,11 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     middleware = _build_from_crawler(mw_cls, crawler)
 
     # AutoThrottle does this.
-    spider.download_delay = 5  # type: ignore[attr-defined]
+    downloader = crawler.engine.downloader
+    if hasattr(downloader, "_delay"):
+        downloader._delay = 5
+    else:  # Scrapy < 2.17
+        spider.download_delay = 5  # type: ignore[attr-defined]
 
     # No effect on non-Zyte-API requests
     request = Request("https://example.com")
@@ -104,7 +108,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     assert "download_slot" not in request.meta
     args = (crawler.spider,) if _GET_SLOT_NEEDS_SPIDER else ()
     _, slot = crawler.engine.downloader._get_slot(request, *args)
-    assert slot.delay == spider.download_delay  # type: ignore[attr-defined]
+    assert slot.delay == 5
 
     # On Zyte API requests, the download slot is changed, and its delay may be
     # set to 0 depending on settings.
