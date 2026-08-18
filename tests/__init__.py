@@ -188,7 +188,9 @@ async def make_handler(
         yield handler
     finally:
         if handler is not None:
-            await handler._close()
+            # close() also closes the fallback handlers, which would
+            # otherwise leak the connections that they keep open.
+            await _ensure_awaitable(handler.close())
 
 
 def serialize_settings(settings):
