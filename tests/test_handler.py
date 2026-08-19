@@ -616,6 +616,7 @@ async def test_engine_started_cookie_middleware_not_found(mockserver):
         RuntimeError, match="Could not find a configured downloader middleware"
     ):
         await handler.engine_started()
+    await handler._close()
 
 
 @pytest.mark.parametrize("enabled", [True, False, None])
