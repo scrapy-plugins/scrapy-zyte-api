@@ -1350,7 +1350,12 @@ def _load_mw_skip_headers(crawler):
                 user_agent_in_default_headers = True
 
     if not accept_encoding_in_default_headers:
-        engine = getattr(crawler, "engine", None)
+        # The engine is only set once the crawl starts. Until then, depending on
+        # the Scrapy version, reading it gives None or raises RuntimeError.
+        try:
+            engine = getattr(crawler, "engine", None)
+        except RuntimeError:
+            engine = None
         if engine:
             for mw in engine.downloader.middleware.middlewares:
                 if isinstance(mw, HttpCompressionMiddleware):
