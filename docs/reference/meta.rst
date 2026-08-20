@@ -37,6 +37,19 @@ Default: ``True``
 If set to ``False``, the values of :setting:`ZYTE_API_AUTOMAP_PARAMS` and
 :setting:`ZYTE_API_DEFAULT_PARAMS` are ignored for this request.
 
+.. reqmeta:: zyte_api_transport
+
+zyte_api_transport
+==================
+
+Default: ``"auto"`` for :ref:`automap <automap>`, ``"http"`` for :ref:`manual
+<manual>`
+
+Sets the :ref:`transport <request-transport>` of the request.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, a
+    request only uses proxy mode if this key (or the
+    :setting:`ZYTE_API_TRANSPORT` setting) is set to ``"auto"`` or ``"proxy"``.
 
 .. reqmeta:: zyte_api_provider
 
@@ -65,6 +78,20 @@ For example:
 
 See also :setting:`ZYTE_API_PROVIDER_PARAMS`.
 
+.. reqmeta:: zyte_api_provider_transport
+
+zyte_api_provider_transport
+===========================
+
+Default: ``"auto"``
+
+Sets the :ref:`transport <request-transport-provider>` of requests made by the
+:ref:`scrapy-poet integration <scrapy-poet>`.
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, a
+    provider request only uses proxy mode if this key (or the
+    :setting:`ZYTE_API_PROVIDER_TRANSPORT` setting) is set to ``"auto"`` or
+    ``"proxy"``.
 
 .. reqmeta:: zyte_api_retry_policy
 
@@ -157,3 +184,22 @@ If not falsy, it determines the default pool ID and options for the request.
 
 It supports the same values as the return value of
 :meth:`scrapy_zyte_api.SessionConfig.pool`.
+
+
+.. reqmeta:: zyte_api_session_transport
+
+zyte_api_session_transport
+==========================
+
+Default: :setting:`ZYTE_API_SESSION_TRANSPORT`
+
+Sets the :ref:`transport <request-transport-session>` of the :ref:`session
+initialization <session-init>` request triggered by this request.
+
+This is independent of the transport used to *use* the session (see
+:reqmeta:`zyte_api_transport` and :setting:`ZYTE_API_TRANSPORT`).
+
+.. note:: While :ref:`proxy mode is experimental <experimental-proxy>`, a
+    session initialization request only uses proxy mode if this key (or the
+    :setting:`ZYTE_API_SESSION_TRANSPORT` setting) is set to ``"auto"`` or
+    ``"proxy"``.

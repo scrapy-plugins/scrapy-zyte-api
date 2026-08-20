@@ -22,7 +22,7 @@ the ``scrapy-zyte-api`` prefix:
 
 ``scrapy-zyte-api/error_ratio``
     Ratio of :ref:`unsuccessful responses <zapi-unsuccessful-responses>` to
-    ``scrapy-zyte-api/processed``.
+    ``scrapy-zyte-api/attempts``.
 
 ``scrapy-zyte-api/error_types/{error_type}``
     Number of :ref:`unsuccessful responses <zapi-unsuccessful-responses>` for
@@ -56,6 +56,28 @@ the ``scrapy-zyte-api`` prefix:
 
     For ``experimental`` sub-parameters, the stat name uses dot notation:
     ``scrapy-zyte-api/request_args/experimental.{subarg}``.
+
+``scrapy-zyte-api/request/transport/{transport}``
+    Number of Zyte API requests dispatched via ``{transport}``, where
+    ``{transport}`` is either ``http`` (HTTP API) or ``proxy`` (proxy mode).
+    Useful to verify that :setting:`ZYTE_API_TRANSPORT` or
+    :reqmeta:`zyte_api_transport` settings are taking effect.
+
+``scrapy-zyte-api/request/transport/proxy/experimental``
+    Number of Zyte API requests that would have been dispatched via proxy mode
+    automatically, but were sent through the HTTP API instead because
+    :ref:`proxy mode is experimental <experimental-proxy>` and the transport
+    was not explicitly configured. These requests also count towards
+    ``scrapy-zyte-api/request/transport/http``. Useful to gauge how much
+    traffic would shift to proxy mode if you opted in.
+
+``scrapy-zyte-api/request/transport/proxy/experimental/header``
+    Like ``scrapy-zyte-api/request/transport/proxy/experimental``, but counting
+    only requests that would have been dispatched via proxy mode specifically
+    because they carry ``Zyte-*`` headers (see
+    :setting:`ZYTE_API_HEADER_TRANSPORT_ENABLED`). These requests count towards
+    ``scrapy-zyte-api/request/transport/http`` but not towards
+    ``scrapy-zyte-api/request/transport/proxy/experimental``.
 
 .. _session-stats:
 
@@ -140,4 +162,4 @@ the ``scrapy-zyte-api`` prefix:
 
 ``scrapy-zyte-api/throttle_ratio``
     Ratio of :ref:`rate-limited responses <zapi-rate-limit>` to
-    ``scrapy-zyte-api/processed``.
+    ``scrapy-zyte-api/attempts``.

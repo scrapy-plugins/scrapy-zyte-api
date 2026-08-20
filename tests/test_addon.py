@@ -14,7 +14,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISessionResetterDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
-from scrapy_zyte_api.addon import Addon
+from scrapy_zyte_api.addon import Addon, _setdefault
 from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
 from scrapy_zyte_api.utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
@@ -408,4 +408,36 @@ async def test_sessions(manual_settings, addon_settings):
     )
     assert serialize_settings(crawler.settings) == serialize_settings(
         addon_crawler.settings
+    )
+
+
+def test_setdefault_priority_not_changed():
+    settings = Settings()
+    settings.set(
+        "DOWNLOADER_MIDDLEWARES",
+        {ScrapyZyteAPIDownloaderMiddleware: 100},
+        "spider",
+    )
+    _setdefault(
+        settings, "DOWNLOADER_MIDDLEWARES", ScrapyZyteAPIDownloaderMiddleware, 633
+    )
+    assert settings["DOWNLOADER_MIDDLEWARES"][ScrapyZyteAPIDownloaderMiddleware] == 100
+
+
+def test_setdefault_string_path_matches_cls():
+    settings = Settings()
+    settings.set(
+        "DOWNLOADER_MIDDLEWARES",
+        {"scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 500},
+        "spider",
+    )
+    _setdefault(
+        settings, "DOWNLOADER_MIDDLEWARES", ScrapyZyteAPIDownloaderMiddleware, 633
+    )
+    # Priority should remain 500, not changed to 633.
+    assert (
+        settings["DOWNLOADER_MIDDLEWARES"][
+            "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware"
+        ]
+        == 500
     )

@@ -348,6 +348,15 @@ class RequestCountResource(LeafResource):
         return str(DefaultResource.request_count).encode()
 
 
+class SilentSite(Site):
+    # Twisted's Site logs one access-log line per request, defaulting to
+    # stdout. Nothing consumes the mock server's stdout, so in long test runs
+    # the OS pipe buffer fills up, the server blocks on write and stops serving
+    # requests. Suppress request logging so the output is never produced.
+    def log(self, request):
+        pass
+
+
 class DelayedResource(LeafResource):
     def render_POST(self, request):
         data = json.loads(request.content.read())
@@ -422,7 +431,7 @@ def main():
     module_name, name = args.resource.rsplit(".", 1)
     sys.path.append(".")
     resource = getattr(import_module(module_name), name)()
-    http_port = reactor.listenTCP(args.port, Site(resource))  # type: ignore[attr-defined]
+    http_port = reactor.listenTCP(args.port, SilentSite(resource))  # type: ignore[attr-defined]
 
     def print_listening():
         host = http_port.getHost()
