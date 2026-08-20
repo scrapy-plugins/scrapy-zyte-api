@@ -49,6 +49,7 @@ from zyte_common_items.fields import is_auto_field
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
 from scrapy_zyte_api._page_inputs import CapturedResponse, NetworkCapture
+from scrapy_zyte_api._provider_params import _get_api_response
 from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
 
 _PROVIDER_META_CACHE_MAX_SIZE = 1024
@@ -155,6 +156,30 @@ _AUTO_PAGES: set[type] = {
     AutoProductNavigationPage,
     AutoSerpPage,
 }
+
+
+# Zyte API response fields that the provider reads unconditionally, i.e. that
+# must be present in a Zyte API response for it to cover a given set of Zyte API
+# request params.
+_REQUIRED_OUTPUT_KEYS = frozenset(
+    {"browserHtml", "customAttributes", "screenshot", *_ITEM_KEYWORDS.values()}
+)
+
+
+def _reuse_api_response(
+    request: Request, zyte_api_meta: dict[str, Any]
+) -> "ZyteAPITextResponse | None":
+    """Return the Zyte API response of *request* as a provider response, if it
+    already covers every output that *zyte_api_meta* asks for."""
+    from .responses import ZyteAPITextResponse  # noqa: PLC0415
+
+    raw_api_response = _get_api_response(request)
+    if raw_api_response is None:
+        return None
+    for key in _REQUIRED_OUTPUT_KEYS:
+        if zyte_api_meta.get(key) and key not in raw_api_response:
+            return None
+    return ZyteAPITextResponse.from_api_response(raw_api_response, request=request)
 
 
 def _get_zyte_api_provider_params(request: Request, crawler: Crawler) -> dict[str, Any]:
@@ -395,29 +420,32 @@ class ZyteApiProvider(PageObjectInputProvider):
             http_response_available=http_response_available,
         )
 
-        api_request = Request(
-            url=request.url,
-            meta={
-                "zyte_api": zyte_api_meta,
-                "zyte_api_default_params": False,
-            },
-            callback=NO_CALLBACK,
-        )
-        assert crawler.engine
-        if _ENGINE_HAS_DOWNLOAD_ASYNC:
-            future = cast(
-                "Coroutine[None, None, ZyteAPITextResponse]",
-                crawler.engine.download_async(api_request),
+        api_response = _reuse_api_response(request, zyte_api_meta)
+        if api_response is None:
+            api_request = Request(
+                url=request.url,
+                meta={
+                    "zyte_api": zyte_api_meta,
+                    "zyte_api_default_params": False,
+                },
+                callback=NO_CALLBACK,
             )
-        else:  # Scrapy < 2.14
-            deferred = cast(
-                "Deferred[ZyteAPITextResponse]", crawler.engine.download(api_request)
-            )
-            future = cast(
-                "Coroutine[None, None, ZyteAPITextResponse]",
-                maybe_deferred_to_future(deferred),
-            )
-        api_response: ZyteAPITextResponse = await future
+            assert crawler.engine
+            if _ENGINE_HAS_DOWNLOAD_ASYNC:
+                future = cast(
+                    "Coroutine[None, None, ZyteAPITextResponse]",
+                    crawler.engine.download_async(api_request),
+                )
+            else:  # Scrapy < 2.14
+                deferred = cast(
+                    "Deferred[ZyteAPITextResponse]",
+                    crawler.engine.download(api_request),
+                )
+                future = cast(
+                    "Coroutine[None, None, ZyteAPITextResponse]",
+                    maybe_deferred_to_future(deferred),
+                )
+            api_response = await future
 
         assert api_response.raw_api_response
         if html_requested:

@@ -1031,10 +1031,6 @@ async def test_provider_any_response_product_options_empty(mockserver):
     assert type(item["page"].product) is Product
 
 
-# The issue here is that HttpResponseProvider runs earlier than ScrapyZyteAPI.
-# HttpResponseProvider doesn't know that it should not run since ScrapyZyteAPI
-# could provide HttpResponse in anycase.
-@pytest.mark.xfail(reason="Not supported yet", raises=AssertionError, strict=True)
 @deferred_f_from_coro_f
 async def test_provider_any_response_product_extract_from_http_response_2(mockserver):
     @attrs.define
@@ -1990,3 +1986,188 @@ async def test_multiple_types(mockserver):
             "pageNumber": 0,
         }
     )
+
+
+@attrs.define
+class BrowserResponsePage(BasePage):
+    response: BrowserResponse
+
+
+@deferred_f_from_coro_f
+async def test_merge_browser_html_param(mockserver):
+    """A request that asks for browser HTML and whose callback needs an item
+    gets both from a single Zyte API request."""
+
+    class TestSpider(ZyteAPISpider):
+        def get_start_request(self):
+            return Request(
+                self.url,
+                callback=self.parse_,
+                meta={"zyte_api": {"browserHtml": True}},
+            )
+
+        def parse_(self, response, product: Product):  # type: ignore[override]
+            yield {"body": response.text, "product": product}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0] == {
+        "url": url,
+        "browserHtml": True,
+        "product": True,
+    }
+    assert item["body"] == "<html><body>Hello<h1>World!</h1></body></html>"
+    assert type(item["product"]) is Product
+
+
+@deferred_f_from_coro_f
+async def test_merge_browser_dependency(mockserver):
+    """A dependency that requires browser rendering makes the request of a
+    callback that needs a response a browser request, instead of getting its own
+    Zyte API request."""
+
+    class TestSpider(ZyteAPISpider):
+        def parse_(self, response, page: BrowserResponsePage):  # type: ignore[override]
+            yield {"body": response.text, "html": page.response.html}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0] == {
+        "url": url,
+        "browserHtml": True,
+    }
+    assert item["body"] == item["html"]
+
+
+@deferred_f_from_coro_f
+async def test_merge_http_response_body_requested(mockserver):
+    """An explicitly requested HTTP response body cannot be combined with a
+    browser output, so a separate Zyte API request is sent for the latter."""
+
+    class TestSpider(ZyteAPISpider):
+        def get_start_request(self):
+            return Request(
+                self.url,
+                callback=self.parse_,
+                meta={"zyte_api_automap": {"httpResponseBody": True}},
+            )
+
+        def parse_(self, response, page: BrowserResponsePage):  # type: ignore[override]
+            yield {"body": response.text, "html": page.response.html}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 2
+    assert params[0] == {
+        "url": url,
+        "httpResponseBody": True,
+        "httpResponseHeaders": True,
+    }
+    assert params[1] == {
+        "url": url,
+        "browserHtml": True,
+    }
+    assert item["body"] == item["html"]
+
+
+@deferred_f_from_coro_f
+async def test_merge_http_response_dependency(mockserver):
+    """A dependency that needs the HTTP response body keeps it out of the
+    browser request of a browser dependency."""
+
+    @attrs.define
+    class SomePage(BasePage):
+        http_response: HttpResponse
+        browser_response: BrowserResponse
+
+    class TestSpider(ZyteAPISpider):
+        def parse_(self, response, page: SomePage):  # type: ignore[override]
+            yield {
+                "http_response": page.http_response.text,
+                "html": str(page.browser_response.html),
+            }
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 2
+    assert params[0] == {
+        "url": url,
+        "httpResponseBody": True,
+        "httpResponseHeaders": True,
+    }
+    assert params[1] == {
+        "url": url,
+        "browserHtml": True,
+    }
+    assert item["http_response"] == item["html"]
+
+
+@deferred_f_from_coro_f
+async def test_merge_conflicting_param(mockserver):
+    """Parameters that the request and its dependencies define differently
+    cannot be combined into a single Zyte API request."""
+
+    class TestSpider(ZyteAPISpider):
+        def get_start_request(self):
+            return Request(
+                self.url,
+                callback=self.parse_,
+                meta={
+                    "zyte_api_automap": {"geolocation": "US"},
+                    "zyte_api_provider": {"geolocation": "IE"},
+                },
+            )
+
+        def parse_(self, response, product: Product):  # type: ignore[override]
+            yield {"product": product}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 2
+    assert params[0] == {
+        "url": url,
+        "geolocation": "US",
+        "httpResponseBody": True,
+        "httpResponseHeaders": True,
+    }
+    assert params[1] == {
+        "url": url,
+        "geolocation": "IE",
+        "product": True,
+    }
+    assert item["product"].name == "Product name (country IE)"
+
+
+@deferred_f_from_coro_f
+async def test_merge_non_zyte_api_request(mockserver):
+    """A request that is not sent through Zyte API leaves the Zyte API request
+    of its dependencies alone."""
+
+    class TestSpider(ZyteAPISpider):
+        def parse_(self, response, product: Product):  # type: ignore[override]
+            yield {"body": response.text, "product": product}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_TRANSPARENT_MODE"] = False
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0] == {
+        "url": url,
+        "product": True,
+    }
+    assert item["body"] == ""
+    assert type(item["product"]) is Product

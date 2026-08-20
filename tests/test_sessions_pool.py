@@ -402,7 +402,9 @@ async def test_delay_random(settings, start_requests, mockserver, monkeypatch):
     async def fake_sleep(delay):
         if delay != pytest.approx(queue_wait_time):
             sleep_calls.append(delay)
-        await sleep(0)
+        # Queue waits must yield long enough for the request holding the only
+        # session of the pool to return it to the queue.
+        await sleep(0.001)
 
     monkeypatch.setattr("scrapy_zyte_api._session.sleep", fake_sleep)
 
