@@ -84,7 +84,7 @@ PROVIDER_PARAMS = {"geolocation": "IE"}
 try:
     from scrapy_poet.utils.testing import crawl_single_item_async as crawl_single_item
 except ImportError:  # scrapy-poet < 0.27.0
-    from scrapy_poet.utils.testing import crawl_single_item
+    from scrapy_poet.utils.testing import crawl_single_item  # type: ignore[assignment]
 
 
 def _crawl_single_item(
