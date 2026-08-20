@@ -259,7 +259,7 @@ assert RETRY_POLICY_A != RETRY_POLICY_B
 @pytest.mark.parametrize(
     ("settings", "meta", "expected"),
     [
-        ({}, {}, None),
+        ({"ZYTE_API_RETRY_POLICY": None}, {}, None),
         (
             {"ZYTE_API_RETRY_POLICY": "tests.test_handler.RETRY_POLICY_A"},
             {},
