@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.36.0 (unreleased)
+0.36.0 (2026-08-20)
 -------------------
 
 -   Added support for running without a Twisted reactor, honoring Scrapy’s
