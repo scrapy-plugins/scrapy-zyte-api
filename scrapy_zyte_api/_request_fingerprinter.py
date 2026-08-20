@@ -24,6 +24,7 @@ else:
     from scrapy.utils.misc import load_object
     from w3lib.url import canonicalize_url
 
+    from ._params import _FINGERPRINT_PARAM_KEYS as _PROVIDER_FINGERPRINT_PARAM_KEYS
     from ._params import _REQUEST_PARAMS, _may_use_browser, _ParamParser
     from .utils import _build_from_crawler  # type: ignore[attr-defined]
 
@@ -31,12 +32,6 @@ else:
         is_provider_only: bool
         to_provide: frozenset[object] | None
         http_response_available: bool
-
-    _PROVIDER_FINGERPRINT_PARAM_KEYS = frozenset(
-        key
-        for key, value in _REQUEST_PARAMS.items()
-        if value.get("changes_fingerprint", True) and key != "url"
-    )
 
     class ScrapyZyteAPIRequestFingerprinter:
         @classmethod
@@ -272,6 +267,7 @@ else:
 
             from .providers import (  # noqa: PLC0415
                 _get_or_build_zyte_api_provider_meta,
+                _get_zyte_api_meta_params,
                 _get_zyte_api_provider_params,
             )
 
@@ -283,13 +279,18 @@ else:
             provider_params = self._get_fingerprint_provider_params(
                 _get_zyte_api_provider_params(request, self._crawler)
             )
+            meta_params = self._get_fingerprint_provider_params(
+                _get_zyte_api_meta_params(request)
+            )
 
             zyte_api_meta, _html_requested = _get_or_build_zyte_api_provider_meta(
                 provider_plan_data.to_provide,
                 request,
                 self._crawler,
                 provider_params=provider_params,
+                meta_params=meta_params,
                 http_response_available=provider_plan_data.http_response_available,
+                for_fingerprint=True,
             )
 
             fingerprint_api_params = dict(zyte_api_meta)

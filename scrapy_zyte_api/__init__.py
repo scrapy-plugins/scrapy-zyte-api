@@ -7,7 +7,13 @@ if _NEEDS_EARLY_REACTOR:
 
 # Register web-poet serializers
 from . import _serialization  # noqa: F401
-from ._annotations import ExtractFrom, actions, custom_attrs, network_capture
+from ._annotations import (
+    ExtractFrom,
+    actions,
+    custom_attrs,
+    network_capture,
+    zyte_api_params,
+)
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPIRefererSpiderMiddleware,
@@ -19,6 +25,7 @@ from ._page_inputs import (
     Geolocation,
     NetworkCapture,
     Screenshot,
+    ZyteApiParams,
 )
 from ._request_fingerprinter import ScrapyZyteAPIRequestFingerprinter
 from ._session import (
@@ -75,6 +82,7 @@ __all__ = [
     "ScrapyZyteAPISpiderMiddleware",
     "Screenshot",
     "SessionConfig",
+    "ZyteApiParams",
     "actions",
     "custom_attrs",
     "get_request_session_id",
@@ -82,4 +90,5 @@ __all__ = [
     "network_capture",
     "session_config",
     "session_config_registry",
+    "zyte_api_params",
 ]

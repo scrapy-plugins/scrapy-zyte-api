@@ -44,9 +44,11 @@ from scrapy_zyte_api import (
     NetworkCapture,
     ScrapyZyteAPIRequestFingerprinter,
     Screenshot,
+    ZyteApiParams,
     actions,
     custom_attrs,
     network_capture,
+    zyte_api_params,
 )
 from scrapy_zyte_api._params import _EXTRACT_KEYS
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
@@ -57,6 +59,7 @@ from scrapy_zyte_api.providers import (
     _build_zyte_api_provider_meta,
     _get_zyte_api_provider_params,
     _set_in_provider_meta_cache,
+    _warned_dependency_managed_params,
 )
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _ensure_awaitable,
@@ -666,6 +669,169 @@ def test_provider_meta_annotated_item_without_extract_from():
 
     assert meta == {"product": True}
     assert html_requested is False
+
+
+def _build_meta_with_dependency_params(
+    params, *, setting_params=None, meta_params=None, to_provide=None, **kwargs
+):
+    class DummyCrawler:
+        settings = _DummySettings(
+            {"ZYTE_API_PROVIDER_PARAMS": setting_params} if setting_params else {}
+        )
+
+    request = Request(
+        "https://example.com",
+        meta={"zyte_api_provider": meta_params} if meta_params else {},
+    )
+    to_provide = to_provide if to_provide is not None else {Product}
+    return _build_zyte_api_provider_meta(
+        {*to_provide, Annotated[ZyteApiParams, zyte_api_params(params)]},  # type: ignore[arg-type]
+        request,
+        DummyCrawler(),  # type: ignore[arg-type]
+        **kwargs,
+    )
+
+
+def test_provider_meta_dependency_params():
+    meta, html_requested = _build_meta_with_dependency_params(
+        {"ipType": "residential", "followRedirect": False}
+    )
+
+    assert meta == {
+        "product": True,
+        "ipType": "residential",
+        "followRedirect": False,
+    }
+    assert html_requested is False
+
+
+def test_provider_meta_dependency_params_override_setting_params():
+    meta, _ = _build_meta_with_dependency_params(
+        {"ipType": "residential"},
+        setting_params={"ipType": "datacenter", "device": "mobile"},
+    )
+
+    assert meta == {"product": True, "ipType": "residential", "device": "mobile"}
+
+
+def test_provider_meta_request_params_override_dependency_params():
+    meta, _ = _build_meta_with_dependency_params(
+        {"ipType": "residential", "device": "mobile"},
+        meta_params={"ipType": "datacenter"},
+    )
+
+    assert meta == {"product": True, "ipType": "datacenter", "device": "mobile"}
+
+
+def test_provider_meta_dependency_params_repeated():
+    """The same parameter can be set by multiple dependencies as long as the
+    value is the same."""
+
+    class DummyCrawler:
+        settings = _DummySettings()
+
+    request = Request("https://example.com")
+    meta, _ = _build_zyte_api_provider_meta(
+        {
+            Product,
+            Annotated[ZyteApiParams, zyte_api_params({"ipType": "residential"})],  # type: ignore[arg-type]
+            Annotated[  # type: ignore[arg-type]
+                ZyteApiParams,
+                zyte_api_params({"ipType": "residential", "device": "mobile"}),
+            ],
+        },
+        request,
+        DummyCrawler(),  # type: ignore[arg-type]
+    )
+
+    assert meta == {"product": True, "ipType": "residential", "device": "mobile"}
+
+
+def test_provider_meta_dependency_params_conflict():
+    class DummyCrawler:
+        settings = _DummySettings()
+
+    request = Request("https://example.com")
+    with pytest.raises(ValueError, match="Multiple different values requested"):
+        _build_zyte_api_provider_meta(
+            {
+                Product,
+                Annotated[ZyteApiParams, zyte_api_params({"ipType": "residential"})],  # type: ignore[arg-type]
+                Annotated[ZyteApiParams, zyte_api_params({"ipType": "datacenter"})],  # type: ignore[arg-type]
+            },
+            request,
+            DummyCrawler(),  # type: ignore[arg-type]
+        )
+
+
+def test_provider_meta_dependency_params_url():
+    with pytest.raises(ValueError, match="cannot set the url Zyte API parameter"):
+        _build_meta_with_dependency_params({"url": "https://example.org"})
+
+
+def test_provider_meta_dependency_params_unannotated():
+    class DummyCrawler:
+        settings = _DummySettings()
+
+    request = Request("https://example.com")
+    with pytest.raises(
+        ValueError, match="ZyteApiParams dependencies must be annotated"
+    ):
+        _build_zyte_api_provider_meta(
+            {Product, ZyteApiParams},
+            request,
+            DummyCrawler(),  # type: ignore[arg-type]
+        )
+
+
+def test_provider_meta_dependency_params_bad_annotation():
+    class DummyCrawler:
+        settings = _DummySettings()
+
+    request = Request("https://example.com")
+    with pytest.raises(ValueError, match="must be annotated with a dictionary"):
+        _build_zyte_api_provider_meta(
+            {Product, Annotated[ZyteApiParams, "not-a-dict"]},  # type: ignore[arg-type]
+            request,
+            DummyCrawler(),  # type: ignore[arg-type]
+        )
+
+
+def test_provider_meta_dependency_params_dependency_managed(caplog):
+    _warned_dependency_managed_params.discard("geolocation")
+    caplog.clear()
+    meta, _ = _build_meta_with_dependency_params({"geolocation": "IE"})
+
+    assert meta == {"product": True, "geolocation": "IE"}
+    assert "sets the geolocation Zyte API parameter" in caplog.text
+
+    # The warning is only logged once per parameter.
+    caplog.clear()
+    _build_meta_with_dependency_params({"geolocation": "IE"})
+
+    assert "sets the geolocation Zyte API parameter" not in caplog.text
+
+
+def test_provider_meta_dependency_params_unused_options_removed():
+    """Unused extraction options are removed from dependency parameters, as
+    they are from setting and request metadata parameters."""
+    meta, _ = _build_meta_with_dependency_params(
+        {"productNavigationOptions": {"extractFrom": "httpResponseBody"}}
+    )
+
+    assert meta == {"product": True}
+
+
+def test_provider_meta_dependency_params_for_fingerprint():
+    """Dependency parameters that do not change the request fingerprint are
+    excluded when building parameters for request fingerprinting."""
+    params = {"ipType": "residential", "device": "mobile", "unknown": "a"}
+
+    meta, _ = _build_meta_with_dependency_params(params)
+    assert meta == {"product": True, **params}
+
+    meta, _ = _build_meta_with_dependency_params(params, for_fingerprint=True)
+    assert meta == {"product": True, "device": "mobile"}
 
 
 def test_set_in_provider_meta_cache_disabled():
@@ -1391,6 +1557,89 @@ async def test_provider_network_capture(mockserver):
     assert second.url == "https://api.example.com/data?filter=xhr"
     assert second.status == 200
     assert second.body is None
+
+
+@deferred_f_from_coro_f
+async def test_provider_zyte_api_params(mockserver):
+    @attrs.define
+    class ParamsPage(BasePage):
+        product: Product
+        params: Annotated[ZyteApiParams, zyte_api_params({"ipType": "residential"})]
+
+    class ParamsSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: ParamsPage):  # type: ignore[override]
+            yield {"params": page.params}
+
+    settings = provider_settings(mockserver)
+    item, _, crawler = await _crawl_single_item(ParamsSpider, HtmlResource, settings)
+
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+    assert len(params) == 1
+    assert params[0]["ipType"] == "residential"
+    assert params[0]["product"] is True
+
+    result: ZyteApiParams = item["params"]
+    assert isinstance(result, ZyteApiParams)
+    assert result.params["ipType"] == "residential"
+    assert result.params["product"] is True
+
+
+@deferred_f_from_coro_f
+async def test_provider_zyte_api_params_precedence(mockserver):
+    """Parameters from page objects override the ZYTE_API_PROVIDER_PARAMS
+    setting, but not the zyte_api_provider request metadata key."""
+
+    @attrs.define
+    class ParamsPage(BasePage):
+        product: Product
+        params: Annotated[
+            ZyteApiParams,
+            zyte_api_params({"ipType": "residential", "device": "mobile"}),
+        ]
+
+    class ParamsSpider(ZyteAPISpider):
+        def get_start_request(self):
+            return Request(
+                self.url,
+                callback=self.parse_,  # type: ignore[arg-type]
+                meta={"zyte_api_provider": {"device": "desktop"}},
+            )
+
+        def parse_(self, response: DummyResponse, page: ParamsPage):  # type: ignore[override]
+            yield {"params": page.params}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "ipType": "datacenter",
+        "followRedirect": False,
+    }
+    _, _, crawler = await _crawl_single_item(ParamsSpider, HtmlResource, settings)
+
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+    assert len(params) == 1
+    assert params[0]["ipType"] == "residential"  # page object > setting
+    assert params[0]["device"] == "desktop"  # request metadata > page object
+    assert params[0]["followRedirect"] is False  # setting only
+
+
+@deferred_f_from_coro_f
+async def test_provider_zyte_api_params_unannotated(mockserver, caplog):
+    @attrs.define
+    class ParamsPage(BasePage):
+        product: Product
+        params: ZyteApiParams
+
+    class ParamsSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: ParamsPage):  # type: ignore[override]
+            pass
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, *_ = await _crawl_single_item(ParamsSpider, HtmlResource, settings)
+    assert item is None
+    assert "ZyteApiParams dependencies must be annotated" in caplog.text
 
 
 @deferred_f_from_coro_f

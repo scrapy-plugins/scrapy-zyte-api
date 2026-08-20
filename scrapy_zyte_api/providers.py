@@ -1,6 +1,7 @@
 import json
 from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Mapping, Sequence
+from logging import getLogger
 from typing import TYPE_CHECKING, Any, Set, cast
 from weakref import WeakKeyDictionary
 
@@ -48,8 +49,11 @@ from zyte_common_items.fields import is_auto_field
 
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
-from scrapy_zyte_api._page_inputs import CapturedResponse, NetworkCapture
+from scrapy_zyte_api._page_inputs import CapturedResponse, NetworkCapture, ZyteApiParams
+from scrapy_zyte_api._params import _FINGERPRINT_PARAM_KEYS
 from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
+
+logger = getLogger(__name__)
 
 _PROVIDER_META_CACHE_MAX_SIZE = 1024
 _provider_meta_caches: WeakKeyDictionary = WeakKeyDictionary()
@@ -65,12 +69,23 @@ def _get_provider_meta_cache(crawler) -> OrderedDict:
 
 
 def _build_provider_meta_cache_key(
-    to_provide, http_response_available: bool, provider_params: dict
+    to_provide,
+    http_response_available: bool,
+    provider_params: dict,
+    meta_params: dict,
+    for_fingerprint: bool,
 ) -> tuple:
     return (
         frozenset(to_provide),
         http_response_available,
         json.dumps(provider_params, sort_keys=True, separators=(",", ":")),
+        # Only the keys matter: values, if any, are also in provider_params.
+        tuple(sorted(meta_params)),
+        # Parameters from dependencies are filtered when building parameters
+        # for request fingerprinting, so cache entries can only be shared
+        # between both scenarios if there are no such parameters.
+        for_fingerprint
+        and any(strip_annotated(cls) is ZyteApiParams for cls in to_provide),
     )
 
 
@@ -94,12 +109,18 @@ def _get_or_build_zyte_api_provider_meta(
     crawler: Crawler,
     *,
     provider_params,
+    meta_params,
     screenshot_requested=None,
     http_response_available: bool = False,
+    for_fingerprint: bool = False,
 ) -> tuple[dict, bool]:
     cache = _get_provider_meta_cache(crawler)
     key = _build_provider_meta_cache_key(
-        to_provide, http_response_available, provider_params
+        to_provide,
+        http_response_available,
+        provider_params,
+        meta_params,
+        for_fingerprint,
     )
     try:
         meta, html_requested = cache[key]
@@ -112,8 +133,10 @@ def _get_or_build_zyte_api_provider_meta(
         request,
         crawler,
         provider_params=provider_params,
+        meta_params=meta_params,
         screenshot_requested=screenshot_requested,
         http_response_available=http_response_available,
+        for_fingerprint=for_fingerprint,
     )
     _set_in_provider_meta_cache(cache, key, result[0], result[1])
     return result
@@ -157,22 +180,91 @@ _AUTO_PAGES: set[type] = {
 }
 
 
-def _get_zyte_api_provider_params(request: Request, crawler: Crawler) -> dict[str, Any]:
-    setting_params = crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS")
+# Zyte API parameters that have a dedicated input or annotation, and hence
+# should not be set through ZyteApiParams.
+_DEPENDENCY_MANAGED_PARAMS = frozenset(
+    {
+        "actions",
+        "browserHtml",
+        "customAttributes",
+        "customAttributesOptions",
+        "geolocation",
+        "networkCapture",
+        "screenshot",
+        *_ITEM_KEYWORDS.values(),
+    }
+)
+# Parameters from _DEPENDENCY_MANAGED_PARAMS already warned about, to warn only
+# once per parameter.
+_warned_dependency_managed_params: set[str] = set()
 
+
+def _get_zyte_api_meta_params(request: Request) -> dict[str, Any]:
     request_params = request.meta.get("zyte_api_provider", {})
     if request_params is None:
-        request_params = {}
+        return {}
     if not isinstance(request_params, Mapping):
         raise ValueError(
             f"Request {request} has {request_params!r} as the "
             f"zyte_api_provider value, but only dictionaries are supported."
         )
+    return dict(request_params)
+
+
+def _get_zyte_api_provider_params(request: Request, crawler: Crawler) -> dict[str, Any]:
+    setting_params = crawler.settings.getdict("ZYTE_API_PROVIDER_PARAMS")
 
     return {
         **setting_params,
-        **dict(request_params),
+        **_get_zyte_api_meta_params(request),
     }
+
+
+def _get_zyte_api_dependency_params(to_provide: Set[Callable]) -> dict[str, Any]:
+    """Return the Zyte API parameters requested through
+    :class:`~scrapy_zyte_api.ZyteApiParams` dependencies."""
+    params: dict[str, Any] = {}
+    for cls in to_provide:
+        if strip_annotated(cls) is not ZyteApiParams:
+            continue
+        if not is_typing_annotated(cls):
+            raise ValueError(
+                "ZyteApiParams dependencies must be annotated, "
+                "e.g. Annotated[ZyteApiParams, zyte_api_params({...})]."
+            )
+        cls_params = _from_hashable(cls.__metadata__[0])  # type: ignore[attr-defined]
+        if not isinstance(cls_params, dict):
+            raise ValueError(
+                f"ZyteApiParams dependencies must be annotated with a "
+                f"dictionary of Zyte API parameters, ideally through "
+                f"zyte_api_params(), but {cls} is annotated with "
+                f"{cls.__metadata__[0]!r}."  # type: ignore[attr-defined]
+            )
+        for key, value in cls_params.items():
+            if key == "url":
+                raise ValueError(
+                    "ZyteApiParams dependencies cannot set the url Zyte API "
+                    "parameter, which is always the URL of the request being "
+                    "processed."
+                )
+            if key in params and params[key] != value:
+                raise ValueError(
+                    f"Multiple different values requested for the {key} Zyte "
+                    f"API parameter through ZyteApiParams dependencies: "
+                    f"{params[key]!r} and {value!r}."
+                )
+            params[key] = value
+    for key in sorted(
+        (params.keys() & _DEPENDENCY_MANAGED_PARAMS) - _warned_dependency_managed_params
+    ):
+        _warned_dependency_managed_params.add(key)
+        logger.warning(
+            f"A ZyteApiParams dependency sets the {key} Zyte API parameter, "
+            f"which has a dedicated input or annotation. Use that input or "
+            f"annotation instead; setting {key} directly may have no effect, "
+            f"or make you pay for output that cannot be read."
+        )
+    return params
 
 
 def _build_zyte_api_provider_meta(
@@ -181,8 +273,10 @@ def _build_zyte_api_provider_meta(
     crawler: Crawler,
     *,
     provider_params: dict[str, Any] | None = None,
+    meta_params: dict[str, Any] | None = None,
     screenshot_requested: bool | None = None,
     http_response_available: bool = False,
+    for_fingerprint: bool = False,
 ) -> tuple[dict[str, Any], bool]:
     """Build Zyte API params for a provider request.
 
@@ -195,8 +289,20 @@ def _build_zyte_api_provider_meta(
 
     if provider_params is None:
         provider_params = _get_zyte_api_provider_params(request, crawler)
+    if meta_params is None:
+        meta_params = _get_zyte_api_meta_params(request)
 
     zyte_api_meta = dict(provider_params)
+
+    # Parameters from ZyteApiParams dependencies override those from the
+    # ZYTE_API_PROVIDER_PARAMS setting, but not those from the
+    # zyte_api_provider request metadata key.
+    for key, value in _get_zyte_api_dependency_params(to_provide).items():
+        if key in meta_params:
+            continue
+        if for_fingerprint and key not in _FINGERPRINT_PARAM_KEYS:
+            continue
+        zyte_api_meta[key] = value
 
     to_provide_stripped: set[type] = set()
     extract_from_seen: dict[str, str] = {}
@@ -316,6 +422,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         ProductNavigation,
         Screenshot,
         Serp,
+        ZyteApiParams,
     }
 
     def __init__(self, *args, **kwargs):
@@ -383,6 +490,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         if not to_provide:
             return results
 
+        meta_params = _get_zyte_api_meta_params(request)
         provider_params = _get_zyte_api_provider_params(request, crawler)
 
         http_response_available = http_response is not None
@@ -391,6 +499,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             request,
             crawler,
             provider_params=provider_params,
+            meta_params=meta_params,
             screenshot_requested=screenshot_requested,
             http_response_available=http_response_available,
         )
@@ -488,6 +597,13 @@ class ZyteApiProvider(PageObjectInputProvider):
                 else:
                     actions_result = None
                 result = AnnotatedInstance(Actions(actions_result), cls.__metadata__)  # type: ignore[attr-defined]
+                results.append(result)
+                continue
+            if cls_stripped is ZyteApiParams and is_typing_annotated(cls):
+                result = AnnotatedInstance(
+                    ZyteApiParams(dict(zyte_api_meta)),
+                    cls.__metadata__,  # type: ignore[attr-defined]
+                )
                 results.append(result)
                 continue
             if cls_stripped is NetworkCapture and is_typing_annotated(cls):
