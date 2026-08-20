@@ -140,6 +140,16 @@ class DefaultResource(Resource):
             }
             return json.dumps(response_data).encode()
 
+        if "error-type" in domain:
+            request.setResponseCode(400)
+            response_data = {
+                "status": 400,
+                "type": urlparse(request_data["url"]).path[1:],
+                "title": "...",
+                "detail": "...",
+            }
+            return json.dumps(response_data).encode()
+
         if "session-redirect" in domain:
             response_data["httpResponseHeaders"] = [
                 {"name": "Location", "value": "https://example.com/"}

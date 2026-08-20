@@ -626,6 +626,108 @@ def test_user_agent_for_build_client(user_agent, expected):
     assert client.user_agent == expected
 
 
+class _RetryOnceFactory(RetryFactory):
+    def wait(self, retry_state):
+        return 0
+
+    def stop(self, retry_state):
+        return retry_state.attempt_number >= 2
+
+
+RETRY_ONCE = _RetryOnceFactory().build()
+
+
+@deferred_f_from_coro_f
+async def test_fatal_error_type_stats():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://temporary-download-error.example"]
+
+        def parse(self, response):
+            pass
+
+    settings: SETTINGS_T = {
+        "RETRY_ENABLED": False,
+        "ZYTE_API_RETRY_POLICY": "tests.test_handler.RETRY_ONCE",
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await maybe_deferred_to_future(crawler.crawl())
+
+    assert crawler.stats
+    stats = crawler.stats.get_stats()
+    assert stats["scrapy-zyte-api/error_types/download/temporary-error"] == 2
+    assert stats["scrapy-zyte-api/fatal_error_types/download/temporary-error"] == 1
+    assert stats["scrapy-zyte-api/fatal_errors"] == 1
+
+
+@deferred_f_from_coro_f
+async def test_error_type_stat_names():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = [
+            "https://error-type.example/",
+            "https://error-type.example/no-leading-slash",
+        ]
+
+        def parse(self, response):
+            pass
+
+    settings: SETTINGS_T = {
+        "RETRY_ENABLED": False,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+
+    with MockServer() as server:
+        settings["ZYTE_API_URL"] = server.urljoin("/")
+        crawler = get_crawler(TestSpider, settings_dict=settings)
+        await maybe_deferred_to_future(crawler.crawl())
+
+    assert crawler.stats
+    stats = crawler.stats.get_stats()
+    for suffix in ("<empty>", "no-leading-slash"):
+        assert stats[f"scrapy-zyte-api/error_types/{suffix}"] == 1
+        assert stats[f"scrapy-zyte-api/fatal_error_types/{suffix}"] == 1
+
+
+@deferred_f_from_coro_f
+async def test_fatal_exception_type_stats():
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            pass
+
+    settings: SETTINGS_T = {
+        "RETRY_ENABLED": False,
+        # No server listens on port 1, so requests raise a connection error.
+        "ZYTE_API_URL": "http://127.0.0.1:1/",
+        "ZYTE_API_RETRY_POLICY": "tests.test_handler.RETRY_ONCE",
+        "ZYTE_API_TRANSPARENT_MODE": True,
+        **SETTINGS,
+    }
+    crawler = get_crawler(TestSpider, settings_dict=settings)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert crawler.stats
+    stats = crawler.stats.get_stats()
+    fatal = {
+        k: v
+        for k, v in stats.items()
+        if k.startswith("scrapy-zyte-api/fatal_exception_types/")
+    }
+    assert len(fatal) == 1
+    key, value = next(iter(fatal.items()))
+    assert value == 1
+    assert stats[key.replace("/fatal_exception_types/", "/exception_types/")] == 2
+
+
 @deferred_f_from_coro_f
 async def test_bad_key():
     class TestSpider(Spider):
