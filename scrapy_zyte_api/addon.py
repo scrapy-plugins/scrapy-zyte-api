@@ -102,6 +102,11 @@ class Addon:
                 "addon",
             )
         settings.set("ZYTE_API_TRANSPARENT_MODE", True, "addon")
+        settings.set(
+            "HTTPCACHE_POLICY",
+            "scrapy_zyte_api.ScrapyZyteAPIHttpCachePolicy",
+            "addon",
+        )
 
         try:
             from scrapy_poet import InjectionMiddleware  # noqa: PLC0415

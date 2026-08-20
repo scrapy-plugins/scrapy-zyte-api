@@ -18,7 +18,6 @@ from scrapy.exceptions import CloseSpider, IgnoreRequest
 from scrapy.http import Response
 from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import load_object
-from scrapy.utils.python import global_object_name
 from tenacity import stop_after_attempt
 from zyte_api import AggressiveRetryFactory, RequestError, RetryFactory, stop_on_count
 from zyte_api import aggressive_retrying as _aggressive_retrying
@@ -29,6 +28,7 @@ from .utils import (  # type: ignore[attr-defined]
     _build_from_crawler,
     _close_spider,
     _ensure_awaitable,
+    _get_retry_request,
     deferred_to_future,
 )
 
@@ -102,57 +102,6 @@ except ImportError:
 
     class DummyResponse:  # type: ignore[no-redef]
         pass
-
-
-try:
-    from scrapy.downloadermiddlewares.retry import get_retry_request
-except ImportError:  # pragma: no cover
-    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/downloadermiddlewares/retry.py#L57-L142
-    def get_retry_request(  # type: ignore[misc]
-        request,
-        *,
-        spider,
-        reason="unspecified",
-        max_retry_times=None,
-        priority_adjust=None,
-        stats_base_key="retry",
-    ):
-        settings = spider.crawler.settings
-        assert spider.crawler.stats
-        stats = spider.crawler.stats
-        retry_times = request.meta.get("retry_times", 0) + 1
-        if max_retry_times is None:
-            max_retry_times = request.meta.get("max_retry_times")
-            if max_retry_times is None:
-                max_retry_times = settings.getint("RETRY_TIMES")
-        if retry_times <= max_retry_times:
-            logger.debug(
-                "Retrying %(request)s (failed %(retry_times)d times): %(reason)s",
-                {"request": request, "retry_times": retry_times, "reason": reason},
-                extra={"spider": spider},
-            )
-            new_request: Request = request.copy()
-            new_request.meta["retry_times"] = retry_times
-            new_request.dont_filter = True
-            if priority_adjust is None:
-                priority_adjust = settings.getint("RETRY_PRIORITY_ADJUST")
-            new_request.priority = request.priority + priority_adjust
-
-            if callable(reason):
-                reason = reason()
-            if isinstance(reason, Exception):
-                reason = global_object_name(reason.__class__)
-
-            stats.inc_value(f"{stats_base_key}/count")
-            stats.inc_value(f"{stats_base_key}/reason_count/{reason}")
-            return new_request
-        stats.inc_value(f"{stats_base_key}/max_reached")
-        logger.error(
-            "Gave up retrying %(request)s (failed %(retry_times)d times): %(reason)s",
-            {"request": request, "retry_times": retry_times, "reason": reason},
-            extra={"spider": spider},
-        )
-        return None
 
 
 try:
@@ -1408,7 +1357,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
         if not passed:
             self._sessions.allow_new_session_assignments(request)
             assert self._crawler.spider
-            new_request_or_none = get_retry_request(
+            new_request_or_none = _get_retry_request(
                 request,
                 spider=self._crawler.spider,
                 reason="session_expired",
@@ -1440,7 +1389,7 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             return None
 
         assert self._crawler.spider
-        return get_retry_request(
+        return _get_retry_request(
             request,
             spider=self._crawler.spider,
             reason=reason,
