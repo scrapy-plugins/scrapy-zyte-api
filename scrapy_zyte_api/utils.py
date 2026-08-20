@@ -73,6 +73,26 @@ except ImportError:  # Scrapy < 2.12
         return create_instance(objcls, None, crawler, *args, **kwargs)
 
 
+_MiddlewareT = TypeVar("_MiddlewareT")
+
+
+def _get_downloader_middleware(
+    crawler: "scrapy.crawler.Crawler", cls: type[_MiddlewareT]
+) -> _MiddlewareT | None:
+    """Return the run-time instance of the *cls* downloader middleware, or
+    ``None`` if there is none.
+
+    Backport of :meth:`Crawler.get_downloader_middleware()
+    <scrapy.crawler.Crawler.get_downloader_middleware>`, added in Scrapy 2.12.
+    """
+    if _SCRAPY_VERSION >= _SCRAPY_2_12_0:
+        return crawler.get_downloader_middleware(cls)
+    for middleware in crawler.engine.downloader.middleware.middlewares:  # type: ignore[union-attr]
+        if isinstance(middleware, cls):
+            return middleware
+    return None
+
+
 try:
     import scrapy_poet  # noqa: F401
 except ImportError:

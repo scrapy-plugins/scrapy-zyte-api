@@ -12,6 +12,7 @@ from typing import Any, TypedDict, cast
 from uuid import uuid4
 from weakref import WeakKeyDictionary
 
+import attrs
 from scrapy import Request, Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.exceptions import CloseSpider, IgnoreRequest
@@ -41,6 +42,11 @@ logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"
 COOKIE_SESSION_ID_META_KEY = "_zyte_api_cookie_session_id"
 ZYTE_API_META_KEYS = ("zyte_api", "zyte_api_automap", "zyte_api_provider")
+# Holds a list of (pool, session ID) tuples, shared between a request and the
+# Zyte API requests that ZyteApiProvider sends to build its page inputs, so
+# that discarding the session of a request also discards the sessions used to
+# build its page inputs. See _SessionManager.discard().
+PROVIDER_SESSIONS_META_KEY = "_zyte_api_provider_sessions"
 
 
 def _troubleshoot(slug):
@@ -50,9 +56,7 @@ def _troubleshoot(slug):
     )
 
 
-def get_request_session_id(request: Request) -> str | None:
-    """Return the session ID of *request*, or ``None`` if it does not have a
-    session ID assigned."""
+def _get_request_session_id(request: Request) -> str | None:
     if session_id := request.meta.get(COOKIE_SESSION_ID_META_KEY):
         return session_id
     for meta_key in ZYTE_API_META_KEYS:
@@ -61,6 +65,14 @@ def get_request_session_id(request: Request) -> str | None:
         session_id = request.meta[meta_key].get("session", {}).get("id", None)
         if session_id:
             return session_id
+    return None
+
+
+def get_request_session_id(request: Request) -> str | None:
+    """Return the session ID of *request*, or ``None`` if it does not have a
+    session ID assigned."""
+    if session_id := _get_request_session_id(request):
+        return session_id
     logger.warning(
         f"Request {request} had no session ID assigned, unexpectedly. "
         f"If you are sure this issue is not caused by your own code, "
@@ -169,6 +181,11 @@ class PoolError(ValueError):
 
 class TooManyBadSessionInits(RuntimeError):
     pass
+
+
+class NoSession(ValueError):
+    """Raised by :meth:`Session.discard() <scrapy_zyte_api.Session.discard>`
+    when there is no session to discard."""
 
 
 class PoolConfig(TypedDict):
@@ -1360,6 +1377,10 @@ class _SessionManager:
             # middleware does not assign a new session again.
             request.meta.setdefault("_zyte_api_session_assigned", True)
             request.meta.setdefault("zyte_api_retry_policy", self._session_retry_policy)
+            # Let the request that triggered this one, if any, know about this
+            # session, so that discarding its session also discards this one.
+            if (sessions := request.meta.get(PROVIDER_SESSIONS_META_KEY)) is not None:
+                sessions.append((self.get_pool(request), session_id))
             return session_config.process_request(request)
 
     def is_enabled(self, request: Request) -> bool:
@@ -1382,6 +1403,43 @@ class _SessionManager:
             pool = self.get_pool(request)
             self._inc_stat("use/expired", pool)
             self._start_request_session_refresh(request, pool)
+
+    def discard(self, request: Request, *, log: bool = True) -> bool:
+        """Discard the sessions of *request*, and return ``False`` if it had
+        none."""
+        if not self.is_enabled(request):
+            if log:
+                logger.warning(
+                    f"Ignoring a request to discard the session of request "
+                    f"{request}, which does not use session management."
+                )
+            return False
+        try:
+            pool = self.get_pool(request)
+        except PoolError:
+            _close_spider(self._crawler, "pool_error")
+            raise
+        # Sessions used to build the page inputs of the request, if any, in
+        # addition to the session of the request itself, if any.
+        sessions = list(request.meta.pop(PROVIDER_SESSIONS_META_KEY, []))
+        if session_id := _get_request_session_id(request):
+            sessions.append((pool, session_id))
+        if not sessions:
+            if log:
+                logger.warning(
+                    f"Ignoring a request to discard the session of request "
+                    f"{request}, which has no session assigned."
+                )
+            return False
+        for session_pool, session_id in dict.fromkeys(sessions):
+            if session_id not in self._pools[session_pool]:
+                continue  # Already discarded, e.g. by a concurrent request.
+            self._inc_stat("use/discarded", session_pool)
+            self._check_failures.pop(session_id, None)
+            self._start_session_refresh(session_id, request, session_pool)
+        # If the request is retried, let it get a new session assigned.
+        self.allow_new_session_assignments(request)
+        return True
 
 
 class ScrapyZyteAPISessionDownloaderMiddleware:
@@ -1452,6 +1510,63 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             if self._sessions.is_enabled(request)
             else None
         )
+
+    def discard_session(self, request_or_response: Request | Response) -> None:
+        """:ref:`Discard <session-discard>` the session assigned to *request*,
+        or to the request of *response*, as well as any session used to build
+        its :ref:`page inputs <inputs>`.
+
+        Sessions used for the :ref:`additional requests
+        <web-poet:additional-requests>` of a page object are not affected.
+
+        This method does not retry the affected request.
+        """
+        if isinstance(request_or_response, Response):
+            request = request_or_response.request
+            if request is None:
+                raise ValueError(
+                    f"Cannot discard the session of response "
+                    f"{request_or_response}, which has no request assigned."
+                )
+        else:
+            request = request_or_response
+        self._sessions.discard(request)
+
+    def _discard_session(self, request: Request, *, log: bool = True) -> bool:
+        return self._sessions.discard(request, log=log)
+
+
+@attrs.define
+class Session:
+    """Page input to :ref:`discard <session-discard-page-object>` the session
+    used to build the page inputs of a page object."""
+
+    _middleware: "ScrapyZyteAPISessionDownloaderMiddleware | None" = None
+    _request: Request | None = None
+
+    def discard(self) -> None:
+        """:ref:`Discard <session-discard-page-object>` the session used to
+        build the page inputs of the page object.
+
+        Raises :exc:`~scrapy_zyte_api.NoSession` if no :ref:`plugin-managed
+        session <session>` was used, e.g. because session management is not
+        enabled for the requests of the page object.
+        """
+        if self._request is None:
+            # Deserialized from a web-poet test fixture, i.e. there is no live
+            # session to discard.
+            logger.debug(
+                "Ignoring a call to Session.discard() on a Session page input "
+                "that is not associated to a request."
+            )
+            return
+        if self._middleware is None or not self._middleware._discard_session(
+            self._request, log=False
+        ):
+            raise NoSession(
+                f"Cannot discard the session used to build the page inputs of "
+                f"request {self._request}: no plugin-managed session was used."
+            )
 
 
 class ScrapyZyteAPISessionResetterDownloaderMiddleware:

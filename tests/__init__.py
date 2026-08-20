@@ -98,17 +98,21 @@ if _REACTORLESS:
     SETTINGS["TWISTED_REACTOR_ENABLED"] = False
 
 try:
-    from scrapy_poet import InjectionMiddleware
+    from scrapy_poet import InjectionMiddleware, RetryMiddleware
 except ImportError:
     pass
 else:
     assert isinstance(SETTINGS["DOWNLOADER_MIDDLEWARES"], dict)
+    assert isinstance(SETTINGS["SPIDER_MIDDLEWARES"], dict)
 
     if not _POET_ADDON_SUPPORT:
+        # Same components and positions that the scrapy-poet add-on sets.
         SETTINGS["DOWNLOADER_MIDDLEWARES"][InjectionMiddleware] = 543
+        SETTINGS["SPIDER_MIDDLEWARES"][RetryMiddleware] = 275
 
     SETTINGS["SCRAPY_POET_PROVIDERS"] = {
-        "scrapy_zyte_api.providers.ZyteApiProvider": 1100
+        "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
+        "scrapy_zyte_api.providers.ZyteApiSessionProvider": 1101,
     }
 
 SETTINGS_ADDON: SETTINGS_T = {

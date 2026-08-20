@@ -49,7 +49,16 @@ from zyte_common_items.fields import is_auto_field
 from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
 from scrapy_zyte_api._page_inputs import CapturedResponse, NetworkCapture
-from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
+from scrapy_zyte_api._session import (
+    PROVIDER_SESSIONS_META_KEY,
+    ScrapyZyteAPISessionDownloaderMiddleware,
+    Session,
+)
+from scrapy_zyte_api.utils import (
+    _ENGINE_HAS_DOWNLOAD_ASYNC,
+    _get_downloader_middleware,
+    maybe_deferred_to_future,
+)
 
 _PROVIDER_META_CACHE_MAX_SIZE = 1024
 _provider_meta_caches: WeakKeyDictionary = WeakKeyDictionary()
@@ -400,6 +409,11 @@ class ZyteApiProvider(PageObjectInputProvider):
             meta={
                 "zyte_api": zyte_api_meta,
                 "zyte_api_default_params": False,
+                # Shared with the source request, so that discarding its
+                # session also discards the session used here.
+                PROVIDER_SESSIONS_META_KEY: request.meta.setdefault(
+                    PROVIDER_SESSIONS_META_KEY, []
+                ),
             },
             callback=NO_CALLBACK,
         )
@@ -528,3 +542,19 @@ class ZyteApiProvider(PageObjectInputProvider):
                 result = AnnotatedInstance(result, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(result)
         return results
+
+
+class ZyteApiSessionProvider(PageObjectInputProvider):
+    """Provides :class:`~scrapy_zyte_api.Session`."""
+
+    name = "zyte_api_session"
+
+    provided_classes = {Session}
+
+    def __call__(
+        self, to_provide: Set[Callable], request: Request, crawler: Crawler
+    ) -> Sequence[Any]:
+        middleware = _get_downloader_middleware(
+            crawler, ScrapyZyteAPISessionDownloaderMiddleware
+        )
+        return [Session(middleware=middleware, request=request)]

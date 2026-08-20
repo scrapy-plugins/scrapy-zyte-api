@@ -108,7 +108,10 @@ class Addon:
         except ImportError:
             pass
         else:
-            from scrapy_zyte_api.providers import ZyteApiProvider  # noqa: PLC0415
+            from scrapy_zyte_api.providers import (  # noqa: PLC0415
+                ZyteApiProvider,
+                ZyteApiSessionProvider,
+            )
 
             if not _POET_ADDON_SUPPORT:
                 _setdefault(
@@ -116,3 +119,4 @@ class Addon:
                 )
 
             _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiProvider, 1100)
+            _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiSessionProvider, 1101)

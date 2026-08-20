@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from scrapy import Request, Spider
 from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
@@ -49,9 +51,10 @@ except ImportError:
     POET = False
     InjectionMiddleware = None  # type: ignore[assignment,misc]
     ZyteApiProvider: type | None = None
+    ZyteApiSessionProvider: type | None = None
 else:
     POET = True
-    from scrapy_zyte_api.providers import ZyteApiProvider
+    from scrapy_zyte_api.providers import ZyteApiProvider, ZyteApiSessionProvider
 
 _crawler = get_crawler()
 BASELINE_SETTINGS = _crawler.settings.copy_to_dict()
@@ -321,10 +324,15 @@ EXPECTED_DOWNLOADER_MIDDLEWARES = {
 if not _POET_ADDON_SUPPORT:
     EXPECTED_DOWNLOADER_MIDDLEWARES[InjectionMiddleware] = 543
 
+EXPECTED_POET_PROVIDERS: dict[Any, int] = {}
+if POET:
+    EXPECTED_POET_PROVIDERS[ZyteApiProvider] = 1100
+    EXPECTED_POET_PROVIDERS[ZyteApiSessionProvider] = 1101
+
 _SESSIONS_BASE_EXPECTED = dict(BASE_EXPECTED)
 if POET:
     _SESSIONS_BASE_EXPECTED["DOWNLOADER_MIDDLEWARES"] = EXPECTED_DOWNLOADER_MIDDLEWARES
-    _SESSIONS_BASE_EXPECTED["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
+    _SESSIONS_BASE_EXPECTED["SCRAPY_POET_PROVIDERS"] = EXPECTED_POET_PROVIDERS
 
 
 @pytest.mark.parametrize(
@@ -367,9 +375,7 @@ def test_sessions_setting_changes(initial_settings, expected_settings):
             {
                 **BASE_EXPECTED,
                 "DOWNLOADER_MIDDLEWARES": EXPECTED_DOWNLOADER_MIDDLEWARES,
-                "SCRAPY_POET_PROVIDERS": {
-                    ZyteApiProvider: 1100,
-                },
+                "SCRAPY_POET_PROVIDERS": EXPECTED_POET_PROVIDERS,
             },
         ),
     ],

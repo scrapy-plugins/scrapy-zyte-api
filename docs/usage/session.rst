@@ -282,6 +282,88 @@ redirect entirely:
     580 and :class:`~scrapy.downloadermiddlewares.retry.RetryMiddleware` at
     550) is correct.
 
+.. _session-discard:
+
+Discarding sessions
+===================
+
+:ref:`Session validity checks <session-check>` run before your spider callbacks
+and page objects see a response. Sometimes, though, you only find out that a
+session is no longer good while parsing, e.g. because an expected field is
+missing from an item. In those scenarios you can discard the session that was
+used to get the data you are parsing.
+
+Discarding a session removes it from its :ref:`pool <session-pools>` and
+triggers the start of a new session to replace it, as if the session had failed
+a :ref:`session validity check <session-check>`.
+
+.. _session-discard-crawler:
+
+Discarding a session through the crawler
+----------------------------------------
+
+Get the session downloader middleware from the crawler, and call its
+:meth:`~scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware.discard_session`
+method:
+
+.. code-block:: python
+
+    from scrapy.downloadermiddlewares.retry import get_retry_request
+
+    from scrapy_zyte_api import ScrapyZyteAPISessionDownloaderMiddleware
+
+
+    class MySpider(Spider):
+        name = "my_spider"
+
+        def parse(self, response):
+            if not response.css(".price"):
+                middleware = self.crawler.get_downloader_middleware(
+                    ScrapyZyteAPISessionDownloaderMiddleware
+                )
+                middleware.discard_session(response)
+                yield get_retry_request(response.request, spider=self, reason="no_price")
+
+.. note:: :meth:`Crawler.get_downloader_middleware()
+    <scrapy.crawler.Crawler.get_downloader_middleware>` requires Scrapy 2.12+.
+    On earlier versions, find the middleware yourself:
+
+    .. code-block:: python
+
+        for middleware in self.crawler.engine.downloader.middleware.middlewares:
+            if isinstance(middleware, ScrapyZyteAPISessionDownloaderMiddleware):
+                break
+
+.. _session-discard-page-object:
+
+Discarding a session from a page object
+---------------------------------------
+
+Declare a :class:`~scrapy_zyte_api.Session` dependency and call its
+:meth:`~scrapy_zyte_api.Session.discard` method. To get the underlying request
+retried, raise :exc:`web_poet.exceptions.Retry`, which :ref:`scrapy-poet
+<scrapy-poet>` handles for you:
+
+.. code-block:: python
+
+    import attrs
+    from web_poet import WebPage
+    from web_poet.exceptions import Retry
+    from zyte_common_items import Product
+
+    from scrapy_zyte_api import Session
+
+
+    @attrs.define
+    class MyProductPage(WebPage[Product]):
+        session: Session
+
+        async def to_item(self):
+            if not self.css(".price"):
+                self.session.discard()
+                raise Retry
+            ...
+
 
 .. _session-pools:
 
@@ -463,42 +545,28 @@ reusability purposes, you might want to define different session configs for
 different websites.
 
 The default session config is implemented by the
-:class:`~scrapy_zyte_api.SessionConfig` class:
-
-.. autoclass:: scrapy_zyte_api.SessionConfig
-    :members:
+:class:`~scrapy_zyte_api.SessionConfig` class.
 
 To define a different session config for a given URL pattern, install
 :doc:`web-poet <web-poet:index>` and define a subclass of
 :class:`~scrapy_zyte_api.SessionConfig` decorated with
-:func:`~scrapy_zyte_api.session_config`:
-
-.. autofunction:: scrapy_zyte_api.session_config
+:func:`~scrapy_zyte_api.session_config`.
 
 If you only need to override the :meth:`SessionConfig.check
 <scrapy_zyte_api.SessionConfig.check>` or :meth:`SessionConfig.params
 <scrapy_zyte_api.SessionConfig.params>` methods for scenarios involving a
 location, you may subclass :class:`~scrapy_zyte_api.LocationSessionConfig`
-instead:
-
-.. autoclass:: scrapy_zyte_api.LocationSessionConfig
-    :members: location_check, location_params
+instead.
 
 If in a session config implementation or in any other Scrapy component you need
 to tell whether a request is a :ref:`session initialization request
-<session-init>` or not, use :func:`~scrapy_zyte_api.is_session_init_request`:
+<session-init>` or not, use :func:`~scrapy_zyte_api.is_session_init_request`.
 
-.. autofunction:: scrapy_zyte_api.is_session_init_request
-
-To get the session ID of a given request, use:
-
-.. autofunction:: scrapy_zyte_api.get_request_session_id
+To get the session ID of a given request, use
+:func:`~scrapy_zyte_api.get_request_session_id`.
 
 Classes decorated with :func:`~scrapy_zyte_api.session_config` are registered
-into :data:`~scrapy_zyte_api.session_config_registry`:
-
-.. autodata:: scrapy_zyte_api.session_config_registry
-    :annotation:
+into :data:`~scrapy_zyte_api.session_config_registry`.
 
 .. _session-cookies:
 
@@ -538,15 +606,10 @@ sessions.
 Session retry policies
 ======================
 
-The following retry policies are designed to work well with session management
-(see :ref:`enable-sessions`). They are meant for
-:setting:`ZYTE_API_SESSION_RETRY_POLICY`:
-
-.. autodata:: scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY
-    :annotation:
-
-.. autodata:: scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY
-    :annotation:
+:data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY` and
+:data:`~scrapy_zyte_api.SESSION_AGGRESSIVE_RETRY_POLICY` are designed to work
+well with session management (see :ref:`enable-sessions`). They are meant for
+:setting:`ZYTE_API_SESSION_RETRY_POLICY`.
 
 
 Spider closers
