@@ -1,5 +1,5 @@
 import hashlib
-from copy import copy
+from copy import copy, deepcopy
 
 import pytest
 from packaging.version import Version
@@ -16,7 +16,7 @@ from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
 from scrapy_zyte_api._request_fingerprinter import _ProviderPlanData
 from scrapy_zyte_api.utils import _build_from_crawler  # type: ignore[attr-defined]
 
-from . import SETTINGS, get_crawler
+from . import SETTINGS, get_crawler, get_download_handler
 
 try:
     import scrapy_poet
@@ -127,6 +127,85 @@ async def test_headers():
     fingerprint1 = fingerprinter.fingerprint(request1)
     fingerprint2 = fingerprinter.fingerprint(request2)
     assert fingerprint1 == fingerprint2
+
+
+@deferred_f_from_coro_f
+async def test_cookies():
+    crawler = await get_crawler()
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
+    request1 = Request(
+        "https://example.com",
+        meta={
+            "zyte_api": {
+                "responseCookies": False,
+                "requestCookies": [{"name": "foo", "value": "bar"}],
+                "cookieManagement": "discard",
+                "experimental": {
+                    "responseCookies": False,
+                    "requestCookies": [{"name": "foo", "value": "bar"}],
+                    "cookieManagement": "discard",
+                },
+            }
+        },
+    )
+    # Same with responseCookies set to `True`.
+    request2 = Request(
+        "https://example.com",
+        meta={
+            "zyte_api": {
+                "responseCookies": True,
+                "requestCookies": [{"name": "foo", "value": "bar"}],
+                "cookieManagement": "discard",
+                "experimental": {
+                    "responseCookies": False,
+                    "requestCookies": [{"name": "foo", "value": "bar"}],
+                    "cookieManagement": "discard",
+                },
+            }
+        },
+    )
+    # Same with experimental.responseCookies set to `True`.
+    request3 = Request(
+        "https://example.com",
+        meta={
+            "zyte_api": {
+                "requestCookies": [{"name": "foo", "value": "bar"}],
+                "cookieManagement": "discard",
+                "experimental": {
+                    "responseCookies": True,
+                    "requestCookies": [{"name": "foo", "value": "bar"}],
+                    "cookieManagement": "discard",
+                },
+            }
+        },
+    )
+    request4 = Request("https://example.com", meta={"zyte_api": True})
+    fingerprint1 = fingerprinter.fingerprint(request1)
+    fingerprint2 = fingerprinter.fingerprint(request2)
+    fingerprint3 = fingerprinter.fingerprint(request3)
+    fingerprint4 = fingerprinter.fingerprint(request4)
+    assert fingerprint1 != fingerprint2
+    assert fingerprint1 != fingerprint3
+    assert fingerprint1 == fingerprint4
+    assert fingerprint2 == fingerprint3
+
+
+@deferred_f_from_coro_f
+async def test_cookies_default_params():
+    """Fingerprinting must not alter the default parameters, which are shared
+    with the download handler and with later requests."""
+    default_params = {"experimental": {"responseCookies": True}}
+    crawler = await get_crawler({"ZYTE_API_DEFAULT_PARAMS": deepcopy(default_params)})
+    fingerprinter = _build_from_crawler(ScrapyZyteAPIRequestFingerprinter, crawler)
+    param_parser = get_download_handler(crawler, "https")._param_parser
+
+    def parse():
+        return param_parser.parse(Request("https://example.com", meta={"zyte_api": {}}))
+
+    expected_params = parse()
+    fingerprinter.fingerprint(Request("https://example.com", meta={"zyte_api": {}}))
+    assert parse() == expected_params
+    assert crawler.settings["ZYTE_API_DEFAULT_PARAMS"] == default_params
 
 
 @pytest.mark.parametrize(
@@ -280,9 +359,7 @@ async def test_only_end_parameters_matter():
             "zyte_api": {
                 "httpResponseBody": True,
                 "httpResponseHeaders": True,
-                "experimental": {
-                    "responseCookies": True,
-                },
+                "responseCookies": True,
             }
         },
     )

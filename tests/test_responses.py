@@ -71,9 +71,7 @@ def raw_api_response_browser():
             {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
         ],
         "statusCode": 200,
-        "experimental": {
-            "responseCookies": INPUT_COOKIES,
-        },
+        "responseCookies": INPUT_COOKIES,
     }
 
 
@@ -87,9 +85,7 @@ def raw_api_response_body():
             {"name": "Content-Length", "value": str(len(PAGE_CONTENT))},
         ],
         "statusCode": 200,
-        "experimental": {
-            "responseCookies": INPUT_COOKIES,
-        },
+        "responseCookies": INPUT_COOKIES,
     }
 
 
@@ -104,9 +100,7 @@ def raw_api_response_mixed():
             {"name": "Content-Length", "value": str(len(PAGE_CONTENT_2))},
         ],
         "statusCode": 200,
-        "experimental": {
-            "responseCookies": INPUT_COOKIES,
-        },
+        "responseCookies": INPUT_COOKIES,
     }
 
 
@@ -574,6 +568,49 @@ def test_status_code(base_kwargs_func, kwargs, expected_status_code):
     response = _process_response(api_response, Request(api_response["url"]))
     assert response is not None
     assert response.status == expected_status_code
+
+
+@pytest.mark.parametrize(
+    "api_response",
+    [
+        {
+            "url": "https://example.com",
+            "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+            "statusCode": 200,
+            "responseCookies": INPUT_COOKIES,
+        },
+        {
+            "url": "https://example.com",
+            "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+            "statusCode": 200,
+            "experimental": {
+                "responseCookies": INPUT_COOKIES,
+            },
+        },
+        {
+            "url": "https://example.com",
+            "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+            "statusCode": 200,
+            "responseCookies": INPUT_COOKIES,
+            "experimental": {
+                "responseCookies": [
+                    {
+                        "name": "foo",
+                        "value": "bar",
+                    },
+                ],
+            },
+        },
+    ],
+)
+def test_cookies(api_response, caplog):
+    with caplog.at_level("WARNING"):
+        response = _process_response(api_response, Request(api_response["url"]))
+    assert response is not None
+    assert response.headers == OUTPUT_COOKIE_HEADERS
+    # Do not warn about the deprecated experimental.responseCookies response
+    # parameter, we already warn about it when found among request parameters.
+    assert not caplog.text
 
 
 XML_BODY = b'<?xml version="1.0"?><Error><Code>NoSuchKey</Code></Error>'

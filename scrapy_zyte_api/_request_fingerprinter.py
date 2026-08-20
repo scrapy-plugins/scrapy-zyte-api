@@ -38,6 +38,8 @@ else:
         if value.get("changes_fingerprint", True) and key != "url"
     )
 
+    _Undefined = object()
+
     class ScrapyZyteAPIRequestFingerprinter:
         @classmethod
         def from_crawler(cls, crawler):
@@ -99,7 +101,7 @@ else:
                 Request,
                 _ProviderPlanData,
             ] = WeakKeyDictionary()
-            self._param_parser = _ParamParser(crawler, cookies_enabled=False)
+            self._param_parser = _ParamParser(crawler)
             self._crawler = crawler
 
         def _normalize_params(self, api_params):
@@ -113,9 +115,21 @@ else:
                     api_params.pop("httpRequestText").encode()
                 ).decode()
 
+            # experimental is dropped below, so the deprecated cookie parameter
+            # within it is read out first, to keep fingerprints consistent
+            # regardless of the parameter name space.
+            experimental = api_params.get("experimental", {})
+            if (
+                "responseCookies" not in api_params
+                and "responseCookies" in experimental
+            ):
+                api_params["responseCookies"] = experimental["responseCookies"]
+
             for key, value in _REQUEST_PARAMS.items():
                 if not value.get("changes_fingerprint", True):
                     api_params.pop(key, None)
+                elif value["default"] == api_params.get(key, _Undefined):
+                    api_params.pop(key)
 
         @cached_property
         def _session_mw(self):

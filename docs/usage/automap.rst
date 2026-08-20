@@ -70,9 +70,7 @@ following parameters:
 
     {
         "browserHtml": true,
-        "experimental": {
-            "responseCookies": true
-        },
+        "responseCookies": true,
         "requestHeaders": {"referer": "https://example.com/"},
         "url": "https://quotes.toscrape.com"
     }

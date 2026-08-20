@@ -74,13 +74,17 @@ async def test_cookies(mockserver):
         },
     )
 
+    # Requests that get cookies also get the cookies that the response to the
+    # 1st request sets.
+    response_cookies = b"test_cookie=test_value; extra_cookie=extra_value"
+
     assert tracker.cookies == [
         # The 1st request sets cookies and disables session management, so
         # cookies are set.
         b"a=b",
         # The 2nd request disables session management, and gets the cookies set
         # by the previous request in the global cookiejar.
-        b"a=b",
+        b"a=b; " + response_cookies,
         # The 3rd request uses session management, and neither the session init
         # request nor the actual request using the session get cookies.
         None,
@@ -89,5 +93,5 @@ async def test_cookies(mockserver):
         # to ``False``, so while session init does not use cookies, the actual
         # request using the session gets the cookies.
         None,
-        b"a=b",
+        b"a=b; " + response_cookies,
     ]
