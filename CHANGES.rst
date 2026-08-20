@@ -1,6 +1,21 @@
 Changes
 =======
 
+0.36.0 (unreleased)
+-------------------
+
+-   Added support for running without a Twisted reactor, honoring Scrapy’s
+    :setting:`TWISTED_REACTOR_ENABLED <scrapy:TWISTED_REACTOR_ENABLED>`
+    setting (available since Scrapy 2.15).
+
+-   Fixed a bug where a request could be dropped as a duplicate when it only
+    differed from another request in the Zyte API parameters requested
+    through :class:`~scrapy_zyte_api.providers.ZyteApiProvider`, e.g. through
+    the ``zyte_api_provider`` request metadata key.
+
+-   Fixed a crash on the upcoming Scrapy 2.18 when building request headers
+    before the crawl starts.
+
 0.35.0 (2026-06-26)
 -------------------
 
