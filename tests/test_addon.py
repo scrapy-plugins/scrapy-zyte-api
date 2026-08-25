@@ -132,6 +132,21 @@ async def test_addon_fallback_explicit():
     assert isinstance(handler._fallback_handler, DummyDownloadHandler)
 
 
+def test_addon_disabled():
+    base = {
+        "DOWNLOAD_HANDLERS": {
+            "http": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
+            "https": "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler",
+        },
+    }
+    settings = Settings({**base, "ZYTE_API_ENABLED": False})
+    Addon().update_settings(settings)
+    assert (
+        settings.copy_to_dict()
+        == Settings({**base, "ZYTE_API_ENABLED": False}).copy_to_dict()
+    )
+
+
 @pytest.mark.skipif(
     not _REACTORLESS_SUPPORT,
     reason="TWISTED_REACTOR_ENABLED requires Scrapy >= 2.15",
