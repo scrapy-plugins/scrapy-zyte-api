@@ -183,9 +183,9 @@ class ZyteAPIResponse(ZyteAPIMixin, Response):
     pass
 
 
-_IMMUTABLE_JSON: TypeAlias = None | str | int | float | bool
+_IMMUTABLE_JSON: TypeAlias = str | int | float | bool | None
 _JSON: TypeAlias = (
-    None | str | int | float | bool | list["_JSON"] | dict[_IMMUTABLE_JSON, "_JSON"]
+    str | int | float | bool | list["_JSON"] | dict[_IMMUTABLE_JSON, "_JSON"] | None
 )
 _API_RESPONSE: TypeAlias = dict[str, _JSON]
 
