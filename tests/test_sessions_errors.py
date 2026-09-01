@@ -301,7 +301,10 @@ async def test_missing_session_id_on_response(mockserver, caplog):
     ("extra_settings", "expected_policy"),
     [
         # Default: SESSION_DEFAULT_RETRY_POLICY is applied.
-        ({}, "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY"),
+        (
+            {"ZYTE_API_RETRY_POLICY": None, "ZYTE_API_SESSION_RETRY_POLICY": None},
+            "scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY",
+        ),
         # Custom ZYTE_API_SESSION_RETRY_POLICY is applied.
         (
             {
@@ -466,6 +469,7 @@ async def test_custom_retry_policy_warning(mockserver, caplog):
         "ZYTE_API_TRANSPARENT_MODE": True,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_RETRY_POLICY": custom_policy,
+        "ZYTE_API_SESSION_RETRY_POLICY": None,
     }
 
     class TestSpider(Spider):
