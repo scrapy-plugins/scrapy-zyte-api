@@ -87,6 +87,8 @@ SETTINGS: SETTINGS_T = {
     "TELNETCONSOLE_ENABLED": False,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
     "ZYTE_API_KEY": _API_KEY,
+    "ZYTE_API_RETRY_POLICY": "tests._retry.POLICY",
+    "ZYTE_API_SESSION_RETRY_POLICY": "tests._retry.SESSION_POLICY",
 }
 if Version(SCRAPY_VERSION) < Version("2.12"):
     SETTINGS["REQUEST_FINGERPRINTER_IMPLEMENTATION"] = (
@@ -123,6 +125,8 @@ SETTINGS_ADDON: SETTINGS_T = {
     },
     "TELNETCONSOLE_ENABLED": False,
     "ZYTE_API_KEY": _API_KEY,
+    "ZYTE_API_RETRY_POLICY": "tests._retry.POLICY",
+    "ZYTE_API_SESSION_RETRY_POLICY": "tests._retry.SESSION_POLICY",
 }
 if _REACTORLESS:
     SETTINGS_ADDON["TWISTED_REACTOR_ENABLED"] = False
@@ -140,7 +144,7 @@ SESSION_SETTINGS: SETTINGS_T = {
     # Not 0: with no wait, the ZYTE_API_SESSION_QUEUE_MAX_ATTEMPTS budget is
     # spent on event loop iterations, which session initialization requests do
     # not have time to complete within.
-    "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0.001,
+    "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0.05,
     "ZYTE_API_SESSION_STATS_PER_POOL": True,
 }
 
@@ -197,7 +201,9 @@ async def make_handler(
         yield handler
     finally:
         if handler is not None:
-            await handler._close()
+            # close() also closes the fallback handlers, which would
+            # otherwise leak the connections that they keep open.
+            await _ensure_awaitable(handler.close())
 
 
 def serialize_settings(settings):

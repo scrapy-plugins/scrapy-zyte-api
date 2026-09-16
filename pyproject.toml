@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scrapy-zyte-api"
-version = "0.35.0"
+version = "0.36.0"
 description = "Client library to process URLs through Zyte API"
 authors = [{name = "Zyte Group Ltd", email = "info@zyte.com"}]
 license = "BSD-3-Clause"
@@ -48,7 +48,7 @@ source = "https://github.com/scrapy-plugins/scrapy-zyte-api"
 docs = "https://scrapy-zyte-api.readthedocs.io/en/latest/"
 
 [tool.bumpversion]
-current_version = "0.35.0"
+current_version = "0.36.0"
 commit = true
 tag = true
 tag_name = "{new_version}"
@@ -121,15 +121,37 @@ testpaths = [
 ]
 minversion = "6.0"
 filterwarnings = [
+    # Envs with pinned old dependencies opt out of this, see tox.ini.
+    "error",
     "ignore::DeprecationWarning:twisted\\.web\\.http",
     "ignore::DeprecationWarning:scrapy\\.core\\.downloader\\.contextfactory",  # https://github.com/scrapy/scrapy/issues/3288
 
-    # scrapy-poet warnings for Scrapy 2.14:
-    "ignore:CollectorPipeline\\.:scrapy.exceptions.ScrapyDeprecationWarning",
-    "ignore:DownloaderStatsMiddleware\\.:scrapy.exceptions.ScrapyDeprecationWarning",
-    "ignore:.*?InjectionMiddleware\\.:scrapy.exceptions.ScrapyDeprecationWarning",
-    "ignore:RetryMiddleware\\.process_spider_exception\\(\\):scrapy.exceptions.ScrapyDeprecationWarning",
-    "ignore::scrapy.exceptions.ScrapyDeprecationWarning:scrapy_poet",
+    # scrapy-poet warnings for Scrapy 2.14. They match on the message, and not
+    # on ScrapyDeprecationWarning, because pytest imports the category that a
+    # filter names with the error filter already in place, and importing Scrapy
+    # emits warnings of its own on the oldest supported dependency versions.
+    "ignore:CollectorPipeline\\.",
+    "ignore:DownloaderStatsMiddleware\\.",
+    "ignore:.*?InjectionMiddleware\\.",
+    "ignore:RetryMiddleware\\.process_spider_exception\\(\\)",
+    "ignore:::scrapy_poet",
+
+    # The scrapy-poet mock server leaks the socket it uses to find a free port
+    # and the pipe it reads the server URL from. They are collected at an
+    # arbitrary point, sometimes while finalizing objects, hence the second
+    # pair of filters, and never from the same module, hence matching on the
+    # object repr rather than on the module.
+    "ignore:unclosed <socket\\.socket:ResourceWarning",
+    "ignore:unclosed file <_io\\.BufferedReader:ResourceWarning",
+    "ignore:.*<socket\\.socket fd=:pytest.PytestUnraisableExceptionWarning",
+    "ignore:.*<_io\\.FileIO name=:pytest.PytestUnraisableExceptionWarning",
+
+    # The scrapy-crawlera and scrapy-zyte-smartproxy middlewares still declare
+    # a spider parameter in their method signatures.
+    "ignore:(Crawlera|ZyteSmartProxy)Middleware\\.",
+
+    # CI runs without coverage pass --no-cov, which pytest-cov reports.
+    "ignore:Coverage disabled via --no-cov switch!",
 ]
 
 [tool.ruff.lint]
@@ -198,6 +220,8 @@ extend-select = [
     "YTT",
 ]
 ignore = [
+    # Do not catch blind exception
+    "BLE001",
     # Trailing comma missing
     "COM812",
     # Missing docstring in public module
@@ -244,6 +268,8 @@ ignore = [
     "PLR0913",
     # Too many statements
     "PLR0915",
+    # Too many positional arguments
+    "PLR0917",
     # Magic value used in comparison
     "PLR2004",
     # String contains ambiguous {}.
@@ -256,6 +282,8 @@ ignore = [
     "RUF012",
     # Use of `assert` detected
     "S101",
+    # Prefer `TypeError` exception for invalid type
+    "TRY004",
 ]
 
 [tool.ruff.lint.isort]
@@ -265,7 +293,7 @@ split-on-trailing-comma = false
 # we need to use typing.Set[] over modern alternatives with web-poet<0.19.0 && Python<3.11
 # see https://github.com/scrapinghub/web-poet/pull/219
 "scrapy_zyte_api/providers.py" = ["UP006", "UP035"]
-"tests/**" = ["S"]
+"tests/**" = ["S", "TRY002"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
