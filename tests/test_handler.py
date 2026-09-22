@@ -445,6 +445,18 @@ async def test_stats(mockserver):
 
 
 @deferred_f_from_coro_f
+async def test_error_type_stats(mockserver):
+    """Error types are reported as stats, always with a leading slash."""
+    async with make_handler({}, mockserver.urljoin("/")) as handler:
+        handler._client.agg_stats.api_error_types.update({"/a": 1, "b": 2, "": 3})
+        handler._update_stats({})
+        stats = handler._stats.get_stats()
+    assert stats["scrapy-zyte-api/error_types/a"] == 1
+    assert stats["scrapy-zyte-api/error_types/b"] == 2
+    assert stats["scrapy-zyte-api/error_types/<empty>"] == 3
+
+
+@deferred_f_from_coro_f
 async def test_single_client():
     """Make sure that the same Zyte API client is used by both download
     handlers."""
@@ -506,6 +518,7 @@ async def test_log_request_truncate(
     input_params = {
         "short": short_str,
         "long": long_str,
+        "number": 1,
         "list": [
             short_str,
             long_str,
@@ -526,6 +539,7 @@ async def test_log_request_truncate(
     expected_logged_params = {
         "short": short_str,
         "long": truncated_str,
+        "number": 1,
         "list": [
             short_str,
             truncated_str,

@@ -73,18 +73,12 @@ def _truncate_str(obj, index, text, limit):
 
 
 def _truncate(obj, limit):
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            if isinstance(value, str):
-                _truncate_str(obj, key, value, limit)
-            elif isinstance(value, (list, dict)):
-                _truncate(value, limit)
-    elif isinstance(obj, list):
-        for index, value in enumerate(obj):
-            if isinstance(value, str):
-                _truncate_str(obj, index, value, limit)
-            elif isinstance(value, (list, dict)):
-                _truncate(value, limit)
+    items = obj.items() if isinstance(obj, dict) else enumerate(obj)
+    for index, value in items:
+        if isinstance(value, str):
+            _truncate_str(obj, index, value, limit)
+        elif isinstance(value, (list, dict)):
+            _truncate(value, limit)
 
 
 def _load_retry_policy(settings):

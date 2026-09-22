@@ -77,8 +77,10 @@ async def test_init_session_chain(mockserver):
 
 @deferred_f_from_coro_f
 async def test_init_session_overrides(mockserver):
-    """Setting session=None suppresses session injection; setting
-    dont_merge_cookies explicitly in meta overrides the default True."""
+    """Setting session=None suppresses session injection, setting
+    dont_merge_cookies explicitly in meta overrides the default True, a session
+    ID set in meta is kept, and requests that do not define Zyte API parameters
+    in meta get no session."""
     results = []
 
     @session_config(["example.com"])
@@ -99,12 +101,23 @@ async def test_init_session_overrides(mockserver):
                     },
                 )
             )
+            r3 = await download(
+                Request("https://example.com", meta={"zyte_api_automap": True})
+            )
+            r4 = await download(
+                Request(
+                    "https://example.com",
+                    meta={"zyte_api": {"browserHtml": True, "session": {"id": "a"}}},
+                )
+            )
             results.append(
                 {
                     "session_suppressed": "session" not in r1.raw_api_response,
                     "dont_merge_cookies_override": r2.request.meta.get(
                         "dont_merge_cookies"
                     ),
+                    "automap_session": r3.raw_api_response.get("session"),
+                    "custom_session": r4.raw_api_response["session"],
                 }
             )
             return True
@@ -126,7 +139,12 @@ async def test_init_session_overrides(mockserver):
     await maybe_deferred_to_future(crawler.crawl())
 
     assert results == [
-        {"session_suppressed": True, "dont_merge_cookies_override": False}
+        {
+            "session_suppressed": True,
+            "dont_merge_cookies_override": False,
+            "automap_session": None,
+            "custom_session": {"id": "a"},
+        }
     ]
     assert_session_stats(crawler, {"example.com": (1, 1)})
 

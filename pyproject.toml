@@ -20,6 +20,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
 ]
 requires-python = ">=3.10"
 # Sync with [min] @ tox.ini
@@ -79,6 +81,12 @@ omit = [
 ]
 disable_warnings = [
     "include-ignored",
+]
+
+[tool.coverage.report]
+exclude_also = [
+    # Type-checking-only branches.
+    "if not TYPE_CHECKING:",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -299,4 +307,4 @@ split-on-trailing-comma = false
 convention = "pep257"
 
 [tool.sphinx-scrapy]
-python-version = "3.13"  # Keep in sync with .github/workflows/test.yml.
+python-version = "3.14"  # Keep in sync with .github/workflows/test.yml.
