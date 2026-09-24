@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from base64 import b64decode
+from base64 import b64decode, b64encode
 from copy import copy
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
@@ -22,8 +22,15 @@ from scrapy_zyte_api.utils import (
 _DEFAULT_ENCODING = "utf-8"
 
 
+def _without(api_response: dict, key: str | None) -> dict:
+    if key is None:
+        return api_response
+    return {k: v for k, v in api_response.items() if k != key}
+
+
 class ZyteAPIMixin:
     url: str
+    body: bytes
 
     REMOVE_HEADERS = {
         # Zyte API already decompresses the HTTP Response Body. Scrapy's
@@ -35,6 +42,10 @@ class ZyteAPIMixin:
     def __init__(self, *args, raw_api_response: dict | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._raw_api_response = raw_api_response
+        # Field removed from _raw_api_response because it can be rebuilt from
+        # the response body, which the raw_api_response property does on
+        # first access.
+        self._body_field: str | None = None
         if not _RESPONSE_HAS_ATTRIBUTES:
             self.attributes: tuple[str, ...] = (
                 "url",
@@ -54,10 +65,19 @@ class ZyteAPIMixin:
     def replace(self, *args, **kwargs):
         if kwargs.get("raw_api_response"):
             raise ValueError("Replacing the value of 'raw_api_response' isn't allowed.")
+        body_field = None
+        if "body" not in kwargs and kwargs.get("encoding") == getattr(
+            self, "encoding", None
+        ):
+            kwargs["raw_api_response"] = self._raw_api_response
+            body_field = self._body_field
         for attribute in self.attributes:
-            kwargs.setdefault(attribute, getattr(self, attribute))
+            if attribute not in kwargs:
+                kwargs[attribute] = getattr(self, attribute)
         cls = kwargs.pop("cls", self.__class__)
-        return cls(*args, **kwargs)
+        response = cls(*args, **kwargs)
+        response._body_field = body_field
+        return response
 
     @property
     def raw_api_response(self) -> dict | None:
@@ -65,6 +85,14 @@ class ZyteAPIMixin:
 
         For the full list of parameters, see :ref:`zapi-reference`.
         """
+        if self._body_field is not None:
+            assert self._raw_api_response is not None
+            if self._body_field == "browserHtml":
+                value = cast("TextResponse", self).text
+            else:
+                value = b64encode(self.body).decode()
+            self._raw_api_response[self._body_field] = value
+            self._body_field = None
         return self._raw_api_response
 
     @staticmethod
@@ -95,15 +123,23 @@ class ZyteAPIMixin:
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
-        return cls(
+        http_response_body = api_response.get("httpResponseBody")
+        body_field = (
+            "httpResponseBody"
+            if http_response_body and isinstance(http_response_body, str)
+            else None
+        )
+        response = cls(
             url=api_response["url"],
             status=api_response.get("statusCode") or 200,
             body=b64decode(api_response.get("httpResponseBody") or ""),
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response),
-            raw_api_response=api_response,
+            raw_api_response=_without(api_response, body_field),
         )
+        response._body_field = body_field
+        return response
 
     @classmethod
     def _prepare_headers(cls, api_response: dict[str, Any]):
@@ -138,16 +174,20 @@ class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
-        body = None
+        body: str | bytes | None = None
         encoding = None
+        body_field = None
 
         if api_response.get("browserHtml"):
             encoding = _DEFAULT_ENCODING  # Zyte API has "utf-8" by default
-            body = api_response["browserHtml"].encode(encoding)
+            body = api_response["browserHtml"]
+            body_field = "browserHtml"
         elif api_response.get("httpResponseBody"):
             body = b64decode(api_response["httpResponseBody"])
+            if isinstance(api_response["httpResponseBody"], str):
+                body_field = "httpResponseBody"
 
-        return cls(
+        response = cls(
             url=api_response["url"],
             status=api_response.get("statusCode") or 200,
             body=body,
@@ -155,8 +195,10 @@ class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response),
-            raw_api_response=api_response,
+            raw_api_response=_without(api_response, body_field),
         )
+        response._body_field = body_field
+        return response
 
     def replace(self, *args, **kwargs):
         kwargs.setdefault("encoding", self.encoding)

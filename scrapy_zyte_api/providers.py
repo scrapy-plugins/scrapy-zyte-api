@@ -420,9 +420,14 @@ class ZyteApiProvider(PageObjectInputProvider):
             )
         api_response: ZyteAPITextResponse = await future
 
-        assert api_response.raw_api_response
+        raw_api_response = api_response._raw_api_response
+        assert raw_api_response
         if html_requested:
-            html = BrowserHtml(api_response.raw_api_response["browserHtml"])
+            html = BrowserHtml(
+                api_response.text
+                if api_response._body_field == "browserHtml"
+                else raw_api_response["browserHtml"]
+            )
         else:
             html = None
         if BrowserHtml in to_provide:
@@ -438,14 +443,14 @@ class ZyteApiProvider(PageObjectInputProvider):
             results.append(browser_response)
 
         if screenshot_requested:
-            screenshot_b64 = api_response.raw_api_response["screenshot"]
+            screenshot_b64 = raw_api_response["screenshot"]
             screenshot = Screenshot.from_base64(screenshot_b64)
             results.append(screenshot)
 
         if AnyResponse in to_provide:
             any_response = None  # type: ignore[assignment]
 
-            if "browserHtml" in api_response.raw_api_response:
+            if html is not None:
                 any_response = AnyResponse(
                     response=browser_response
                     or BrowserResponse(
@@ -455,9 +460,9 @@ class ZyteApiProvider(PageObjectInputProvider):
                     )
                 )
             elif (
-                "httpResponseBody" in api_response.raw_api_response
-                and "httpResponseHeaders" in api_response.raw_api_response
-            ):
+                api_response._body_field == "httpResponseBody"
+                or "httpResponseBody" in raw_api_response
+            ) and "httpResponseHeaders" in raw_api_response:
                 any_response = AnyResponse(
                     response=HttpResponse(
                         url=api_response.url,
@@ -481,10 +486,10 @@ class ZyteApiProvider(PageObjectInputProvider):
                 continue
             if cls_stripped is Actions and is_typing_annotated(cls):
                 actions_result: list[_ActionResult] | None
-                if "actions" in api_response.raw_api_response:
+                if "actions" in raw_api_response:
                     actions_result = [
                         _ActionResult(**action_result)
-                        for action_result in api_response.raw_api_response["actions"]
+                        for action_result in raw_api_response["actions"]
                     ]
                 else:
                     actions_result = None
@@ -494,13 +499,13 @@ class ZyteApiProvider(PageObjectInputProvider):
             if cls_stripped is NetworkCapture and is_typing_annotated(cls):
                 captured = [
                     CapturedResponse.from_dict(item)
-                    for item in api_response.raw_api_response.get("networkCapture", [])
+                    for item in raw_api_response.get("networkCapture", [])
                 ]
                 result = AnnotatedInstance(NetworkCapture(captured), cls.__metadata__)  # type: ignore[attr-defined]
                 results.append(result)
                 continue
             if cls_stripped is CustomAttributes and is_typing_annotated(cls):
-                custom_attrs_result = api_response.raw_api_response["customAttributes"]
+                custom_attrs_result = raw_api_response["customAttributes"]
                 result = AnnotatedInstance(
                     CustomAttributes(
                         CustomAttributesValues(custom_attrs_result["values"]),
@@ -513,7 +518,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                 results.append(result)
                 continue
             if cls_stripped is CustomAttributesValues and is_typing_annotated(cls):
-                custom_attrs_result = api_response.raw_api_response["customAttributes"]
+                custom_attrs_result = raw_api_response["customAttributes"]
                 result = AnnotatedInstance(
                     CustomAttributesValues(custom_attrs_result["values"]),
                     cls.__metadata__,  # type: ignore[attr-defined]
@@ -524,7 +529,7 @@ class ZyteApiProvider(PageObjectInputProvider):
             if not kw:
                 continue
             assert issubclass(cls_stripped, Item)
-            result = cls_stripped.from_dict(api_response.raw_api_response[kw])
+            result = cls_stripped.from_dict(raw_api_response[kw])
             if is_typing_annotated(cls):
                 result = AnnotatedInstance(result, cls.__metadata__)  # type: ignore[attr-defined]
             results.append(result)

@@ -515,7 +515,7 @@ class SessionConfig:
         if self._checker:
             return self._checker.check(response, request)
 
-        response_actions = response.raw_api_response.get("actions", [])  # type: ignore[attr-defined]
+        response_actions = response._raw_api_response.get("actions", [])  # type: ignore[attr-defined]
 
         if self.location(request):
             for action in response_actions:
@@ -1114,7 +1114,7 @@ class _SessionManager:
         outcome = "passed" if result else "failed"
         self._inc_stat(f"init/check-{outcome}", pool)
         if cookies_mode and result and _init_responses:
-            self._cookie_jar[session_id] = _init_responses[-1].raw_api_response.get(
+            self._cookie_jar[session_id] = _init_responses[-1]._raw_api_response.get(
                 "responseCookies", []
             )
         return result
@@ -1289,7 +1289,7 @@ class _SessionManager:
                                 f"{COOKIE_SESSION_ID_META_KEY!r} meta key of "
                                 f"request {request}."
                             )
-                        new_cookies = getattr(response, "raw_api_response", {}).get(
+                        new_cookies = getattr(response, "_raw_api_response", {}).get(
                             "responseCookies", []
                         )
                         self._merge_cookies(session_id, new_cookies)
