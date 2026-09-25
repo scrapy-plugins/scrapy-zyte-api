@@ -1,9 +1,13 @@
+from collections.abc import AsyncIterator, Iterable
 from logging import getLogger
+from typing import Any
 from warnings import warn
 
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest, ScrapyDeprecationWarning
+from scrapy.http import Response
 from scrapy.utils.python import global_object_name
+from typing_extensions import Self
 from zyte_api import RequestError
 
 from ._params import _ParamParser
@@ -19,6 +23,61 @@ from .utils import (
 
 logger = getLogger(__name__)
 _start_requests_processed = object()
+
+
+try:
+    from scrapy.spidermiddlewares.base import (
+        BaseSpiderMiddleware as _BaseSpiderMiddleware,
+    )
+except ImportError:  # pragma: no cover
+    # Scrapy < 2.13
+
+    class _BaseSpiderMiddleware:  # type: ignore[no-redef]
+        """Compatibility subset of Scrapy's BaseSpiderMiddleware."""
+
+        def __init__(self, crawler: Any) -> None:
+            self.crawler = crawler
+
+        @classmethod
+        def from_crawler(cls, crawler: Any) -> Self:
+            return cls(crawler)
+
+        def process_spider_output(
+            self,
+            response: Response,
+            result: Iterable[Any],
+            spider: Spider | None = None,
+        ) -> Iterable[Any]:
+            for item_or_request in result:
+                if (
+                    item_or_request := self._get_processed(item_or_request, response)
+                ) is not None:
+                    yield item_or_request
+
+        async def process_spider_output_async(
+            self,
+            response: Response,
+            result: AsyncIterator[Any],
+            spider: Spider | None = None,
+        ) -> AsyncIterator[Any]:
+            async for item_or_request in result:
+                if (
+                    item_or_request := self._get_processed(item_or_request, response)
+                ) is not None:
+                    yield item_or_request
+
+        def _get_processed(self, item_or_request: Any, response: Response) -> Any:
+            if isinstance(item_or_request, Request):
+                return self.get_processed_request(item_or_request, response)
+            return self.get_processed_item(item_or_request, response)
+
+        def get_processed_request(
+            self, request: Request, response: Response | None
+        ) -> Request | None:
+            return request
+
+        def get_processed_item(self, item: Any, response: Response | None) -> Any:
+            return item
 
 
 class _BaseMiddleware:
@@ -194,9 +253,10 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         _close_spider(self._crawler, "failed_forbidden_domain")
 
 
-class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
+class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware, _BaseSpiderMiddleware):
     def __init__(self, crawler):
-        super().__init__(crawler)
+        _BaseMiddleware.__init__(self, crawler)
+        _BaseSpiderMiddleware.__init__(self, crawler)
         if _LOG_DEFERRED_IS_DEPRECATED:
             self._send_signal = crawler.signals.send_catch_log_async
         else:
@@ -220,7 +280,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
             if isinstance(item_or_request, Request):
                 count += 1
                 item_or_request.meta["is_start_request"] = True
-                self._process_output_request(item_or_request)
+                self.get_processed_request(item_or_request, None)
             yield item_or_request
         await self._send_signal(_start_requests_processed, count=count)
 
@@ -230,7 +290,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
             if isinstance(item_or_request, Request):
                 count += 1
                 item_or_request.meta["is_start_request"] = True
-                self._process_output_request(item_or_request)
+                self.get_processed_request(item_or_request, None)
             yield item_or_request
         _schedule_coro(self._send_signal(_start_requests_processed, count=count))
 
@@ -239,51 +299,27 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):
             request.meta["_pre_mw_headers"] = self._get_header_set(request)
         self.slot_request(request)
 
-    def _process_output_item_or_request(self, item_or_request):
-        if not isinstance(item_or_request, Request):
-            return
-        self._process_output_request(item_or_request)
-
-    def process_spider_output(self, response, result, spider: Spider | None = None):
-        for item_or_request in result:
-            self._process_output_item_or_request(item_or_request)
-            yield item_or_request
-
-    async def process_spider_output_async(
-        self, response, result, spider: Spider | None = None
-    ):
-        async for item_or_request in result:
-            self._process_output_item_or_request(item_or_request)
-            yield item_or_request
+    def get_processed_request(
+        self, request: Request, response: Response | None
+    ) -> Request:
+        self._process_output_request(request)
+        return request
 
 
-class ScrapyZyteAPIRefererSpiderMiddleware:
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(crawler)
-
+class ScrapyZyteAPIRefererSpiderMiddleware(_BaseSpiderMiddleware):
     def __init__(self, crawler):
+        super().__init__(crawler)
         self._default_policy = crawler.settings.get(
             "ZYTE_API_REFERRER_POLICY", "no-referrer"
         )
         self._param_parser = _ParamParser(crawler, cookies_enabled=False)
 
-    def process_spider_output(self, response, result, spider: Spider | None = None):
-        for item_or_request in result:
-            self._process_output_item_or_request(item_or_request)
-            yield item_or_request
-
-    async def process_spider_output_async(
-        self, response, result, spider: Spider | None = None
-    ):
-        async for item_or_request in result:
-            self._process_output_item_or_request(item_or_request)
-            yield item_or_request
-
-    def _process_output_item_or_request(self, item_or_request):
-        if not isinstance(item_or_request, Request):
-            return
-        self._process_output_request(item_or_request)
+    def get_processed_request(
+        self, request: Request, response: Response | None
+    ) -> Request:
+        if response is not None:
+            self._process_output_request(request)
+        return request
 
     def _process_output_request(self, request: Request):
         if self._is_zyte_api_request(request):

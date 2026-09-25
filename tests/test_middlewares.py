@@ -10,10 +10,12 @@ from scrapy.utils.test import get_crawler
 
 from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
+    ScrapyZyteAPIRefererSpiderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
 from scrapy_zyte_api.responses import ZyteAPIResponse
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _ASYNC_START_SUPPORT,
     _GET_SLOT_NEEDS_SPIDER,
     _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT,
     _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER,
@@ -23,12 +25,33 @@ from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     maybe_deferred_to_future,
 )
 
+if _ASYNC_START_SUPPORT:
+    from scrapy.spidermiddlewares.base import BaseSpiderMiddleware
+
 from . import SETTINGS, deferred_f_from_coro_f, process_request
 from .mockserver import DelayedResource, MockServer
 
 
 class NamedSpider(Spider):
     name = "named"
+
+
+@pytest.mark.skipif(not _ASYNC_START_SUPPORT, reason="Scrapy < 2.13")
+def test_spider_middlewares_inherit_base_spider_middleware():
+    assert issubclass(ScrapyZyteAPISpiderMiddleware, BaseSpiderMiddleware)
+    assert issubclass(ScrapyZyteAPIRefererSpiderMiddleware, BaseSpiderMiddleware)
+
+
+@pytest.mark.skipif(not _ASYNC_START_SUPPORT, reason="Scrapy < 2.13")
+@deferred_f_from_coro_f
+async def test_referer_spider_middleware_does_not_process_start_requests():
+    crawler = get_crawler(settings_dict=SETTINGS)
+    middleware = _build_from_crawler(ScrapyZyteAPIRefererSpiderMiddleware, crawler)
+    request = Request("https://example.com", meta={"zyte_api": {}})
+
+    await start_request_processor(middleware, request)
+
+    assert "referrer_policy" not in request.meta
 
 
 async def request_processor(middleware, request: Request):
