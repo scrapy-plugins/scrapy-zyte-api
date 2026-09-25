@@ -42,15 +42,81 @@ def test_spider_middlewares_inherit_base_spider_middleware():
     assert issubclass(ScrapyZyteAPIRefererSpiderMiddleware, BaseSpiderMiddleware)
 
 
-@pytest.mark.skipif(not _ASYNC_START_SUPPORT, reason="Scrapy < 2.13")
+@pytest.mark.parametrize(
+    "middleware_cls",
+    [ScrapyZyteAPISpiderMiddleware, ScrapyZyteAPIRefererSpiderMiddleware],
+)
 @deferred_f_from_coro_f
-async def test_referer_spider_middleware_does_not_process_start_requests():
+async def test_spider_middleware_output_override_backward_compatibility(
+    middleware_cls: Any,
+):
+    class CustomMiddleware(middleware_cls):
+        def __init__(self, crawler):
+            super().__init__(crawler)
+            self.processed = []
+
+        def _process_output_item_or_request(self, item_or_request):
+            self.processed.append(item_or_request)
+
     crawler = get_crawler(settings_dict=SETTINGS)
-    middleware = _build_from_crawler(ScrapyZyteAPIRefererSpiderMiddleware, crawler)
-    request = Request("https://example.com", meta={"zyte_api": {}})
+    middleware = CustomMiddleware(crawler)
+    response = Response("https://example.com")
+    outputs = [Request("https://example.com/1"), {"key": "value"}]
+    args = (None,) if _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER else ()
+
+    assert list(middleware.process_spider_output(response, outputs, *args)) == outputs
+    assert middleware.processed == outputs
+
+    middleware.processed.clear()
+    async_result = [
+        output
+        async for output in middleware.process_spider_output_async(
+            response, aiter_(outputs), *args
+        )
+    ]
+    assert async_result == outputs
+    assert middleware.processed == outputs
+
+
+@deferred_f_from_coro_f
+async def test_spider_middleware_start_request_override_backward_compatibility():
+    class CustomMiddleware(ScrapyZyteAPISpiderMiddleware):
+        def __init__(self, crawler):
+            super().__init__(crawler)
+            self.processed = []
+
+        def _process_output_request(self, request):
+            self.processed.append(request)
+
+        def _process_output_item_or_request(self, item_or_request):
+            raise AssertionError
+
+    crawler = get_crawler(settings_dict=SETTINGS)
+    middleware = CustomMiddleware(crawler)
+    request = Request("https://example.com")
 
     await start_request_processor(middleware, request)
 
+    assert middleware.processed == [request]
+
+
+@pytest.mark.skipif(not _ASYNC_START_SUPPORT, reason="Scrapy < 2.13")
+@deferred_f_from_coro_f
+async def test_referer_spider_middleware_does_not_process_start_requests():
+    class CustomMiddleware(ScrapyZyteAPIRefererSpiderMiddleware):
+        def _process_output_item_or_request(self, item_or_request):
+            raise AssertionError
+
+    crawler = get_crawler(settings_dict=SETTINGS)
+    middleware = CustomMiddleware(crawler)
+    request = Request("https://example.com", meta={"zyte_api": {}})
+    item = {"key": "value"}
+
+    result = [
+        output async for output in middleware.process_start(aiter_([request, item]))
+    ]
+
+    assert result == [request, item]
     assert "referrer_policy" not in request.meta
 
 

@@ -280,7 +280,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware, _BaseSpiderMiddleware):
             if isinstance(item_or_request, Request):
                 count += 1
                 item_or_request.meta["is_start_request"] = True
-                self.get_processed_request(item_or_request, None)
+                self._process_output_request(item_or_request)
             yield item_or_request
         await self._send_signal(_start_requests_processed, count=count)
 
@@ -290,7 +290,7 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware, _BaseSpiderMiddleware):
             if isinstance(item_or_request, Request):
                 count += 1
                 item_or_request.meta["is_start_request"] = True
-                self.get_processed_request(item_or_request, None)
+                self._process_output_request(item_or_request)
             yield item_or_request
         _schedule_coro(self._send_signal(_start_requests_processed, count=count))
 
@@ -299,14 +299,27 @@ class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware, _BaseSpiderMiddleware):
             request.meta["_pre_mw_headers"] = self._get_header_set(request)
         self.slot_request(request)
 
+    def _process_output_item_or_request(self, item_or_request):
+        if not isinstance(item_or_request, Request):
+            return
+        self._process_output_request(item_or_request)
+
     def get_processed_request(
         self, request: Request, response: Response | None
     ) -> Request:
-        self._process_output_request(request)
+        self._process_output_item_or_request(request)
         return request
+
+    def get_processed_item(self, item: Any, response: Response | None) -> Any:
+        self._process_output_item_or_request(item)
+        return item
 
 
 class ScrapyZyteAPIRefererSpiderMiddleware(_BaseSpiderMiddleware):
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler)
+
     def __init__(self, crawler):
         super().__init__(crawler)
         self._default_policy = crawler.settings.get(
@@ -318,8 +331,18 @@ class ScrapyZyteAPIRefererSpiderMiddleware(_BaseSpiderMiddleware):
         self, request: Request, response: Response | None
     ) -> Request:
         if response is not None:
-            self._process_output_request(request)
+            self._process_output_item_or_request(request)
         return request
+
+    def get_processed_item(self, item: Any, response: Response | None) -> Any:
+        if response is not None:
+            self._process_output_item_or_request(item)
+        return item
+
+    def _process_output_item_or_request(self, item_or_request):
+        if not isinstance(item_or_request, Request):
+            return
+        self._process_output_request(item_or_request)
 
     def _process_output_request(self, request: Request):
         if self._is_zyte_api_request(request):
