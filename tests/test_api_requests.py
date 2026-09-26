@@ -2236,6 +2236,33 @@ UNSAFE_HEADER_HANDLING_SCENARIOS: list[dict[str, Any]] = [
             },
             [],
         ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "userHtml", "userHtml": "a"},
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "userHtml", "userHtml": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "userHtml", "userHtml": "a"},
+                EXTRACT_KEY_2: True,
+            },
+            {
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "userHtml", "userHtml": "a"},
+                EXTRACT_KEY_2: True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
         # Only *Options parameters matching enabled extraction outputs are
         # taken into account.
         (

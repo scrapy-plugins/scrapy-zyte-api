@@ -31,7 +31,8 @@ Automatic mapping
     :http:`request:requestHeaders` for browser requests. See
     :ref:`header-mapping` and :ref:`request-unsupported` for details.
 
-    If :http:`request:serp` is enabled, request header mapping is disabled.
+    If :http:`request:serp` is enabled, or all enabled automatic extraction
+    properties extract from ``userHtml``, request header mapping is disabled.
 
 -   If :setting:`ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED` is ``True``,
     :setting:`COOKIES_ENABLED <scrapy:COOKIES_ENABLED>` is ``True`` (default),

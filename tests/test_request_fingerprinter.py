@@ -450,6 +450,10 @@ def merge_dicts(*dicts):
                     "serp": True,
                     "serpOptions": {"extractFrom": "httpResponseBody"},
                 },
+                {
+                    "product": True,
+                    "productOptions": {"extractFrom": "userHtml", "userHtml": "a"},
+                },
                 # productOptions should not influence serp, or anything else if
                 # product is not enabled.
                 {
