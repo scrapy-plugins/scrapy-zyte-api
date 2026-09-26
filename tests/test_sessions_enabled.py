@@ -96,3 +96,26 @@ async def test_session_config_enabled(mockserver):
 
     # Clean up the session config registry.
     session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_non_http_scheme(mockserver):
+    settings = {
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_ENABLED": True,
+    }
+    responses = []
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["data:,a"]
+
+        def parse(self, response):
+            responses.append(response)
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert [response.text for response in responses] == ["a"]
+    assert crawler.stats.get_value("finish_reason") == "finished"
+    assert_session_stats(crawler, {"/use/disabled": 1})
