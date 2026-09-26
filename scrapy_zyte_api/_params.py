@@ -162,6 +162,13 @@ _REQUEST_PARAMS: dict[str, dict[str, Any]] = {
     "jobPostingNavigationOptions": {
         "default": {},
     },
+    "pageContent": {
+        "default": False,
+        "is_extract_type": True,
+    },
+    "pageContentOptions": {
+        "default": {},
+    },
     "product": {
         "default": False,
         "is_extract_type": True,
