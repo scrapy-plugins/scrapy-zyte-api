@@ -399,6 +399,12 @@ def merge_dicts(*dicts):
                 {"browserHtml": True, "screenshot": True},
                 {"product": True, "productOptions": {"extractFrom": "browserHtml"}},
                 {"serp": True, "serpOptions": {"extractFrom": "browserHtml"}},
+                {"product": True, "extractFrom": "browserHtml"},
+                {
+                    "product": True,
+                    "extractFrom": "httpResponseBody",
+                    "productOptions": {"extractFrom": "browserHtml"},
+                },
             )
         ),
         # If there is no clear indication of whether the requests is an HTTP
@@ -450,6 +456,9 @@ def merge_dicts(*dicts):
                     "serp": True,
                     "serpOptions": {"extractFrom": "httpResponseBody"},
                 },
+                {"product": True, "extractFrom": "httpResponseBody"},
+                # The root extractFrom does not apply to serp.
+                {"serp": True, "extractFrom": "browserHtml"},
                 # productOptions should not influence serp, or anything else if
                 # product is not enabled.
                 {

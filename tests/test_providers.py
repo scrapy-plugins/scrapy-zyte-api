@@ -33,6 +33,7 @@ from zyte_common_items import (
     CustomAttributesValues,
     Product,
     ProductNavigation,
+    Serp,
 )
 from zyte_common_items.fields import auto_field
 
@@ -666,6 +667,65 @@ def test_provider_meta_annotated_item_without_extract_from():
 
     assert meta == {"product": True}
     assert html_requested is False
+
+
+@pytest.mark.parametrize(
+    ("to_provide", "extract_from", "expected_meta", "expected_html_requested"),
+    [
+        (
+            {AnyResponse, Product},
+            "httpResponseBody",
+            {
+                "product": True,
+                "extractFrom": "httpResponseBody",
+                "httpResponseBody": True,
+                "httpResponseHeaders": True,
+            },
+            False,
+        ),
+        (
+            {AnyResponse, Product},
+            "browserHtml",
+            {"product": True, "extractFrom": "browserHtml", "browserHtml": True},
+            True,
+        ),
+        (
+            {AnyResponse, Annotated[Product, ExtractFrom.browserHtml]},
+            "httpResponseBody",
+            {
+                "product": True,
+                "productOptions": {"extractFrom": "browserHtml"},
+                "extractFrom": "httpResponseBody",
+                "browserHtml": True,
+            },
+            True,
+        ),
+        (
+            {AnyResponse},
+            "browserHtml",
+            {"httpResponseBody": True, "httpResponseHeaders": True},
+            False,
+        ),
+        ({Serp}, "browserHtml", {"serp": True}, False),
+    ],
+)
+def test_provider_meta_root_extract_from(
+    to_provide, extract_from, expected_meta, expected_html_requested
+):
+    class DummyCrawler:
+        settings = _DummySettings(
+            {"ZYTE_API_PROVIDER_PARAMS": {"extractFrom": extract_from}}
+        )
+
+    request = Request("https://example.com")
+    meta, html_requested = _build_zyte_api_provider_meta(
+        to_provide,
+        request,
+        DummyCrawler(),  # type: ignore[arg-type]
+    )
+
+    assert meta == expected_meta
+    assert html_requested is expected_html_requested
 
 
 def test_set_in_provider_meta_cache_disabled():
