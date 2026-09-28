@@ -5,7 +5,9 @@ from functools import partial
 from typing import Any, cast
 
 import pytest
+from packaging.version import Version
 from scrapy import Request
+from scrapy import __version__ as SCRAPY_VERSION
 from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
@@ -450,7 +452,7 @@ def test__process_response_body_and_headers(encoding, content_type):
             """<html><head><meta http-equiv="Content-Type" content="text/html; charset="gb2312"></head><body>✨</body></html>""",
             "✨",
             "gb18030",
-            None,
+            "gb18030" if Version(SCRAPY_VERSION) >= Version("2.19") else None,
         ),
     ],
 )
