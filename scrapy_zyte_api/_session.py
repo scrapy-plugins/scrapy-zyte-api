@@ -10,12 +10,14 @@ from functools import partial
 from logging import getLogger
 from typing import Any, TypedDict, cast
 from uuid import uuid4
+from warnings import warn
 from weakref import WeakKeyDictionary
 
 from scrapy import Request, Spider, signals
 from scrapy.crawler import Crawler
-from scrapy.exceptions import CloseSpider, IgnoreRequest
+from scrapy.exceptions import CloseSpider, IgnoreRequest, ScrapyDeprecationWarning
 from scrapy.http import Response
+from scrapy.settings import BaseSettings
 from scrapy.utils.httpobj import urlparse_cached
 from scrapy.utils.misc import load_object
 from scrapy.utils.python import global_object_name
@@ -174,12 +176,14 @@ class TooManyBadSessionInits(RuntimeError):
 class PoolConfig(TypedDict):
     id: str
     delay: NotRequired[float]
+    jitter: NotRequired[float]
     randomize_delay: NotRequired[bool]
     size: NotRequired[int]
 
 
 class PoolOptions(TypedDict):
     delay: NotRequired[float]
+    jitter: NotRequired[float]
     randomize_delay: NotRequired[bool]
     size: NotRequired[int]
 
@@ -806,6 +810,50 @@ session_config_registry = SessionConfigRulesRegistry()
 session_config = session_config_registry.session_config
 
 
+def _scrapy_jitter(settings: BaseSettings) -> float:
+    """Resolve DOWNLOAD_DELAY_JITTER against the deprecated
+    RANDOMIZE_DOWNLOAD_DELAY the way Scrapy does: the one set at the highest
+    priority wins, and DOWNLOAD_DELAY_JITTER wins ties."""
+    jitter_priority = settings.getpriority("DOWNLOAD_DELAY_JITTER")
+    randomize_priority = settings.getpriority("RANDOMIZE_DOWNLOAD_DELAY") or 0
+    if jitter_priority is None or jitter_priority < randomize_priority:
+        return 0.5 if settings.getbool("RANDOMIZE_DOWNLOAD_DELAY") else 0.0
+    return settings.getfloat("DOWNLOAD_DELAY_JITTER")
+
+
+def _settings_jitter(settings: BaseSettings) -> float:
+    default = _scrapy_jitter(settings)
+    if "ZYTE_API_SESSION_RANDOMIZE_DELAY" in settings:
+        warn(
+            "The ZYTE_API_SESSION_RANDOMIZE_DELAY setting is deprecated, use "
+            "ZYTE_API_SESSION_DELAY_JITTER instead: it takes the magnitude of "
+            "the random variation as a number, e.g. 0.5 for the ±50% that "
+            "ZYTE_API_SESSION_RANDOMIZE_DELAY enables, or 0 to disable it.",
+            ScrapyDeprecationWarning,
+            stacklevel=2,
+        )
+        default = 0.5 if settings.getbool("ZYTE_API_SESSION_RANDOMIZE_DELAY") else 0.0
+    return settings.getfloat("ZYTE_API_SESSION_DELAY_JITTER", default)
+
+
+def _pool_jitter(options: PoolOptions, default: float) -> float:
+    if "randomize_delay" in options:
+        warn(
+            "The randomize_delay session pool option is deprecated, use "
+            "jitter instead: it takes the magnitude of the random variation "
+            "as a number, e.g. 0.5 for the ±50% that randomize_delay enables, "
+            "or 0 to disable it.",
+            ScrapyDeprecationWarning,
+            stacklevel=2,
+        )
+        default = 0.5 if options["randomize_delay"] else 0.0
+    return options.get("jitter", default)
+
+
+def _jittered(delay: float, jitter: float) -> float:
+    return max(0.0, delay * (1 + random.uniform(-jitter, jitter)))  # noqa: S311
+
+
 class _SessionManager:
     def __init__(self, crawler: Crawler):
         self._crawler = crawler
@@ -822,13 +870,13 @@ class _SessionManager:
         self._default_pool_delay = settings.getfloat(
             "ZYTE_API_SESSION_DELAY", settings.getfloat("DOWNLOAD_DELAY")
         )
-        self._randomize_delay = settings.getbool(
-            "ZYTE_API_SESSION_RANDOMIZE_DELAY",
-            settings.getbool("RANDOMIZE_DOWNLOAD_DELAY"),
-        )
+        self._jitter = _settings_jitter(settings)
         self._default_pool_size = settings.getint("ZYTE_API_SESSION_POOL_SIZE", 8)
         self._pending_initial_sessions: dict[str, int] = {}
         self._pool_configs = settings.getdict("ZYTE_API_SESSION_POOLS")
+        for config in self._pool_configs.values():
+            if "randomize_delay" in config:
+                config["jitter"] = _pool_jitter(config, self._jitter)
         pool_sizes = settings.getdict("ZYTE_API_SESSION_POOL_SIZES")
         if pool_sizes:
             logger.warning(
@@ -1003,19 +1051,19 @@ class _SessionManager:
                         "PoolOptions", {k: v for k, v in pool.items() if k != "id"}
                     )
             delay = options.get("delay", self._default_pool_delay)
-            randomize_delay = options.get("randomize_delay", self._randomize_delay)
+            jitter = _pool_jitter(options, self._jitter)
             size = options.get("size", self._default_pool_size)
             if pool_id not in self._pool_configs:
                 self._pool_configs[pool_id] = {
                     "delay": delay,
                     "size": size,
-                    "randomize_delay": randomize_delay,
+                    "jitter": jitter,
                 }
                 self._pending_initial_sessions[pool_id] = size
             else:
                 config = self._pool_configs[pool_id]
                 config.setdefault("delay", delay)
-                config.setdefault("randomize_delay", randomize_delay)
+                config.setdefault("jitter", jitter)
                 if "size" not in config:
                     self._pending_initial_sessions[pool_id] = size
                 config.setdefault("size", size)
@@ -1138,13 +1186,9 @@ class _SessionManager:
                 if self._bad_inits[pool] >= self._max_bad_inits[pool]:
                     raise TooManyBadSessionInits
             pool_config = self._pool_configs[pool]
-            delay = pool_config["delay"]
-            sleep_delay = next_use_delay = delay
-            if pool_config["randomize_delay"]:
-                next_use_delay *= random.uniform(0.5, 1.5)  # noqa: S311
-                sleep_delay *= random.uniform(0.5, 1.5)  # noqa: S311
-            await sleep(sleep_delay)
-            next_use = time.time() + next_use_delay
+            delay, jitter = pool_config["delay"], pool_config["jitter"]
+            await sleep(_jittered(delay, jitter))
+            next_use = time.time() + _jittered(delay, jitter)
             self._queues[pool].append((session_id, next_use))
             return session_id
 
@@ -1179,9 +1223,7 @@ class _SessionManager:
                 await sleep(wait)
                 now = time.time()
             pool_config = self._pool_configs[pool]
-            next_use_delay = pool_config["delay"]
-            if pool_config["randomize_delay"]:
-                next_use_delay *= random.uniform(0.5, 1.5)  # noqa: S311
+            next_use_delay = _jittered(pool_config["delay"], pool_config["jitter"])
             self._queues[pool].append((session_id, now + next_use_delay))
             return session_id
 
