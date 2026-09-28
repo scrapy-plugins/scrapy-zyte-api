@@ -537,7 +537,18 @@ Increasing this number can reduce the number of ban-related session
 expirations, hence increasing the lifetime of each session. See
 :ref:`optimize-sessions`.
 
-.. seealso:: :setting:`ZYTE_API_SESSION_RANDOMIZE_DELAY`
+.. seealso:: :setting:`ZYTE_API_SESSION_DELAY_JITTER`
+
+.. setting:: ZYTE_API_SESSION_DELAY_JITTER
+
+ZYTE_API_SESSION_DELAY_JITTER
+=============================
+
+Default: :setting:`DOWNLOAD_DELAY_JITTER`
+
+Magnitude of the random variation applied to :setting:`ZYTE_API_SESSION_DELAY`
+each time it is used, e.g. ``0.5`` multiplies the delay by a random factor
+between 0.5 and 1.5, and ``0`` disables the variation.
 
 .. setting:: ZYTE_API_SESSION_ENABLED
 
@@ -706,8 +717,7 @@ corresponding setting for that pool:
 
 -   ``"delay"`` overrides :setting:`ZYTE_API_SESSION_DELAY`.
 
--   ``"randomize_delay"`` overrides
-    :setting:`ZYTE_API_SESSION_RANDOMIZE_DELAY`.
+-   ``"jitter"`` overrides :setting:`ZYTE_API_SESSION_DELAY_JITTER`.
 
 -   ``"size"`` overrides :setting:`ZYTE_API_SESSION_POOL_SIZE`.
 
@@ -785,16 +795,6 @@ already-set value.
 
 See :ref:`enable-sessions` for details.
 
-
-.. setting:: ZYTE_API_SESSION_RANDOMIZE_DELAY
-
-ZYTE_API_SESSION_RANDOMIZE_DELAY
-================================
-
-Default: :setting:`RANDOMIZE_DOWNLOAD_DELAY`
-
-If enabled, :setting:`ZYTE_API_SESSION_DELAY` is randomized each time it is
-used by multiplying it by a random factor between 0.5 and 1.5.
 
 .. setting:: ZYTE_API_SESSION_STATS_PER_POOL
 
