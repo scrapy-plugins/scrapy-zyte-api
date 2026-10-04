@@ -151,8 +151,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
 async def test_cookies():
     """Make sure that the downloader middleware does not crash on Zyte API
     requests with cookies."""
-    settings = {"ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True}
-    crawler = get_crawler(settings_dict=settings)
+    crawler = get_crawler()
     await maybe_deferred_to_future(crawler.crawl("a"))
     middleware = _build_from_crawler(ScrapyZyteAPIDownloaderMiddleware, crawler)
     request = Request(
