@@ -1,6 +1,6 @@
 from functools import cached_property
 from logging import getLogger
-from typing import TYPE_CHECKING, NamedTuple, cast
+from typing import TYPE_CHECKING, cast
 
 from ._session import ScrapyZyteAPISessionDownloaderMiddleware
 
@@ -25,12 +25,8 @@ else:
     from w3lib.url import canonicalize_url
 
     from ._params import _REQUEST_PARAMS, _may_use_browser, _ParamParser
+    from ._provider_params import _get_provider_plan_data, _ProviderPlanData
     from .utils import _build_from_crawler  # type: ignore[attr-defined]
-
-    class _ProviderPlanData(NamedTuple):
-        is_provider_only: bool
-        to_provide: frozenset[object] | None
-        http_response_available: bool
 
     _PROVIDER_FINGERPRINT_PARAM_KEYS = frozenset(
         key
@@ -95,10 +91,6 @@ else:
                 )
                 self._fallback_fingerprinter_is_poets = False
             self._cache: WeakKeyDictionary[Request, bytes] = WeakKeyDictionary()
-            self._provider_plan_data_cache: WeakKeyDictionary[
-                Request,
-                _ProviderPlanData,
-            ] = WeakKeyDictionary()
             self._param_parser = _ParamParser(crawler, cookies_enabled=False)
             self._crawler = crawler
 
@@ -165,79 +157,8 @@ else:
                 if key in _PROVIDER_FINGERPRINT_PARAM_KEYS
             }
 
-        def _analyze_provider_plan(
-            self,
-            request: Request,
-            plan,
-        ) -> _ProviderPlanData:
-            from scrapy_poet.injection import (  # noqa: PLC0415
-                get_callback,
-                is_callback_requiring_scrapy_response,
-            )
-            from web_poet import HttpResponse  # noqa: PLC0415
-
-            from .providers import ZyteApiProvider  # noqa: PLC0415
-
-            injector = self._injector
-            callback = get_callback(request, injector.spider)
-            scrapy_response_required = is_callback_requiring_scrapy_response(
-                callback,
-                request.callback,
-            )
-
-            remaining_dependencies = {
-                dependency for dependency, _kwargs in plan.dependencies
-            }
-            provided_dependencies: set = set()
-            zyte_api_provider_dependencies: frozenset[object] | None = None
-            http_response_available = False
-
-            for provider in injector.providers:
-                to_provide = {
-                    dependency
-                    for dependency in remaining_dependencies
-                    if provider.is_provided(dependency)
-                }
-                if not to_provide:
-                    continue
-
-                if injector.is_provider_requiring_scrapy_response[provider]:
-                    scrapy_response_required = True
-
-                if isinstance(provider, ZyteApiProvider):
-                    zyte_api_provider_dependencies = frozenset(to_provide)
-                    from andi.typeutils import strip_annotated  # noqa: PLC0415
-
-                    http_response_available = any(
-                        strip_annotated(dep) is HttpResponse
-                        for dep in provided_dependencies
-                    )
-
-                provided_dependencies |= to_provide
-                remaining_dependencies -= to_provide
-                if not remaining_dependencies:
-                    break
-
-            return _ProviderPlanData(
-                is_provider_only=not scrapy_response_required,
-                to_provide=zyte_api_provider_dependencies,
-                http_response_available=(
-                    http_response_available
-                    if zyte_api_provider_dependencies is not None
-                    else False
-                ),
-            )
-
         def _get_provider_plan_data(self, request: Request) -> _ProviderPlanData:
-            try:
-                return self._provider_plan_data_cache[request]
-            except KeyError:
-                pass
-
-            plan = self._injector.build_plan(request)
-            provider_plan_data = self._analyze_provider_plan(request, plan)
-            self._provider_plan_data_cache[request] = provider_plan_data
-            return provider_plan_data
+            return _get_provider_plan_data(self._injector, request)
 
         def _is_provider_only_request(self, request: Request) -> bool:
             if not self._fallback_fingerprinter_is_poets:

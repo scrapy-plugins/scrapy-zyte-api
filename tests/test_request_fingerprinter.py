@@ -13,7 +13,7 @@ if Version(SCRAPY_VERSION) < Version("2.7"):
 from scrapy import Request, Spider
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
-from scrapy_zyte_api._request_fingerprinter import _ProviderPlanData
+from scrapy_zyte_api._provider_params import _ProviderPlanData
 from scrapy_zyte_api.utils import _build_from_crawler  # type: ignore[attr-defined]
 
 from . import SETTINGS, get_crawler

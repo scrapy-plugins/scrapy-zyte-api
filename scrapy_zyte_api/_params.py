@@ -1230,6 +1230,33 @@ def _get_api_params(
     return api_params
 
 
+def _get_explicit_params(
+    request: Request,
+    *,
+    default_params: dict[str, Any],
+    automap_params: dict[str, Any],
+    transparent_mode: bool,
+) -> tuple[str, dict[str, Any]] | None:
+    """Return the request metadata key through which *request* defines its Zyte
+    API parameters, and those parameters as defined, i.e. before any parameter
+    is set automatically.
+
+    Return ``None`` if *request* is not a Zyte API request.
+    """
+    for meta_key, setting_params, default_enabled in (
+        ("zyte_api", default_params, False),
+        ("zyte_api_automap", automap_params, transparent_mode),
+    ):
+        meta_params = request.meta.get(meta_key, default_enabled)
+        if meta_params is False or (not meta_params and meta_params != {}):
+            continue
+        meta_params = _copy_meta_params_as_dict(
+            meta_params, param=meta_key, request=request
+        )
+        return meta_key, {**setting_params, **meta_params}
+    return None
+
+
 def _load_default_params(settings, setting):
     params = settings.getdict(setting)
     for param in list(params):
@@ -1346,6 +1373,15 @@ class _ParamParser:
         for name in request.meta.get("_pre_mw_headers", set()):
             result.pop(name, None)
         return result
+
+    def explicit_params(self, request):
+        use_default_params = request.meta.get("zyte_api_default_params", True)
+        return _get_explicit_params(
+            request,
+            default_params=self._default_params if use_default_params else {},
+            automap_params=self._automap_params,
+            transparent_mode=self._transparent_mode,
+        )
 
     def parse(self, request):
         dont_merge_cookies = request.meta.get("dont_merge_cookies", False)

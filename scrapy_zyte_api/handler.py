@@ -21,6 +21,7 @@ from zyte_api import AsyncZyteAPI, RequestError
 from zyte_api.apikey import NoApiKey
 
 from ._params import _ParamParser
+from ._provider_params import _merged_provider_request, _set_api_response
 from .responses import (
     ZyteAPIJsonResponse,
     ZyteAPIResponse,
@@ -227,12 +228,17 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         if self._fallback_handler is not None:
             yield self._fallback_handler
 
+    def _parse_params(self, request: Request) -> dict | None:
+        return self._param_parser.parse(
+            _merged_provider_request(request, self._crawler, self._param_parser)
+        )
+
     if _DOWNLOAD_REQUEST_RETURNS_DEFERRED:  # Scrapy < 2.14
 
         def download_request(
             self, request: Request, spider: Spider
         ) -> Deferred[Response | None]:
-            api_params = self._param_parser.parse(request)
+            api_params = self._parse_params(request)
             if api_params is not None:
                 return deferred_from_coro(self._download_request(api_params, request))
             fallback_handler = self._get_fallback_handler(request)
@@ -243,7 +249,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
     else:
 
         async def download_request(self, request: Request) -> Response | None:  # type: ignore[misc]
-            api_params = self._param_parser.parse(request)
+            api_params = self._parse_params(request)
             if api_params is not None:
                 return await self._download_request(api_params, request)
             fallback_handler = self._get_fallback_handler(request)
@@ -343,6 +349,8 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             ):
                 request.meta["download_latency"] = time.time() - start_time
             self._update_stats(api_params)
+
+        _set_api_response(request, api_response)
 
         response = _process_response(
             api_response=api_response, request=request, cookie_jars=self._cookie_jars
