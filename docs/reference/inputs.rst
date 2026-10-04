@@ -62,6 +62,9 @@ Built-in inputs
 .. autoclass:: scrapy_zyte_api.Screenshot
     :members:
 
+.. autoclass:: scrapy_zyte_api.Session
+    :members:
+
 
 Built-in input annotations
 ==========================

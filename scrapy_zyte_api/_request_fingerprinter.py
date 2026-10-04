@@ -25,7 +25,10 @@ else:
     from w3lib.url import canonicalize_url
 
     from ._params import _REQUEST_PARAMS, _may_use_browser, _ParamParser
-    from .utils import _build_from_crawler  # type: ignore[attr-defined]
+    from .utils import (  # type: ignore[attr-defined]
+        _build_from_crawler,
+        _get_downloader_middleware,
+    )
 
     class _ProviderPlanData(NamedTuple):
         is_provider_only: bool
@@ -119,25 +122,17 @@ else:
 
         @cached_property
         def _session_mw(self):
-            try:
-                mw = self._crawler.get_downloader_middleware(
-                    ScrapyZyteAPISessionDownloaderMiddleware
-                )
-            except AttributeError:  # Scrapy < 2.12
-                for component in self._crawler.engine.downloader.middleware.middlewares:
-                    if isinstance(component, ScrapyZyteAPISessionDownloaderMiddleware):
-                        mw = component
-                        break
-                else:
-                    mw = None
-            if mw is None:
+            mw = _get_downloader_middleware(
+                self._crawler, ScrapyZyteAPISessionDownloaderMiddleware
+            )
+            if mw is not None:
+                return mw
 
-                class NoOpSessionDownloaderMiddleware:
-                    def get_pool(self, request):
-                        return None
+            class NoOpSessionDownloaderMiddleware:
+                def get_pool(self, request):
+                    return None
 
-                mw = NoOpSessionDownloaderMiddleware()
-            return mw
+            return NoOpSessionDownloaderMiddleware()
 
         def _get_pool(self, request: Request) -> str | None:
             return self._session_mw.get_pool(request)

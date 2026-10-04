@@ -110,6 +110,10 @@ the ``scrapy-zyte-api`` prefix:
     Number of times that a response that used a session from pool ``{pool}``
     passed its session validation check.
 
+``scrapy-zyte-api/sessions/pools/{pool}/use/discarded``
+    Number of times that a session from pool ``{pool}`` was :ref:`discarded by
+    user code <session-discard>`.
+
 ``scrapy-zyte-api/sessions/pools/{pool}/use/expired``
     Number of times that a session from pool ``{pool}`` expired.
 

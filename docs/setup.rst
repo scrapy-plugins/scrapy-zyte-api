@@ -153,7 +153,7 @@ spider to use Zyte API for all requests, set the following setting as well:
     ZYTE_API_TRANSPARENT_MODE = True
 
 For :ref:`scrapy-poet integration <scrapy-poet>`, :ref:`configure scrapy-poet
-<scrapy-poet:setup>` first, and then add the following provider to the
+<scrapy-poet:setup>` first, and then add the following providers to the
 ``SCRAPY_POET_PROVIDERS`` setting:
 
 .. code-block:: python
@@ -161,6 +161,7 @@ For :ref:`scrapy-poet integration <scrapy-poet>`, :ref:`configure scrapy-poet
 
     SCRAPY_POET_PROVIDERS = {
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100,
+        "scrapy_zyte_api.providers.ZyteApiSessionProvider": 1101,
     }
 
 If you already had a custom value for :setting:`REQUEST_FINGERPRINTER_CLASS
