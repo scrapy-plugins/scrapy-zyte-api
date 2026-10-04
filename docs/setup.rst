@@ -141,6 +141,7 @@ scrapy-zyte-api integration as follows:
         "scrapy_zyte_api.ScrapyZyteAPISpiderMiddleware": 100,
         "scrapy_zyte_api.ScrapyZyteAPIRefererSpiderMiddleware": 1000,
     }
+    HTTPCACHE_POLICY = "scrapy_zyte_api.ScrapyZyteAPIHttpCachePolicy"
     REQUEST_FINGERPRINTER_CLASS = "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter"
     TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 

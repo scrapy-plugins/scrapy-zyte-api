@@ -3,16 +3,20 @@ import inspect
 import sys
 from collections.abc import Coroutine
 from importlib.metadata import version
+from logging import getLogger
 from typing import Any, TypeVar, Union
 from warnings import catch_warnings, filterwarnings
 
 import scrapy
 from packaging.version import Version
+from scrapy.utils.python import global_object_name
 from scrapy.utils.reactor import is_asyncio_reactor_installed
 from twisted.internet.defer import Deferred
 from zyte_api.utils import USER_AGENT as PYTHON_ZYTE_API_USER_AGENT
 
 from .__version__ import __version__
+
+_logger = getLogger(__name__)
 
 USER_AGENT = f"scrapy-zyte-api/{__version__} {PYTHON_ZYTE_API_USER_AGENT}"
 
@@ -31,12 +35,16 @@ _SCRAPY_2_13_0 = Version("2.13.0")
 _SCRAPY_2_14_0 = Version("2.14.0")
 _SCRAPY_2_15_0 = Version("2.15.0")
 
-# Need to install an asyncio reactor before download handler imports to work
-# around:
-# https://github.com/scrapy/scrapy/commit/0946eb335a285e1f210ba1185a564699f53b17d8
-# Fixed in:
-# https://github.com/scrapy/scrapy/commit/e4bdd1cb958b7d89b86ea66f0af1cec2d91a6d44
-_NEEDS_EARLY_REACTOR = _SCRAPY_2_4_0 <= _SCRAPY_VERSION < _SCRAPY_2_6_0
+if _SCRAPY_2_4_0 <= _SCRAPY_VERSION < _SCRAPY_2_6_0:
+    # On these Scrapy versions the import of
+    # scrapy.downloadermiddlewares.retry below reaches
+    # scrapy.core.downloader.webclient, which installs the default reactor, so
+    # the asyncio reactor must be installed before it.
+    # https://github.com/scrapy/scrapy/commit/0946eb335a285e1f210ba1185a564699f53b17d8
+    # https://github.com/scrapy/scrapy/commit/e4bdd1cb958b7d89b86ea66f0af1cec2d91a6d44
+    from scrapy.utils.reactor import install_reactor
+
+    install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
 _ADDON_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_10_0
 _ASYNC_START_SUPPORT = _SCRAPY_VERSION >= _SCRAPY_2_13_0
@@ -164,6 +172,59 @@ def _reactor_enabled(settings) -> bool:
     if not _REACTORLESS_SUPPORT:
         return True
     return settings.getbool("TWISTED_REACTOR_ENABLED", True)
+
+
+try:
+    from scrapy.downloadermiddlewares.retry import (
+        get_retry_request as _get_retry_request,
+    )
+except ImportError:  # pragma: no cover
+    # https://github.com/scrapy/scrapy/blob/b1fe97dc6c8509d58b29c61cf7801eeee1b409a9/scrapy/downloadermiddlewares/retry.py#L57-L142
+    def _get_retry_request(  # type: ignore[misc]
+        request,
+        *,
+        spider,
+        reason="unspecified",
+        max_retry_times=None,
+        priority_adjust=None,
+        stats_base_key="retry",
+    ):
+        settings = spider.crawler.settings
+        assert spider.crawler.stats
+        stats = spider.crawler.stats
+        retry_times = request.meta.get("retry_times", 0) + 1
+        if max_retry_times is None:
+            max_retry_times = request.meta.get("max_retry_times")
+            if max_retry_times is None:
+                max_retry_times = settings.getint("RETRY_TIMES")
+        if retry_times <= max_retry_times:
+            _logger.debug(
+                "Retrying %(request)s (failed %(retry_times)d times): %(reason)s",
+                {"request": request, "retry_times": retry_times, "reason": reason},
+                extra={"spider": spider},
+            )
+            new_request = request.copy()
+            new_request.meta["retry_times"] = retry_times
+            new_request.dont_filter = True
+            if priority_adjust is None:
+                priority_adjust = settings.getint("RETRY_PRIORITY_ADJUST")
+            new_request.priority = request.priority + priority_adjust
+
+            if callable(reason):
+                reason = reason()
+            if isinstance(reason, Exception):
+                reason = global_object_name(reason.__class__)
+
+            stats.inc_value(f"{stats_base_key}/count")
+            stats.inc_value(f"{stats_base_key}/reason_count/{reason}")
+            return new_request
+        stats.inc_value(f"{stats_base_key}/max_reached")
+        _logger.error(
+            "Gave up retrying %(request)s (failed %(retry_times)d times): %(reason)s",
+            {"request": request, "retry_times": retry_times, "reason": reason},
+            extra={"spider": spider},
+        )
+        return None
 
 
 def _close_spider(crawler, reason):

@@ -3,16 +3,19 @@ from warnings import warn
 
 from scrapy import Request, Spider
 from scrapy.exceptions import IgnoreRequest, ScrapyDeprecationWarning
+from scrapy.http import Response
 from scrapy.utils.python import global_object_name
 from zyte_api import RequestError
 
 from ._params import _ParamParser
-from .responses import ZyteAPIMixin
-from .utils import (
+from .exceptions import ActionError
+from .responses import ZyteAPIMixin, _has_action_error
+from .utils import (  # type: ignore[attr-defined]
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
     _GET_SLOT_NEEDS_SPIDER,
     _LOG_DEFERRED_IS_DEPRECATED,
     _close_spider,
+    _get_retry_request,
     _schedule_coro,
     maybe_deferred_to_future,
 )
@@ -75,6 +78,13 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         self._forbidden_domain_start_request_count = 0
         self._total_start_request_count = 0
 
+        self._retry_action_errors = crawler.settings.getbool(
+            "ZYTE_API_ACTION_ERROR_RETRY_ENABLED", True
+        )
+        self._max_retry_times = crawler.settings.getint("RETRY_TIMES")
+        self._priority_adjust = crawler.settings.getint("RETRY_PRIORITY_ADJUST")
+        self._load_action_error_handling()
+
         self._max_requests = crawler.settings.getint("ZYTE_API_MAX_REQUESTS")
         if self._max_requests:
             logger.info(
@@ -88,6 +98,18 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             self._start_requests_processed, signal=_start_requests_processed
         )
         self._crawler = crawler
+
+    def _load_action_error_handling(self):
+        value = self._crawler.settings.get("ZYTE_API_ACTION_ERROR_HANDLING", "pass")
+        if value in ("pass", "ignore", "err"):
+            self._action_error_handling = value
+        else:
+            fallback_value = "pass"
+            logger.error(
+                f"Setting ZYTE_API_ACTION_ERROR_HANDLING got an unexpected "
+                f"value: {value!r}. Falling back to {fallback_value!r}."
+            )
+            self._action_error_handling = fallback_value
 
     def _get_spm_mw(self):
         spm_mw_classes = []
@@ -160,14 +182,36 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         self.slot_request(request, force=True)
 
     def process_response(
-        self, request: Request, response, spider: Spider | None = None
-    ):
-        if isinstance(response, ZyteAPIMixin) and response.url != request.url:
+        self, request: Request, response: Response, spider: Spider | None = None
+    ) -> Request | Response:
+        if not isinstance(response, ZyteAPIMixin):
+            return response
+
+        if response.url != request.url:
             logger.debug(
                 f"Redirecting to {response} from {request}",
                 extra={"spider": spider},
             )
-        return response
+
+        if not _has_action_error(response):
+            return response
+
+        if not self._retry_action_errors or request.meta.get("dont_retry", False):
+            return self._handle_action_error(response)
+
+        return self._retry(request, reason="action-error") or self._handle_action_error(
+            response
+        )
+
+    def _retry(self, request: Request, *, reason: str) -> Request | None:
+        assert self._crawler.spider
+        return _get_retry_request(
+            request,
+            reason=reason,
+            spider=self._crawler.spider,
+            max_retry_times=request.meta.get("max_retry_times", self._max_retry_times),
+            priority_adjust=request.meta.get("priority_adjust", self._priority_adjust),
+        )
 
     def process_exception(
         self, request: Request, exception: Exception, spider: Spider | None = None
@@ -192,6 +236,14 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
             "were pointing to a domain forbidden by Zyte API."
         )
         _close_spider(self._crawler, "failed_forbidden_domain")
+
+    def _handle_action_error(self, response):
+        if self._action_error_handling == "pass":
+            return response
+        if self._action_error_handling == "ignore":
+            raise IgnoreRequest
+        assert self._action_error_handling == "err"
+        raise ActionError(response)
 
 
 class ScrapyZyteAPISpiderMiddleware(_BaseMiddleware):

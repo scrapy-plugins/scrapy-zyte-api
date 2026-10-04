@@ -1,13 +1,7 @@
-from .utils import _NEEDS_EARLY_REACTOR
-
-if _NEEDS_EARLY_REACTOR:
-    from scrapy.utils.reactor import install_reactor
-
-    install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
-
 # Register web-poet serializers
 from . import _serialization  # noqa: F401
 from ._annotations import ExtractFrom, actions, custom_attrs, network_capture
+from ._cache import ScrapyZyteAPIHttpCachePolicy
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPIRefererSpiderMiddleware,
@@ -68,6 +62,7 @@ __all__ = [
     "NetworkCapture",
     "ScrapyZyteAPIDownloadHandler",
     "ScrapyZyteAPIDownloaderMiddleware",
+    "ScrapyZyteAPIHttpCachePolicy",
     "ScrapyZyteAPIRefererSpiderMiddleware",
     "ScrapyZyteAPIRequestFingerprinter",
     "ScrapyZyteAPISessionDownloaderMiddleware",

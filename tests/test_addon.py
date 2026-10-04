@@ -248,6 +248,7 @@ BASE_EXPECTED = {
         "http": "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPDownloadHandler",
         "https": "scrapy_zyte_api.handler.ScrapyZyteAPIHTTPSDownloadHandler",
     },
+    "HTTPCACHE_POLICY": "scrapy_zyte_api.ScrapyZyteAPIHttpCachePolicy",
     "REQUEST_FINGERPRINTER_CLASS": "scrapy_zyte_api.ScrapyZyteAPIRequestFingerprinter",
     "SPIDER_MIDDLEWARES": {
         ScrapyZyteAPISpiderMiddleware: 100,
@@ -320,6 +321,13 @@ if (
                     ScrapyZyteAPISessionDownloaderMiddleware: 667,
                     "scrapy_zyte_api.ScrapyZyteAPIDownloaderMiddleware": 999,
                 },
+            },
+        ),
+        (
+            {"HTTPCACHE_POLICY": "scrapy.extensions.httpcache.RFC2616Policy"},
+            {
+                **BASE_EXPECTED,
+                "HTTPCACHE_POLICY": "scrapy.extensions.httpcache.RFC2616Policy",
             },
         ),
     ],
