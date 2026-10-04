@@ -469,6 +469,94 @@ async def test_provider_geolocation_unannotated(mockserver, caplog):
     assert "Geolocation dependencies must be annotated" in caplog.text
 
 
+@attrs.define
+class GeoHttpResponsePage(BasePage):
+    response: HttpResponse
+    geolocation: Annotated[Geolocation, "DE"]
+
+
+class GeoHttpResponseSpider(ZyteAPISpider):
+    def parse_(self, response: DummyResponse, page: GeoHttpResponsePage):  # type: ignore[override]
+        yield {"geolocation": page.geolocation}
+
+
+@deferred_f_from_coro_f
+async def test_provider_geolocation_download(mockserver):
+    """A Geolocation dependency applies to the request that downloads the
+    response, so that it also works for dependencies that the provider does
+    not build, such as HttpResponse."""
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["ZYTE_API_TRANSPARENT_MODE"] = True
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
+
+    item, _, crawler = await _crawl_single_item(
+        GeoHttpResponseSpider, HtmlResource, settings
+    )
+    assert isinstance(item["geolocation"], Geolocation)
+    stats = crawler.stats.get_stats()
+    assert stats["scrapy-zyte-api/request_args/geolocation"] == 1
+    assert stats["scrapy-zyte-api/request_args/httpResponseBody"] == 1
+
+
+@deferred_f_from_coro_f
+async def test_provider_geolocation_download_raw_params(mockserver):
+    class RawParamsSpider(GeoHttpResponseSpider):
+        def get_start_request(self):
+            return Request(
+                self.url,
+                callback=self.parse_,  # type: ignore[arg-type]
+                meta={"zyte_api": {"httpResponseBody": True}},
+            )
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
+
+    item, _, crawler = await _crawl_single_item(RawParamsSpider, HtmlResource, settings)
+    assert isinstance(item["geolocation"], Geolocation)
+    assert crawler.stats.get_value("scrapy-zyte-api/request_args/geolocation") == 1
+
+
+@deferred_f_from_coro_f
+async def test_provider_geolocation_no_zyte_api_request(mockserver, caplog):
+    """When the response is not downloaded through Zyte API, and no other
+    dependency requires a Zyte API request, there is nothing to apply the
+    geolocation to."""
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
+
+    item, *_ = await _crawl_single_item(GeoHttpResponseSpider, HtmlResource, settings)
+    assert item is None
+    assert "there is no Zyte API request to apply it to" in caplog.text
+
+
+@deferred_f_from_coro_f
+async def test_provider_geolocation_item_dependency(mockserver):
+    """When another dependency requires a Zyte API request, the geolocation
+    also applies to the request that downloads the response."""
+
+    @attrs.define
+    class GeoPage(BasePage):
+        response: HttpResponse
+        product: Product
+        geolocation: Annotated[Geolocation, "DE"]
+
+    class GeoSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: GeoPage):  # type: ignore[override]
+            yield {"product": page.product}
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["ZYTE_API_TRANSPARENT_MODE"] = True
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 1100}
+
+    item, _, crawler = await _crawl_single_item(GeoSpider, HtmlResource, settings)
+    assert item["product"].name == "Product name (country DE)"
+    assert crawler.stats.get_value("scrapy-zyte-api/request_args/geolocation") == 2
+
+
 custom_attrs_input = {
     "attr1": {"type": "string", "description": "descr1"},
     "attr2": {"type": "number", "description": "descr2"},

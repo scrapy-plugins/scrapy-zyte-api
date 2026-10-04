@@ -396,6 +396,22 @@ class ZyteApiProvider(PageObjectInputProvider):
             http_response_available=http_response_available,
         )
 
+        if all(strip_annotated(cls) is Geolocation for cls in to_provide):
+            if not request.meta.get("_zyte_api_dep_geolocation", False):
+                raise ValueError(
+                    f"Request {request} has a Geolocation dependency, but "
+                    f"there is no Zyte API request to apply it to: no other "
+                    f"dependency requires one, and the response itself is not "
+                    f"downloaded through Zyte API. Enable "
+                    f"ZYTE_API_TRANSPARENT_MODE, or set the zyte_api_automap "
+                    f"request metadata key."
+                )
+            results.extend(
+                AnnotatedInstance(Geolocation(), cls.__metadata__)  # type: ignore[attr-defined]
+                for cls in to_provide
+            )
+            return results
+
         api_request = Request(
             url=request.url,
             meta={

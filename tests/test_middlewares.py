@@ -12,6 +12,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPISpiderMiddleware,
 )
+from scrapy_zyte_api._middlewares import _set_geolocation
 from scrapy_zyte_api.responses import ZyteAPIResponse
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _GET_SLOT_NEEDS_SPIDER,
@@ -554,3 +555,26 @@ async def test_start_requests_items():
     assert crawler.stats is not None
     assert crawler.stats.get_value("finish_reason") == "finished"
     assert "log_count/ERROR" not in crawler.stats.get_stats()
+
+
+@pytest.mark.parametrize(
+    ("meta", "expected"),
+    [
+        ({}, {"zyte_api_automap": {"geolocation": "DE"}}),
+        ({"zyte_api_automap": True}, {"zyte_api_automap": {"geolocation": "DE"}}),
+        (
+            {"zyte_api_automap": {"geolocation": "FR"}},
+            {"zyte_api_automap": {"geolocation": "FR"}},
+        ),
+        (
+            {"zyte_api": {"httpResponseBody": True}},
+            {"zyte_api": {"httpResponseBody": True, "geolocation": "DE"}},
+        ),
+    ],
+)
+def test_set_geolocation(meta, expected):
+    request = Request("https://example.com", meta=meta)
+    _set_geolocation(request, "DE")
+    assert request.meta["_zyte_api_dep_geolocation"] is True
+    del request.meta["_zyte_api_dep_geolocation"]
+    assert request.meta == expected
