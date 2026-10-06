@@ -1,6 +1,25 @@
 import pytest
+from scrapy.core import engine
 
 from .mockserver import MockServer
+
+# Nothing but the engine heartbeat, 5 seconds by default, gets a crawl going
+# after the engine starts, so every crawl in the suite would stall that long.
+_HEARTBEAT_INTERVAL = 0.05
+if hasattr(engine.ExecutionEngine, "_SLOT_HEARTBEAT_INTERVAL"):
+    engine.ExecutionEngine._SLOT_HEARTBEAT_INTERVAL = _HEARTBEAT_INTERVAL
+else:  # Scrapy < 2.14 hardcodes the interval.
+    _Slot = engine.Slot  # type: ignore[attr-defined]
+    _slot_init = _Slot.__init__
+
+    def _fast_slot_init(self, *args, **kwargs):
+        _slot_init(self, *args, **kwargs)
+        start = self.heartbeat.start
+        self.heartbeat.start = lambda interval, *a, **kw: start(
+            min(interval, _HEARTBEAT_INTERVAL), *a, **kw
+        )
+
+    _Slot.__init__ = _fast_slot_init
 
 
 def pytest_addoption(parser, pluginmanager):
