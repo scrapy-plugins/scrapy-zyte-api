@@ -13,16 +13,12 @@ if TYPE_CHECKING:
     from scrapy.http.cookies import CookieJar
 
 from scrapy_zyte_api._cookies import _process_cookies
-from scrapy_zyte_api.utils import (
-    _RESPONSE_HAS_ATTRIBUTES,
-    _RESPONSE_HAS_IP_ADDRESS,
-    _RESPONSE_HAS_PROTOCOL,
-)
 
 _DEFAULT_ENCODING = "utf-8"
 
 
 class ZyteAPIMixin:
+    attributes: tuple[str, ...]
     url: str
 
     REMOVE_HEADERS = {
@@ -35,20 +31,6 @@ class ZyteAPIMixin:
     def __init__(self, *args, raw_api_response: dict | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._raw_api_response = raw_api_response
-        if not _RESPONSE_HAS_ATTRIBUTES:
-            self.attributes: tuple[str, ...] = (
-                "url",
-                "status",
-                "headers",
-                "body",
-                "request",
-                "flags",
-                "certificate",
-            )
-            if _RESPONSE_HAS_IP_ADDRESS:
-                self.attributes += ("ip_address",)
-            if _RESPONSE_HAS_PROTOCOL:
-                self.attributes += ("protocol",)
         self.attributes += ("raw_api_response",)
 
     def replace(self, *args, **kwargs):

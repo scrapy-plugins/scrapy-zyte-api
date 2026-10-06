@@ -27,7 +27,6 @@ from zyte_api import aggressive_retrying as _aggressive_retrying
 from zyte_api import zyte_api_retrying as _zyte_api_retrying
 
 from .utils import (  # type: ignore[attr-defined]
-    _DOWNLOAD_NEEDS_SPIDER,
     _build_from_crawler,
     _close_spider,
     _ensure_awaitable,
@@ -1091,11 +1090,7 @@ class _SessionManager:
             if self._download_async is not None:  # Scrapy >= 2.14
                 return await self._download_async(init_request)
             assert self._download
-            if not _DOWNLOAD_NEEDS_SPIDER:
-                return await deferred_to_future(self._download(init_request))
-            return await deferred_to_future(
-                self._download(init_request, spider=self._crawler.spider)  # type: ignore[call-arg]
-            )
+            return await deferred_to_future(self._download(init_request))
 
         cookies_mode = session_config.cookie_mode(request)
         _init_responses: list = []
