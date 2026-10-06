@@ -869,7 +869,7 @@ When upgrading, you should set the following in your Scrapy settings:
   to allow custom fingerprinting. By default, the default Scrapy request
   fingerprinter is used for non-Zyte API requests.
 
-  For users having ``scrapy < 2.7``, see :ref:`fingerprint-pre-2.7` for
+  For users having ``scrapy < 2.7``, see the documentation of this ``scrapy-zyte-api`` version for
   different ways on handling the duplicate request issue.
 
   More information about the request fingerprinting topic can be found in

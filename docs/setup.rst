@@ -22,8 +22,6 @@ You need at least:
 
 -   Scrapy 2.7.0+
 
-:doc:`scrapy-poet <scrapy-poet:index>` integration requires Scrapy 2.6+.
-
 
 .. _install:
 

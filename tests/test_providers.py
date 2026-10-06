@@ -42,7 +42,6 @@ from scrapy_zyte_api import (
     ExtractFrom,
     Geolocation,
     NetworkCapture,
-    ScrapyZyteAPIRequestFingerprinter,
     Screenshot,
     actions,
     custom_attrs,
@@ -686,10 +685,6 @@ def test_set_in_provider_meta_cache_eviction():
     assert list(cache.keys()) == [("b",), ("c",)]
 
 
-@pytest.mark.skipif(
-    ScrapyZyteAPIRequestFingerprinter is None,
-    reason="Request fingerprinting not supported (Scrapy < 2.7)",
-)
 @deferred_f_from_coro_f
 async def test_provider_reuses_cached_provider_meta_from_fingerprinter(
     mockserver, monkeypatch
@@ -715,10 +710,6 @@ async def test_provider_reuses_cached_provider_meta_from_fingerprinter(
     assert build_meta_calls == 1
 
 
-@pytest.mark.skipif(
-    ScrapyZyteAPIRequestFingerprinter is None,
-    reason="Request fingerprinting not supported (Scrapy < 2.7)",
-)
 @deferred_f_from_coro_f
 async def test_provider_rebuilds_meta_for_non_fingerprint_params(
     mockserver, monkeypatch
