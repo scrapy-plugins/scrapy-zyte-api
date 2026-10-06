@@ -267,6 +267,13 @@ _EXTRACT_KEYS = {
     key for key, value in _REQUEST_PARAMS.items() if value.get("is_extract_type", False)
 }
 _BROWSER_OR_EXTRACT_KEYS = _BROWSER_KEYS | _EXTRACT_KEYS
+# Known request params that make 2 requests different for request
+# fingerprinting purposes. url is excluded because it is handled separately.
+_FINGERPRINT_PARAM_KEYS = frozenset(
+    key
+    for key, value in _REQUEST_PARAMS.items()
+    if value.get("changes_fingerprint", True) and key != "url"
+)
 _DEFAULT_API_PARAMS = {
     key: value["default"]
     for key, value in _REQUEST_PARAMS.items()

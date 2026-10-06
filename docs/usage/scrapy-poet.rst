@@ -222,6 +222,68 @@ You can then access the results as the dependency value:
                 ...
 
 
+.. _zyte-api-params:
+
+Arbitrary parameters
+--------------------
+
+For Zyte API parameters without a dedicated input or annotation, you can add a
+:class:`scrapy_zyte_api.ZyteApiParams` dependency, annotated with a dictionary
+of Zyte API parameters passed to the :func:`scrapy_zyte_api.zyte_api_params`
+function:
+
+.. code-block:: python
+
+    from typing import Annotated
+
+    from scrapy_zyte_api import ZyteApiParams, zyte_api_params
+
+
+    @attrs.define
+    class MyPageObject(BasePage):
+        product: Product
+        params: Annotated[ZyteApiParams, zyte_api_params({"ipType": "residential"})]
+
+Those parameters are included into the Zyte API request that the scrapy-poet
+integration sends to get the other inputs of the page object.
+
+You can access the resulting Zyte API request parameters, including those set
+by other means, as the dependency value:
+
+.. code-block:: python
+
+        def parse_page(self, response: DummyResponse, page: MyPageObject):
+            ...
+            print(page.params.params)
+
+Mind the following:
+
+-   Prefer :ref:`inputs <inputs>` and the annotations above when they cover
+    what you need. Setting a parameter that has a dedicated input or annotation
+    (e.g. ``geolocation`` or ``actions``) through
+    :class:`~scrapy_zyte_api.ZyteApiParams` logs a warning.
+
+-   Parameters set this way take precedence over the
+    :setting:`ZYTE_API_PROVIDER_PARAMS` setting, but not over the
+    :reqmeta:`zyte_api_provider` request metadata key, which always wins and
+    hence remains a per-request override.
+
+-   If 2 :class:`~scrapy_zyte_api.ZyteApiParams` dependencies of the same
+    request set the same parameter to different values, a :exc:`ValueError`
+    exception is raised. Setting the ``url`` parameter also raises
+    :exc:`ValueError`.
+
+-   As with :reqmeta:`zyte_api_provider`, parameters that :ref:`do not change
+    the request fingerprint <fingerprint-params>` do not change it here either,
+    so 2 requests that only differ on such a parameter are considered
+    duplicates.
+
+-   Annotations are static, so you cannot build these parameters at run time,
+    e.g. based on :class:`~web_poet.page_inputs.page_params.PageParams`. Use
+    :reqmeta:`zyte_api_provider` or :ref:`additional requests
+    <web-poet:additional-requests>` for that.
+
+
 Custom parameters
 =================
 
@@ -230,9 +292,12 @@ scrapy-poet integration ignores both :ref:`manual <manual>` and :ref:`automatic
 
 Whenever you can, use :ref:`inputs <inputs>` and :ref:`dependency annotations
 <annotations>` to get additional Zyte API parameters into Zyte API requests
-made by the scrapy-poet integration.
+made by the scrapy-poet integration, including
+:class:`~scrapy_zyte_api.ZyteApiParams` for :ref:`arbitrary parameters
+<zyte-api-params>`.
 
-If that is not possible, you can add Zyte API parameters to requests made by
+If that is not possible, e.g. if parameters must be built at run time or must
+be defined in the spider, you can add Zyte API parameters to requests made by
 the scrapy-poet integration with the :reqmeta:`zyte_api_provider` request
 metadata key or the :setting:`ZYTE_API_PROVIDER_PARAMS` setting.
 
@@ -253,4 +318,7 @@ default options for various extraction types:
 
 When both :reqmeta:`zyte_api_provider` and :setting:`ZYTE_API_PROVIDER_PARAMS`
 are defined, they are combined, with :reqmeta:`zyte_api_provider` taking
-precedence in case of conflict.
+precedence in case of conflict. :ref:`Parameters from page objects
+<zyte-api-params>` fall in between: they override
+:setting:`ZYTE_API_PROVIDER_PARAMS`, and are overridden by
+:reqmeta:`zyte_api_provider`.
