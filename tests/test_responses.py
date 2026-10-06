@@ -21,7 +21,6 @@ from scrapy_zyte_api.responses import (
     ZyteAPIXmlResponse,
 )
 from scrapy_zyte_api.responses import _process_response as _unwrapped_process_response
-from scrapy_zyte_api.utils import _RESPONSE_HAS_IP_ADDRESS, _RESPONSE_HAS_PROTOCOL
 
 PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
 PAGE_CONTENT_2 = "<html><body>Ceci n’est pas une pipe</body></html>"
@@ -135,10 +134,8 @@ def test_init(api_response, cls):
     assert not response.flags
     assert response.request is None
     assert response.certificate is None
-    if _RESPONSE_HAS_IP_ADDRESS:
-        assert response.ip_address is None
-    if _RESPONSE_HAS_PROTOCOL:
-        assert response.protocol is None
+    assert response.ip_address is None
+    assert response.protocol is None
 
 
 @pytest.mark.parametrize(
@@ -165,10 +162,8 @@ def test_text_from_api_response(api_response, cls, content_length):
     assert response.flags == ["zyte-api"]
     assert response.request is None
     assert response.certificate is None
-    if _RESPONSE_HAS_IP_ADDRESS:
-        assert response.ip_address is None
-    if _RESPONSE_HAS_PROTOCOL:
-        assert response.protocol is None
+    assert response.ip_address is None
+    assert response.protocol is None
 
 
 @pytest.mark.parametrize(

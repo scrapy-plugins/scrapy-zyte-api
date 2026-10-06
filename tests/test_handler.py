@@ -14,7 +14,7 @@ from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
 from scrapy.utils.test import get_crawler
-from zyte_api import RetryFactory
+from zyte_api import AsyncZyteAPI, RetryFactory
 from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import (
@@ -48,11 +48,6 @@ from . import (
 )
 from . import get_crawler as get_crawler_zyte_api
 from .mockserver import MockServer
-
-try:
-    from zyte_api import AsyncZyteAPI
-except ImportError:
-    from zyte_api.aio.client import AsyncClient as AsyncZyteAPI
 
 _EXPECTED_FALLBACK_HANDLER: type
 if _REACTORLESS:

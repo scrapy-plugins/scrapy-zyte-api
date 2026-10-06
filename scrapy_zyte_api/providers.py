@@ -1,7 +1,7 @@
 import json
 from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Set, cast
+from typing import TYPE_CHECKING, Any, cast
 from weakref import WeakKeyDictionary
 
 from andi.typeutils import is_typing_annotated, strip_annotated
@@ -176,7 +176,7 @@ def _get_zyte_api_provider_params(request: Request, crawler: Crawler) -> dict[st
 
 
 def _build_zyte_api_provider_meta(
-    to_provide: Set[Callable],
+    to_provide: set[Callable],
     request: Request,
     crawler: Crawler,
     *,
@@ -353,7 +353,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         crawler.stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)
 
     async def __call__(
-        self, to_provide: Set[Callable], request: Request, crawler: Crawler
+        self, to_provide: set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
         results: list[Any] = []

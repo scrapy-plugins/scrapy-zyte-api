@@ -1,7 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 from scrapy.core import engine
+from twisted.python.log import PythonLoggingObserver
 
 from .mockserver import MockServer
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # Nothing but the engine heartbeat, 5 seconds by default, gets a crawl going
 # after the engine starts, so every crawl in the suite would stall that long.
@@ -65,6 +73,18 @@ def mockserver():
 def fresh_mockserver():
     with MockServer() as server:
         yield server
+
+
+@pytest.fixture
+def twisted_logging() -> Generator[None]:
+    """Forward Twisted logging to Python logging, as Scrapy does in
+    configure_logging(), so that caplog captures it."""
+    observer = PythonLoggingObserver("twisted")
+    observer.start()
+    try:
+        yield
+    finally:
+        observer.stop()
 
 
 pytest.register_assert_rewrite("tests.helpers")
