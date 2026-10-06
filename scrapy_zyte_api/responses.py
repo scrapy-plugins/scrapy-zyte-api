@@ -5,7 +5,7 @@ from base64 import b64decode
 from copy import copy
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from scrapy.http import Headers, HtmlResponse, Response, TextResponse, XmlResponse
+from scrapy.http import HtmlResponse, Response, TextResponse, XmlResponse
 from scrapy.responsetypes import responsetypes
 
 if TYPE_CHECKING:
@@ -208,8 +208,7 @@ def _process_response(
         return ZyteAPITextResponse.from_api_response(api_response, request=request)
 
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
-        # a plain dict here doesn't work correctly on Scrapy < 2.1
-        scrapy_headers = Headers()
+        scrapy_headers: dict[bytes, bytes] = {}
         for header in cast("list[dict[str, str]]", api_response["httpResponseHeaders"]):
             scrapy_headers[header["name"].encode()] = header["value"].encode()
         response_cls = responsetypes.from_args(
