@@ -40,9 +40,6 @@ SESSION_DEFAULT_RETRY_POLICY = _SESSION_DEFAULT_RETRY_POLICY
 #: Alternative to the :ref:`aggresive retry policy <aggressive-retry-policy>`
 #: for :ref:`session management <session>` that does not retry 520 and 521
 #: responses.
-#:
-#: .. note:: When using python-zyte-api 0.5.2 or lower, this is the same as
-#:           :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY`.
 SESSION_AGGRESSIVE_RETRY_POLICY = _SESSION_AGGRESSIVE_RETRY_POLICY
 
 #: Instance of :class:`web_poet.rules.RulesRegistry` that holds :ref:`session
