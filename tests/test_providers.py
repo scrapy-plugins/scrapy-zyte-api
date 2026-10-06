@@ -372,6 +372,7 @@ async def test_provider_extractfrom(mockserver):
     )
 
 
+@pytest.mark.usefixtures("twisted_logging")
 @deferred_f_from_coro_f
 async def test_provider_extractfrom_double(mockserver, caplog):
     @attrs.define
@@ -449,6 +450,7 @@ async def test_provider_geolocation(mockserver):
     assert item["product"].name == "Product name (country DE)"
 
 
+@pytest.mark.usefixtures("twisted_logging")
 @deferred_f_from_coro_f
 async def test_provider_geolocation_unannotated(mockserver, caplog):
     @attrs.define
@@ -1371,6 +1373,7 @@ async def test_provider_actions_missing(mockserver):
     assert item["action_results"] == Actions(None)
 
 
+@pytest.mark.usefixtures("twisted_logging")
 @deferred_f_from_coro_f
 async def test_provider_actions_unannotated(mockserver, caplog):
     @attrs.define
@@ -1438,6 +1441,7 @@ async def test_provider_network_capture(mockserver):
     assert second.body is None
 
 
+@pytest.mark.usefixtures("twisted_logging")
 @deferred_f_from_coro_f
 async def test_provider_network_capture_unannotated(mockserver, caplog):
     @attrs.define
