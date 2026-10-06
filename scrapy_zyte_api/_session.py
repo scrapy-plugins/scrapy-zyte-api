@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable
 from copy import deepcopy
 from functools import partial
 from logging import getLogger
-from typing import Any, TypedDict, cast
+from typing import Any, NotRequired, TypedDict, cast
 from uuid import uuid4
 from warnings import warn
 from weakref import WeakKeyDictionary
@@ -33,11 +33,6 @@ from .utils import (  # type: ignore[attr-defined]
     _ensure_awaitable,
     deferred_to_future,
 )
-
-try:
-    from typing import NotRequired  # Python 3.11+
-except ImportError:
-    from typing_extensions import NotRequired  # Python 3.10
 
 logger = getLogger(__name__)
 SESSION_INIT_META_KEY = "_is_session_init_request"

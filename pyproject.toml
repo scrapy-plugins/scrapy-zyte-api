@@ -16,19 +16,17 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3.15",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 # Sync with [min] @ tox.ini
 dependencies = [
     "packaging>=20.0",
     "scrapy>=2.7.0",
-    "typing_extensions>=4.1.0",
     "zyte-api>=0.6.0",
 ]
 

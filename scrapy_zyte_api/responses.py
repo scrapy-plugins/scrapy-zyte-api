@@ -78,7 +78,7 @@ class ZyteAPIMixin:
             result += f"; Path={path}"
         expires = cookie.get("expires")
         if expires is not None:
-            expires_date = dt.datetime.fromtimestamp(expires, dt.timezone.utc)
+            expires_date = dt.datetime.fromtimestamp(expires, dt.UTC)
             expires_date_string = expires_date.strftime("%a, %d %b %Y %H:%M:%S GMT")
             result += f"; Expires={expires_date_string}"
         if cookie.get("httpOnly"):
