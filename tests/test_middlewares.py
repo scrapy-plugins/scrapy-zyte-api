@@ -4,6 +4,7 @@ from unittest import SkipTest
 import pytest
 from packaging.version import Version
 from scrapy import Request, Spider
+from scrapy.exceptions import ScrapyDeprecationWarning
 from scrapy.http.response import Response
 from scrapy.item import Item
 from scrapy.utils.test import get_crawler
@@ -554,3 +555,23 @@ async def test_start_requests_items():
     assert crawler.stats is not None
     assert crawler.stats.get_value("finish_reason") == "finished"
     assert "log_count/ERROR" not in crawler.stats.get_stats()
+
+
+@deferred_f_from_coro_f
+async def test_slot_request_spider():
+    crawler = get_crawler()
+    await maybe_deferred_to_future(crawler.crawl("a"))
+    middleware = _build_from_crawler(ScrapyZyteAPIDownloaderMiddleware, crawler)
+    request = Request("https://example.com")
+    with pytest.warns(ScrapyDeprecationWarning, match="slot_request"):
+        middleware.slot_request(request, crawler.spider)
+
+
+@deferred_f_from_coro_f
+async def test_process_start_requests_items():
+    """Items yielded by start_requests() are yielded back untouched."""
+    crawler = get_crawler()
+    await maybe_deferred_to_future(crawler.crawl("a"))
+    middleware = _build_from_crawler(ScrapyZyteAPISpiderMiddleware, crawler)
+    item = Item()
+    assert list(middleware.process_start_requests([item], crawler.spider)) == [item]

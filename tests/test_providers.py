@@ -1351,6 +1351,27 @@ async def test_provider_actions(mockserver, caplog):
 
 
 @deferred_f_from_coro_f
+async def test_provider_actions_missing(mockserver):
+    """Actions are None when the response reports no action results."""
+
+    @attrs.define
+    class ActionProductPage(BasePage):
+        product: Product
+        actions: Annotated[Actions, actions([])]
+
+    class ActionZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: ActionProductPage):  # type: ignore[override]
+            yield {"action_results": page.actions}
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, *_ = await _crawl_single_item(ActionZyteAPISpider, HtmlResource, settings)
+    assert item["action_results"] == Actions(None)
+
+
+@deferred_f_from_coro_f
 async def test_provider_actions_unannotated(mockserver, caplog):
     @attrs.define
     class ActionProductPage(BasePage):

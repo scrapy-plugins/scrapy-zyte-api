@@ -362,13 +362,8 @@ class ZyteApiProvider(PageObjectInputProvider):
         screenshot_requested = Screenshot in to_provide
         for cls in list(to_provide):
             self._track_auto_fields(crawler, request, cast("type", cls))
-            item = self.injector.weak_cache.get(request, {}).get(cls)
-            if item:
-                results.append(item)
-                to_provide.remove(cls)
-
             # BrowserResponse takes precedence over HttpResponse
-            elif (
+            if (
                 cls == AnyResponse
                 and BrowserResponse not in to_provide
                 and not screenshot_requested
@@ -443,8 +438,6 @@ class ZyteApiProvider(PageObjectInputProvider):
             results.append(screenshot)
 
         if AnyResponse in to_provide:
-            any_response = None  # type: ignore[assignment]
-
             if "browserHtml" in api_response.raw_api_response:
                 any_response = AnyResponse(
                     response=browser_response
@@ -454,10 +447,9 @@ class ZyteApiProvider(PageObjectInputProvider):
                         html=html,
                     )
                 )
-            elif (
-                "httpResponseBody" in api_response.raw_api_response
-                and "httpResponseHeaders" in api_response.raw_api_response
-            ):
+            else:
+                assert "httpResponseBody" in api_response.raw_api_response
+                assert "httpResponseHeaders" in api_response.raw_api_response
                 any_response = AnyResponse(
                     response=HttpResponse(
                         url=api_response.url,
@@ -468,9 +460,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                         ),
                     )
                 )
-
-            if any_response:
-                results.append(any_response)
+            results.append(any_response)
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)
