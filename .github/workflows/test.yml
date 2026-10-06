@@ -21,19 +21,7 @@ jobs:
       matrix:
         include:
         - python-version: '3.10'
-          toxenv: min-scrapy-2x0
-        - python-version: '3.10'
-          toxenv: min-scrapy-2x1
-        - python-version: '3.10'
-          toxenv: min-scrapy-2x3
-        - python-version: '3.10'
-          toxenv: min-scrapy-2x4
-        - python-version: '3.10'
-          toxenv: min-scrapy-2x5
-        - python-version: '3.10'
-          toxenv: min-scrapy-2x6
-        - python-version: '3.10'
-          toxenv: min-scrapy-2x7
+          toxenv: min
         - python-version: '3.10'
           toxenv: min-extra
         - python-version: '3.10'
