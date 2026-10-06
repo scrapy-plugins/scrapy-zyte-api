@@ -788,8 +788,8 @@ else:
 
 
 class FatalErrorHandler:
-    def __init__(self, crawler):
-        self.crawler = crawler
+    def __init__(self, session_manager):
+        self.session_manager = session_manager
 
     async def __aenter__(self):
         return None
@@ -797,7 +797,8 @@ class FatalErrorHandler:
     async def __aexit__(self, exc_type, exc, tb):
         if exc_type is None:
             return
-        close = partial(_close_spider, self.crawler)
+        self.session_manager._closing = True
+        close = partial(_close_spider, self.session_manager._crawler)
         if issubclass(exc_type, TooManyBadSessionInits):
             close("bad_session_inits")
         elif issubclass(exc_type, PoolError):
@@ -968,7 +969,7 @@ class _SessionManager:
         )
         self._session_config_map: dict[type[SessionConfig], SessionConfig] = {}
 
-        self._fatal_error_handler = FatalErrorHandler(crawler)
+        self._fatal_error_handler = FatalErrorHandler(self)
 
         self._stats_per_pool: bool = settings.getbool("ZYTE_API_SESSION_STATS_PER_POOL")
 
