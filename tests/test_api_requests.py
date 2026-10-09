@@ -2241,6 +2241,37 @@ UNSAFE_HEADER_HANDLING_SCENARIOS: list[dict[str, Any]] = [
             },
             [],
         ),
+        # The root extractFrom applies to extraction types without their own.
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                "extractFrom": "httpResponseBody",
+            },
+            {
+                EXTRACT_KEY: True,
+                "extractFrom": "httpResponseBody",
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                EXTRACT_KEY: True,
+                "extractFrom": "httpResponseBody",
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+            },
+            {
+                EXTRACT_KEY: True,
+                "extractFrom": "httpResponseBody",
+                f"{EXTRACT_KEY}Options": {"extractFrom": "browserHtml"},
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
         # Only *Options parameters matching enabled extraction outputs are
         # taken into account.
         (

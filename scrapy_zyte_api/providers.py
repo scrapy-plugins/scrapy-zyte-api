@@ -274,6 +274,10 @@ def _build_zyte_api_provider_meta(
             del zyte_api_meta[options_name]
         elif zyte_api_meta.get(options_name, {}).get("extractFrom"):
             extract_from = zyte_api_meta[options_name]["extractFrom"]
+    if to_provide_stripped - {Serp}:
+        extract_from = extract_from or zyte_api_meta.get("extractFrom")
+    else:
+        zyte_api_meta.pop("extractFrom", None)
 
     if AnyResponse in to_provide:
         if (
