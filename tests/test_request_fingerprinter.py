@@ -697,8 +697,19 @@ async def test_deps():
 
 
 @pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")
+@pytest.mark.parametrize(
+    ("params1", "params2"),
+    [
+        (
+            {"jobPostingNavigationOptions": {"extractFrom": "browserHtml"}},
+            {"jobPostingNavigationOptions": {"extractFrom": "httpResponseBody"}},
+        ),
+        ({}, {"verifyCertificate": True}),
+        ({}, {"includeIframes": True}),
+    ],
+)
 @deferred_f_from_coro_f
-async def test_zyte_api_provider_meta_affects_fingerprint():
+async def test_zyte_api_provider_meta_affects_fingerprint(params1, params2):
     from scrapy_poet import DummyResponse  # noqa: PLC0415
     from zyte_common_items import JobPostingNavigation  # noqa: PLC0415
 
@@ -706,25 +717,15 @@ async def test_zyte_api_provider_meta_affects_fingerprint():
         name = "provider_meta"
 
         def __init__(self, *args, **kwargs):
-            self.browser_request = Request(
+            self.request1 = Request(
                 "https://example.com",
                 callback=self.parse,  # type: ignore[arg-type]
-                meta={
-                    "zyte_api_provider": {
-                        "jobPostingNavigationOptions": {"extractFrom": "browserHtml"},
-                    },
-                },
+                meta={"zyte_api_provider": params1},
             )
-            self.http_request = Request(
+            self.request2 = Request(
                 "https://example.com",
                 callback=self.parse,  # type: ignore[arg-type]
-                meta={
-                    "zyte_api_provider": {
-                        "jobPostingNavigationOptions": {
-                            "extractFrom": "httpResponseBody"
-                        },
-                    },
-                },
+                meta={"zyte_api_provider": params2},
             )
 
         async def parse(self, response: DummyResponse, item: JobPostingNavigation):  # type: ignore[override]
@@ -733,10 +734,10 @@ async def test_zyte_api_provider_meta_affects_fingerprint():
     crawler = await get_crawler(spider_cls=ProviderMetaSpider)
     fingerprinter = crawler.request_fingerprinter
 
-    browser_fingerprint = fingerprinter.fingerprint(crawler.spider.browser_request)
-    http_fingerprint = fingerprinter.fingerprint(crawler.spider.http_request)
+    fingerprint1 = fingerprinter.fingerprint(crawler.spider.request1)
+    fingerprint2 = fingerprinter.fingerprint(crawler.spider.request2)
 
-    assert browser_fingerprint != http_fingerprint
+    assert fingerprint1 != fingerprint2
 
 
 @pytest.mark.skipif(scrapy_poet is None, reason="scrapy-poet is not installed")

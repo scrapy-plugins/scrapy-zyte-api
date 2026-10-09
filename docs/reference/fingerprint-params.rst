@@ -31,10 +31,10 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
     to work).
 
 -   Rendering option parameters (:http:`request:actions`,
-    :http:`request:device`, :http:`request:javascript`,
-    :http:`request:screenshotOptions`, :http:`request:viewport`, and automatic
-    extraction options like :http:`request:productOptions` or
-    :http:`request:customAttributesOptions`).
+    :http:`request:device`, :http:`request:includeIframes`,
+    :http:`request:javascript`, :http:`request:screenshotOptions`,
+    :http:`request:viewport`, and automatic extraction options like
+    :http:`request:productOptions` or :http:`request:customAttributesOptions`).
 
 -   :http:`request:geolocation`.
 
@@ -45,6 +45,8 @@ fingerprints for Zyte API requests based on the following Zyte API parameters:
     :http:`request:sessionContext`.
 
 -   :http:`request:followRedirect`.
+
+-   :http:`request:verifyCertificate`.
 
 -   :http:`request:echoData`.
 
