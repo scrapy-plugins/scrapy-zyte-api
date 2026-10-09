@@ -462,7 +462,7 @@ class SessionConfig:
         if self._checker:
             return self._checker.check(response, request)
 
-        response_actions = response.raw_api_response.get("actions", [])  # type: ignore[attr-defined]
+        response_actions = getattr(response, "raw_api_response", {}).get("actions", [])
 
         if self.location(request):
             for action in response_actions:
@@ -1102,9 +1102,9 @@ class _SessionManager:
         outcome = "passed" if result else "failed"
         self._inc_stat(f"init/check-{outcome}", pool)
         if cookies_mode and result and _init_responses:
-            self._cookie_jar[session_id] = _init_responses[-1].raw_api_response.get(
-                "responseCookies", []
-            )
+            self._cookie_jar[session_id] = getattr(
+                _init_responses[-1], "raw_api_response", {}
+            ).get("responseCookies", [])
         return result
 
     async def _create_session(self, request: Request, pool: str) -> str:
@@ -1245,9 +1245,9 @@ class _SessionManager:
         async with self._fatal_error_handler:
             if self.is_init_request(request):
                 return True
-            session_config = self._get_session_config(request)
-            if not session_config.enabled(request):
+            if not self.is_enabled(request):
                 return True
+            session_config = self._get_session_config(request)
             pool = self.get_pool(request)
             try:
                 passed = session_config.check(response, request)
@@ -1296,11 +1296,11 @@ class _SessionManager:
                 "_zyte_api_session_assigned", False
             ):
                 return None
-            session_config = self._get_session_config(request)
-            if not session_config.enabled(request):
+            if not self.is_enabled(request):
                 assert self._crawler.stats
                 self._crawler.stats.inc_value("scrapy-zyte-api/sessions/use/disabled")
                 return None
+            session_config = self._get_session_config(request)
             session_id = await self._next(request)
             cookies_mode = session_config.cookie_mode(request)
             # Note: If there is a session set already (e.g. a request being
@@ -1345,6 +1345,8 @@ class _SessionManager:
             return session_config.process_request(request)
 
     def is_enabled(self, request: Request) -> bool:
+        if urlparse_cached(request).scheme not in {"http", "https"}:
+            return False
         session_config = self._get_session_config(request)
         return session_config.enabled(request)
 

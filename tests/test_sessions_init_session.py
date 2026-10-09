@@ -189,3 +189,35 @@ async def test_init_session_failure(mockserver, behavior, expected_stat):
     assert_session_stats(crawler, {"example.com": {expected_stat: 1}})
 
     session_config_registry.__init__()  # type: ignore[misc]
+
+
+@deferred_f_from_coro_f
+async def test_init_session_cookie_mode_non_zyte_api_response(mockserver):
+    @session_config(["example.com"])
+    class CustomSessionConfig(SessionConfig):
+        async def init_session(self, session_id, request, download):
+            await download(Request("data:,a"))
+            return True
+
+    settings = {
+        **SESSION_SETTINGS,
+        "RETRY_TIMES": 0,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_COOKIE_MODE": True,
+    }
+    request_cookies = []
+
+    class TestSpider(Spider):
+        name = "test"
+        start_urls = ["https://example.com"]
+
+        def parse(self, response):
+            request_cookies.append(response.request.meta["zyte_api"]["requestCookies"])
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert request_cookies == [[]]
+    assert_session_stats(crawler, {"example.com": (1, 1)})
+
+    session_config_registry.__init__()  # type: ignore[misc]
