@@ -238,7 +238,10 @@ async def test_response_html(meta: dict[str, dict[str, Any]], mockserver):
     assert resp.css("h1 ::text").get() == "World!"
     assert resp.xpath("//body/text()").getall() == ["Hello"]
     if meta.get("httpResponseHeaders", False) is True:
-        assert resp.headers == {b"Test_Header": [b"test_value"]}
+        # lowercase manually as Scrapy <= 2.19 capitalizes header names
+        assert {k.lower(): v for k, v in resp.headers.items()} == {
+            b"test_header": [b"test_value"]
+        }
     else:
         assert not resp.headers
 
