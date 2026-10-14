@@ -2,21 +2,16 @@ import hashlib
 from copy import copy
 
 import pytest
-from packaging.version import Version
-from scrapy import __version__ as SCRAPY_VERSION
-
-from . import deferred_f_from_coro_f
-
-if Version(SCRAPY_VERSION) < Version("2.7"):
-    pytest.skip("Skipping tests for Scrapy ≥ 2.7", allow_module_level=True)
-
 from scrapy import Request, Spider
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
 from scrapy_zyte_api._request_fingerprinter import _ProviderPlanData
-from scrapy_zyte_api.utils import _build_from_crawler  # type: ignore[attr-defined]
+from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _POET_ADDON_SUPPORT,
+    _build_from_crawler,
+)
 
-from . import SETTINGS, get_crawler
+from . import SETTINGS, SETTINGS_T, deferred_f_from_coro_f, get_crawler
 
 try:
     import scrapy_poet
@@ -81,9 +76,15 @@ async def test_poet_installed_but_disabled(caplog):
         def parse_deps(self, response, a: WebPage):
             pass
 
-    crawler = await get_crawler(
-        spider_cls=DepsSpider, settings={"ZYTE_API_TRANSPARENT_MODE": True}, poet=False
-    )
+    settings: SETTINGS_T = {"ZYTE_API_TRANSPARENT_MODE": True}
+    if not _POET_ADDON_SUPPORT:
+        # SETTINGS enables InjectionMiddleware directly for scrapy-poet
+        # versions without an add-on, so poet=False does not disable it.
+        settings["DOWNLOADER_MIDDLEWARES"] = {
+            **SETTINGS["DOWNLOADER_MIDDLEWARES"],
+            scrapy_poet.InjectionMiddleware: None,
+        }
+    crawler = await get_crawler(spider_cls=DepsSpider, settings=settings, poet=False)
     fingerprinter = crawler.request_fingerprinter
 
     no_deps_fp = fingerprinter.fingerprint(no_deps_request)
