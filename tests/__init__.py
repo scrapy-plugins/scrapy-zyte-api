@@ -8,6 +8,7 @@ from urllib.request import Request
 from packaging.version import Version
 from scrapy import Spider
 from scrapy import __version__ as SCRAPY_VERSION
+from scrapy.core.engine import ExecutionEngine
 from scrapy.crawler import Crawler
 from scrapy.http import Response
 from scrapy.utils.misc import load_object
@@ -81,6 +82,8 @@ SETTINGS: SETTINGS_T = {
     "TELNETCONSOLE_ENABLED": False,
     "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
     "ZYTE_API_KEY": _API_KEY,
+    "ZYTE_API_RETRY_POLICY": "tests._retry.POLICY",
+    "ZYTE_API_SESSION_RETRY_POLICY": "tests._retry.SESSION_POLICY",
 }
 if Version(SCRAPY_VERSION) < Version("2.12"):
     SETTINGS["REQUEST_FINGERPRINTER_IMPLEMENTATION"] = (
@@ -121,6 +124,8 @@ SETTINGS_ADDON: SETTINGS_T = {
     },
     "TELNETCONSOLE_ENABLED": False,
     "ZYTE_API_KEY": _API_KEY,
+    "ZYTE_API_RETRY_POLICY": "tests._retry.POLICY",
+    "ZYTE_API_SESSION_RETRY_POLICY": "tests._retry.SESSION_POLICY",
 }
 if _REACTORLESS:
     SETTINGS_ADDON["TWISTED_REACTOR_ENABLED"] = False
@@ -135,7 +140,7 @@ SESSION_SETTINGS: SETTINGS_T = {
     "ZYTE_API_SESSION_CREATION_RETRY_DELAY": 0,
     "ZYTE_API_SESSION_DELAY": 0,
     "ZYTE_API_SESSION_ENABLED": True,
-    "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0,
+    "ZYTE_API_SESSION_QUEUE_WAIT_TIME": 0.05,
     "ZYTE_API_SESSION_STATS_PER_POOL": True,
 }
 
@@ -192,7 +197,9 @@ async def make_handler(
         yield handler
     finally:
         if handler is not None:
-            await handler._close()
+            # close() also closes the fallback handlers, which would
+            # otherwise leak the connections that they keep open.
+            await _ensure_awaitable(handler.close())
 
 
 def serialize_settings(settings):
@@ -239,7 +246,10 @@ async def setup_crawler_engine(crawler: Crawler, start_handler: bool = False) ->
 
     crawler.crawling = True
     crawler.spider = crawler._create_spider()
-    crawler.engine = crawler._create_engine()
+    if hasattr(crawler, "_create_engine"):  # Scrapy < 2.20
+        crawler.engine = crawler._create_engine()
+    else:
+        crawler.engine = ExecutionEngine(crawler)  # type: ignore[call-arg]
 
     if start_handler:
         handler = get_download_handler(crawler, "https")

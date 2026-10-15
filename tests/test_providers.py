@@ -10,7 +10,7 @@ import attrs
 from scrapy import Request, Spider
 from scrapy.statscollectors import MemoryStatsCollector
 from scrapy_poet import DummyResponse
-from scrapy_poet.utils.testing import HtmlResource, crawl_single_item
+from scrapy_poet.utils.testing import HtmlResource
 from twisted.internet.defer import Deferred
 from twisted.internet.protocol import Protocol
 from twisted.web.client import Agent
@@ -42,7 +42,6 @@ from scrapy_zyte_api import (
     ExtractFrom,
     Geolocation,
     NetworkCapture,
-    ScrapyZyteAPIRequestFingerprinter,
     Screenshot,
     actions,
     custom_attrs,
@@ -58,7 +57,10 @@ from scrapy_zyte_api.providers import (
     _get_zyte_api_provider_params,
     _set_in_provider_meta_cache,
 )
-from scrapy_zyte_api.utils import maybe_deferred_to_future
+from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
+    _ensure_awaitable,
+    maybe_deferred_to_future,
+)
 
 from . import _REACTORLESS, SETTINGS, deferred_f_from_coro_f
 from .mockserver import get_ephemeral_port
@@ -78,10 +80,16 @@ requires_reactor = pytest.mark.skipif(
 PROVIDER_PARAMS = {"geolocation": "IE"}
 
 
+try:
+    from scrapy_poet.utils.testing import crawl_single_item_async as crawl_single_item
+except ImportError:  # scrapy-poet < 0.27.0
+    from scrapy_poet.utils.testing import crawl_single_item  # type: ignore[assignment]
+
+
 def _crawl_single_item(
     spider_cls, resource_cls, settings, spider_kwargs=None, port=None
 ):
-    return maybe_deferred_to_future(
+    return _ensure_awaitable(
         crawl_single_item(
             spider_cls, resource_cls, settings, spider_kwargs=spider_kwargs, port=port
         )
@@ -363,6 +371,7 @@ async def test_provider_extractfrom(mockserver):
     )
 
 
+@pytest.mark.usefixtures("twisted_logging")
 @deferred_f_from_coro_f
 async def test_provider_extractfrom_double(mockserver, caplog):
     @attrs.define
@@ -440,6 +449,7 @@ async def test_provider_geolocation(mockserver):
     assert item["product"].name == "Product name (country DE)"
 
 
+@pytest.mark.usefixtures("twisted_logging")
 @deferred_f_from_coro_f
 async def test_provider_geolocation_unannotated(mockserver, caplog):
     @attrs.define
@@ -675,10 +685,6 @@ def test_set_in_provider_meta_cache_eviction():
     assert list(cache.keys()) == [("b",), ("c",)]
 
 
-@pytest.mark.skipif(
-    ScrapyZyteAPIRequestFingerprinter is None,
-    reason="Request fingerprinting not supported (Scrapy < 2.7)",
-)
 @deferred_f_from_coro_f
 async def test_provider_reuses_cached_provider_meta_from_fingerprinter(
     mockserver, monkeypatch
@@ -704,10 +710,6 @@ async def test_provider_reuses_cached_provider_meta_from_fingerprinter(
     assert build_meta_calls == 1
 
 
-@pytest.mark.skipif(
-    ScrapyZyteAPIRequestFingerprinter is None,
-    reason="Request fingerprinting not supported (Scrapy < 2.7)",
-)
 @deferred_f_from_coro_f
 async def test_provider_rebuilds_meta_for_non_fingerprint_params(
     mockserver, monkeypatch
@@ -1271,6 +1273,30 @@ async def test_screenshot(mockserver):
 
 
 @deferred_f_from_coro_f
+async def test_screenshot_any_response(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        screenshot: Screenshot
+
+    class TestSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
+            yield {"screenshot": page.screenshot, "response": page.response}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert len(params) == 1
+    assert params[0] == {"url": url, "browserHtml": True, "screenshot": True}
+
+    assert type(item["screenshot"]) is Screenshot
+    assert item["screenshot"].body == b"screenshot-body-contents"
+    assert type(item["response"]) is AnyResponse
+    assert type(item["response"].response) is BrowserResponse
+
+
+@deferred_f_from_coro_f
 async def test_provider_actions(mockserver, caplog):
     @attrs.define
     class ActionProductPage(BasePage):
@@ -1317,6 +1343,28 @@ async def test_provider_actions(mockserver, caplog):
     )
 
 
+@deferred_f_from_coro_f
+async def test_provider_actions_missing(mockserver):
+    """Actions are None when the response reports no action results."""
+
+    @attrs.define
+    class ActionProductPage(BasePage):
+        product: Product
+        actions: Annotated[Actions, actions([])]
+
+    class ActionZyteAPISpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: ActionProductPage):  # type: ignore[override]
+            yield {"action_results": page.actions}
+
+    settings = deepcopy(SETTINGS)
+    settings["ZYTE_API_URL"] = mockserver.urljoin("/")
+    settings["SCRAPY_POET_PROVIDERS"] = {ZyteApiProvider: 0}
+
+    item, *_ = await _crawl_single_item(ActionZyteAPISpider, HtmlResource, settings)
+    assert item["action_results"] == Actions(None)
+
+
+@pytest.mark.usefixtures("twisted_logging")
 @deferred_f_from_coro_f
 async def test_provider_actions_unannotated(mockserver, caplog):
     @attrs.define
@@ -1384,6 +1432,7 @@ async def test_provider_network_capture(mockserver):
     assert second.body is None
 
 
+@pytest.mark.usefixtures("twisted_logging")
 @deferred_f_from_coro_f
 async def test_provider_network_capture_unannotated(mockserver, caplog):
     @attrs.define
