@@ -6,7 +6,7 @@ from scrapy.utils.misc import load_object
 
 from scrapy_zyte_api import SessionConfig, session_config
 from scrapy_zyte_api._session import SESSION_INIT_META_KEY, session_config_registry
-from scrapy_zyte_api.utils import _RAW_CLASS_SETTING_SUPPORT, maybe_deferred_to_future
+from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, deferred_f_from_coro_f, get_crawler
 from .helpers import assert_session_stats
@@ -160,18 +160,7 @@ CHECKER_TESTS: tuple[
     [
         *CHECKER_TESTS,
         *(
-            pytest.param(
-                load_object(checker),
-                close_reason,
-                stats,
-                marks=pytest.mark.skipif(
-                    not _RAW_CLASS_SETTING_SUPPORT,
-                    reason=(
-                        "Configuring component classes instead of their "
-                        "import paths requires Scrapy 2.4+."
-                    ),
-                ),
-            )
+            pytest.param(load_object(checker), close_reason, stats)
             for checker, close_reason, stats in CHECKER_TESTS
         ),
     ],
