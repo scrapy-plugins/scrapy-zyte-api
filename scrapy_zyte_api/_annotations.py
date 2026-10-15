@@ -1,9 +1,9 @@
 from collections.abc import Iterable
-from enum import Enum
+from enum import StrEnum
 from typing import Any, TypedDict
 
 
-class ExtractFrom(str, Enum):
+class ExtractFrom(StrEnum):
     """:ref:`Annotation <annotations>` to specify the :ref:`extraction source
     <zapi-extract-from>` of an automatic extraction :ref:`input <inputs>`,
     such as :class:`~zyte_common_items.Product` or
