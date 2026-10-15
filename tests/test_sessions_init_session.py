@@ -79,8 +79,8 @@ async def test_init_session_chain(mockserver):
 async def test_init_session_overrides(mockserver):
     """Setting session=None suppresses session injection, setting
     dont_merge_cookies explicitly in meta overrides the default True, a session
-    ID set in meta is kept, and requests that do not define Zyte API parameters
-    in meta get no session."""
+    ID set in meta is kept, and requests that go through automatic request
+    parameter mapping get the session too."""
     results = []
 
     @session_config(["example.com"])
@@ -116,7 +116,8 @@ async def test_init_session_overrides(mockserver):
                     "dont_merge_cookies_override": r2.request.meta.get(
                         "dont_merge_cookies"
                     ),
-                    "automap_session": r3.raw_api_response.get("session"),
+                    "automap_session": r3.raw_api_response.get("session")
+                    == {"id": session_id},
                     "custom_session": r4.raw_api_response["session"],
                 }
             )
@@ -142,7 +143,7 @@ async def test_init_session_overrides(mockserver):
         {
             "session_suppressed": True,
             "dont_merge_cookies_override": False,
-            "automap_session": None,
+            "automap_session": True,
             "custom_session": {"id": "a"},
         }
     ]

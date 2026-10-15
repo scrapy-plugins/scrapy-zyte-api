@@ -5,13 +5,12 @@ from __future__ import annotations
 import pytest
 from scrapy import Request
 from scrapy.http import HtmlResponse, Response
-from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api._proxy import ProxyModeError
 from scrapy_zyte_api.responses import ZyteAPIProxyResponse, ZyteAPIProxyTextResponse
 from scrapy_zyte_api.utils import USER_AGENT
 
-from . import SETTINGS, SETTINGS_T, download_request
+from . import SETTINGS, SETTINGS_T, deferred_f_from_coro_f, download_request
 
 PROXY_SETTINGS: SETTINGS_T = {
     **SETTINGS,

@@ -10,7 +10,6 @@ pytest.importorskip("scrapy_poet")
 
 from scrapy import Request
 from scrapy.http import HtmlResponse
-from scrapy.utils.defer import deferred_f_from_coro_f
 from scrapy_poet import DummyResponse
 from scrapy_poet.utils.testing import HtmlResource
 from web_poet import BrowserResponse
@@ -18,7 +17,7 @@ from web_poet import BrowserResponse
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import ZyteApiProvider
 
-from . import SETTINGS
+from . import SETTINGS, deferred_f_from_coro_f
 from .test_providers import ZyteAPISpider, _crawl_single_item
 
 _BROWSER_HTML = "<html><body>Hello<h1>World!</h1></body></html>"

@@ -1,7 +1,6 @@
 import pytest
 from packaging.version import Version
 from scrapy import __version__ as SCRAPY_VERSION
-from scrapy.utils.defer import deferred_f_from_coro_f
 
 if Version(SCRAPY_VERSION) < Version("2.7"):
     pytest.skip("Skipping tests for Scrapy ≥ 2.7", allow_module_level=True)
@@ -11,7 +10,7 @@ from scrapy import Request
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
 from scrapy_zyte_api.utils import _build_from_crawler  # type: ignore[attr-defined]
 
-from . import get_crawler
+from . import deferred_f_from_coro_f, get_crawler
 
 
 @pytest.mark.parametrize(

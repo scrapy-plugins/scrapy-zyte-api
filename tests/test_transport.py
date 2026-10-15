@@ -8,7 +8,6 @@ from __future__ import annotations
 import pytest
 from scrapy import Request, Spider
 from scrapy.settings import Settings
-from scrapy.utils.defer import deferred_f_from_coro_f
 
 from scrapy_zyte_api._params import _ParamParser, _smartproxy_enabled
 from scrapy_zyte_api._request_transport import (
@@ -22,7 +21,7 @@ from scrapy_zyte_api._request_transport import (
 )
 from scrapy_zyte_api._request_type import is_manual_request
 
-from . import get_crawler
+from . import deferred_f_from_coro_f, get_crawler
 
 COMPATIBLE_PARAMS = {"url": "https://example.com", "httpResponseBody": True}
 INCOMPATIBLE_PARAMS = {"url": "https://example.com", "product": True}
