@@ -1,6 +1,5 @@
 from collections import deque
 from copy import copy
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -14,22 +13,19 @@ from scrapy_zyte_api import (
     SESSION_DEFAULT_RETRY_POLICY,
 )
 from scrapy_zyte_api._session import SESSION_INIT_META_KEY
-from scrapy_zyte_api.utils import _REQUEST_ERROR_HAS_QUERY, maybe_deferred_to_future
+from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import SESSION_SETTINGS, deferred_f_from_coro_f, get_crawler
 from .helpers import assert_session_stats
 
 
 def mock_request_error(*, status=200, response_content=None):
-    kwargs: dict[str, Any] = {}
-    if _REQUEST_ERROR_HAS_QUERY:
-        kwargs["query"] = {}
     return RequestError(
         history=None,
         request_info=None,
         response_content=response_content,
         status=status,
-        **kwargs,
+        query={},
     )
 
 

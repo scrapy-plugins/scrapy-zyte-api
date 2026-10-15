@@ -3,10 +3,12 @@ from collections import deque
 
 import pytest
 from scrapy import Request, Spider
+from scrapy.exceptions import ScrapyDeprecationWarning
 
 from scrapy_zyte_api import SessionConfig, session_config
 from scrapy_zyte_api._session import (
     ScrapyZyteAPISessionDownloaderMiddleware,
+    _SessionManager,
     session_config_registry,
 )
 from scrapy_zyte_api.utils import maybe_deferred_to_future
@@ -283,7 +285,7 @@ async def test_delay(settings, meta, expected, mockserver, monkeypatch):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_SESSION_QUEUE_WAIT_TIME": queue_wait_time,
-        "ZYTE_API_SESSION_RANDOMIZE_DELAY": False,
+        "ZYTE_API_SESSION_DELAY_JITTER": 0,
         **settings,
     }
 
@@ -332,7 +334,7 @@ async def test_delay_reuse(mockserver, monkeypatch):
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
         "ZYTE_API_SESSION_QUEUE_WAIT_TIME": queue_wait_time,
-        "ZYTE_API_SESSION_RANDOMIZE_DELAY": False,
+        "ZYTE_API_SESSION_DELAY_JITTER": 0,
     }
 
     sleep_calls = []
@@ -361,9 +363,9 @@ async def test_delay_reuse(mockserver, monkeypatch):
 @pytest.mark.parametrize(
     ("settings", "start_requests"),
     [
-        ({"ZYTE_API_SESSION_RANDOMIZE_DELAY": True}, ["https://example.com"] * 2),
+        ({"ZYTE_API_SESSION_DELAY_JITTER": 0.5}, ["https://example.com"] * 2),
         (
-            {"ZYTE_API_SESSION_POOLS": {"example.com": {"randomize_delay": True}}},
+            {"ZYTE_API_SESSION_POOLS": {"example.com": {"jitter": 0.5}}},
             ["https://example.com"] * 2,
         ),
         (
@@ -374,7 +376,7 @@ async def test_delay_reuse(mockserver, monkeypatch):
                     meta={
                         "zyte_api_session_pool": {
                             "id": "example.com",
-                            "randomize_delay": True,
+                            "jitter": 0.5,
                         }
                     },
                 )
@@ -388,7 +390,7 @@ async def test_delay_random(settings, start_requests, mockserver, monkeypatch):
     base_delay = 1.0
     queue_wait_time = base_delay * 2
     settings = {
-        "RANDOMIZE_DOWNLOAD_DELAY": False,
+        "ZYTE_API_SESSION_DELAY_JITTER": 0,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_ENABLED": True,
         "ZYTE_API_SESSION_POOL_SIZE": 1,
@@ -527,3 +529,65 @@ async def test_size(settings, start_requests, expected_stats, mockserver, caplog
             "ZYTE_API_SESSION_POOL_SIZES is deprecated" in rec.getMessage()
             for rec in caplog.records
         )
+
+
+@pytest.mark.parametrize(
+    ("settings", "expected"),
+    [
+        ({}, 0.5),
+        ({"DOWNLOAD_DELAY_JITTER": 0}, 0.0),
+        ({"RANDOMIZE_DOWNLOAD_DELAY": False}, 0.0),
+        ({"RANDOMIZE_DOWNLOAD_DELAY": False, "DOWNLOAD_DELAY_JITTER": 0.2}, 0.2),
+        ({"RANDOMIZE_DOWNLOAD_DELAY": True, "DOWNLOAD_DELAY_JITTER": 0}, 0.0),
+        ({"DOWNLOAD_DELAY_JITTER": 0, "ZYTE_API_SESSION_DELAY_JITTER": 0.3}, 0.3),
+    ],
+)
+@deferred_f_from_coro_f
+async def test_jitter_default(settings, expected):
+    crawler = await get_crawler(settings, setup_engine=False)
+    assert _SessionManager(crawler)._jitter == expected
+
+
+@pytest.mark.parametrize(
+    ("settings", "expected"),
+    [
+        ({"ZYTE_API_SESSION_RANDOMIZE_DELAY": True}, 0.5),
+        ({"ZYTE_API_SESSION_RANDOMIZE_DELAY": False}, 0.0),
+        (
+            {
+                "ZYTE_API_SESSION_RANDOMIZE_DELAY": True,
+                "ZYTE_API_SESSION_DELAY_JITTER": 0.2,
+            },
+            0.2,
+        ),
+    ],
+)
+@deferred_f_from_coro_f
+async def test_randomize_delay_deprecated(settings, expected):
+    crawler = await get_crawler(settings, setup_engine=False)
+    with pytest.warns(ScrapyDeprecationWarning, match="ZYTE_API_SESSION_DELAY_JITTER"):
+        assert _SessionManager(crawler)._jitter == expected
+
+
+@pytest.mark.parametrize(
+    ("options", "expected"),
+    [
+        ({"randomize_delay": True}, 0.5),
+        ({"randomize_delay": False}, 0.0),
+        ({"randomize_delay": True, "jitter": 0.2}, 0.2),
+    ],
+)
+@deferred_f_from_coro_f
+async def test_pool_randomize_delay_deprecated(options, expected):
+    settings = {"ZYTE_API_SESSION_POOLS": {"example.com": options}}
+    crawler = await get_crawler(settings, setup_engine=False)
+    with pytest.warns(ScrapyDeprecationWarning, match="jitter"):
+        manager = _SessionManager(crawler)
+    assert manager._pool_configs["example.com"]["jitter"] == expected
+    manager = _SessionManager(await get_crawler({}, setup_engine=False))
+    request = Request(
+        "https://example.com", meta={"zyte_api_session_pool": {"id": "a", **options}}
+    )
+    with pytest.warns(ScrapyDeprecationWarning, match="jitter"):
+        assert manager.get_pool(request) == "a"
+    assert manager._pool_configs["a"]["jitter"] == expected
