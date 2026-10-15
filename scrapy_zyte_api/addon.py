@@ -31,6 +31,9 @@ def _setdefault(settings, setting, cls, pos):
 
 class Addon:
     def update_settings(self, settings: BaseSettings) -> None:
+        if not settings.getbool("ZYTE_API_ENABLED", True):
+            return
+
         from scrapy.settings.default_settings import (  # noqa: PLC0415
             REQUEST_FINGERPRINTER_CLASS as _SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS,
         )

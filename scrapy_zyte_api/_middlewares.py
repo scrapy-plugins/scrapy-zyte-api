@@ -2,6 +2,7 @@ from logging import getLogger
 from warnings import warn
 
 from scrapy import Request, Spider
+from scrapy.downloadermiddlewares.retry import get_retry_request
 from scrapy.exceptions import IgnoreRequest, ScrapyDeprecationWarning
 from scrapy.http import Response
 from scrapy.utils.python import global_object_name
@@ -10,12 +11,11 @@ from zyte_api import RequestError
 from ._params import _ParamParser
 from .exceptions import ActionError
 from .responses import ZyteAPIMixin, _has_action_error
-from .utils import (  # type: ignore[attr-defined]
+from .utils import (
     _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
     _GET_SLOT_NEEDS_SPIDER,
     _LOG_DEFERRED_IS_DEPRECATED,
     _close_spider,
-    _get_retry_request,
     _schedule_coro,
     maybe_deferred_to_future,
 )
@@ -205,7 +205,7 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
 
     def _retry(self, request: Request, *, reason: str) -> Request | None:
         assert self._crawler.spider
-        return _get_retry_request(
+        return get_retry_request(
             request,
             reason=reason,
             spider=self._crawler.spider,

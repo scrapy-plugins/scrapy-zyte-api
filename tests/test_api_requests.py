@@ -15,6 +15,7 @@ from scrapy.downloadermiddlewares.httpcompression import ACCEPTED_ENCODINGS
 from scrapy.exceptions import CloseSpider
 from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
+from scrapy.settings import Settings
 from scrapy.settings.default_settings import DEFAULT_REQUEST_HEADERS
 from scrapy.settings.default_settings import USER_AGENT as DEFAULT_USER_AGENT
 from twisted.internet.defer import Deferred, succeed
@@ -22,7 +23,12 @@ from zyte_api import RequestError
 
 import scrapy_zyte_api._params as params_module
 from scrapy_zyte_api._cookies import _get_cookie_jar
-from scrapy_zyte_api._params import ANY_VALUE, _ParamParser
+from scrapy_zyte_api._params import (
+    ANY_VALUE,
+    _iter_ban_sensitive_headers_in_params,
+    _load_mw_skip_headers,
+    _ParamParser,
+)
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.responses import _process_response
 from scrapy_zyte_api.utils import (
@@ -232,7 +238,10 @@ async def test_response_html(meta: dict[str, dict[str, Any]], mockserver):
     assert resp.css("h1 ::text").get() == "World!"
     assert resp.xpath("//body/text()").getall() == ["Hello"]
     if meta.get("httpResponseHeaders", False) is True:
-        assert resp.headers == {b"Test_Header": [b"test_value"]}
+        # lowercase manually as Scrapy <= 2.19 capitalizes header names
+        assert {k.lower(): v for k, v in resp.headers.items()} == {
+            b"test_header": [b"test_value"]
+        }
     else:
         assert not resp.headers
 
@@ -570,7 +579,7 @@ async def test_transparent_mode_toggling(setting, meta, expected):
     param_parser = handler._param_parser
     func = partial(param_parser.parse, request)
     if isclass(expected):
-        with pytest.raises(expected):
+        with pytest.raises(expected):  # type: ignore[type-var]
             func()
     else:
         api_params = func()
@@ -2393,6 +2402,20 @@ async def test_automap_header_settings(
     )
 
 
+def test_iter_ban_sensitive_headers_in_params():
+    """Headers without a name are ignored, and a header defined both as a
+    custom HTTP request header and as a request header is only reported once."""
+    params = {
+        "customHttpRequestHeaders": [
+            {"value": "es"},
+            {"name": "Accept-Language", "value": "es"},
+            {"name": "Referer", "value": "https://example.com"},
+        ],
+        "requestHeaders": {"acceptLanguage": "es", "referer": "https://example.com"},
+    }
+    assert list(_iter_ban_sensitive_headers_in_params(params)) == [b"accept-language"]
+
+
 @deferred_f_from_coro_f
 async def test_ban_sensitive_header_warning_user_agent_setting(caplog):
     await _test_param_processing(
@@ -3682,6 +3705,23 @@ async def test_automap_custom_cookie_middleware():
     await handler._close()
 
 
+@deferred_f_from_coro_f
+async def test_automap_missing_cookie_middleware():
+    """The cookie middleware that ZYTE_API_COOKIE_MIDDLEWARE points at must be
+    enabled."""
+    mw_cls = CustomCookieMiddleware
+    settings = {
+        "ZYTE_API_COOKIE_MIDDLEWARE": f"{mw_cls.__module__}.{mw_cls.__qualname__}",
+        "ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED": True,
+        "ZYTE_API_TRANSPARENT_MODE": True,
+    }
+    crawler = await get_crawler(settings)
+    handler = get_download_handler(crawler, "https")
+    with pytest.raises(RuntimeError, match=mw_cls.__qualname__):
+        await handler.engine_started()
+    await handler._close()
+
+
 @pytest.mark.parametrize(
     ("body", "meta", "expected", "warnings"),
     [
@@ -4026,6 +4066,22 @@ async def test_middleware_headers_default_custom():
         {"name": "Referer", "value": "https://referrer.example"},
         {"name": "User-Agent", "value": "foo/1.2.3"},
     ]
+
+
+def test_middleware_headers_no_engine():
+    """When reading the engine raises RuntimeError because the crawl has not
+    started, the headers that middlewares set are assumed to be the default
+    ones."""
+
+    class _Crawler:
+        settings = Settings()
+
+        @property
+        def engine(self):
+            raise RuntimeError
+
+    headers = _load_mw_skip_headers(_Crawler())
+    assert headers[b"accept-encoding"] == b", ".join(ACCEPTED_ENCODINGS)
 
 
 @deferred_f_from_coro_f

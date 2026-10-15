@@ -5,7 +5,7 @@ from unittest import SkipTest
 import pytest
 from packaging.version import Version
 from scrapy import Request, Spider
-from scrapy.exceptions import IgnoreRequest
+from scrapy.exceptions import IgnoreRequest, ScrapyDeprecationWarning
 from scrapy.http.response import Response
 from scrapy.item import Item
 from scrapy.utils.test import get_crawler
@@ -18,7 +18,6 @@ from scrapy_zyte_api.exceptions import ActionError
 from scrapy_zyte_api.responses import ZyteAPIResponse
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _GET_SLOT_NEEDS_SPIDER,
-    _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT,
     _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER,
     _PROCESS_START_REQUIRES_SPIDER,
     _START_REQUESTS_CAN_YIELD_ITEMS,
@@ -58,15 +57,12 @@ async def start_request_processor(middleware, request: Request):
 async def spider_output_processor(middleware, request: Request):
     response = Response("https://example.com")
     args = (None,) if _PROCESS_SPIDER_OUTPUT_REQUIRES_SPIDER else ()
-    if _PROCESS_SPIDER_OUTPUT_ASYNC_SUPPORT:
-        result = [
-            request
-            async for request in middleware.process_spider_output_async(
-                response, aiter_([request]), *args
-            )
-        ]
-    else:
-        result = list(middleware.process_spider_output(response, [request], *args))
+    result = [
+        request
+        async for request in middleware.process_spider_output_async(
+            response, aiter_([request]), *args
+        )
+    ]
     assert result == [request]
 
 
@@ -99,7 +95,11 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     middleware = _build_from_crawler(mw_cls, crawler)
 
     # AutoThrottle does this.
-    spider.download_delay = 5  # type: ignore[attr-defined]
+    downloader = crawler.engine.downloader
+    if hasattr(downloader, "_delay"):
+        downloader._delay = 5
+    else:  # Scrapy < 2.17
+        spider.download_delay = 5  # type: ignore[attr-defined]
 
     # No effect on non-Zyte-API requests
     request = Request("https://example.com")
@@ -107,7 +107,7 @@ async def test_preserve_delay(mw_cls, processor, settings, preserve):
     assert "download_slot" not in request.meta
     args = (crawler.spider,) if _GET_SLOT_NEEDS_SPIDER else ()
     _, slot = crawler.engine.downloader._get_slot(request, *args)
-    assert slot.delay == spider.download_delay  # type: ignore[attr-defined]
+    assert slot.delay == 5
 
     # On Zyte API requests, the download slot is changed, and its delay may be
     # set to 0 depending on settings.
@@ -854,3 +854,23 @@ async def test_start_requests_items():
     assert crawler.stats is not None
     assert crawler.stats.get_value("finish_reason") == "finished"
     assert "log_count/ERROR" not in crawler.stats.get_stats()
+
+
+@deferred_f_from_coro_f
+async def test_slot_request_spider():
+    crawler = get_crawler()
+    await maybe_deferred_to_future(crawler.crawl("a"))
+    middleware = _build_from_crawler(ScrapyZyteAPIDownloaderMiddleware, crawler)
+    request = Request("https://example.com")
+    with pytest.warns(ScrapyDeprecationWarning, match="slot_request"):
+        middleware.slot_request(request, crawler.spider)
+
+
+@deferred_f_from_coro_f
+async def test_process_start_requests_items():
+    """Items yielded by start_requests() are yielded back untouched."""
+    crawler = get_crawler()
+    await maybe_deferred_to_future(crawler.crawl("a"))
+    middleware = _build_from_crawler(ScrapyZyteAPISpiderMiddleware, crawler)
+    item = Item()
+    assert list(middleware.process_start_requests([item], crawler.spider)) == [item]

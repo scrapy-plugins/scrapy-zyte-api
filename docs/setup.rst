@@ -18,11 +18,9 @@ You need at least:
 -   A :ref:`Zyte API <zyte-api>` subscription (there’s a :ref:`free trial
     <zapi-trial>`).
 
--   Python 3.10+
+-   Python 3.11+
 
--   Scrapy 2.0.1+
-
-:doc:`scrapy-poet <scrapy-poet:index>` integration requires Scrapy 2.6+.
+-   Scrapy 2.7.0+
 
 
 .. _install:
