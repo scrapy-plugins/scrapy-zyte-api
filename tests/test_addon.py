@@ -23,7 +23,6 @@ from scrapy_zyte_api.utils import (
 )
 
 from . import (
-    _HTTPX_HANDLER,
     _REACTORLESS,
     deferred_f_from_coro_f,
     download_request,
@@ -170,6 +169,16 @@ def test_addon_reactorless():
     assert disabled.getpriority("TWISTED_REACTOR") != SETTINGS_PRIORITIES["addon"]
 
 
+@pytest.mark.skipif(not POET, reason="scrapy-poet is not installed")
+def test_addon_poet_injection_middleware(monkeypatch):
+    """With a scrapy-poet version that has no add-on of its own, the add-on
+    enables the scrapy-poet injection middleware."""
+    monkeypatch.setattr("scrapy_zyte_api.addon._POET_ADDON_SUPPORT", False)
+    settings = Settings()
+    Addon().update_settings(settings)
+    assert settings.getdict("DOWNLOADER_MIDDLEWARES")[InjectionMiddleware] == 543
+
+
 @deferred_f_from_coro_f
 async def test_addon_matching_settings():
     crawler = await get_crawler_zyte_api(
@@ -229,11 +238,14 @@ def _test_setting_changes(initial_settings, expected_settings):
     assert actual_settings == expected_settings
 
 
-FALLBACK_HANDLER = (
-    _HTTPX_HANDLER
-    if _REACTORLESS
-    else "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
-)
+if _REACTORLESS:
+    from scrapy.utils.test import get_reactor_settings
+
+    # Which asyncio-based handler Scrapy uses without a reactor depends on the
+    # Scrapy version, so it is read from Scrapy itself.
+    FALLBACK_HANDLER = get_reactor_settings()["DOWNLOAD_HANDLERS"]["https"]
+else:
+    FALLBACK_HANDLER = "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
 BASE_EXPECTED = {
     "DOWNLOADER_MIDDLEWARES": {
         ScrapyZyteAPISessionResetterDownloaderMiddleware: 565,

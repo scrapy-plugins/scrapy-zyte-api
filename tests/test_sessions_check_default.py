@@ -110,23 +110,33 @@ def test_session_config_check_non_setlocation_action_first():
     assert config.check(cast("Response", MockResponse()), request) is True
 
 
-def test_session_config_check_location_without_setlocation_action():
-    """When a location is set but the response has no ``setLocation`` action,
-    the default check passes (neither the unsupported-location nor the
-    success-status code paths apply)."""
-    crawler = scrapy_get_crawler(settings_dict={})
-    config = SessionConfig(crawler)
+@deferred_f_from_coro_f
+async def test_checker_location_without_set_location(mockserver):
+    """With a location, responses that have actions but no ``setLocation``
+    action pass the check."""
+    settings = {
+        **SESSION_SETTINGS,
+        "ZYTE_API_URL": mockserver.urljoin("/"),
+        "ZYTE_API_SESSION_LOCATION": {"postalCode": "10001"},
+    }
 
-    request = Request(
-        "https://example.com",
-        meta={"zyte_api_session_location": {"postalCode": "10001"}},
-    )
+    class TestSpider(Spider):
+        name = "test"
 
-    class MockResponse:
-        raw_api_response = {
-            "actions": [
-                {"action": "click", "status": "success"},
-            ]
-        }
+        async def start(self):
+            for request in self.start_requests():
+                yield request
 
-    assert config.check(cast("Response", MockResponse()), request) is True
+        def start_requests(self):
+            yield Request(
+                "https://example.com",
+                meta={"zyte_api_automap": {"actions": [{"action": "click"}]}},
+            )
+
+        def parse(self, response):
+            pass
+
+    crawler = await get_crawler(settings, spider_cls=TestSpider, setup_engine=False)
+    await maybe_deferred_to_future(crawler.crawl())
+
+    assert_session_stats(crawler, {"example.com": (1, 1)})

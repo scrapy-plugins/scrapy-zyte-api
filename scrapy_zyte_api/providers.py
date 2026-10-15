@@ -1,7 +1,7 @@
 import json
 from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Set, cast
+from typing import TYPE_CHECKING, Any, cast
 from weakref import WeakKeyDictionary
 
 from andi.typeutils import is_typing_annotated, strip_annotated
@@ -177,7 +177,7 @@ def _get_zyte_api_provider_params(request: Request, crawler: Crawler) -> dict[st
 
 
 def _build_zyte_api_provider_meta(
-    to_provide: Set[Callable],
+    to_provide: set[Callable],
     request: Request,
     crawler: Crawler,
     *,
@@ -354,7 +354,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         crawler.stats.set_value(f"scrapy-zyte-api/auto_fields/{cls_fqn}", field_list)
 
     async def __call__(
-        self, to_provide: Set[Callable], request: Request, crawler: Crawler
+        self, to_provide: set[Callable], request: Request, crawler: Crawler
     ) -> Sequence[Any]:
         """Makes a Zyte API request to provide BrowserResponse and/or item dependencies."""
         results: list[Any] = []
@@ -363,7 +363,6 @@ class ZyteApiProvider(PageObjectInputProvider):
         screenshot_requested = Screenshot in to_provide
         for cls in list(to_provide):
             self._track_auto_fields(crawler, request, cast("type", cls))
-
             # BrowserResponse takes precedence over HttpResponse
             if (
                 cls == AnyResponse
@@ -452,8 +451,6 @@ class ZyteApiProvider(PageObjectInputProvider):
             results.append(screenshot)
 
         if AnyResponse in to_provide:
-            any_response = None  # type: ignore[assignment]
-
             if "browserHtml" in api_response.raw_api_response:
                 any_response = AnyResponse(
                     response=browser_response
@@ -463,10 +460,9 @@ class ZyteApiProvider(PageObjectInputProvider):
                         html=html,
                     )
                 )
-            elif (
-                "httpResponseBody" in api_response.raw_api_response
-                and "httpResponseHeaders" in api_response.raw_api_response
-            ):
+            else:
+                assert "httpResponseBody" in api_response.raw_api_response
+                assert "httpResponseHeaders" in api_response.raw_api_response
                 any_response = AnyResponse(
                     response=HttpResponse(
                         url=api_response.url,
@@ -477,9 +473,7 @@ class ZyteApiProvider(PageObjectInputProvider):
                         ),
                     )
                 )
-
-            if any_response:
-                results.append(any_response)
+            results.append(any_response)
 
         for cls in to_provide:
             cls_stripped = strip_annotated(cls)

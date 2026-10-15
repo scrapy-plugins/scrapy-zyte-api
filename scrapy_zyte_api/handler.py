@@ -90,18 +90,12 @@ def _truncate_str(obj, index, text, limit):
 
 
 def _truncate(obj, limit):
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            if isinstance(value, str):
-                _truncate_str(obj, key, value, limit)
-            elif isinstance(value, (list, dict)):
-                _truncate(value, limit)
-    else:  # list
-        for index, value in enumerate(obj):
-            if isinstance(value, str):
-                _truncate_str(obj, index, value, limit)
-            elif isinstance(value, (list, dict)):
-                _truncate(value, limit)
+    items = obj.items() if isinstance(obj, dict) else enumerate(obj)
+    for index, value in items:
+        if isinstance(value, str):
+            _truncate_str(obj, index, value, limit)
+        elif isinstance(value, (list, dict)):
+            _truncate(value, limit)
 
 
 def _load_retry_policy(settings):
@@ -457,12 +451,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     def _get_request_retrying(self, request: Request) -> AsyncRetrying:
         retrying = request.meta.get("zyte_api_retry_policy")
-        if retrying:
-            if isinstance(retrying, str):  # Scrapy < 2.4 doesn't have this check
-                retrying = load_object(retrying)
-        else:
-            retrying = self._retry_policy
-        return retrying
+        return load_object(retrying) if retrying else self._retry_policy
 
     async def _download_via_proxy_mode(
         self,
