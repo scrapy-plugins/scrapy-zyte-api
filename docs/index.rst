@@ -41,6 +41,7 @@ either :ref:`globally <transparent>` or :ref:`per request <automap>`, or
    reference/settings
    reference/meta
    reference/inputs
+   reference/session
    reference/stats
    reference/fingerprint-params
 
