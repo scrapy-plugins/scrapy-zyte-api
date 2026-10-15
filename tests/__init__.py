@@ -8,6 +8,7 @@ from urllib.request import Request
 from packaging.version import Version
 from scrapy import Spider
 from scrapy import __version__ as SCRAPY_VERSION
+from scrapy.core.engine import ExecutionEngine
 from scrapy.crawler import Crawler
 from scrapy.http import Response
 from scrapy.utils.misc import load_object
@@ -243,7 +244,10 @@ async def setup_crawler_engine(crawler: Crawler, start_handler: bool = False) ->
 
     crawler.crawling = True
     crawler.spider = crawler._create_spider()
-    crawler.engine = crawler._create_engine()
+    if hasattr(crawler, "_create_engine"):  # Scrapy < 2.20
+        crawler.engine = crawler._create_engine()
+    else:
+        crawler.engine = ExecutionEngine(crawler)  # type: ignore[call-arg]
 
     if start_handler:
         handler = get_download_handler(crawler, "https")
