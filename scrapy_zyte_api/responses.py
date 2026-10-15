@@ -5,7 +5,7 @@ from base64 import b64decode, b64encode
 from copy import copy
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from scrapy.http import Headers, HtmlResponse, Response, TextResponse, XmlResponse
+from scrapy.http import HtmlResponse, Response, TextResponse, XmlResponse
 from scrapy.responsetypes import responsetypes
 
 if TYPE_CHECKING:
@@ -13,11 +13,6 @@ if TYPE_CHECKING:
     from scrapy.http.cookies import CookieJar
 
 from scrapy_zyte_api._cookies import _process_cookies
-from scrapy_zyte_api.utils import (
-    _RESPONSE_HAS_ATTRIBUTES,
-    _RESPONSE_HAS_IP_ADDRESS,
-    _RESPONSE_HAS_PROTOCOL,
-)
 
 _DEFAULT_ENCODING = "utf-8"
 
@@ -29,6 +24,7 @@ def _without(api_response: dict, key: str | None) -> dict:
 
 
 class ZyteAPIMixin:
+    attributes: tuple[str, ...]
     url: str
     body: bytes
 
@@ -46,20 +42,6 @@ class ZyteAPIMixin:
         # the response body, which the raw_api_response property does on
         # first access.
         self._body_field: str | None = None
-        if not _RESPONSE_HAS_ATTRIBUTES:
-            self.attributes: tuple[str, ...] = (
-                "url",
-                "status",
-                "headers",
-                "body",
-                "request",
-                "flags",
-                "certificate",
-            )
-            if _RESPONSE_HAS_IP_ADDRESS:
-                self.attributes += ("ip_address",)
-            if _RESPONSE_HAS_PROTOCOL:
-                self.attributes += ("protocol",)
         self.attributes += ("raw_api_response",)
 
     def replace(self, *args, **kwargs):
@@ -106,7 +88,7 @@ class ZyteAPIMixin:
             result += f"; Path={path}"
         expires = cookie.get("expires")
         if expires is not None:
-            expires_date = dt.datetime.fromtimestamp(expires, dt.timezone.utc)
+            expires_date = dt.datetime.fromtimestamp(expires, dt.UTC)
             expires_date_string = expires_date.strftime("%a, %d %b %Y %H:%M:%S GMT")
             result += f"; Expires={expires_date_string}"
         if cookie.get("httpOnly"):
@@ -268,8 +250,7 @@ def _process_response(
         return ZyteAPITextResponse.from_api_response(api_response, request=request)
 
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
-        # a plain dict here doesn't work correctly on Scrapy < 2.1
-        scrapy_headers = Headers()
+        scrapy_headers: dict[bytes, bytes] = {}
         for header in cast("list[dict[str, str]]", api_response["httpResponseHeaders"]):
             scrapy_headers[header["name"].encode()] = header["value"].encode()
         response_cls = responsetypes.from_args(

@@ -1,10 +1,3 @@
-from .utils import _NEEDS_EARLY_REACTOR
-
-if _NEEDS_EARLY_REACTOR:
-    from scrapy.utils.reactor import install_reactor
-
-    install_reactor("twisted.internet.asyncioreactor.AsyncioSelectorReactor")
-
 # Register web-poet serializers
 from . import _serialization  # noqa: F401
 from ._annotations import ExtractFrom, actions, custom_attrs, network_capture
@@ -47,9 +40,6 @@ SESSION_DEFAULT_RETRY_POLICY = _SESSION_DEFAULT_RETRY_POLICY
 #: Alternative to the :ref:`aggresive retry policy <aggressive-retry-policy>`
 #: for :ref:`session management <session>` that does not retry 520 and 521
 #: responses.
-#:
-#: .. note:: When using python-zyte-api 0.5.2 or lower, this is the same as
-#:           :data:`~scrapy_zyte_api.SESSION_DEFAULT_RETRY_POLICY`.
 SESSION_AGGRESSIVE_RETRY_POLICY = _SESSION_AGGRESSIVE_RETRY_POLICY
 
 #: Instance of :class:`web_poet.rules.RulesRegistry` that holds :ref:`session
