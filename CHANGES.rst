@@ -1,6 +1,21 @@
 Changes
 =======
 
+0.36.0 (2026-08-20)
+-------------------
+
+-   Added support for running without a Twisted reactor, honoring Scrapy’s
+    :setting:`TWISTED_REACTOR_ENABLED <scrapy:TWISTED_REACTOR_ENABLED>`
+    setting (available since Scrapy 2.15).
+
+-   Fixed a bug where a request could be dropped as a duplicate when it only
+    differed from another request in the Zyte API parameters requested
+    through :class:`~scrapy_zyte_api.providers.ZyteApiProvider`, e.g. through
+    the ``zyte_api_provider`` request metadata key.
+
+-   Fixed a crash on the upcoming Scrapy 2.18 when building request headers
+    before the crawl starts.
+
 0.35.0 (2026-06-26)
 -------------------
 
@@ -854,7 +869,7 @@ When upgrading, you should set the following in your Scrapy settings:
   to allow custom fingerprinting. By default, the default Scrapy request
   fingerprinter is used for non-Zyte API requests.
 
-  For users having ``scrapy < 2.7``, see :ref:`fingerprint-pre-2.7` for
+  For users having ``scrapy < 2.7``, see the documentation of this ``scrapy-zyte-api`` version for
   different ways on handling the duplicate request issue.
 
   More information about the request fingerprinting topic can be found in

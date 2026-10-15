@@ -5,7 +5,9 @@ from functools import partial
 from typing import Any, cast
 
 import pytest
+from packaging.version import Version
 from scrapy import Request
+from scrapy import __version__ as SCRAPY_VERSION
 from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
@@ -19,7 +21,6 @@ from scrapy_zyte_api.responses import (
     ZyteAPIXmlResponse,
 )
 from scrapy_zyte_api.responses import _process_response as _unwrapped_process_response
-from scrapy_zyte_api.utils import _RESPONSE_HAS_IP_ADDRESS, _RESPONSE_HAS_PROTOCOL
 
 PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
 PAGE_CONTENT_2 = "<html><body>Ceci n’est pas une pipe</body></html>"
@@ -35,6 +36,7 @@ INPUT_COOKIES = [
         "expires": 1679893056,
         "httpOnly": True,
         "secure": True,
+        "sameSite": "Lax",
     },
     {
         "name": "c",
@@ -49,7 +51,8 @@ OUTPUT_COOKIE_HEADERS = {
             b"Path=/; "
             b"Expires=Mon, 27 Mar 2023 04:57:36 GMT; "
             b"HttpOnly; "
-            b"Secure"
+            b"Secure; "
+            b"SameSite=Lax"
         ),
         (b"c=d"),
     ]
@@ -131,10 +134,8 @@ def test_init(api_response, cls):
     assert not response.flags
     assert response.request is None
     assert response.certificate is None
-    if _RESPONSE_HAS_IP_ADDRESS:
-        assert response.ip_address is None
-    if _RESPONSE_HAS_PROTOCOL:
-        assert response.protocol is None
+    assert response.ip_address is None
+    assert response.protocol is None
 
 
 @pytest.mark.parametrize(
@@ -162,10 +163,8 @@ def test_text_from_api_response(api_response, cls, content_length):
     assert response.flags == ["zyte-api"]
     assert response.request is None
     assert response.certificate is None
-    if _RESPONSE_HAS_IP_ADDRESS:
-        assert response.ip_address is None
-    if _RESPONSE_HAS_PROTOCOL:
-        assert response.protocol is None
+    assert response.ip_address is None
+    assert response.protocol is None
 
 
 @pytest.mark.parametrize(
@@ -451,7 +450,7 @@ def test__process_response_body_and_headers(encoding, content_type):
             """<html><head><meta http-equiv="Content-Type" content="text/html; charset="gb2312"></head><body>✨</body></html>""",
             "✨",
             "gb18030",
-            None,
+            "gb18030" if Version(SCRAPY_VERSION) >= Version("2.19") else None,
         ),
     ],
 )
@@ -689,3 +688,54 @@ def test__process_response_decodes_body_once(
     assert isinstance(resp, expected_cls)
     assert resp.body == body
     assert calls == 1
+
+
+def test_response_cookies_to_jar():
+    """Response cookies are added to the cookie jar of the request, including
+    their httpOnly and sameSite attributes."""
+    cookie_jars: dict[Any, CookieJar] = {None: CookieJar()}
+    request = Request(URL)
+    _unwrapped_process_response(
+        raw_api_response_browser(), request, cookie_jars=cookie_jars
+    )
+    cookies = {cookie.name: cookie for cookie in cookie_jars[None].jar}
+    assert set(cookies) == {"a", "c"}
+    assert cookies["a"].domain == ".example.com"
+    assert cookies["a"].get_nonstandard_attr("httpOnly") is True
+    assert cookies["a"].get_nonstandard_attr("sameSite") == "Lax"
+    assert cookies["c"].domain == "example.com"
+    assert not cookies["c"].has_nonstandard_attr("httpOnly")
+    assert not cookies["c"].has_nonstandard_attr("sameSite")
+
+
+def test_response_cookie_without_domain():
+    """A response cookie without a domain, for a URL without a domain either,
+    is an error."""
+    api_response: _API_RESPONSE = {
+        "url": "data:,",
+        "browserHtml": PAGE_CONTENT,
+        "experimental": {"responseCookies": [{"name": "a", "value": "b"}]},
+    }
+    with pytest.raises(ValueError, match="cookie without a domain"):
+        _unwrapped_process_response(
+            api_response, Request("data:,"), cookie_jars={None: CookieJar()}
+        )
+
+
+def test_text_response_without_body():
+    """A text response can be built from an API response with no body field."""
+    response = ZyteAPITextResponse.from_api_response({"url": URL})
+    assert response.body == b""
+
+
+def test__process_response_binary():
+    """A response with a binary content type is not a text response."""
+    body = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+    api_response: _API_RESPONSE = {
+        "url": URL,
+        "httpResponseBody": b64encode(body).decode(),
+        "httpResponseHeaders": [{"name": "Content-Type", "value": "image/png"}],
+    }
+    response = _process_response(api_response, Request(URL))
+    assert type(response) is ZyteAPIResponse
+    assert response.body == body

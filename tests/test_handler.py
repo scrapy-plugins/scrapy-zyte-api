@@ -14,7 +14,7 @@ from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
 from scrapy.utils.test import get_crawler
-from zyte_api import RetryFactory
+from zyte_api import AsyncZyteAPI, RetryFactory
 from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import (
@@ -48,11 +48,6 @@ from . import (
 )
 from . import get_crawler as get_crawler_zyte_api
 from .mockserver import MockServer
-
-try:
-    from zyte_api import AsyncZyteAPI
-except ImportError:
-    from zyte_api.aio.client import AsyncClient as AsyncZyteAPI
 
 _EXPECTED_FALLBACK_HANDLER: type
 if _REACTORLESS:
@@ -259,7 +254,7 @@ assert RETRY_POLICY_A != RETRY_POLICY_B
 @pytest.mark.parametrize(
     ("settings", "meta", "expected"),
     [
-        ({}, {}, None),
+        ({"ZYTE_API_RETRY_POLICY": None}, {}, None),
         (
             {"ZYTE_API_RETRY_POLICY": "tests.test_handler.RETRY_POLICY_A"},
             {},
@@ -445,6 +440,18 @@ async def test_stats(mockserver):
 
 
 @deferred_f_from_coro_f
+async def test_error_type_stats(mockserver):
+    """Error types are reported as stats, always with a leading slash."""
+    async with make_handler({}, mockserver.urljoin("/")) as handler:
+        handler._client.agg_stats.api_error_types.update({"/a": 1, "b": 2, "": 3})
+        handler._update_stats({})
+        stats = handler._stats.get_stats()
+    assert stats["scrapy-zyte-api/error_types/a"] == 1
+    assert stats["scrapy-zyte-api/error_types/b"] == 2
+    assert stats["scrapy-zyte-api/error_types/<empty>"] == 3
+
+
+@deferred_f_from_coro_f
 async def test_single_client():
     """Make sure that the same Zyte API client is used by both download
     handlers."""
@@ -506,6 +513,7 @@ async def test_log_request_truncate(
     input_params = {
         "short": short_str,
         "long": long_str,
+        "number": 1,
         "list": [
             short_str,
             long_str,
@@ -526,6 +534,7 @@ async def test_log_request_truncate(
     expected_logged_params = {
         "short": short_str,
         "long": truncated_str,
+        "number": 1,
         "list": [
             short_str,
             truncated_str,
