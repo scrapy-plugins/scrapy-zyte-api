@@ -999,11 +999,21 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
     assert type(item["page"].product) is Product
 
 
+@pytest.mark.parametrize(
+    ("annotations", "options"),
+    [
+        (
+            (MarkdownScope.fullPage, ExtractFrom.browserHtml),
+            {"extractFrom": "browserHtml", "scope": "fullPage"},
+        ),
+        ((ExtractFrom.browserHtml,), {"extractFrom": "browserHtml"}),
+    ],
+)
 @deferred_f_from_coro_f
-async def test_provider_markdown(mockserver):
+async def test_provider_markdown(annotations, options, mockserver):
     @attrs.define
     class SomePage(BasePage):
-        markdown: Annotated[Markdown, MarkdownScope.fullPage, ExtractFrom.browserHtml]
+        markdown: Annotated[Markdown, *annotations]
 
     class TestSpider(ZyteAPISpider):
         def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
@@ -1017,7 +1027,7 @@ async def test_provider_markdown(mockserver):
         {
             "url": url,
             "markdown": True,
-            "markdownOptions": {"extractFrom": "browserHtml", "scope": "fullPage"},
+            "markdownOptions": options,
         }
     ]
     assert type(item["page"].markdown) is Markdown
