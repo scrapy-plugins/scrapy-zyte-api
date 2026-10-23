@@ -1454,7 +1454,8 @@ async def test_provider_network_capture_unannotated(mockserver, caplog):
 
 
 def test_item_keywords():
-    assert set(_EXTRACT_KEYS) == set(_ITEM_KEYWORDS.values())
+    # markdown has no matching zyte-common-items item type.
+    assert set(_EXTRACT_KEYS) - {"markdown"} == set(_ITEM_KEYWORDS.values())
 
 
 def test_auto_pages_set():
