@@ -1,9 +1,41 @@
+from contextlib import suppress
+from email.utils import parsedate_to_datetime
 from http.cookiejar import Cookie
 from typing import Any
 from urllib.parse import urlparse
 
 from scrapy.http import Request
 from scrapy.http.cookies import CookieJar
+
+
+def _parse_set_cookie_header(header_value: str) -> dict | None:
+    parts = [p.strip() for p in header_value.split(";")]
+    if not parts or "=" not in parts[0]:
+        return None
+    name, _, value = parts[0].partition("=")
+    result: dict = {"name": name.strip(), "value": value.strip()}
+    for part in parts[1:]:
+        if "=" in part:
+            key, _, val = part.partition("=")
+            key_lower = key.strip().lower()
+            val = val.strip()
+        else:
+            key_lower = part.strip().lower()
+            val = ""
+        if key_lower == "domain":
+            result["domain"] = val
+        elif key_lower == "path":
+            result["path"] = val
+        elif key_lower == "expires" and val:
+            with suppress(Exception):
+                result["expires"] = int(parsedate_to_datetime(val).timestamp())
+        elif key_lower == "httponly":
+            result["httpOnly"] = True
+        elif key_lower == "secure":
+            result["secure"] = True
+        elif key_lower == "samesite" and val:
+            result["sameSite"] = val
+    return result
 
 
 def _get_cookie_jar(request: Request, cookie_jars: dict[Any, CookieJar]) -> CookieJar:

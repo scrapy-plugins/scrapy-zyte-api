@@ -176,6 +176,15 @@ Precedence, from higher to lower, is:
     different :http:`request:geolocation` in a follow-up request that reuses a
     session is not supported and results in undefined behavior.
 
+.. note::
+
+    Session initialization requests use the Zyte API HTTP API by default, even
+    when the requests that use the session go through :ref:`proxy mode
+    <request-transport>`. To initialize sessions through proxy mode instead,
+    use the :setting:`ZYTE_API_SESSION_TRANSPORT` setting or the
+    :reqmeta:`zyte_api_session_transport` request metadata key. See
+    :ref:`request-transport-session`.
+
 .. _session-check:
 
 Checking sessions
