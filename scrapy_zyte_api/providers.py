@@ -28,6 +28,7 @@ from zyte_common_items import (
     AutoForumThreadPage,
     AutoJobPostingNavigationPage,
     AutoJobPostingPage,
+    AutoPageContentPage,
     AutoProductListPage,
     AutoProductNavigationPage,
     AutoProductPage,
@@ -39,6 +40,7 @@ from zyte_common_items import (
     Item,
     JobPosting,
     JobPostingNavigation,
+    PageContent,
     Product,
     ProductList,
     ProductNavigation,
@@ -141,6 +143,7 @@ _ITEM_KEYWORDS: dict[type, str] = {
     ForumThread: "forumThread",
     JobPosting: "jobPosting",
     JobPostingNavigation: "jobPostingNavigation",
+    PageContent: "pageContent",
     Serp: "serp",
 }
 _AUTO_PAGES: set[type] = {
@@ -150,6 +153,7 @@ _AUTO_PAGES: set[type] = {
     AutoForumThreadPage,
     AutoJobPostingPage,
     AutoJobPostingNavigationPage,
+    AutoPageContentPage,
     AutoProductPage,
     AutoProductListPage,
     AutoProductNavigationPage,

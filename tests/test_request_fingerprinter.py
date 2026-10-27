@@ -448,6 +448,10 @@ def merge_dicts(*dicts):
                     "productOptions": {"extractFrom": "httpResponseBody"},
                 },
                 {
+                    "pageContent": True,
+                    "pageContentOptions": {"extractFrom": "httpResponseBody"},
+                },
+                {
                     "serp": True,
                     "serpOptions": {"extractFrom": "httpResponseBody"},
                 },
