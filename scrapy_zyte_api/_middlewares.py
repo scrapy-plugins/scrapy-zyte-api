@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+from functools import cached_property
 from logging import getLogger
 from warnings import warn
 
@@ -6,6 +8,7 @@ from scrapy.exceptions import IgnoreRequest, ScrapyDeprecationWarning
 from scrapy.utils.python import global_object_name
 from zyte_api import RequestError
 
+from ._page_inputs import Geolocation
 from ._params import _ParamParser
 from .responses import ZyteAPIMixin
 from .utils import (
@@ -19,6 +22,21 @@ from .utils import (
 
 logger = getLogger(__name__)
 _start_requests_processed = object()
+
+
+def _set_geolocation(request: Request, geolocation: str) -> None:
+    """Set *geolocation* as the geolocation of the Zyte API request that
+    *request* maps to, unless it already defines one."""
+    key = (
+        "zyte_api"
+        if request.meta.get("zyte_api", False) is not False
+        else "zyte_api_automap"
+    )
+    params = request.meta.get(key)
+    params = dict(params) if isinstance(params, Mapping) else {}
+    params.setdefault("geolocation", geolocation)
+    request.meta[key] = params
+    request.meta["_zyte_api_dep_geolocation"] = True
 
 
 class _BaseMiddleware:
@@ -143,11 +161,44 @@ class ScrapyZyteAPIDownloaderMiddleware(_BaseMiddleware):
         self._total_start_request_count = count
         self._maybe_close()
 
+    @cached_property
+    def _injector(self):
+        try:
+            from scrapy_poet import InjectionMiddleware  # noqa: PLC0415
+        except ImportError:
+            return None
+        try:
+            mw = self._crawler.get_downloader_middleware(InjectionMiddleware)
+        except AttributeError:  # Scrapy < 2.12
+            mw = None
+            for component in self._crawler.engine.downloader.middleware.middlewares:
+                if isinstance(component, InjectionMiddleware):
+                    mw = component
+                    break
+        return getattr(mw, "injector", None)
+
+    def _get_dep_geolocation(self, request: Request) -> str | None:
+        """Return the geolocation that the callback of *request* requires
+        through a :class:`~scrapy_zyte_api.Geolocation` dependency, if any."""
+        injector = self._injector
+        if injector is None:
+            return None
+        from andi.typeutils import is_typing_annotated, strip_annotated  # noqa: PLC0415
+
+        for dep, _kwargs in injector.build_plan(request).dependencies:
+            if strip_annotated(dep) is Geolocation and is_typing_annotated(dep):
+                return dep.__metadata__[0]
+        return None
+
     def process_request(self, request: Request, spider: Spider | None = None):
         self._check_spm_conflict()
 
         if self._param_parser.parse(request) is None:
             return
+
+        geolocation = self._get_dep_geolocation(request)
+        if geolocation is not None:
+            _set_geolocation(request, geolocation)
 
         self._request_count += 1
         if self._max_requests and self._request_count > self._max_requests:
