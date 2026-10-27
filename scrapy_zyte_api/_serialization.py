@@ -1,6 +1,7 @@
 import json
 
 from ._page_inputs import Actions, Geolocation, Screenshot
+from ._session import Session
 
 try:
     from web_poet.serialization import SerializedLeafData, register_serialization
@@ -35,3 +36,12 @@ else:
         return cls(body=data["body"])
 
     register_serialization(_serialize_Screenshot, _deserialize_Screenshot)
+
+    def _serialize_Session(o: Session) -> SerializedLeafData:
+        return {}
+
+    def _deserialize_Session(cls: type[Session], data: SerializedLeafData) -> Session:
+        # There is no live session to discard when replaying a fixture.
+        return cls()
+
+    register_serialization(_serialize_Session, _deserialize_Session)
