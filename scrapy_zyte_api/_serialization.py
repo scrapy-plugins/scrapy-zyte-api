@@ -1,6 +1,6 @@
 import json
 
-from ._page_inputs import Actions, Geolocation, Screenshot
+from ._page_inputs import Actions, Geolocation, Markdown, Screenshot
 
 try:
     from web_poet.serialization import SerializedLeafData, register_serialization
@@ -25,6 +25,16 @@ else:
         return cls()
 
     register_serialization(_serialize_Geolocation, _deserialize_Geolocation)
+
+    def _serialize_Markdown(o: Markdown) -> SerializedLeafData:
+        return {"body.md": o.encode()}
+
+    def _deserialize_Markdown(
+        cls: type[Markdown], data: SerializedLeafData
+    ) -> Markdown:
+        return cls(data["body.md"].decode())
+
+    register_serialization(_serialize_Markdown, _deserialize_Markdown)
 
     def _serialize_Screenshot(o: Screenshot) -> SerializedLeafData:
         return {"body": o.body}

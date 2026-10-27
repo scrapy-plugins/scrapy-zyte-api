@@ -177,6 +177,8 @@ class DefaultResource(Resource):
             response_data["screenshot"] = b64encode(
                 b"screenshot-body-contents"
             ).decode()
+        if request_data.get("markdown") is True:
+            response_data["markdown"] = "# World!"
 
         if "session" in request_data:
             # See test_sessions.py::test_param_precedence

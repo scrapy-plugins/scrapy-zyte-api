@@ -2335,6 +2335,66 @@ UNSAFE_HEADER_HANDLING_SCENARIOS: list[dict[str, Any]] = [
             },
             [],
         ),
+        # markdown uses httpResponseBody by default, browserHtml if enabled,
+        # and otherwise the source of any other extraction type.
+        (
+            {"Referer": "a"},
+            {"markdown": True},
+            {
+                "markdown": True,
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"markdown": True, "browserHtml": True},
+            {
+                "markdown": True,
+                "browserHtml": True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"markdown": True, EXTRACT_KEY: True},
+            {
+                "markdown": True,
+                EXTRACT_KEY: True,
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {
+                "markdown": True,
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+            },
+            {
+                "markdown": True,
+                EXTRACT_KEY: True,
+                f"{EXTRACT_KEY}Options": {"extractFrom": "httpResponseBody"},
+                "customHttpRequestHeaders": [
+                    {"name": "Referer", "value": "a"},
+                ],
+            },
+            [],
+        ),
+        (
+            {"Referer": "a"},
+            {"markdown": True, "markdownOptions": {"extractFrom": "browserHtml"}},
+            {
+                "markdown": True,
+                "markdownOptions": {"extractFrom": "browserHtml"},
+                "requestHeaders": {"referer": "a"},
+            },
+            [],
+        ),
     ],
 )
 @deferred_f_from_coro_f

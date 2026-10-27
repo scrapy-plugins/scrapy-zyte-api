@@ -16,6 +16,18 @@ class ExtractFrom(StrEnum):
     browserHtml = "browserHtml"
 
 
+class MarkdownScope(StrEnum):
+    """:ref:`Annotation <annotations>` to specify the
+    :http:`scope <request:markdownOptions.scope>` of a
+    :class:`~scrapy_zyte_api.Markdown` input.
+
+    See :ref:`markdown`.
+    """
+
+    mainContent = "mainContent"
+    fullPage = "fullPage"
+
+
 class _Selector(TypedDict, total=False):
     type: str
     value: str

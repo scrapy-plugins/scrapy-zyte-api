@@ -56,6 +56,8 @@ Built-in inputs
 .. autoclass:: scrapy_zyte_api.Geolocation
     :members:
 
+.. autoclass:: scrapy_zyte_api.Markdown
+
 .. autoclass:: scrapy_zyte_api.NetworkCapture
     :members:
 
@@ -67,6 +69,9 @@ Built-in input annotations
 ==========================
 
 .. autoenum:: scrapy_zyte_api.ExtractFrom
+    :members:
+
+.. autoenum:: scrapy_zyte_api.MarkdownScope
     :members:
 
 .. autofunction:: scrapy_zyte_api.actions
