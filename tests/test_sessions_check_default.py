@@ -42,6 +42,7 @@ async def test_checker_location(postal_code, url, close_reason, stats, mockserve
     if a location meta/setting was used."""
     settings = {
         **SESSION_SETTINGS,
+        "ZYTE_API_ACTION_ERROR_RETRY_ENABLED": False,
         "ZYTE_API_URL": mockserver.urljoin("/"),
         "ZYTE_API_SESSION_MAX_BAD_INITS": 1,
     }

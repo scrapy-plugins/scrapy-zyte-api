@@ -6,6 +6,44 @@ Settings
 
 :ref:`Settings <topics-settings>` for scrapy-zyte-api.
 
+.. setting:: ZYTE_API_ACTION_ERROR_RETRY_ENABLED
+
+ZYTE_API_ACTION_ERROR_RETRY_ENABLED
+===================================
+
+Default: ``True``
+
+Enables retries of Zyte API requests if responses contain an action error.
+
+Maximum retries and priority adjustment are handled with the same settings and
+request metadata keywords as regular retries in Scrapy, see
+:setting:`RETRY_TIMES <scrapy:RETRY_TIMES>` and
+:setting:`RETRY_PRIORITY_ADJUST <scrapy:RETRY_PRIORITY_ADJUST>`.
+
+See also :setting:`ZYTE_API_ACTION_ERROR_HANDLING`.
+
+
+.. setting:: ZYTE_API_ACTION_ERROR_HANDLING
+
+ZYTE_API_ACTION_ERROR_HANDLING
+==============================
+
+Default: ``"pass"``
+
+Determines how to handle Zyte API responses that contain an action error:
+
+-   ``"pass"``: Responses are treated as valid responses, i.e. they will reach
+    your spider callback.
+
+-   ``"ignore"``: Responses are dropped, i.e. they will not reach your spider.
+
+-   ``"err"``: :class:`~scrapy_zyte_api.exceptions.ActionError` is raised, and
+    will reach your spider errback if you set one.
+
+.. autoexception:: scrapy_zyte_api.exceptions.ActionError
+    :members:
+
+
 .. setting:: ZYTE_API_AUTO_FIELD_STATS
 
 ZYTE_API_AUTO_FIELD_STATS
@@ -39,6 +77,7 @@ If for any request a custom page object class is used to override some
 
 .. note:: :func:`zyte_common_items.fields.is_auto_field` is used to determine
     whether a field has been overridden or not.
+
 
 .. setting:: ZYTE_API_AUTOMAP_PARAMS
 

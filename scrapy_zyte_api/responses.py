@@ -17,6 +17,15 @@ from scrapy_zyte_api._cookies import _process_cookies
 _DEFAULT_ENCODING = "utf-8"
 
 
+def _has_action_error(response: Response) -> bool:
+    """Return whether *response* is a Zyte API response in which at least one
+    browser action failed."""
+    if not isinstance(response, ZyteAPIMixin):
+        return False
+    actions = (response.raw_api_response or {}).get("actions", [])
+    return any("error" in action for action in actions)
+
+
 class ZyteAPIMixin:
     attributes: tuple[str, ...]
     url: str
