@@ -5,7 +5,7 @@ import pytest
 from scrapy import Request, Spider
 
 from scrapy_zyte_api import ScrapyZyteAPIRequestFingerprinter
-from scrapy_zyte_api._request_fingerprinter import _ProviderPlanData
+from scrapy_zyte_api._provider_params import _ProviderPlanData
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _POET_ADDON_SUPPORT,
     _build_from_crawler,

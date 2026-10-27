@@ -32,6 +32,19 @@ Or request them directly in the callback::
                        ):
             ...
 
+.. _poet-combined-requests:
+
+Combined requests
+=================
+
+When a callback takes both a response and dependencies, a single Zyte API
+request provides all of them.
+
+A dependency that requires browser rendering then makes the callback response a
+browser response. To get an HTTP response in the callback alongside such a
+dependency, request :http:`request:httpResponseBody` explicitly, and the
+dependency gets a Zyte API request of its own.
+
 .. _annotations:
 
 Dependency annotations
@@ -225,8 +238,8 @@ You can then access the results as the dependency value:
 Custom parameters
 =================
 
-scrapy-poet integration ignores both :ref:`manual <manual>` and :ref:`automatic
-<automap>` Zyte API parameters.
+Zyte API requests sent only for dependencies ignore both :ref:`manual <manual>`
+and :ref:`automatic <automap>` Zyte API parameters.
 
 Whenever you can, use :ref:`inputs <inputs>` and :ref:`dependency annotations
 <annotations>` to get additional Zyte API parameters into Zyte API requests
