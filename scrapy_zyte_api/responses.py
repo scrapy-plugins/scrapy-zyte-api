@@ -73,14 +73,22 @@ class ZyteAPIMixin:
         return result
 
     @classmethod
-    def from_api_response(cls, api_response: dict, *, request: Request | None = None):
+    def from_api_response(
+        cls,
+        api_response: dict,
+        *,
+        request: Request | None = None,
+        _body: bytes | None = None,
+    ):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
+        if _body is None:
+            _body = b64decode(api_response.get("httpResponseBody") or "")
         return cls(
             url=api_response["url"],
             status=api_response.get("statusCode") or 200,
-            body=b64decode(api_response.get("httpResponseBody") or ""),
+            body=_body,
             request=request,
             flags=["zyte-api"],
             headers=cls._prepare_headers(api_response),
@@ -116,23 +124,28 @@ class ZyteAPIMixin:
 
 class ZyteAPITextResponse(ZyteAPIMixin, HtmlResponse):
     @classmethod
-    def from_api_response(cls, api_response: dict, *, request: Request | None = None):
+    def from_api_response(
+        cls,
+        api_response: dict,
+        *,
+        request: Request | None = None,
+        _body: bytes | None = None,
+    ):
         """Alternative constructor to instantiate the response from the raw
         Zyte API response.
         """
-        body = None
         encoding = None
 
         if api_response.get("browserHtml"):
             encoding = _DEFAULT_ENCODING  # Zyte API has "utf-8" by default
-            body = api_response["browserHtml"].encode(encoding)
-        elif api_response.get("httpResponseBody"):
-            body = b64decode(api_response["httpResponseBody"])
+            _body = api_response["browserHtml"].encode(encoding)
+        elif _body is None and api_response.get("httpResponseBody"):
+            _body = b64decode(api_response["httpResponseBody"])
 
         return cls(
             url=api_response["url"],
             status=api_response.get("statusCode") or 200,
-            body=body,
+            body=_body,
             encoding=encoding,
             request=request,
             flags=["zyte-api"],
@@ -207,18 +220,19 @@ def _process_response(
         # even when requesting files (like images)
         return ZyteAPITextResponse.from_api_response(api_response, request=request)
 
+    body = None
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
         scrapy_headers: dict[bytes, bytes] = {}
         for header in cast("list[dict[str, str]]", api_response["httpResponseHeaders"]):
             scrapy_headers[header["name"].encode()] = header["value"].encode()
+        body = b64decode(cast("str", api_response["httpResponseBody"]))
         response_cls = responsetypes.from_args(
             headers=scrapy_headers,
             url=cast("str", api_response["url"]),
-            # FIXME: update this when python-zyte-api supports base64 decoding
-            body=b64decode(api_response["httpResponseBody"]),  # type: ignore[arg-type]
+            body=body,
         )
         if issubclass(response_cls, TextResponse):
             zyte_cls = _SCRAPY_TO_ZYTE_RESPONSE.get(response_cls, ZyteAPITextResponse)
-            return zyte_cls.from_api_response(api_response, request=request)
+            return zyte_cls.from_api_response(api_response, request=request, _body=body)
 
-    return ZyteAPIResponse.from_api_response(api_response, request=request)
+    return ZyteAPIResponse.from_api_response(api_response, request=request, _body=body)
