@@ -13,9 +13,9 @@ ZYTE_API_AUTO_FIELD_STATS
 
 Default: ``False``
 
-Enables stats that indicate which requested fields :ref:`obtained through
-scrapy-poet integration <scrapy-poet>` come directly from
-:ref:`zapi-extract`.
+Enables :stat:`scrapy-zyte-api/auto_fields/{cls}` stats, which indicate which
+requested fields :ref:`obtained through scrapy-poet integration <scrapy-poet>`
+come directly from :ref:`zapi-extract`.
 
 If for any request no page object class is used to override
 :ref:`zapi-extract` fields for a given item type, the following stat is
