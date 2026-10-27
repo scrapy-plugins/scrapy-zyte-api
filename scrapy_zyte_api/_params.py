@@ -216,6 +216,9 @@ _REQUEST_PARAMS: dict[str, dict[str, Any]] = {
     "followRedirect": {
         "default": True,
     },
+    "verifyCertificate": {
+        "default": None,
+    },
     "sessionContext": {
         "default": [],
     },
@@ -251,6 +254,9 @@ _REQUEST_PARAMS: dict[str, dict[str, Any]] = {
     },
     "serpOptions": {
         "default": {},
+    },
+    "includeIframes": {
+        "default": False,
     },
     "experimental": {
         "default": {},
