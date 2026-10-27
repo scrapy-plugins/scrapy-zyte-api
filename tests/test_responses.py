@@ -83,7 +83,7 @@ def raw_api_response_browser():
 def raw_api_response_body():
     return {
         "url": "https://example.com",
-        "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+        "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")).decode(),
         "echoData": {"some_value": "here"},
         "httpResponseHeaders": [
             {"name": "Content-Type", "value": "text/html"},
@@ -100,7 +100,7 @@ def raw_api_response_mixed():
     return {
         "url": URL,
         "browserHtml": PAGE_CONTENT,
-        "httpResponseBody": b64encode(PAGE_CONTENT_2.encode("utf-8")),
+        "httpResponseBody": b64encode(PAGE_CONTENT_2.encode("utf-8")).decode(),
         "echoData": {"some_value": "here"},
         "httpResponseHeaders": [
             {"name": "Content-Type", "value": "text/html"},
@@ -164,6 +164,28 @@ def test_text_from_api_response(api_response, cls, content_length):
     assert response.certificate is None
     assert response.ip_address is None
     assert response.protocol is None
+
+
+@pytest.mark.parametrize(
+    ("api_response", "cls"),
+    [
+        (raw_api_response_browser, ZyteAPITextResponse),
+        (raw_api_response_body, ZyteAPIResponse),
+    ],
+)
+def test_raw_api_response_body_field(api_response, cls):
+    field = "browserHtml" if cls is ZyteAPITextResponse else "httpResponseBody"
+    response = cls.from_api_response(api_response())
+    assert field not in response._raw_api_response
+    replaced = response.replace(status=404)
+    assert field not in replaced._raw_api_response
+    assert response.raw_api_response == api_response()
+    assert response.raw_api_response is response.raw_api_response
+    assert replaced.raw_api_response == api_response()
+
+    response = cls.from_api_response(api_response())
+    replaced = response.replace(body=b"foo")
+    assert replaced.raw_api_response == api_response()
 
 
 @pytest.mark.parametrize(
@@ -653,6 +675,17 @@ def test_json_from_api_response():
     assert resp.raw_api_response == api_response
     assert resp.flags == ["zyte-api"]
     assert json.loads(resp.text) == {"status": "ok", "count": 42}
+
+
+@pytest.mark.parametrize("cls", [ZyteAPITextResponse, ZyteAPIResponse])
+def test_raw_api_response_bytes_body(cls):
+    api_response = {
+        **raw_api_response_body(),
+        "httpResponseBody": b64encode(PAGE_CONTENT.encode("utf-8")),
+    }
+    response = cls.from_api_response(api_response)
+    raw_body = response.raw_api_response["httpResponseBody"]
+    assert raw_body == api_response["httpResponseBody"]
 
 
 def test_response_cookies_to_jar():
