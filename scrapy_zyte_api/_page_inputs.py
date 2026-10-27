@@ -71,6 +71,23 @@ class CapturedResponse:
 
 
 @attrs.define
+class ZyteApiParams:
+    """A page input that sets arbitrary Zyte API request parameters for all
+    other page inputs, and contains the resulting parameters.
+
+    The parameters must be :ref:`specified with an annotation
+    <zyte-api-params>` using :func:`~scrapy_zyte_api.zyte_api_params`.
+    """
+
+    #: Zyte API request parameters of the underlying Zyte API request, as built
+    #: by the :ref:`scrapy-poet integration <scrapy-poet>`, i.e. including
+    #: parameters set through other page inputs, annotations, the
+    #: :reqmeta:`zyte_api_provider` request metadata key and the
+    #: :setting:`ZYTE_API_PROVIDER_PARAMS` setting.
+    params: dict[str, Any]
+
+
+@attrs.define
 class NetworkCapture:
     """A page input that specifies network capture filters and contains captured responses.
 

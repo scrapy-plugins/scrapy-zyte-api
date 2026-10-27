@@ -1,6 +1,6 @@
 import json
 
-from ._page_inputs import Actions, Geolocation, Screenshot
+from ._page_inputs import Actions, Geolocation, Screenshot, ZyteApiParams
 
 try:
     from web_poet.serialization import SerializedLeafData, register_serialization
@@ -35,3 +35,13 @@ else:
         return cls(body=data["body"])
 
     register_serialization(_serialize_Screenshot, _deserialize_Screenshot)
+
+    def _serialize_ZyteApiParams(o: ZyteApiParams) -> SerializedLeafData:
+        return {"params.json": json.dumps(o.params).encode()}
+
+    def _deserialize_ZyteApiParams(
+        cls: type[ZyteApiParams], data: SerializedLeafData
+    ) -> ZyteApiParams:
+        return cls(params=json.loads(data["params.json"]))
+
+    register_serialization(_serialize_ZyteApiParams, _deserialize_ZyteApiParams)

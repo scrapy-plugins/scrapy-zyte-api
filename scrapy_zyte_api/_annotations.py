@@ -102,6 +102,15 @@ def network_capture(filters: Iterable[NetworkCaptureFilter]) -> tuple[Any, ...]:
     return tuple(make_hashable(f) for f in filters)
 
 
+def zyte_api_params(params: dict[str, Any]) -> Any:
+    """Convert a dict of arbitrary Zyte API request parameters into a hashable
+    value.
+
+    See :ref:`zyte-api-params`.
+    """
+    return make_hashable(params)
+
+
 def custom_attrs(
     input: dict[str, Any],  # noqa: A002
     options: dict[str, Any] | None = None,
