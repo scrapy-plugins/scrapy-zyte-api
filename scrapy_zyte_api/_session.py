@@ -46,9 +46,7 @@ def _troubleshoot(slug):
     )
 
 
-def get_request_session_id(request: Request) -> str | None:
-    """Return the session ID of *request*, or ``None`` if it does not have a
-    session ID assigned."""
+def _get_request_session_id(request: Request) -> str | None:
     if session_id := request.meta.get(COOKIE_SESSION_ID_META_KEY):
         return session_id
     for meta_key in ZYTE_API_META_KEYS:
@@ -57,6 +55,14 @@ def get_request_session_id(request: Request) -> str | None:
         session_id = request.meta[meta_key].get("session", {}).get("id", None)
         if session_id:
             return session_id
+    return None
+
+
+def get_request_session_id(request: Request) -> str | None:
+    """Return the session ID of *request*, or ``None`` if it does not have a
+    session ID assigned."""
+    if session_id := _get_request_session_id(request):
+        return session_id
     logger.warning(
         f"Request {request} had no session ID assigned, unexpectedly. "
         f"If you are sure this issue is not caused by your own code, "
@@ -1365,6 +1371,32 @@ class _SessionManager:
             self._inc_stat("use/expired", pool)
             self._start_request_session_refresh(request, pool)
 
+    def discard(self, request: Request) -> None:
+        if not self.is_enabled(request):
+            logger.warning(
+                f"Ignoring a request to discard the session of request "
+                f"{request}, which does not use session management."
+            )
+            return
+        try:
+            pool = self.get_pool(request)
+        except PoolError:
+            _close_spider(self._crawler, "pool_error")
+            raise
+        session_id = _get_request_session_id(request)
+        if session_id is None:
+            logger.warning(
+                f"Ignoring a request to discard the session of request "
+                f"{request}, which has no session assigned."
+            )
+            return
+        if session_id in self._pools[pool]:
+            self._inc_stat("use/discarded", pool)
+            self._check_failures.pop(session_id, None)
+            self._start_session_refresh(session_id, request, pool)
+        # If the request is retried, let it get a new session assigned.
+        self.allow_new_session_assignments(request)
+
 
 class ScrapyZyteAPISessionDownloaderMiddleware:
     @classmethod
@@ -1434,6 +1466,23 @@ class ScrapyZyteAPISessionDownloaderMiddleware:
             if self._sessions.is_enabled(request)
             else None
         )
+
+    def discard_session(self, request_or_response: Request | Response) -> None:
+        """:ref:`Discard <session-discard>` the session assigned to a request,
+        or to the request of a response.
+
+        This method does not retry the affected request.
+        """
+        if isinstance(request_or_response, Response):
+            request = request_or_response.request
+            if request is None:
+                raise ValueError(
+                    f"Cannot discard the session of response "
+                    f"{request_or_response}, which has no request assigned."
+                )
+        else:
+            request = request_or_response
+        self._sessions.discard(request)
 
 
 class ScrapyZyteAPISessionResetterDownloaderMiddleware:

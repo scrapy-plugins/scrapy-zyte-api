@@ -283,6 +283,59 @@ redirect entirely:
     550) is correct.
 
 
+.. _session-discard:
+
+Discarding sessions
+===================
+
+:ref:`Session validity checks <session-check>` run before your spider callbacks
+see a response. Sometimes, though, you only find out that a session is no
+longer good while parsing, e.g. because an expected field is missing from an
+item. In those scenarios you can discard the session that was used to get the
+data you are parsing.
+
+Discarding a session removes it from its :ref:`pool <session-pools>` and
+triggers the start of a new session to replace it, as if the session had failed
+a :ref:`session validity check <session-check>`.
+
+.. _session-discard-crawler:
+
+Discarding a session through the crawler
+----------------------------------------
+
+Get the session downloader middleware from the crawler, and call its
+:meth:`~scrapy_zyte_api.ScrapyZyteAPISessionDownloaderMiddleware.discard_session`
+method:
+
+.. code-block:: python
+
+    from scrapy.downloadermiddlewares.retry import get_retry_request
+
+    from scrapy_zyte_api import ScrapyZyteAPISessionDownloaderMiddleware
+
+
+    class MySpider(Spider):
+        name = "my_spider"
+
+        def parse(self, response):
+            if not response.css(".price"):
+                middleware = self.crawler.get_downloader_middleware(
+                    ScrapyZyteAPISessionDownloaderMiddleware
+                )
+                middleware.discard_session(response)
+                yield get_retry_request(response.request, spider=self, reason="no_price")
+
+.. note:: :meth:`Crawler.get_downloader_middleware()
+    <scrapy.crawler.Crawler.get_downloader_middleware>` requires Scrapy 2.12+.
+    On earlier versions, find the middleware yourself:
+
+    .. code-block:: python
+
+        for middleware in self.crawler.engine.downloader.middleware.middlewares:
+            if isinstance(middleware, ScrapyZyteAPISessionDownloaderMiddleware):
+                break
+
+
 .. _session-pools:
 
 Managing pools
