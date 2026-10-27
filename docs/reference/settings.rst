@@ -143,6 +143,10 @@ ZYTE_API_EXPERIMENTAL_COOKIES_ENABLED
 
 Default: ``False``
 
+Deprecated. When ``True``, cookie parameters are mapped into the deprecated
+``experimental`` name space, i.e. as ``experimental.requestCookies`` and
+``experimental.responseCookies``.
+
 See :ref:`request-automatic`.
 
 
@@ -255,11 +259,11 @@ calculated as:
 which corresponds to the ``name=value; Domain=domain[; Path=path]``
 representation used by Zyte API.
 
-To silence this warning, set :http:`request:experimental.requestCookies`
-manually, e.g. to an empty :class:`dict`.
+To silence this warning, set :http:`request:requestCookies` manually, e.g. to
+an empty :class:`dict`.
 
-Alternatively, if :http:`request:experimental.requestCookies` starts supporting
-larger cookies, update this setting accordingly.
+Alternatively, if :http:`request:requestCookies` starts supporting larger
+cookies, update this setting accordingly.
 
 See also :setting:`ZYTE_API_MAX_COOKIE_NAME_LENGTH` and
 :setting:`ZYTE_API_MAX_COOKIE_VALUE_LENGTH`.
@@ -275,11 +279,11 @@ Default: ``4085``
 During :ref:`request mapping <request>`, cookies whose ``name`` length exceeds
 this limit are dropped and a warning is logged.
 
-To silence this warning, set :http:`request:experimental.requestCookies`
-manually, e.g. to an empty :class:`dict`.
+To silence this warning, set :http:`request:requestCookies` manually, e.g. to
+an empty :class:`dict`.
 
-Alternatively, if :http:`request:experimental.requestCookies` starts supporting
-longer cookie names, update this setting accordingly.
+Alternatively, if :http:`request:requestCookies` starts supporting longer
+cookie names, update this setting accordingly.
 
 
 .. setting:: ZYTE_API_MAX_COOKIE_VALUE_LENGTH
@@ -292,11 +296,11 @@ Default: ``4085``
 During :ref:`request mapping <request>`, cookies whose ``value`` length exceeds
 this limit are dropped and a warning is logged.
 
-To silence this warning, set :http:`request:experimental.requestCookies`
-manually, e.g. to an empty :class:`dict`.
+To silence this warning, set :http:`request:requestCookies` manually, e.g. to
+an empty :class:`dict`.
 
-Alternatively, if :http:`request:experimental.requestCookies` starts supporting
-longer cookie values, update this setting accordingly.
+Alternatively, if :http:`request:requestCookies` starts supporting longer
+cookie values, update this setting accordingly.
 
 
 .. setting:: ZYTE_API_MAX_COOKIES
@@ -310,11 +314,11 @@ If the cookies to be set during :ref:`request mapping <request>` exceed this
 limit, a warning is logged, and only as many cookies as the limit allows are
 set for the target request.
 
-To silence this warning, set :http:`request:experimental.requestCookies`
-manually, e.g. to an empty :class:`dict`.
+To silence this warning, set :http:`request:requestCookies` manually, e.g. to
+an empty :class:`dict`.
 
-Alternatively, if :http:`request:experimental.requestCookies` starts supporting
-more than 100 cookies, update this setting accordingly.
+Alternatively, if :http:`request:requestCookies` starts supporting more than
+100 cookies, update this setting accordingly.
 
 
 .. setting:: ZYTE_API_MAX_REQUESTS
