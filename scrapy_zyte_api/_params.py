@@ -40,8 +40,8 @@ _MAX_SESSION_CONTEXT_TRACKING = 128
 # -   httpResponseBody and httpResponseHeaders are not enabled by default if an
 #     extract type field is enabled.
 #
-# -   The extractFrom key of <type>Options is taken into account for the
-#     following:
+# -   The extractFrom key of <type>Options, or the root extractFrom field if
+#     not set (except for serp), is taken into account for the following:
 #
 #     -   If there is certainty that browser rendering is not used, the
 #         fragment part of the url field is ignored during request
@@ -119,6 +119,9 @@ _REQUEST_PARAMS: dict[str, dict[str, Any]] = {
     },
     "screenshotOptions": {
         "default": {},
+    },
+    "extractFrom": {
+        "default": None,
     },
     "article": {
         "default": False,
@@ -683,6 +686,8 @@ def _get_extract_from(api_params: dict[str, Any], extract_type: str) -> str | An
     default_extract_from = _REQUEST_PARAMS[extract_type].get(
         "default_extract_from", _NoDefault
     )
+    if extract_type != "serp":
+        default_extract_from = api_params.get("extractFrom") or default_extract_from
     return options.get("extractFrom", default_extract_from)
 
 
