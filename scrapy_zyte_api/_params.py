@@ -45,12 +45,12 @@ _MAX_SESSION_CONTEXT_TRACKING = 128
 #
 #     -   If there is certainty that browser rendering is not used, the
 #         fragment part of the url field is ignored during request
-#         fingerprinting.
+#         fingerprinting. httpResponseBody and userHtml give that certainty.
 #
 #     -   If there are headers to map, httpResponseBody in any extractFrom
 #         forces customHttpRequestHeaders to be used, browserHtml forces
-#         requestHeaders to be used, and in the absence of both, requestHeaders
-#         is used.
+#         requestHeaders to be used, userHtml alone disables header mapping,
+#         and otherwise requestHeaders is used.
 #
 #         An exception is made for serp, which does not support header mapping.
 #
@@ -327,7 +327,7 @@ def _may_use_browser(api_params: dict[str, Any]) -> bool:
     extract_froms = _get_extract_froms(api_params)
     if "browserHtml" in extract_froms:
         return True
-    if "httpResponseBody" in extract_froms:
+    if extract_froms & {"httpResponseBody", "userHtml"}:
         return False
     return not api_params.get(
         "httpResponseBody", _DEFAULT_API_PARAMS["httpResponseBody"]
@@ -732,7 +732,11 @@ def _set_request_headers_from_request(
     if (
         request_headers is not False
         and (
-            (not response_body and "httpResponseBody" not in extract_froms)
+            (
+                not response_body
+                and "httpResponseBody" not in extract_froms
+                and extract_froms != {"userHtml"}
+            )
             or any(api_params.get(k) for k in _BROWSER_KEYS)
             or "browserHtml" in extract_froms
         )
