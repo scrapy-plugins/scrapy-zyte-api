@@ -1,6 +1,12 @@
 # Register web-poet serializers
 from . import _serialization  # noqa: F401
-from ._annotations import ExtractFrom, actions, custom_attrs, network_capture
+from ._annotations import (
+    ExtractFrom,
+    MarkdownScope,
+    actions,
+    custom_attrs,
+    network_capture,
+)
 from ._middlewares import (
     ScrapyZyteAPIDownloaderMiddleware,
     ScrapyZyteAPIRefererSpiderMiddleware,
@@ -10,6 +16,7 @@ from ._page_inputs import (
     Actions,
     CapturedResponse,
     Geolocation,
+    Markdown,
     NetworkCapture,
     Screenshot,
 )
@@ -55,6 +62,8 @@ __all__ = [
     "ExtractFrom",
     "Geolocation",
     "LocationSessionConfig",
+    "Markdown",
+    "MarkdownScope",
     "NetworkCapture",
     "ScrapyZyteAPIDownloadHandler",
     "ScrapyZyteAPIDownloaderMiddleware",

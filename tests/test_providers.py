@@ -41,6 +41,8 @@ from scrapy_zyte_api import (
     CapturedResponse,
     ExtractFrom,
     Geolocation,
+    Markdown,
+    MarkdownScope,
     NetworkCapture,
     Screenshot,
     actions,
@@ -51,6 +53,7 @@ from scrapy_zyte_api._params import _EXTRACT_KEYS
 from scrapy_zyte_api.handler import ScrapyZyteAPIDownloadHandler
 from scrapy_zyte_api.providers import (
     _AUTO_PAGES,
+    _EXTRACT_KEYWORDS,
     _ITEM_KEYWORDS,
     ZyteApiProvider,
     _build_zyte_api_provider_meta,
@@ -996,6 +999,68 @@ async def test_provider_any_response_product_extract_from_http_response(mockserv
     assert type(item["page"].product) is Product
 
 
+@pytest.mark.parametrize(
+    ("annotations", "options"),
+    [
+        (
+            (MarkdownScope.fullPage, ExtractFrom.browserHtml),
+            {"extractFrom": "browserHtml", "scope": "fullPage"},
+        ),
+        ((ExtractFrom.browserHtml,), {"extractFrom": "browserHtml"}),
+    ],
+)
+@deferred_f_from_coro_f
+async def test_provider_markdown(annotations, options, mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        markdown: Annotated[Markdown, *annotations]
+
+    class TestSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert params == [
+        {
+            "url": url,
+            "markdown": True,
+            "markdownOptions": options,
+        }
+    ]
+    assert type(item["page"].markdown) is Markdown
+    assert item["page"].markdown == "# World!"
+
+
+@deferred_f_from_coro_f
+async def test_provider_any_response_markdown(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+        markdown: Markdown
+
+    class TestSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    item, url, crawler = await _crawl_single_item(TestSpider, HtmlResource, settings)
+    params = crawler.engine.downloader.handlers._handlers["http"].params
+
+    assert params == [
+        {
+            "url": url,
+            "markdown": True,
+            "httpResponseBody": True,
+            "httpResponseHeaders": True,
+        }
+    ]
+    assert type(item["page"].response.response) is HttpResponse
+    assert item["page"].markdown == "# World!"
+
+
 @deferred_f_from_coro_f
 async def test_provider_any_response_product_options_empty(mockserver):
     @attrs.define
@@ -1453,8 +1518,8 @@ async def test_provider_network_capture_unannotated(mockserver, caplog):
     assert "NetworkCapture dependencies must be annotated" in caplog.text
 
 
-def test_item_keywords():
-    assert set(_EXTRACT_KEYS) == set(_ITEM_KEYWORDS.values())
+def test_extract_keywords():
+    assert set(_EXTRACT_KEYS) == set(_EXTRACT_KEYWORDS.values())
 
 
 def test_auto_pages_set():

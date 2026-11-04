@@ -162,6 +162,14 @@ _REQUEST_PARAMS: dict[str, dict[str, Any]] = {
     "jobPostingNavigationOptions": {
         "default": {},
     },
+    "markdown": {
+        "default": False,
+        "is_extract_type": True,
+        "default_extract_from": "httpResponseBody",
+    },
+    "markdownOptions": {
+        "default": {},
+    },
     "product": {
         "default": False,
         "is_extract_type": True,
@@ -680,10 +688,15 @@ def _warn_about_request_headers(
 
 def _get_extract_from(api_params: dict[str, Any], extract_type: str) -> str | Any:
     options = api_params.get(f"{extract_type}Options", {})
-    default_extract_from = _REQUEST_PARAMS[extract_type].get(
-        "default_extract_from", _NoDefault
-    )
-    return options.get("extractFrom", default_extract_from)
+    if "extractFrom" in options:
+        return options["extractFrom"]
+    if extract_type == "markdown":
+        # Markdown follows browserHtml and any other extraction type.
+        if api_params.get("browserHtml", False):
+            return "browserHtml"
+        if any(api_params.get(key, False) for key in _EXTRACT_KEYS - {"markdown"}):
+            return _NoDefault
+    return _REQUEST_PARAMS[extract_type].get("default_extract_from", _NoDefault)
 
 
 def _get_extract_froms(api_params: dict[str, Any]) -> set[str]:

@@ -61,6 +61,27 @@ The provider will set the extraction options based on the annotations, so for
 this code ``extractFrom`` will be set to ``httpResponseBody`` in
 ``productOptions``.
 
+.. _markdown:
+
+Markdown
+--------
+
+You can get the webpage as :http:`Markdown <response:markdown>` with a
+:class:`scrapy_zyte_api.Markdown` dependency, which you can annotate with
+:class:`scrapy_zyte_api.MarkdownScope` and
+:class:`scrapy_zyte_api.ExtractFrom`:
+
+.. code-block:: python
+
+    from typing import Annotated
+
+    from scrapy_zyte_api import ExtractFrom, Markdown, MarkdownScope
+
+
+    @attrs.define
+    class MyPageObject(BasePage):
+        markdown: Annotated[Markdown, MarkdownScope.fullPage, ExtractFrom.browserHtml]
+
 .. _geolocation:
 
 Geolocation

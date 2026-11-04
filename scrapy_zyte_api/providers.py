@@ -46,7 +46,14 @@ from zyte_common_items import (
 )
 from zyte_common_items.fields import is_auto_field
 
-from scrapy_zyte_api import Actions, ExtractFrom, Geolocation, Screenshot
+from scrapy_zyte_api import (
+    Actions,
+    ExtractFrom,
+    Geolocation,
+    Markdown,
+    MarkdownScope,
+    Screenshot,
+)
 from scrapy_zyte_api._annotations import _ActionResult, _from_hashable
 from scrapy_zyte_api._page_inputs import CapturedResponse, NetworkCapture
 from scrapy_zyte_api.utils import _ENGINE_HAS_DOWNLOAD_ASYNC, maybe_deferred_to_future
@@ -143,6 +150,7 @@ _ITEM_KEYWORDS: dict[type, str] = {
     JobPostingNavigation: "jobPostingNavigation",
     Serp: "serp",
 }
+_EXTRACT_KEYWORDS: dict[type, str] = {**_ITEM_KEYWORDS, Markdown: "markdown"}
 _AUTO_PAGES: set[type] = {
     AutoArticlePage,
     AutoArticleListPage,
@@ -238,15 +246,23 @@ def _build_zyte_api_provider_meta(
                     custom_attrs_options
                 )
             continue
-        kw = _ITEM_KEYWORDS.get(cls_stripped)
+        kw = _EXTRACT_KEYWORDS.get(cls_stripped)
         if not kw:
             continue
-        item_requested = True
+        # Only items make AnyResponse default to browser rendering.
+        if cls_stripped is not Markdown:
+            item_requested = True
         to_provide_stripped.add(cls_stripped)
         zyte_api_meta[kw] = True
         if not is_typing_annotated(cls):
             continue
         metadata = cls.__metadata__  # type: ignore[attr-defined]
+        if cls_stripped is Markdown:
+            for scope in MarkdownScope:
+                if scope in metadata:
+                    options = zyte_api_meta.setdefault("markdownOptions", {})
+                    options.setdefault("scope", scope.value)
+                    break
         for extract_from_annotation in ExtractFrom:
             if extract_from_annotation in metadata:
                 prev_extract_from = extract_from_seen.get(kw)
@@ -268,7 +284,7 @@ def _build_zyte_api_provider_meta(
     )
 
     extract_from: str | None = None
-    for item_type, kw in _ITEM_KEYWORDS.items():
+    for item_type, kw in _EXTRACT_KEYWORDS.items():
         options_name = f"{kw}Options"
         if item_type not in to_provide_stripped and options_name in zyte_api_meta:
             del zyte_api_meta[options_name]
@@ -311,6 +327,7 @@ class ZyteApiProvider(PageObjectInputProvider):
         Geolocation,
         JobPosting,
         JobPostingNavigation,
+        Markdown,
         NetworkCapture,
         Product,
         ProductList,
@@ -509,6 +526,13 @@ class ZyteApiProvider(PageObjectInputProvider):
                     cls.__metadata__,  # type: ignore[attr-defined]
                 )
                 results.append(result)
+                continue
+            if cls_stripped is Markdown:
+                markdown = Markdown(api_response.raw_api_response["markdown"])
+                if is_typing_annotated(cls):
+                    results.append(AnnotatedInstance(markdown, cls.__metadata__))  # type: ignore[attr-defined]
+                else:
+                    results.append(markdown)
                 continue
             kw = _ITEM_KEYWORDS.get(cls_stripped)
             if not kw:

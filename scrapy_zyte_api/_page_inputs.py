@@ -27,6 +27,16 @@ class Geolocation:
     """
 
 
+class Markdown(str):
+    """A page input with the webpage as a :http:`Markdown <response:markdown>`
+    :class:`str`.
+
+    See :ref:`markdown`.
+    """
+
+    __slots__ = ()
+
+
 @attrs.define
 class Screenshot:
     """A container for holding the screenshot of a webpage."""

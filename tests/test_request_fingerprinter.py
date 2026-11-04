@@ -400,6 +400,10 @@ def merge_dicts(*dicts):
                 {"browserHtml": True, "screenshot": True},
                 {"product": True, "productOptions": {"extractFrom": "browserHtml"}},
                 {"serp": True, "serpOptions": {"extractFrom": "browserHtml"}},
+                {
+                    "markdown": True,
+                    "markdownOptions": {"extractFrom": "browserHtml"},
+                },
             )
         ),
         # If there is no clear indication of whether the requests is an HTTP
@@ -430,6 +434,7 @@ def merge_dicts(*dicts):
                 {"screenshot": False},
                 {"browserHtml": False, "screenshot": False},
                 {"product": True},
+                {"markdown": True, "product": True},
             )
         ),
         # If there is a clear indication that an HTTP requests is used instead
@@ -443,6 +448,7 @@ def merge_dicts(*dicts):
             for body in (
                 {"httpResponseBody": True},
                 {"serp": True},
+                {"markdown": True},
                 {
                     "product": True,
                     "productOptions": {"extractFrom": "httpResponseBody"},
