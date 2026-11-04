@@ -339,6 +339,27 @@ def test_response_cookie_header(fields, cls, keep):
     )
 
 
+def test_response_cookie_to_header_value_samesite():
+    """_response_cookie_to_header_value appends SameSite when present."""
+    result = ZyteAPIMixin._response_cookie_to_header_value(
+        {"name": "foo", "value": "bar", "sameSite": "Strict"}
+    )
+    assert result == "foo=bar; SameSite=Strict"
+
+
+def test_text_from_api_response_no_body():
+    """ZyteAPITextResponse.from_api_response with neither browserHtml nor
+    httpResponseBody produces an empty body (branch 148->151).
+    """
+    api_response = {
+        "url": "https://example.com",
+        "product": {"name": "shoes"},
+    }
+    resp = ZyteAPITextResponse.from_api_response(api_response)
+    assert resp.body == b""
+    assert resp.url == "https://example.com"
+
+
 def test__process_response_no_body():
     """The _process_response() function should handle missing 'browserHtml' or
     'httpResponseBody'.
@@ -508,12 +529,12 @@ def test__process_response_non_text():
     css/xpath selectors.
     """
     api_response: _API_RESPONSE = {
-        "url": "https://example.com/sprite.gif",
-        "httpResponseBody": "",
+        "url": "https://example.com/file.bin",
+        "httpResponseBody": b64encode(b"\x00\x01\x02\x03").decode(),
         "httpResponseHeaders": [
             {
                 "name": "Content-Type",
-                "value": "image/gif",
+                "value": "application/octet-stream",
             }
         ],
     }
