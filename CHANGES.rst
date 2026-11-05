@@ -1,6 +1,49 @@
 Changes
 =======
 
+0.37.0 (unreleased)
+-------------------
+
+-   Dropped support for Python 3.10, and added support for Python 3.14 and
+    3.15.
+
+-   Increased the minimum required versions of some dependencies:
+
+    -   :doc:`Scrapy <scrapy:index>`: 2.0.1 → 2.13.3
+
+    -   :doc:`scrapy-poet <scrapy-poet:index>`: 0.22.3 → 0.28.0
+
+    -   :doc:`web-poet <web-poet:index>`: 0.17.0 → 0.25.0
+
+-   Deprecated the ``ZYTE_API_SESSION_RANDOMIZE_DELAY`` setting and the
+    ``randomize_delay`` key of :setting:`ZYTE_API_SESSION_POOLS` in favor of
+    the new :setting:`ZYTE_API_SESSION_DELAY_JITTER` setting and ``jitter``
+    key, which take the magnitude of the random variation as a number, e.g.
+    ``0.5`` for the ±50% that ``randomize_delay`` enabled, or ``0`` to disable
+    it.
+
+    :setting:`ZYTE_API_SESSION_DELAY_JITTER` defaults to Scrapy’s
+    :setting:`DOWNLOAD_DELAY_JITTER`, so on Scrapy 2.19+ a custom value of that
+    setting now also applies to :setting:`ZYTE_API_SESSION_DELAY`.
+
+-   Setting :setting:`ZYTE_API_ENABLED` to ``False`` now also disables the
+    :ref:`add-on <config-addon>`, which no longer changes any setting.
+
+-   Page objects that depend on both :class:`~web_poet.AnyResponse` and
+    :class:`~scrapy_zyte_api.Screenshot` now get a browser response, instead of
+    triggering a Zyte API request that combines :http:`request:screenshot` with
+    :http:`request:httpResponseBody`, which Zyte API does not allow.
+
+-   When :class:`~web_poet.AnyResponse` is built from an HTTP response, the
+    :ref:`declarative selectors <web-poet:declarative-selectors>` of the page
+    objects being built are now extracted in a single pass shared by all of
+    them.
+
+-   Fixed the crawl hanging when the spider is closed because of
+    :ref:`plugin-managed session <session>` errors, e.g. after reaching
+    :setting:`ZYTE_API_SESSION_MAX_BAD_INITS`, while requests are waiting for a
+    session.
+
 0.36.0 (2026-08-20)
 -------------------
 
