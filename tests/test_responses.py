@@ -11,6 +11,7 @@ from scrapy import __version__ as SCRAPY_VERSION
 from scrapy.exceptions import NotSupported
 from scrapy.http import Response, TextResponse
 from scrapy.http.cookies import CookieJar
+from w3lib.encoding import resolve_encoding
 
 from scrapy_zyte_api.responses import (
     _API_RESPONSE,
@@ -426,13 +427,22 @@ def test__process_response_body_and_headers(encoding, content_type):
     assert isinstance(resp, TextResponse)
     assert resp.css("h1 ::text").get() == "World!✨"
     assert resp.xpath("//body/text()").getall() == ["Hello"]
-    assert resp.encoding == encoding
+    assert resp.encoding == resolve_encoding(content_type.split("charset=")[1])
+
+
+# Scrapy 2.20+ detects encodings with frostwork.
+_SCRAPY_FROSTWORK = hasattr(TextResponse, "meta_refresh")
 
 
 @pytest.mark.parametrize(
     ("body", "expected", "actual_encoding", "inferred_encoding"),
     [
-        ("<html><body>plain</body></html>", "plain", "cp1252", "cp1252"),
+        (
+            "<html><body>plain</body></html>",
+            "plain",
+            "cp1252",
+            "utf-8" if _SCRAPY_FROSTWORK else "cp1252",
+        ),
         (
             "<html><body>✨</body></html>",
             "✨",
@@ -449,7 +459,11 @@ def test__process_response_body_and_headers(encoding, content_type):
             """<html><head><meta http-equiv="Content-Type" content="text/html; charset="gb2312"></head><body>✨</body></html>""",
             "✨",
             "gb18030",
-            "gb18030" if Version(SCRAPY_VERSION) >= Version("2.19") else None,
+            "gbk"
+            if _SCRAPY_FROSTWORK
+            else "gb18030"
+            if Version(SCRAPY_VERSION) >= Version("2.19")
+            else None,
         ),
     ],
 )
@@ -500,7 +514,7 @@ def test__process_response_body_and_headers_mismatch():
     assert isinstance(resp, TextResponse)
     assert resp.css("h1 ::text").get() != "World!✨"  # mismatch
     assert resp.xpath("//body/text()").getall() == ["Hello"]
-    assert resp.encoding == "gb18030"
+    assert resp.encoding == resolve_encoding("gb2312")
 
 
 def test__process_response_non_text():
@@ -579,29 +593,14 @@ XML_BODY = b'<?xml version="1.0"?><Error><Code>NoSuchKey</Code></Error>'
 JSON_BODY = b'{"status": "ok", "count": 42}'
 
 
-_SCRAPY_JSON_RESPONSE_MARK = pytest.mark.skipif(
-    ZyteAPIJsonResponse is None, reason="Scrapy < 2.12"
-)
-
-
 @pytest.mark.parametrize(
     ("content_type", "body", "expected_cls"),
     [
         ("text/xml", XML_BODY, ZyteAPIXmlResponse),
         ("application/xml", XML_BODY, ZyteAPIXmlResponse),
         ("application/rss+xml", XML_BODY, ZyteAPIXmlResponse),
-        pytest.param(
-            "application/json",
-            JSON_BODY,
-            ZyteAPIJsonResponse,
-            marks=_SCRAPY_JSON_RESPONSE_MARK,
-        ),
-        pytest.param(
-            "application/x-json",
-            JSON_BODY,
-            ZyteAPIJsonResponse,
-            marks=_SCRAPY_JSON_RESPONSE_MARK,
-        ),
+        ("application/json", JSON_BODY, ZyteAPIJsonResponse),
+        ("application/x-json", JSON_BODY, ZyteAPIJsonResponse),
     ],
 )
 def test__process_response_xml_json(content_type, body, expected_cls):
@@ -637,9 +636,7 @@ def test_xml_from_api_response():
     assert resp.xpath("//error/code/text()").get() is None
 
 
-@_SCRAPY_JSON_RESPONSE_MARK
 def test_json_from_api_response():
-    assert ZyteAPIJsonResponse is not None
     api_response = {
         "url": "https://example.com",
         "httpResponseBody": b64encode(JSON_BODY).decode(),

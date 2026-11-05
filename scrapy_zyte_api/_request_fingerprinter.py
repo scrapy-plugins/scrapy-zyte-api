@@ -10,12 +10,11 @@ from scrapy import Request
 from scrapy.settings.default_settings import (
     REQUEST_FINGERPRINTER_CLASS as ScrapyRequestFingerprinter,
 )
-from scrapy.utils.misc import load_object
+from scrapy.utils.misc import build_from_crawler, load_object
 from w3lib.url import canonicalize_url
 
 from ._params import _REQUEST_PARAMS, _may_use_browser, _ParamParser
 from ._session import ScrapyZyteAPISessionDownloaderMiddleware
-from .utils import _build_from_crawler  # type: ignore[attr-defined]
 
 logger = getLogger(__name__)
 
@@ -61,7 +60,7 @@ class ScrapyZyteAPIRequestFingerprinter:
             )
         else:
             DefaultFallbackRequestFingerprinter = ScrapyRequestFingerprinter
-        self._fallback_request_fingerprinter = _build_from_crawler(
+        self._fallback_request_fingerprinter = build_from_crawler(
             load_object(
                 settings.get(
                     "ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS",
@@ -114,17 +113,9 @@ class ScrapyZyteAPIRequestFingerprinter:
 
     @cached_property
     def _session_mw(self):
-        try:
-            mw = self._crawler.get_downloader_middleware(
-                ScrapyZyteAPISessionDownloaderMiddleware
-            )
-        except AttributeError:  # Scrapy < 2.12
-            for component in self._crawler.engine.downloader.middleware.middlewares:
-                if isinstance(component, ScrapyZyteAPISessionDownloaderMiddleware):
-                    mw = component
-                    break
-            else:
-                mw = None
+        mw = self._crawler.get_downloader_middleware(
+            ScrapyZyteAPISessionDownloaderMiddleware
+        )
         if mw is None:
 
             class NoOpSessionDownloaderMiddleware:
@@ -175,10 +166,7 @@ class ScrapyZyteAPIRequestFingerprinter:
 
         injector = self._injector
         callback = get_callback(request, injector.spider)
-        scrapy_response_required = is_callback_requiring_scrapy_response(
-            callback,
-            request.callback,
-        )
+        scrapy_response_required = is_callback_requiring_scrapy_response(callback)
 
         remaining_dependencies = {
             dependency for dependency, _kwargs in plan.dependencies

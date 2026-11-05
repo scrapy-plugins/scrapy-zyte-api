@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from scrapy import Spider, signals
 from scrapy.exceptions import NotConfigured
 from scrapy.utils.httpobj import urlparse_cached
-from scrapy.utils.misc import load_object
+from scrapy.utils.misc import build_from_crawler, load_object
 
 if TYPE_CHECKING:
     from scrapy.crawler import Crawler
@@ -28,12 +28,10 @@ from .responses import (
     ZyteAPIXmlResponse,
     _process_response,
 )
-from .utils import (  # type: ignore[attr-defined]
-    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+from .utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _X402_SUPPORT,
     USER_AGENT,
-    _build_from_crawler,
     _close_spider,
     _reactor_enabled,
 )
@@ -209,7 +207,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     def _create_handler(self, path: Any) -> Any:
         dhcls = load_object(path)
-        return _build_from_crawler(dhcls, self._crawler)
+        return build_from_crawler(dhcls, self._crawler)
 
     def _get_fallback_handler(self, request: Request) -> Any:
         """Return the download handler to use for *request* when it is not sent
@@ -323,13 +321,12 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             raise
         finally:
             # If AutoThrottle is enabled, and autothrottle_dont_adjust_delay is
-            # not set or not supported, we do not set download_latency, as it
-            # would cause AutoThrottle to adjust the download delay of the
-            # request slot, and we do not want AutoThrottle to do that for Zyte
-            # API slots since Zyte API already handles throtling.
-            if not self._autothrottle_is_enabled or (
-                _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT
-                and request.meta.get("autothrottle_dont_adjust_delay", False)
+            # not set, we do not set download_latency, as it would cause
+            # AutoThrottle to adjust the download delay of the request slot,
+            # and we do not want AutoThrottle to do that for Zyte API slots
+            # since Zyte API already handles throtling.
+            if not self._autothrottle_is_enabled or request.meta.get(
+                "autothrottle_dont_adjust_delay", False
             ):
                 request.meta["download_latency"] = time.time() - start_time
             self._update_stats(api_params)

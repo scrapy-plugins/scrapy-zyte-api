@@ -3,7 +3,7 @@ from scrapy import Request, Spider
 from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.http.response import Response
 from scrapy.settings import SETTINGS_PRIORITIES, Settings
-from scrapy.settings.default_settings import TWISTED_REACTOR
+from scrapy.settings.default_settings import DOWNLOAD_HANDLERS_BASE, TWISTED_REACTOR
 from scrapy.utils.test import get_crawler
 from twisted.internet.defer import Deferred, succeed
 
@@ -18,7 +18,6 @@ from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import ScrapyZyteAPIHTTPDownloadHandler
 from scrapy_zyte_api.utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
-    _POET_ADDON_SUPPORT,
     _REACTORLESS_SUPPORT,
 )
 
@@ -40,13 +39,10 @@ if _REACTORLESS:
 else:
     _EXPECTED_FALLBACK_HANDLER = HTTP11DownloadHandler
 
-pytest.importorskip("scrapy.addons")
-
 try:
-    from scrapy_poet import InjectionMiddleware
+    import scrapy_poet  # noqa: F401
 except ImportError:
     POET = False
-    InjectionMiddleware = None  # type: ignore[assignment,misc]
     ZyteApiProvider: type | None = None
 else:
     POET = True
@@ -169,16 +165,6 @@ def test_addon_reactorless():
     assert disabled.getpriority("TWISTED_REACTOR") != SETTINGS_PRIORITIES["addon"]
 
 
-@pytest.mark.skipif(not POET, reason="scrapy-poet is not installed")
-def test_addon_poet_injection_middleware(monkeypatch):
-    """With a scrapy-poet version that has no add-on of its own, the add-on
-    enables the scrapy-poet injection middleware."""
-    monkeypatch.setattr("scrapy_zyte_api.addon._POET_ADDON_SUPPORT", False)
-    settings = Settings()
-    Addon().update_settings(settings)
-    assert settings.getdict("DOWNLOADER_MIDDLEWARES")[InjectionMiddleware] == 543
-
-
 @deferred_f_from_coro_f
 async def test_addon_matching_settings():
     crawler = await get_crawler_zyte_api(
@@ -245,7 +231,7 @@ if _REACTORLESS:
     # Scrapy version, so it is read from Scrapy itself.
     FALLBACK_HANDLER = get_reactor_settings()["DOWNLOAD_HANDLERS"]["https"]
 else:
-    FALLBACK_HANDLER = "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
+    FALLBACK_HANDLER = DOWNLOAD_HANDLERS_BASE["https"]
 BASE_EXPECTED = {
     "DOWNLOADER_MIDDLEWARES": {
         ScrapyZyteAPISessionResetterDownloaderMiddleware: 565,
@@ -345,8 +331,6 @@ EXPECTED_DOWNLOADER_MIDDLEWARES = {
     ScrapyZyteAPIDownloaderMiddleware: 633,
     ScrapyZyteAPISessionDownloaderMiddleware: 667,
 }
-if not _POET_ADDON_SUPPORT:
-    EXPECTED_DOWNLOADER_MIDDLEWARES[InjectionMiddleware] = 543
 
 _SESSIONS_BASE_EXPECTED = dict(BASE_EXPECTED)
 if POET:

@@ -11,7 +11,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 
-from .utils import _POET_ADDON_SUPPORT, _reactor_enabled
+from .utils import _reactor_enabled
 
 
 def _setdefault(settings, setting, cls, pos):
@@ -107,15 +107,10 @@ class Addon:
         settings.set("ZYTE_API_TRANSPARENT_MODE", True, "addon")
 
         try:
-            from scrapy_poet import InjectionMiddleware  # noqa: PLC0415
+            import scrapy_poet  # noqa: F401, PLC0415
         except ImportError:
             pass
         else:
             from scrapy_zyte_api.providers import ZyteApiProvider  # noqa: PLC0415
-
-            if not _POET_ADDON_SUPPORT:
-                _setdefault(
-                    settings, "DOWNLOADER_MIDDLEWARES", InjectionMiddleware, 543
-                )
 
             _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiProvider, 1100)

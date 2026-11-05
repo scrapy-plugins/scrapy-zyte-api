@@ -7,10 +7,12 @@ import pytest
 pytest.importorskip("scrapy_poet")
 
 import attrs
+import web_poet
 from scrapy import Request, Spider
 from scrapy.statscollectors import MemoryStatsCollector
 from scrapy_poet import DummyResponse
 from scrapy_poet.utils.testing import HtmlResource
+from scrapy_poet.utils.testing import crawl_single_item_async as _crawl_single_item
 from twisted.internet.defer import Deferred
 from twisted.internet.protocol import Protocol
 from twisted.web.client import Agent
@@ -20,10 +22,12 @@ from web_poet import (
     BrowserResponse,
     HttpResponse,
     ItemPage,
+    css_get,
     default_registry,
     field,
     handle_urls,
 )
+from web_poet.mixins import ResponseShortcutsMixin
 from web_poet.pages import get_item_cls
 from zyte_common_items import (
     AutoProductPage,
@@ -57,10 +61,7 @@ from scrapy_zyte_api.providers import (
     _get_zyte_api_provider_params,
     _set_in_provider_meta_cache,
 )
-from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
-    _ensure_awaitable,
-    maybe_deferred_to_future,
-)
+from scrapy_zyte_api.utils import maybe_deferred_to_future
 
 from . import _REACTORLESS, SETTINGS, deferred_f_from_coro_f
 from .mockserver import get_ephemeral_port
@@ -70,6 +71,7 @@ if not _REACTORLESS:
     # imports are only used by tests that are skipped in that mode.
     from twisted.internet import reactor
 
+
 # Some tests fetch a URL through a Twisted Agent to inspect the mock server,
 # which is not possible without a reactor.
 requires_reactor = pytest.mark.skipif(
@@ -78,22 +80,6 @@ requires_reactor = pytest.mark.skipif(
 )
 
 PROVIDER_PARAMS = {"geolocation": "IE"}
-
-
-try:
-    from scrapy_poet.utils.testing import crawl_single_item_async as crawl_single_item
-except ImportError:  # scrapy-poet < 0.27.0
-    from scrapy_poet.utils.testing import crawl_single_item  # type: ignore[assignment]
-
-
-def _crawl_single_item(
-    spider_cls, resource_cls, settings, spider_kwargs=None, port=None
-):
-    return _ensure_awaitable(
-        crawl_single_item(
-            spider_cls, resource_cls, settings, spider_kwargs=spider_kwargs, port=port
-        )
-    )
 
 
 def read_body_without_abort(response):
@@ -1157,6 +1143,40 @@ async def test_provider_any_response_http_response(mockserver):
     assert type(item["page"].response) is AnyResponse
     assert type(item["page"].response.response) is HttpResponse
     assert type(item["page"].http_response) is HttpResponse
+
+
+@deferred_f_from_coro_f
+async def test_provider_any_response_preextract_selectors(mockserver, monkeypatch):
+    calls = []
+
+    def preextract_selectors(response, classes):
+        classes = list(classes)
+        navigation = web_poet.preextract_selectors(response, classes)
+        calls.append((response, classes, navigation))
+        return navigation
+
+    monkeypatch.setattr(
+        "scrapy_zyte_api.providers.preextract_selectors", preextract_selectors
+    )
+
+    @attrs.define
+    class SomePage(ItemPage, ResponseShortcutsMixin):
+        response: AnyResponse
+        heading = field(css_get("h1::text"))
+
+    class TestSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
+            yield {"heading": page.heading, "page": page}
+
+    settings = provider_settings(mockserver)
+    item, _, _ = await _crawl_single_item(TestSpider, HtmlResource, settings)
+
+    assert item["heading"] == "World!"
+    assert len(calls) == 1
+    response, classes, navigation = calls[0]
+    assert response is item["page"].response.response
+    assert SomePage in classes
+    assert navigation is not None
 
 
 @deferred_f_from_coro_f

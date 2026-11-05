@@ -13,6 +13,7 @@ from scrapy import Request, Spider
 from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
+from scrapy.utils.misc import build_from_crawler
 from scrapy.utils.test import get_crawler
 from zyte_api import AsyncZyteAPI, RetryFactory
 from zyte_api.constants import API_URL
@@ -22,19 +23,17 @@ from scrapy_zyte_api.handler import (
     _body_max_size_exceeded,
 )
 from scrapy_zyte_api.responses import ZyteAPITextResponse
-from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
-    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+from scrapy_zyte_api.utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
-    _POET_ADDON_SUPPORT,
     _REACTORLESS_SUPPORT,
     _X402_SUPPORT,
     USER_AGENT,
-    _build_from_crawler,
     maybe_deferred_to_future,
 )
 
 from . import (
     _HTTPX_HANDLER,
+    _POET_INSTALLED,
     _REACTORLESS,
     DEFAULT_CLIENT_CONCURRENCY,
     SETTINGS,
@@ -178,7 +177,7 @@ async def test_auth(
         crawler = get_crawler(settings_dict=settings)
 
         def build_hander():
-            return _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
+            return build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
 
         if isclass(expected) and issubclass(expected, Exception):
             with pytest.raises(expected):
@@ -232,7 +231,7 @@ async def test_api_url(setting, expected):
     if setting is not UNSET:
         settings["ZYTE_API_URL"] = setting
     crawler = get_crawler(settings_dict=settings)
-    handler = _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
+    handler = build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
     assert handler._client.api_url == expected
 
 
@@ -322,12 +321,12 @@ async def test_retry_policy(
         (
             {"AUTOTHROTTLE_ENABLED": True},
             {"zyte_api": {"foo": "bar"}},
-            _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+            True,
         ),
         (
             {"AUTOTHROTTLE_ENABLED": True},
             {"autothrottle_dont_adjust_delay": True, "zyte_api": {"foo": "bar"}},
-            _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+            True,
         ),
         (
             {"AUTOTHROTTLE_ENABLED": True},
@@ -592,7 +591,7 @@ def test_log_request_truncate_negative(enabled):
     with pytest.raises(
         ValueError, match=r"ZYTE_API_LOG_REQUESTS_TRUNCATE setting \(-1\) is invalid"
     ):
-        _build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
+        build_from_crawler(ScrapyZyteAPIDownloadHandler, crawler)
 
 
 @pytest.mark.parametrize("enabled", [True, False, None])
@@ -699,7 +698,7 @@ async def test_suspended_account_callback():
         "ZYTE_API_TRANSPARENT_MODE": True,
         **SETTINGS,
     }
-    if _POET_ADDON_SUPPORT:
+    if _POET_INSTALLED:
         settings["ADDONS"] = {"scrapy_poet.Addon": 300}
 
     with MockServer() as server:

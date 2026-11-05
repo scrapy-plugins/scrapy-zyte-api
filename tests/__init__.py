@@ -5,9 +5,7 @@ from os import environ
 from typing import Any
 from urllib.request import Request
 
-from packaging.version import Version
 from scrapy import Spider
-from scrapy import __version__ as SCRAPY_VERSION
 from scrapy.core.engine import ExecutionEngine
 from scrapy.crawler import Crawler
 from scrapy.http import Response
@@ -19,7 +17,6 @@ from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
-    _POET_ADDON_SUPPORT,
     _REACTORLESS_SUPPORT,
     _ensure_awaitable,
     maybe_deferred_to_future,
@@ -85,10 +82,6 @@ SETTINGS: SETTINGS_T = {
     "ZYTE_API_RETRY_POLICY": "tests._retry.POLICY",
     "ZYTE_API_SESSION_RETRY_POLICY": "tests._retry.SESSION_POLICY",
 }
-if Version(SCRAPY_VERSION) < Version("2.12"):
-    SETTINGS["REQUEST_FINGERPRINTER_IMPLEMENTATION"] = (
-        "2.7"  # Silence deprecation warning
-    )
 
 # The HTTP(S) handler used as a fallback when a request is not sent through
 # Zyte API. Without a Twisted reactor the default Twisted-based handler cannot
@@ -101,15 +94,11 @@ if _REACTORLESS:
     SETTINGS["TWISTED_REACTOR_ENABLED"] = False
 
 try:
-    from scrapy_poet import InjectionMiddleware
+    import scrapy_poet  # noqa: F401
 except ImportError:
-    pass
+    _POET_INSTALLED = False
 else:
-    assert isinstance(SETTINGS["DOWNLOADER_MIDDLEWARES"], dict)
-
-    if not _POET_ADDON_SUPPORT:
-        SETTINGS["DOWNLOADER_MIDDLEWARES"][InjectionMiddleware] = 543
-
+    _POET_INSTALLED = True
     SETTINGS["SCRAPY_POET_PROVIDERS"] = {
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100
     }
@@ -156,7 +145,7 @@ async def get_crawler(
     settings = settings or {}
     base_settings: SETTINGS_T = deepcopy(SETTINGS if not use_addon else SETTINGS_ADDON)
     final_settings = {**base_settings, **settings}
-    if poet and _POET_ADDON_SUPPORT:
+    if poet and _POET_INSTALLED:
         final_settings.setdefault("ADDONS", {})["scrapy_poet.Addon"] = 300
     crawler = _get_crawler(settings_dict=final_settings, spidercls=spider_cls)
     if setup_engine:
