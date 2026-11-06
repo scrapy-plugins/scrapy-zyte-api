@@ -1159,9 +1159,9 @@ async def test_provider_any_response_preextract_selectors(mockserver, monkeypatc
 
     def preextract_selectors(response, classes):
         classes = list(classes)
-        navigation = web_poet.preextract_selectors(response, classes)
-        calls.append((response, classes, navigation))
-        return navigation
+        html_metadata = web_poet.preextract_selectors(response, classes)
+        calls.append((response, classes, html_metadata))
+        return html_metadata
 
     monkeypatch.setattr(
         "scrapy_zyte_api.providers.preextract_selectors", preextract_selectors
@@ -1181,10 +1181,10 @@ async def test_provider_any_response_preextract_selectors(mockserver, monkeypatc
 
     assert item["heading"] == "World!"
     assert len(calls) == 1
-    response, classes, navigation = calls[0]
+    response, classes, html_metadata = calls[0]
     assert response is item["page"].response.response
     assert SomePage in classes
-    assert navigation is not None
+    assert html_metadata is not None
 
 
 @deferred_f_from_coro_f
