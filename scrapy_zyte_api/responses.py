@@ -199,8 +199,12 @@ def _process_response(
         return ZyteAPITextResponse.from_api_response(api_response, request=request)
 
     if api_response.get("httpResponseHeaders") and api_response.get("httpResponseBody"):
+        # Choose the class from the headers that the response ends up with,
+        # e.g. Content-Encoding would make Scrapy ignore Content-Type.
         scrapy_headers: dict[bytes, bytes] = {}
         for header in cast("list[dict[str, str]]", api_response["httpResponseHeaders"]):
+            if header["name"].lower() in ZyteAPIMixin.REMOVE_HEADERS:
+                continue
             scrapy_headers[header["name"].encode()] = header["value"].encode()
         response_cls = responsetypes.from_args(
             headers=scrapy_headers,
