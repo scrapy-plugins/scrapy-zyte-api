@@ -7,6 +7,8 @@ from weakref import WeakKeyDictionary
 from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
+from scrapy.http import TextResponse
+from scrapy.http.request import NO_CALLBACK
 from scrapy_poet import PageObjectInputProvider
 from web_poet import (
     AnyResponse,
@@ -14,6 +16,7 @@ from web_poet import (
     BrowserResponse,
     HttpResponse,
     HttpResponseHeaders,
+    preextract_selectors,
 )
 from web_poet.annotated import AnnotatedInstance
 from web_poet.fields import get_fields_dict
@@ -123,13 +126,6 @@ if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
 
     from scrapy_zyte_api.responses import ZyteAPITextResponse
-
-try:
-    # requires Scrapy >= 2.8
-    from scrapy.http.request import NO_CALLBACK
-except ImportError:
-    NO_CALLBACK = None  # type: ignore[assignment]
-
 
 _ITEM_KEYWORDS: dict[type, str] = {
     Product: "product",
@@ -450,16 +446,21 @@ class ZyteApiProvider(PageObjectInputProvider):
             else:
                 assert "httpResponseBody" in api_response.raw_api_response
                 assert "httpResponseHeaders" in api_response.raw_api_response
-                any_response = AnyResponse(
-                    response=HttpResponse(
-                        url=api_response.url,
-                        body=api_response.body,
-                        status=api_response.status,
-                        headers=HttpResponseHeaders.from_bytes_dict(
-                            api_response.headers
-                        ),
-                    )
+                kwargs: dict[str, Any] = {}
+                if isinstance(api_response, TextResponse):
+                    kwargs["encoding"] = api_response.encoding
+                http_response = HttpResponse(
+                    url=api_response.url,
+                    body=api_response.body,
+                    status=api_response.status,
+                    headers=HttpResponseHeaders.from_bytes_dict(api_response.headers),
+                    **kwargs,
                 )
+                preextract_selectors(
+                    http_response,
+                    (cls for cls, _ in self.injector.build_plan(request)),
+                )
+                any_response = AnyResponse(response=http_response)
             results.append(any_response)
 
         for cls in to_provide:

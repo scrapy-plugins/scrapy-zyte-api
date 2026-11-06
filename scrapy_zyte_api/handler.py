@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from scrapy import Spider, signals
 from scrapy.exceptions import NotConfigured
 from scrapy.utils.httpobj import urlparse_cached
-from scrapy.utils.misc import load_object
+from scrapy.utils.misc import build_from_crawler, load_object
 
 if TYPE_CHECKING:
     from scrapy.crawler import Crawler
@@ -28,12 +28,10 @@ from .responses import (
     ZyteAPIXmlResponse,
     _process_response,
 )
-from .utils import (  # type: ignore[attr-defined]
-    _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT,
+from .utils import (
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _X402_SUPPORT,
     USER_AGENT,
-    _build_from_crawler,
     _close_spider,
     _reactor_enabled,
 )
@@ -143,6 +141,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
         crawler.signals.connect(self.engine_started, signal=signals.engine_started)
         self._crawler = crawler
         self._fallback_handler = None
+        self._fallback_handler_path: Any = None
         self._trust_env = settings.getbool("ZYTE_API_USE_ENV_PROXY")
 
         self._autothrottle_is_enabled = settings.getbool("AUTOTHROTTLE_ENABLED")
@@ -209,11 +208,13 @@ class _ScrapyZyteAPIBaseDownloadHandler:
 
     def _create_handler(self, path: Any) -> Any:
         dhcls = load_object(path)
-        return _build_from_crawler(dhcls, self._crawler)
+        return build_from_crawler(dhcls, self._crawler)
 
     def _get_fallback_handler(self, request: Request) -> Any:
         """Return the download handler to use for *request* when it is not sent
         through Zyte API."""
+        if self._fallback_handler is None:
+            self._fallback_handler = self._create_handler(self._fallback_handler_path)
         return self._fallback_handler
 
     def _iter_fallback_handlers(self):
@@ -323,13 +324,12 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             raise
         finally:
             # If AutoThrottle is enabled, and autothrottle_dont_adjust_delay is
-            # not set or not supported, we do not set download_latency, as it
-            # would cause AutoThrottle to adjust the download delay of the
-            # request slot, and we do not want AutoThrottle to do that for Zyte
-            # API slots since Zyte API already handles throtling.
-            if not self._autothrottle_is_enabled or (
-                _AUTOTHROTTLE_DONT_ADJUST_DELAY_SUPPORT
-                and request.meta.get("autothrottle_dont_adjust_delay", False)
+            # not set, we do not set download_latency, as it would cause
+            # AutoThrottle to adjust the download delay of the request slot,
+            # and we do not want AutoThrottle to do that for Zyte API slots
+            # since Zyte API already handles throttling.
+            if not self._autothrottle_is_enabled or request.meta.get(
+                "autothrottle_dont_adjust_delay", False
             ):
                 request.meta["download_latency"] = time.time() - start_time
             self._update_stats(api_params)
@@ -417,16 +417,12 @@ class ScrapyZyteAPIDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
         # sensible default otherwise. Handlers are built lazily, on first use,
         # to avoid building handlers for schemes that are never used.
         #
-        # The default Twisted-based HTTP/1.1 handler cannot be used without a
-        # reactor; fall back to the asyncio-based httpx handler instead.
-        default = (
-            "scrapy.core.downloader.handlers.http11.HTTP11DownloadHandler"
-            if self._reactor_enabled
-            else "scrapy.core.downloader.handlers._httpx.HttpxDownloadHandler"
-        )
+        # Scrapy sets DOWNLOAD_HANDLERS_BASE to handlers that work with or
+        # without a reactor, as needed.
+        base = settings.getdict("DOWNLOAD_HANDLERS_BASE")
         self._fallback_handler_paths = {
-            "http": settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER") or default,
-            "https": settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER") or default,
+            "http": settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER") or base["http"],
+            "https": settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER") or base["https"],
         }
         self._fallback_handlers_by_scheme: dict[str, Any] = {}
 
@@ -451,11 +447,9 @@ class ScrapyZyteAPIHTTPDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
         client: AsyncZyteAPI | None = None,
     ):
         super().__init__(settings, crawler, client)
-        self._fallback_handler = self._create_handler(
-            settings.get(
-                "ZYTE_API_FALLBACK_HTTP_HANDLER",
-                settings.getwithbase("DOWNLOAD_HANDLERS")["http"],
-            )
+        self._fallback_handler_path = (
+            settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER")
+            or settings.getdict("DOWNLOAD_HANDLERS_BASE")["http"]
         )
 
 
@@ -467,9 +461,7 @@ class ScrapyZyteAPIHTTPSDownloadHandler(_ScrapyZyteAPIBaseDownloadHandler):
         client: AsyncZyteAPI | None = None,
     ):
         super().__init__(settings, crawler, client)
-        self._fallback_handler = self._create_handler(
-            settings.get(
-                "ZYTE_API_FALLBACK_HTTPS_HANDLER",
-                settings.getwithbase("DOWNLOAD_HANDLERS")["https"],
-            )
+        self._fallback_handler_path = (
+            settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER")
+            or settings.getdict("DOWNLOAD_HANDLERS_BASE")["https"]
         )

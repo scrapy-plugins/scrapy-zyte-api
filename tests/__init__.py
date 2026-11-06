@@ -5,12 +5,11 @@ from os import environ
 from typing import Any
 from urllib.request import Request
 
-from packaging.version import Version
 from scrapy import Spider
-from scrapy import __version__ as SCRAPY_VERSION
 from scrapy.core.engine import ExecutionEngine
 from scrapy.crawler import Crawler
-from scrapy.http import Response
+from scrapy.http import Response, TextResponse
+from scrapy.settings.default_settings import DOWNLOAD_HANDLERS_BASE
 from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler as _get_crawler
 from zyte_api import AsyncZyteAPI
@@ -19,7 +18,6 @@ from scrapy_zyte_api.addon import Addon
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
-    _POET_ADDON_SUPPORT,
     _REACTORLESS_SUPPORT,
     _ensure_awaitable,
     maybe_deferred_to_future,
@@ -42,6 +40,9 @@ def _detect_reactorless() -> bool:
 
 
 _REACTORLESS = _detect_reactorless()
+
+# Scrapy 2.20+ detects encodings with frostwork.
+_SCRAPY_FROSTWORK = hasattr(TextResponse, "meta_refresh")
 
 if _REACTORLESS:
     import pytest
@@ -85,31 +86,34 @@ SETTINGS: SETTINGS_T = {
     "ZYTE_API_RETRY_POLICY": "tests._retry.POLICY",
     "ZYTE_API_SESSION_RETRY_POLICY": "tests._retry.SESSION_POLICY",
 }
-if Version(SCRAPY_VERSION) < Version("2.12"):
-    SETTINGS["REQUEST_FINGERPRINTER_IMPLEMENTATION"] = (
-        "2.7"  # Silence deprecation warning
-    )
-
-# The HTTP(S) handler used as a fallback when a request is not sent through
-# Zyte API. Without a Twisted reactor the default Twisted-based handler cannot
-# be used, so we rely on the asyncio-based httpx handler instead.
-_HTTPX_HANDLER = "scrapy.core.downloader.handlers._httpx.HttpxDownloadHandler"
 
 if _REACTORLESS:
+    from scrapy.utils.test import get_reactor_settings
+
     # A reactor must not be requested when running without one.
     del SETTINGS["TWISTED_REACTOR"]
     SETTINGS["TWISTED_REACTOR_ENABLED"] = False
 
-try:
-    from scrapy_poet import InjectionMiddleware
-except ImportError:
-    pass
+    # Download handlers that Scrapy uses without a reactor, which depend on the
+    # Scrapy version.
+    _REACTORLESS_HANDLERS: dict[str, Any] = get_reactor_settings()["DOWNLOAD_HANDLERS"]
+    _FALLBACK_HANDLER_CLS = load_object(_REACTORLESS_HANDLERS["https"])
+    # Keep the other handlers that scrapy.utils.test.get_crawler() sets, as
+    # the add-on does.
+    SETTINGS["DOWNLOAD_HANDLERS"] = {
+        **_REACTORLESS_HANDLERS,
+        **SETTINGS["DOWNLOAD_HANDLERS"],
+    }
 else:
-    assert isinstance(SETTINGS["DOWNLOADER_MIDDLEWARES"], dict)
+    _REACTORLESS_HANDLERS = {}
+    _FALLBACK_HANDLER_CLS = load_object(DOWNLOAD_HANDLERS_BASE["https"])
 
-    if not _POET_ADDON_SUPPORT:
-        SETTINGS["DOWNLOADER_MIDDLEWARES"][InjectionMiddleware] = 543
-
+try:
+    import scrapy_poet  # noqa: F401
+except ImportError:
+    _POET_INSTALLED = False
+else:
+    _POET_INSTALLED = True
     SETTINGS["SCRAPY_POET_PROVIDERS"] = {
         "scrapy_zyte_api.providers.ZyteApiProvider": 1100
     }
@@ -125,12 +129,6 @@ SETTINGS_ADDON: SETTINGS_T = {
 }
 if _REACTORLESS:
     SETTINGS_ADDON["TWISTED_REACTOR_ENABLED"] = False
-    # Make the addon capture an asyncio-compatible fallback handler instead of
-    # the default Twisted-based one.
-    SETTINGS_ADDON["DOWNLOAD_HANDLERS"] = {
-        "http": _HTTPX_HANDLER,
-        "https": _HTTPX_HANDLER,
-    }
 
 SESSION_SETTINGS: SETTINGS_T = {
     "ZYTE_API_SESSION_CREATION_RETRY_DELAY": 0,
@@ -156,7 +154,7 @@ async def get_crawler(
     settings = settings or {}
     base_settings: SETTINGS_T = deepcopy(SETTINGS if not use_addon else SETTINGS_ADDON)
     final_settings = {**base_settings, **settings}
-    if poet and _POET_ADDON_SUPPORT:
+    if poet and _POET_INSTALLED:
         final_settings.setdefault("ADDONS", {})["scrapy_poet.Addon"] = 300
     crawler = _get_crawler(settings_dict=final_settings, spidercls=spider_cls)
     if setup_engine:
@@ -245,7 +243,7 @@ async def setup_crawler_engine(crawler: Crawler, start_handler: bool = False) ->
     if hasattr(crawler, "_create_engine"):  # Scrapy < 2.20
         crawler.engine = crawler._create_engine()
     else:
-        crawler.engine = ExecutionEngine(crawler)  # type: ignore[call-arg]
+        crawler.engine = ExecutionEngine(crawler)
 
     if start_handler:
         handler = get_download_handler(crawler, "https")

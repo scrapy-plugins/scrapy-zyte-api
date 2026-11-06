@@ -11,7 +11,7 @@ from scrapy_zyte_api import (
     ScrapyZyteAPISpiderMiddleware,
 )
 
-from .utils import _POET_ADDON_SUPPORT, _reactor_enabled
+from .utils import _reactor_enabled
 
 
 def _setdefault(settings, setting, cls, pos):
@@ -38,20 +38,15 @@ class Addon:
             REQUEST_FINGERPRINTER_CLASS as _SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS,
         )
 
-        # Read the current values of the settings and store them in the fallback settings,
-        # unless those fallback settings are already set.
-        if not settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER"):
-            settings.set(
-                "ZYTE_API_FALLBACK_HTTP_HANDLER",
-                settings.getwithbase("DOWNLOAD_HANDLERS")["http"],
-                "addon",
-            )
-        if not settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER"):
-            settings.set(
-                "ZYTE_API_FALLBACK_HTTPS_HANDLER",
-                settings.getwithbase("DOWNLOAD_HANDLERS")["https"],
-                "addon",
-            )
+        # Store user-defined HTTP(S) download handlers in the fallback
+        # settings, unless those fallback settings are already set. Scrapy
+        # defaults are left for the handlers to resolve, because without a
+        # reactor Scrapy only sets them after add-ons run.
+        download_handlers = settings.getdict("DOWNLOAD_HANDLERS")
+        for scheme in ("http", "https"):
+            setting = f"ZYTE_API_FALLBACK_{scheme.upper()}_HANDLER"
+            if not settings.get(setting) and download_handlers.get(scheme):
+                settings.set(setting, download_handlers[scheme], "addon")
         if not settings.get("ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS") and (
             load_object(settings.get("REQUEST_FINGERPRINTER_CLASS"))
             is not load_object(_SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS)
@@ -107,15 +102,10 @@ class Addon:
         settings.set("ZYTE_API_TRANSPARENT_MODE", True, "addon")
 
         try:
-            from scrapy_poet import InjectionMiddleware  # noqa: PLC0415
+            import scrapy_poet  # noqa: F401, PLC0415
         except ImportError:
             pass
         else:
             from scrapy_zyte_api.providers import ZyteApiProvider  # noqa: PLC0415
-
-            if not _POET_ADDON_SUPPORT:
-                _setdefault(
-                    settings, "DOWNLOADER_MIDDLEWARES", InjectionMiddleware, 543
-                )
 
             _setdefault(settings, "SCRAPY_POET_PROVIDERS", ZyteApiProvider, 1100)

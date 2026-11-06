@@ -18,16 +18,16 @@ from scrapy.crawler import Crawler
 from scrapy.downloadermiddlewares.retry import get_retry_request
 from scrapy.exceptions import CloseSpider, IgnoreRequest, ScrapyDeprecationWarning
 from scrapy.http import Response
+from scrapy.http.request import NO_CALLBACK
 from scrapy.settings import BaseSettings
 from scrapy.utils.httpobj import urlparse_cached
-from scrapy.utils.misc import load_object
+from scrapy.utils.misc import build_from_crawler, load_object
 from tenacity import stop_after_attempt
 from zyte_api import AggressiveRetryFactory, RequestError, RetryFactory, stop_on_count
 from zyte_api import aggressive_retrying as _aggressive_retrying
 from zyte_api import zyte_api_retrying as _zyte_api_retrying
 
 from .utils import (  # type: ignore[attr-defined]
-    _build_from_crawler,
     _close_spider,
     _ensure_awaitable,
     deferred_to_future,
@@ -98,14 +98,6 @@ except ImportError:
 
     class DummyResponse:  # type: ignore[no-redef]
         pass
-
-
-try:
-    from scrapy.http.request import NO_CALLBACK
-except ImportError:
-
-    def NO_CALLBACK(response):  # type: ignore[misc]
-        pass  # pragma: no cover
 
 
 class PoolError(ValueError):
@@ -180,7 +172,7 @@ class SessionConfig:
 
         checker_cls = settings.get("ZYTE_API_SESSION_CHECKER", None)
         if checker_cls:
-            self._checker = _build_from_crawler(load_object(checker_cls), crawler)
+            self._checker = build_from_crawler(load_object(checker_cls), crawler)
         else:
             self._checker = None
         self._enabled = crawler.settings.getbool("ZYTE_API_SESSION_ENABLED", False)
@@ -959,7 +951,7 @@ class _SessionManager:
         except KeyError:
             cls = session_config_registry.session_config_cls(request)
             if cls not in self._session_config_map:
-                self._session_config_map[cls] = _build_from_crawler(cls, self._crawler)
+                self._session_config_map[cls] = build_from_crawler(cls, self._crawler)
             self._session_config_cache[request] = self._session_config_map[cls]
             return self._session_config_map[cls]
 

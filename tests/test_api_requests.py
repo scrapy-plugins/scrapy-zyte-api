@@ -32,7 +32,6 @@ from scrapy_zyte_api._params import (
 from scrapy_zyte_api.handler import _ScrapyZyteAPIBaseDownloadHandler
 from scrapy_zyte_api.responses import _process_response
 from scrapy_zyte_api.utils import (
-    _ADDON_SUPPORT,
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     maybe_deferred_to_future,
 )
@@ -153,7 +152,7 @@ async def request_to_params(
         param_sets.append(params)
 
     crawler = await get_crawler(
-        settings, spider_cls=TestSpider, setup_engine=False, use_addon=_ADDON_SUPPORT
+        settings, spider_cls=TestSpider, setup_engine=False, use_addon=True
     )
     crawler.signals.connect(track_params, signal=params_signal)
     await maybe_deferred_to_future(crawler.crawl())
@@ -302,7 +301,7 @@ async def test_coro_handling(zyte_api: bool, mockserver):
             TypeError,
             (
                 "Got an error when processing Zyte API request "
-                "(http://example.com): Object of type Request is not JSON "
+                "(http://example.com/): Object of type Request is not JSON "
                 "serializable"
             ),
         ),
@@ -312,7 +311,7 @@ async def test_coro_handling(zyte_api: bool, mockserver):
             (
                 "Got Zyte API error (status=422, type='/request/unprocessable'"
                 ", request_id='abcd1234') while processing URL "
-                "(http://example.com): Incompatible parameters were found in "
+                "(http://example.com/): Incompatible parameters were found in "
                 "the request."
             ),
         ),
@@ -327,7 +326,7 @@ async def test_exceptions(
 ):
     caplog.set_level("DEBUG")
     async with mockserver.make_handler() as handler:
-        req = Request("http://example.com", method="POST", meta=meta)
+        req = Request("http://example.com/", method="POST", meta=meta)
         with pytest.raises(exception_type):
             await download_request(handler, req)
         assert exception_text in caplog.text
