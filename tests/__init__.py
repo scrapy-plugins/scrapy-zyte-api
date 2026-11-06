@@ -8,7 +8,7 @@ from urllib.request import Request
 from scrapy import Spider
 from scrapy.core.engine import ExecutionEngine
 from scrapy.crawler import Crawler
-from scrapy.http import Response
+from scrapy.http import Response, TextResponse
 from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler as _get_crawler
 from zyte_api import AsyncZyteAPI
@@ -39,6 +39,9 @@ def _detect_reactorless() -> bool:
 
 
 _REACTORLESS = _detect_reactorless()
+
+# Scrapy 2.20+ detects encodings with frostwork.
+_SCRAPY_FROSTWORK = hasattr(TextResponse, "meta_refresh")
 
 if _REACTORLESS:
     import pytest

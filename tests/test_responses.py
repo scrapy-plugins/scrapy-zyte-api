@@ -23,6 +23,8 @@ from scrapy_zyte_api.responses import (
 )
 from scrapy_zyte_api.responses import _process_response as _unwrapped_process_response
 
+from . import _SCRAPY_FROSTWORK
+
 PAGE_CONTENT = "<html><body>The cake is a lie!</body></html>"
 PAGE_CONTENT_2 = "<html><body>Ceci n’est pas une pipe</body></html>"
 URL = "https://example.com"
@@ -428,10 +430,6 @@ def test__process_response_body_and_headers(encoding, content_type):
     assert resp.css("h1 ::text").get() == "World!✨"
     assert resp.xpath("//body/text()").getall() == ["Hello"]
     assert resp.encoding == resolve_encoding(content_type.split("charset=")[1])
-
-
-# Scrapy 2.20+ detects encodings with frostwork.
-_SCRAPY_FROSTWORK = hasattr(TextResponse, "meta_refresh")
 
 
 @pytest.mark.parametrize(

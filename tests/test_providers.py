@@ -64,7 +64,7 @@ from scrapy_zyte_api.providers import (
 )
 from scrapy_zyte_api.utils import maybe_deferred_to_future
 
-from . import _REACTORLESS, SETTINGS, deferred_f_from_coro_f
+from . import _REACTORLESS, _SCRAPY_FROSTWORK, SETTINGS, deferred_f_from_coro_f
 from .mockserver import get_ephemeral_port
 
 if not _REACTORLESS:
@@ -817,6 +817,29 @@ async def test_provider_any_response_http_response_param(mockserver):
 
 
 @deferred_f_from_coro_f
+async def test_provider_any_response_binary(mockserver):
+    @attrs.define
+    class SomePage(BasePage):
+        response: AnyResponse
+
+    class TestSpider(ZyteAPISpider):
+        def parse_(self, response: DummyResponse, page: SomePage):  # type: ignore[override]
+            yield {"page": page}
+
+    settings = provider_settings(mockserver)
+    settings["ZYTE_API_PROVIDER_PARAMS"] = {
+        "httpResponseBody": True,
+        "customHttpRequestHeaders": [{"name": "Accept", "value": "image/png"}],
+    }
+    item, _, _ = await _crawl_single_item(TestSpider, HtmlResource, settings)
+
+    response = item["page"].response.response
+    assert type(response) is HttpResponse
+    assert response.body == b"\x89PNG\r\n\x1a\n"
+    assert response._encoding is None
+
+
+@deferred_f_from_coro_f
 async def test_provider_any_response_browser_html_param(mockserver):
     @attrs.define
     class SomePage(BasePage):
@@ -1183,7 +1206,7 @@ async def test_provider_any_response_preextract_selectors(mockserver, monkeypatc
     assert len(calls) == 1
     response, classes, html_metadata = calls[0]
     assert response is item["page"].response.response
-    assert response._encoding == "utf-8"
+    assert response._encoding == ("utf-8" if _SCRAPY_FROSTWORK else "cp1252")
     assert SomePage in classes
     assert html_metadata is not None
 

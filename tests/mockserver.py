@@ -228,6 +228,8 @@ class DefaultResource(Resource):
                 accept = None
             if accept == "application/octet-stream":
                 body = b64encode(b"\x00").decode()
+            elif accept == "image/png":
+                body = b64encode(b"\x89PNG\r\n\x1a\n").decode()
             else:
                 body = b64encode(html.encode()).decode()
             response_data["httpResponseBody"] = body
