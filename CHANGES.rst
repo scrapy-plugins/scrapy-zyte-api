@@ -1,7 +1,7 @@
 Changes
 =======
 
-0.37.0 (unreleased)
+0.37.0 (2026-11-06)
 -------------------
 
 -   Dropped support for Python 3.10, and added support for Python 3.14 and
