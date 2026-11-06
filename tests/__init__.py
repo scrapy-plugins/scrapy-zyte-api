@@ -9,6 +9,7 @@ from scrapy import Spider
 from scrapy.core.engine import ExecutionEngine
 from scrapy.crawler import Crawler
 from scrapy.http import Response, TextResponse
+from scrapy.settings.default_settings import DOWNLOAD_HANDLERS_BASE
 from scrapy.utils.misc import load_object
 from scrapy.utils.test import get_crawler as _get_crawler
 from zyte_api import AsyncZyteAPI
@@ -86,15 +87,26 @@ SETTINGS: SETTINGS_T = {
     "ZYTE_API_SESSION_RETRY_POLICY": "tests._retry.SESSION_POLICY",
 }
 
-# The HTTP(S) handler used as a fallback when a request is not sent through
-# Zyte API. Without a Twisted reactor the default Twisted-based handler cannot
-# be used, so we rely on the asyncio-based httpx handler instead.
-_HTTPX_HANDLER = "scrapy.core.downloader.handlers._httpx.HttpxDownloadHandler"
-
 if _REACTORLESS:
+    from scrapy.utils.test import get_reactor_settings
+
     # A reactor must not be requested when running without one.
     del SETTINGS["TWISTED_REACTOR"]
     SETTINGS["TWISTED_REACTOR_ENABLED"] = False
+
+    # Download handlers that Scrapy uses without a reactor, which depend on the
+    # Scrapy version.
+    _REACTORLESS_HANDLERS: dict[str, Any] = get_reactor_settings()["DOWNLOAD_HANDLERS"]
+    _FALLBACK_HANDLER_CLS = load_object(_REACTORLESS_HANDLERS["https"])
+    # Keep the other handlers that scrapy.utils.test.get_crawler() sets, as
+    # the add-on does.
+    SETTINGS["DOWNLOAD_HANDLERS"] = {
+        **_REACTORLESS_HANDLERS,
+        **SETTINGS["DOWNLOAD_HANDLERS"],
+    }
+else:
+    _REACTORLESS_HANDLERS = {}
+    _FALLBACK_HANDLER_CLS = load_object(DOWNLOAD_HANDLERS_BASE["https"])
 
 try:
     import scrapy_poet  # noqa: F401
@@ -117,12 +129,6 @@ SETTINGS_ADDON: SETTINGS_T = {
 }
 if _REACTORLESS:
     SETTINGS_ADDON["TWISTED_REACTOR_ENABLED"] = False
-    # Make the addon capture an asyncio-compatible fallback handler instead of
-    # the default Twisted-based one.
-    SETTINGS_ADDON["DOWNLOAD_HANDLERS"] = {
-        "http": _HTTPX_HANDLER,
-        "https": _HTTPX_HANDLER,
-    }
 
 SESSION_SETTINGS: SETTINGS_T = {
     "ZYTE_API_SESSION_CREATION_RETRY_DELAY": 0,

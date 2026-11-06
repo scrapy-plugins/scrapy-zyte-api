@@ -151,15 +151,12 @@ See :ref:`request-automatic`.
 ZYTE_API_FALLBACK_HTTP_HANDLER
 ==============================
 
-Default: :setting:`DOWNLOAD_HANDLERS["http"] <scrapy:DOWNLOAD_HANDLERS>` (see below)
+Default: :setting:`DOWNLOAD_HANDLERS_BASE["http"] <scrapy:DOWNLOAD_HANDLERS_BASE>`
 
 Download handler to use for HTTP requests that do not go through Zyte API.
 
-When using the combined :class:`~scrapy_zyte_api.ScrapyZyteAPIDownloadHandler`
-(see :ref:`config-components`), which replaces the ``http`` entry of
-:setting:`DOWNLOAD_HANDLERS <scrapy:DOWNLOAD_HANDLERS>` and therefore cannot
-default to it, leaving this setting unset uses the default Scrapy download
-handler instead.
+If you set :setting:`DOWNLOAD_HANDLERS["http"] <scrapy:DOWNLOAD_HANDLERS>`, the
+:ref:`add-on <config-addon>` uses it as the default of this setting.
 
 
 .. setting:: ZYTE_API_FALLBACK_HTTPS_HANDLER
@@ -167,15 +164,12 @@ handler instead.
 ZYTE_API_FALLBACK_HTTPS_HANDLER
 ===============================
 
-Default: :setting:`DOWNLOAD_HANDLERS["https"] <scrapy:DOWNLOAD_HANDLERS>` (see below)
+Default: :setting:`DOWNLOAD_HANDLERS_BASE["https"] <scrapy:DOWNLOAD_HANDLERS_BASE>`
 
 Download handler to use for HTTPS requests that do not go through Zyte API.
 
-When using the combined :class:`~scrapy_zyte_api.ScrapyZyteAPIDownloadHandler`
-(see :ref:`config-components`), which replaces the ``https`` entry of
-:setting:`DOWNLOAD_HANDLERS <scrapy:DOWNLOAD_HANDLERS>` and therefore cannot
-default to it, leaving this setting unset uses the default Scrapy download
-handler instead.
+If you set :setting:`DOWNLOAD_HANDLERS["https"] <scrapy:DOWNLOAD_HANDLERS>`,
+the :ref:`add-on <config-addon>` uses it as the default of this setting.
 
 
 .. setting:: ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS

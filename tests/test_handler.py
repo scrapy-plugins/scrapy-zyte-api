@@ -10,7 +10,6 @@ from unittest import mock
 
 import pytest
 from scrapy import Request, Spider
-from scrapy.core.downloader.handlers.http11 import HTTP11DownloadHandler
 from scrapy.exceptions import NotConfigured
 from scrapy.settings import Settings
 from scrapy.utils.misc import build_from_crawler
@@ -20,21 +19,23 @@ from zyte_api.constants import API_URL
 
 from scrapy_zyte_api.handler import (
     ScrapyZyteAPIDownloadHandler,
+    ScrapyZyteAPIHTTPDownloadHandler,
+    ScrapyZyteAPIHTTPSDownloadHandler,
     _body_max_size_exceeded,
 )
 from scrapy_zyte_api.responses import ZyteAPITextResponse
-from scrapy_zyte_api.utils import (
+from scrapy_zyte_api.utils import (  # type: ignore[attr-defined]
     _DOWNLOAD_REQUEST_RETURNS_DEFERRED,
     _REACTORLESS_SUPPORT,
     _X402_SUPPORT,
     USER_AGENT,
+    _ensure_awaitable,
     maybe_deferred_to_future,
 )
 
 from . import (
-    _HTTPX_HANDLER,
+    _FALLBACK_HANDLER_CLS,
     _POET_INSTALLED,
-    _REACTORLESS,
     DEFAULT_CLIENT_CONCURRENCY,
     SETTINGS,
     SETTINGS_T,
@@ -47,14 +48,6 @@ from . import (
 )
 from . import get_crawler as get_crawler_zyte_api
 from .mockserver import MockServer
-
-_EXPECTED_FALLBACK_HANDLER: type
-if _REACTORLESS:
-    from scrapy.core.downloader.handlers._httpx import HttpxDownloadHandler
-
-    _EXPECTED_FALLBACK_HANDLER = HttpxDownloadHandler
-else:
-    _EXPECTED_FALLBACK_HANDLER = HTTP11DownloadHandler
 
 
 @pytest.mark.parametrize(
@@ -725,12 +718,13 @@ class _DummyFallbackHandler:
 
 @deferred_f_from_coro_f
 async def test_fallback_setting():
-    crawler = await get_crawler_zyte_api(settings=SETTINGS)
+    crawler = await get_crawler_zyte_api(settings=SETTINGS, start_handler=True)
     handler = get_download_handler(crawler, "https")
     assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
     for scheme in ("http", "https"):
         fallback = handler._get_fallback_handler(Request(f"{scheme}://example.com"))
-        assert isinstance(fallback, _EXPECTED_FALLBACK_HANDLER)
+        assert isinstance(fallback, _FALLBACK_HANDLER_CLS)
+    await _ensure_awaitable(handler.close())
 
 
 @deferred_f_from_coro_f
@@ -741,14 +735,15 @@ async def test_fallback_setting_custom():
         **SETTINGS,
         "ZYTE_API_FALLBACK_HTTP_HANDLER": "tests.test_handler._DummyFallbackHandler",
     }
-    crawler = await get_crawler_zyte_api(settings=settings)
+    crawler = await get_crawler_zyte_api(settings=settings, start_handler=True)
     handler = get_download_handler(crawler, "https")
     assert isinstance(handler, ScrapyZyteAPIDownloadHandler)
     http_fallback = handler._get_fallback_handler(Request("http://example.com"))
     assert isinstance(http_fallback, _DummyFallbackHandler)
     # HTTPS was not overridden, so it keeps the default.
     https_fallback = handler._get_fallback_handler(Request("https://example.com"))
-    assert isinstance(https_fallback, _EXPECTED_FALLBACK_HANDLER)
+    assert isinstance(https_fallback, _FALLBACK_HANDLER_CLS)
+    await _ensure_awaitable(handler.close())
 
 
 class _NoCloseFallbackHandler:
@@ -793,15 +788,24 @@ async def test_close_fallback_without_close():
 @deferred_f_from_coro_f
 async def test_reactorless():
     """Without a Twisted reactor (TWISTED_REACTOR_ENABLED=False) the handler
-    does not verify the installed reactor and falls back to the asyncio-based
-    httpx handler."""
+    does not verify the installed reactor and falls back to the handlers that
+    Scrapy sets in DOWNLOAD_HANDLERS_BASE for that mode."""
     crawler = get_crawler()
     settings = Settings({**SETTINGS, "TWISTED_REACTOR_ENABLED": False})
     settings["TWISTED_REACTOR"] = None
+    handler_path = "scrapy.core.downloader.handlers._aiohttp.AiohttpDownloadHandler"
+    settings["DOWNLOAD_HANDLERS_BASE"].update(
+        {"http": handler_path, "https": handler_path}
+    )
     handler = ScrapyZyteAPIDownloadHandler(settings, crawler)
     assert handler._reactor_enabled is False
-    assert handler._fallback_handler_paths["http"] == _HTTPX_HANDLER
-    assert handler._fallback_handler_paths["https"] == _HTTPX_HANDLER
+    assert handler._fallback_handler_paths["http"] == handler_path
+    assert handler._fallback_handler_paths["https"] == handler_path
+    for handler_cls in (
+        ScrapyZyteAPIHTTPDownloadHandler,
+        ScrapyZyteAPIHTTPSDownloadHandler,
+    ):
+        assert handler_cls(settings, crawler)._fallback_handler_path == handler_path
 
 
 @pytest.mark.parametrize(

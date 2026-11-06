@@ -38,20 +38,15 @@ class Addon:
             REQUEST_FINGERPRINTER_CLASS as _SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS,
         )
 
-        # Read the current values of the settings and store them in the fallback settings,
-        # unless those fallback settings are already set.
-        if not settings.get("ZYTE_API_FALLBACK_HTTP_HANDLER"):
-            settings.set(
-                "ZYTE_API_FALLBACK_HTTP_HANDLER",
-                settings.getwithbase("DOWNLOAD_HANDLERS")["http"],
-                "addon",
-            )
-        if not settings.get("ZYTE_API_FALLBACK_HTTPS_HANDLER"):
-            settings.set(
-                "ZYTE_API_FALLBACK_HTTPS_HANDLER",
-                settings.getwithbase("DOWNLOAD_HANDLERS")["https"],
-                "addon",
-            )
+        # Store user-defined HTTP(S) download handlers in the fallback
+        # settings, unless those fallback settings are already set. Scrapy
+        # defaults are left for the handlers to resolve, because without a
+        # reactor Scrapy only sets them after add-ons run.
+        download_handlers = settings.getdict("DOWNLOAD_HANDLERS")
+        for scheme in ("http", "https"):
+            setting = f"ZYTE_API_FALLBACK_{scheme.upper()}_HANDLER"
+            if not settings.get(setting) and download_handlers.get(scheme):
+                settings.set(setting, download_handlers[scheme], "addon")
         if not settings.get("ZYTE_API_FALLBACK_REQUEST_FINGERPRINTER_CLASS") and (
             load_object(settings.get("REQUEST_FINGERPRINTER_CLASS"))
             is not load_object(_SCRAPY_DEFAULT_REQUEST_FINGEPRINTER_CLASS)
