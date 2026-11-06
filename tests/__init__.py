@@ -234,7 +234,7 @@ async def setup_crawler_engine(crawler: Crawler, start_handler: bool = False) ->
     if hasattr(crawler, "_create_engine"):  # Scrapy < 2.20
         crawler.engine = crawler._create_engine()
     else:
-        crawler.engine = ExecutionEngine(crawler)  # type: ignore[call-arg]
+        crawler.engine = ExecutionEngine(crawler)
 
     if start_handler:
         handler = get_download_handler(crawler, "https")

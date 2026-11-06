@@ -324,7 +324,7 @@ class _ScrapyZyteAPIBaseDownloadHandler:
             # not set, we do not set download_latency, as it would cause
             # AutoThrottle to adjust the download delay of the request slot,
             # and we do not want AutoThrottle to do that for Zyte API slots
-            # since Zyte API already handles throtling.
+            # since Zyte API already handles throttling.
             if not self._autothrottle_is_enabled or request.meta.get(
                 "autothrottle_dont_adjust_delay", False
             ):

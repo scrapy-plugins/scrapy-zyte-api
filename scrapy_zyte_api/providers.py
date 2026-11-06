@@ -8,6 +8,7 @@ from andi.typeutils import is_typing_annotated, strip_annotated
 from scrapy import Request
 from scrapy.crawler import Crawler
 from scrapy.http import TextResponse
+from scrapy.http.request import NO_CALLBACK
 from scrapy_poet import PageObjectInputProvider
 from web_poet import (
     AnyResponse,
@@ -125,13 +126,6 @@ if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
 
     from scrapy_zyte_api.responses import ZyteAPITextResponse
-
-try:
-    # requires Scrapy >= 2.8
-    from scrapy.http.request import NO_CALLBACK
-except ImportError:
-    NO_CALLBACK = None  # type: ignore[assignment]
-
 
 _ITEM_KEYWORDS: dict[type, str] = {
     Product: "product",

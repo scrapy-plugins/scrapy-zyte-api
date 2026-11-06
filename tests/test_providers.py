@@ -1183,6 +1183,7 @@ async def test_provider_any_response_preextract_selectors(mockserver, monkeypatc
     assert len(calls) == 1
     response, classes, html_metadata = calls[0]
     assert response is item["page"].response.response
+    assert response._encoding == "utf-8"
     assert SomePage in classes
     assert html_metadata is not None
 
