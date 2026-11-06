@@ -54,9 +54,9 @@ def pytest_configure(config):
 
         install_reactor_import_hook()
 
-        # The httpx-based download handler, used as a fallback when running
-        # without a reactor, logs a warning about being experimental every time
-        # it is instantiated. Silence it so that it does not interfere with
+        # The asyncio-based download handlers, used as a fallback when running
+        # without a reactor, log a warning about being experimental every time
+        # they are instantiated. Silence it so that it does not interfere with
         # tests that inspect logging output.
         logging.getLogger("scrapy.core.downloader.handlers._base_streaming").setLevel(
             logging.ERROR

@@ -20,7 +20,7 @@ You need at least:
 
 -   Python 3.11+
 
--   Scrapy 2.7.0+
+-   Scrapy 2.13.3+
 
 
 .. _install:
@@ -59,8 +59,8 @@ Configuration
 =============
 
 To configure scrapy-zyte-api, :ref:`set up authentication <auth>` and either
-:ref:`enable the add-on <config-addon>` (Scrapy ≥ 2.10) or :ref:`configure all
-components separately <config-components>`.
+:ref:`enable the add-on <config-addon>` or :ref:`configure all components
+separately <config-components>`.
 
 .. warning:: :ref:`reactor-change`.
 
@@ -103,9 +103,8 @@ To use `x402 <https://www.x402.org/>`__ instead, see :ref:`x402`.
 Enabling the add-on
 -------------------
 
-If you are using Scrapy 2.10 or higher, you can set up scrapy-zyte-api
-integration using the following :ref:`add-on <topics-addons>` with any
-priority:
+You can set up scrapy-zyte-api integration using the following :ref:`add-on
+<topics-addons>` with any priority:
 
 .. code-block:: python
     :caption: settings.py

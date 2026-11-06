@@ -5,7 +5,7 @@ from base64 import b64decode
 from copy import copy
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from scrapy.http import HtmlResponse, Response, TextResponse, XmlResponse
+from scrapy.http import HtmlResponse, JsonResponse, Response, TextResponse, XmlResponse
 from scrapy.responsetypes import responsetypes
 
 if TYPE_CHECKING:
@@ -149,16 +149,8 @@ class ZyteAPIXmlResponse(ZyteAPIMixin, XmlResponse):
     pass
 
 
-try:
-    from scrapy.http import JsonResponse as _JsonResponse
-
-    class ZyteAPIJsonResponse(ZyteAPIMixin, _JsonResponse):
-        pass
-
-    _SCRAPY_JSON_CLS: type | None = _JsonResponse
-except ImportError:
-    ZyteAPIJsonResponse = None  # type: ignore[assignment, misc]
-    _SCRAPY_JSON_CLS = None
+class ZyteAPIJsonResponse(ZyteAPIMixin, JsonResponse):
+    pass
 
 
 class ZyteAPIResponse(ZyteAPIMixin, Response):
@@ -172,10 +164,9 @@ _JSON: TypeAlias = (
 _API_RESPONSE: TypeAlias = dict[str, _JSON]
 
 _SCRAPY_TO_ZYTE_RESPONSE: dict[type[TextResponse], type[ZyteAPIMixin]] = {
+    JsonResponse: ZyteAPIJsonResponse,
     XmlResponse: ZyteAPIXmlResponse,
 }
-if _SCRAPY_JSON_CLS is not None and ZyteAPIJsonResponse is not None:
-    _SCRAPY_TO_ZYTE_RESPONSE[_SCRAPY_JSON_CLS] = ZyteAPIJsonResponse
 
 
 def _process_response(
