@@ -109,6 +109,7 @@ async def test_addon_fallback_custom():
     assert isinstance(handler, ScrapyZyteAPIHTTPDownloadHandler)
     fallback = handler._get_fallback_handler(Request("http://example.com"))
     assert isinstance(fallback, DummyDownloadHandler)
+    assert handler._get_fallback_handler(Request("http://example.com")) is fallback
 
 
 @deferred_f_from_coro_f

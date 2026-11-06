@@ -558,10 +558,15 @@ async def test_slot_request_spider():
 
 
 @deferred_f_from_coro_f
-async def test_process_start_requests_items():
-    """Items yielded by start_requests() are yielded back untouched."""
+async def test_process_start_requests():
+    """Scrapy 2.13–2.15 call process_start_requests() instead of
+    process_start() if another spider middleware only defines the former. It
+    flags start requests and yields items back untouched."""
     crawler = get_crawler()
     await maybe_deferred_to_future(crawler.crawl("a"))
     middleware = build_from_crawler(ScrapyZyteAPISpiderMiddleware, crawler)
+    request = Request("https://example.com")
     item = Item()
-    assert list(middleware.process_start_requests([item], crawler.spider)) == [item]
+    output = list(middleware.process_start_requests([request, item], crawler.spider))
+    assert output == [request, item]
+    assert request.meta["is_start_request"] is True

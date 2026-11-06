@@ -1,6 +1,5 @@
 import asyncio
 import inspect
-import sys
 from collections.abc import Coroutine
 from importlib.metadata import version
 from typing import Any
@@ -9,6 +8,7 @@ import scrapy
 from packaging.version import Version
 from scrapy.utils.defer import deferred_to_future, maybe_deferred_to_future
 from scrapy.utils.reactor import is_asyncio_reactor_installed
+from scrapy.utils.reactor import is_reactor_installed as _is_reactor_installed
 from twisted.internet.defer import Deferred
 from zyte_api.utils import USER_AGENT as PYTHON_ZYTE_API_USER_AGENT
 
@@ -36,14 +36,6 @@ except ImportError:
     _X402_SUPPORT = False
 else:
     _X402_SUPPORT = True
-
-
-try:
-    from scrapy.utils.reactor import is_reactor_installed as _is_reactor_installed
-except ImportError:  # Scrapy < 2.14
-
-    def _is_reactor_installed() -> bool:
-        return "twisted.internet.reactor" in sys.modules
 
 
 try:
