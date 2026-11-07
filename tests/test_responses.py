@@ -699,3 +699,23 @@ def test__process_response_binary():
     response = _process_response(api_response, Request(URL))
     assert type(response) is ZyteAPIResponse
     assert response.body == body
+
+
+@pytest.mark.parametrize("content_encoding", ["br", "deflate", "gzip"])
+def test__process_response_content_encoding(content_encoding):
+    """Content-Encoding, which Zyte API keeps although the body is already
+    decoded, does not make Content-Type be ignored when choosing the response
+    class, so a page with a control character is still a text response."""
+    body = b"<html><head><title>a\x02b</title></head><body><h1>c</h1></body></html>"
+    api_response: _API_RESPONSE = {
+        "url": URL,
+        "httpResponseBody": b64encode(body).decode(),
+        "httpResponseHeaders": [
+            {"name": "Content-Type", "value": "text/html; charset=utf-8"},
+            {"name": "Content-Encoding", "value": content_encoding},
+        ],
+    }
+    response = _process_response(api_response, Request(URL))
+    assert type(response) is ZyteAPITextResponse
+    assert b"Content-Encoding" not in response.headers
+    assert response.css("h1::text").get() == "c"
